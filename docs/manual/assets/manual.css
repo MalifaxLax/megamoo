@@ -1,0 +1,122 @@
+/* MegaMOO Developer Manual — print stylesheet (weasyprint) */
+
+@page {
+  size: letter;
+  margin: 0.9in 0.9in 0.85in 0.9in;
+  @bottom-center {
+    content: "MegaMOO Developer Manual";
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font-size: 8pt;
+    color: #9aa0a6;
+  }
+  @bottom-right {
+    content: counter(page);
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font-size: 8pt;
+    color: #9aa0a6;
+  }
+}
+
+html { font-size: 11pt; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.5;
+  color: #1b1f24;
+  max-width: none;
+  margin: 0;
+}
+
+h1, h2, h3, h4 {
+  font-weight: 600;
+  line-height: 1.25;
+  color: #0b1b34;
+  page-break-after: avoid;
+}
+
+h1 {
+  font-size: 21pt;
+  margin: 0 0 0.5em;
+  padding-bottom: 0.25em;
+  border-bottom: 2px solid #2563eb;
+}
+
+h2 {
+  font-size: 15pt;
+  margin: 1.4em 0 0.5em;
+  padding-bottom: 0.18em;
+  border-bottom: 1px solid #d8dee4;
+}
+
+h3 { font-size: 12.5pt; margin: 1.15em 0 0.4em; }
+h4 { font-size: 11pt; margin: 1em 0 0.35em; color: #324158; }
+
+p { margin: 0.55em 0; }
+
+a { color: #2563eb; text-decoration: none; }
+
+code {
+  font-family: "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
+  font-size: 9.2pt;
+  background: #f2f3f5;
+  padding: 0.08em 0.35em;
+  border-radius: 3px;
+}
+
+pre {
+  background: #f6f8fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+  padding: 0.7em 0.9em;
+  font-size: 8.8pt;
+  line-height: 1.42;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  page-break-inside: avoid;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+blockquote {
+  margin: 0.7em 0;
+  padding: 0.4em 0.9em;
+  border-left: 3px solid #2563eb;
+  background: #f3f6fc;
+  color: #36414f;
+}
+blockquote p { margin: 0.3em 0; }
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.7em 0;
+  font-size: 9pt;
+  page-break-inside: avoid;
+}
+
+th, td {
+  border: 1px solid #d8dee4;
+  padding: 0.32em 0.55em;
+  text-align: left;
+  vertical-align: top;
+}
+
+th { background: #eef1f5; font-weight: 600; }
+tr:nth-child(even) td { background: #fafbfc; }
+
+ul, ol { margin: 0.5em 0; padding-left: 1.5em; }
+li { margin: 0.2em 0; }
+
+hr {
+  border: none;
+  border-top: 1px solid #e1e4e8;
+  margin: 1.4em 0;
+}
+
+/* Page break between concatenated chapters in the combined PDF */
+.page-break { page-break-before: always; }

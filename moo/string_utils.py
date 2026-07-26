@@ -1,0 +1,685 @@
+"""
+String Utilities for MegaMOO
+
+This module provides the core text-substitution and formatting engine used
+throughout the MegaMOO server.  It handles three major areas:
+
+1. **Emit Substitution (esub)** -- Replaces placeholder tokens in message
+   strings with object names.  This is the primary mechanism verbs use to
+   build contextual output, e.g. ``"%S attacks %d!"`` becomes
+   ``"Gandalf attacks the orc!"``.
+
+2. **Pronoun Substitution (psub1 / psub2)** -- Resolves gendered pronoun
+   tokens (``%EPS``, ``%OPO``, etc.) against one or two game objects,
+   allowing gender-correct prose like ``"He draws his sword"`` or
+   ``"They ready their staff"``.
+
+3. **List / Formatting Helpers** -- Converts Python lists into
+   human-readable English phrases, numbered menus, or columnar layouts
+   suitable for display in a text-based MUD/MOO client.
+
+Architecture
+------------
+The module exposes a single **module-level singleton** ``su``, which is the
+idiomatic way to access all utilities::
+
+    from moo.string_utils import su
+
+    text = su.esub("You attack %d!", sub=player, dob=target)
+    text = su.psub1("%CN draws %EPP sword.", eobj=player)
+    english = su.listtoenglish(["a sword", "a shield", "a helm"])
+
+This mirrors the Evennia convention of providing a lightweight, stateless
+utility object that can be imported anywhere without circular-dependency
+issues.
+
+Token Reference
+---------------
+Emit tokens (esub):
+    %s / %S   -- subject name / cname (capitalised display name)
+    %d / %D   -- direct-object name / cname
+    %i / %I   -- indirect-object name / cname
+    %u / %U   -- noun string (from uob) / capitalised noun
+    %ps/%po/%pp/%pa/%pr -- gender pronouns resolved from the subject
+
+Enactor pronoun tokens (psub1):
+    %N / %CN             -- enactor name / cname
+    %EPS / %EPO / %EPP / %EPR  -- enactor pronouns (subject/object/possessive/reflexive)
+    %CEPS / %CEPO / %CEPP / %CEPR  -- capitalised enactor pronouns
+
+Target pronoun tokens (psub2, in addition to psub1):
+    %T / %CT             -- target name / cname
+    %OPS / %OPO / %OPP / %OPR  -- target pronouns
+    %COPS / %COPO / %COPP / %COPR  -- capitalised target pronouns
+
+Ported from the Evennia StringUtils module.
+
+Copyright (c) 2026
+License: MIT
+"""
+
+from textwrap import fill as wfill
+from .globals import GENDER_PRONOUN_MAP, RE_GENDER_PRONOUN
+
+
+# ============================================================================
+# HELPER FUNCTIONS -- safe property access and pronoun lookup
+# ============================================================================
+
+def _getprop(obj, name, default=None):
+    """
+    Safely retrieve an attribute from a MegaMOO object.
+
+    This wrapper exists because game objects may be in partially-initialised
+    states (e.g. during database load) or may not have the requested
+    attribute at all.  Rather than raising ``AttributeError``, we silently
+    fall back to *default*.
+
+    Args:
+        obj:     The game object to inspect.
+        name:    Attribute name to look up (e.g. ``'name'``, ``'cname'``).
+        default: Value to return when the attribute is missing or ``None``.
+
+    Returns:
+        The attribute value, or *default* if the attribute is absent,
+        ``None``, or an exception occurs during access.
+    """
+    try:
+        val = getattr(obj, name, None)
+        return val if val is not None else default
+    except Exception:
+        return default
+
+
+def _pronoun_map(obj):
+    """
+    Return the pronoun dictionary for *obj* based on its ``gender`` property.
+
+    Looks up ``obj.gender`` in the global ``GENDER_PRONOUN_MAP`` defined in
+    ``moo.globals``.  If the gender is missing, ``None``, or not a
+    recognised key, the ``'ambiguous'`` pronoun set is used (typically
+    they/them/their).
+
+    The returned dict maps short codes to pronoun strings::
+
+        {'ps': 'he', 'po': 'him', 'pp': 'his', 'pa': 'his', 'pr': 'himself'}
+
+    Args:
+        obj: A MegaMOO game object with an optional ``gender`` property.
+
+    Returns:
+        dict: A mapping of pronoun-type codes (``ps``, ``po``, ``pp``,
+        ``pa``, ``pr``) to the appropriate pronoun strings for this
+        object's gender.
+    """
+    gender = _getprop(obj, 'gender', 'ambiguous')
+    if gender not in GENDER_PRONOUN_MAP:
+        gender = 'ambiguous'
+    return GENDER_PRONOUN_MAP[gender]
+
+
+# ============================================================================
+# STRING UTILS CLASS
+# ============================================================================
+
+class StringUtils:
+    """
+    Stateless utility class providing text substitution and formatting for
+    the MegaMOO server.
+
+    All methods are pure functions that operate on their arguments and
+    produce string output; no internal state is maintained between calls.
+    A single module-level instance (``su``) is created at import time and
+    used throughout the server.
+
+    The class is organised into four sections:
+
+    1. **Gender pronoun helpers** -- low-level regex callbacks for pronoun
+       resolution.
+    2. **Emit substitution** -- the ``esub()`` method used by the message
+       system to build contextual output strings.
+    3. **Pronoun substitution** -- ``psub1()`` / ``psub2()`` and their
+       ``*a`` variants for one- or two-actor pronoun replacement.
+    4. **Output formatting** -- list-to-English, menus, columns, and
+       word-wrapping utilities.
+    """
+
+    # ----------------------------------------------------------------
+    # Gender pronoun helpers
+    # ----------------------------------------------------------------
+
+    def get_pronoun(self, regex_match, source=None):
+        """
+        Regex callback that resolves a pronoun token to a gendered string.
+
+        This method is designed to be passed as the *repl* argument to
+        ``re.sub`` (via a lambda).  It reads the matched token (e.g.
+        ``%ps``, ``%PO``), looks up the corresponding pronoun in the
+        source object's gender map, and returns the correctly-cased
+        result.
+
+        Capitalisation rule:
+            If the *second* character of the token is uppercase (e.g.
+            ``%Ps`` or ``%PO``), the returned pronoun is capitalised.
+            Otherwise it is returned in lowercase.
+
+        Args:
+            regex_match: A ``re.Match`` object from ``RE_GENDER_PRONOUN``.
+                         The full match is expected to be a string like
+                         ``%ps``, ``%Po``, ``%PP``, etc.
+            source:      The game object whose gender determines which
+                         pronoun set to use.  If ``None``, the raw token
+                         is returned unchanged.
+
+        Returns:
+            str: The resolved pronoun string, e.g. ``"he"``, ``"Her"``,
+            ``"their"``.
+        """
+        matched = regex_match.group()       # e.g. "%ps", "%PO"
+        typ = matched[1:].lower()           # e.g. "ps", "po"
+        pmap = _pronoun_map(source)
+        pronoun = pmap.get(typ, matched)
+        # Capitalise if the first letter after '%' was uppercase
+        return pronoun.capitalize() if matched[1].isupper() else pronoun
+
+    # ----------------------------------------------------------------
+    # Emit substitution (used by msg / notify)
+    # ----------------------------------------------------------------
+
+    def esub(self, text, sub=None, dob=None, iob=None, uob=None, svals=None):
+        """
+        Emit substitution -- replace placeholder tokens in *text* with
+        object names and pronouns.
+
+        This is the workhorse method for building contextual game output.
+        Verb code passes a template string and the relevant objects, and
+        ``esub`` returns the final display text.
+
+        Token replacement order:
+            0. ``%0`` / ``%1`` ... ``%N`` -- raw strings from *svals*
+               (each ``sN`` kwarg fills the matching ``%N`` token).
+            1. ``%u`` / ``%U`` -- noun from *uob* (if provided).
+            2. Gender pronouns (``%ps``, ``%po``, etc.) -- resolved from
+               *sub*'s gender.
+            3. ``%s`` / ``%S`` -- subject name / cname from *sub*.
+            4. ``%d`` / ``%D`` -- direct-object name / cname from *dob*.
+            5. ``%i`` / ``%I`` -- indirect-object name / cname from *iob*.
+
+        The order matters: gender-pronoun tokens are processed *before*
+        ``%s``/``%S`` so that a ``%s`` inside a pronoun token does not
+        cause a premature replacement.
+
+        Args:
+            text (str): The template string containing tokens to replace.
+                If ``None`` or not a string, it is returned unchanged.
+            sub (MOOObject, optional):  Subject object. Used for ``%s``,
+                ``%S``, and all gender-pronoun tokens.
+            dob (MOOObject, optional):  Direct object. Used for ``%d``
+                and ``%D``.
+            iob (MOOObject, optional):  Indirect object. Used for ``%i``
+                and ``%I``.
+            uob (MOOObject, optional):  Noun object. ``%u`` and ``%U``
+                are replaced with its ``noun`` property.
+            svals (dict, optional):  Raw-string slots keyed ``'s0'``,
+                ``'s1'``, ... -- each replaces the matching ``%N``/``$N``
+                token verbatim (no object lookup; the kwarg keeps its ``s``
+                prefix, the token drops it -- ``s1`` fills ``%1``).  Unlike
+                %d/%i, the value is used as-is, so this is the way to splice
+                plain strings.
+
+        Returns:
+            str: Text with all recognised tokens replaced. Unrecognised
+            tokens are left in place.
+
+        Examples::
+
+            su.esub("You attack %d!", sub=player, dob=orc)
+            # => "You attack the orc!"
+
+            su.esub("%S picks up %d.", sub=player, dob=sword)
+            # => "Gandalf picks up the sword."
+
+            su.esub("%S says '%1'.", sub=player, svals={'s1': 'Hi!'})
+            # => "Gandalf says 'Hi!'."  (s1 kwarg fills the %1 token)
+        """
+        if not text or not isinstance(text, str):
+            return text
+
+        # --- Raw-string slots: %0 / %1 ... / %N (also $0 / $1 ... / $N) ---
+        # Each `sN` value (passed straight as a kwarg, e.g. s0="txt0") replaces
+        # the matching %N/$N token verbatim -- the kwarg keeps its `s` prefix,
+        # the token drops it (s0 -> %0).  Higher indices first so `%1` can't
+        # clobber `%10`.
+        if svals:
+            for _k in sorted(svals,
+                             key=lambda n: int(n[1:]) if n[1:].isdigit() else 0,
+                             reverse=True):
+                _idx = _k[1:]                 # 's3' -> '3'
+                _rep = '' if svals[_k] is None else str(svals[_k])
+                text = text.replace('%' + _idx, _rep).replace('$' + _idx, _rep)
+
+        # --- Noun object (uob) tokens: %u / %U / $u / $U ---
+        if uob is not None:
+            noun = _getprop(uob, 'noun', '')
+            cap_noun = noun[:1].upper() + noun[1:] if noun else ''
+            text = text.replace('%U', cap_noun).replace('$U', cap_noun)
+            text = text.replace('%u', noun).replace('$u', noun)
+
+        # --- Subject tokens: gender pronouns first, then %s / %S / $s / $S ---
+        if sub is not None:
+            # Replace gender pronouns (%ps, %po, etc.) via regex
+            text = RE_GENDER_PRONOUN.sub(
+                lambda m: self.get_pronoun(m, source=sub), text
+            )
+            sname = _getprop(sub, 'name', '')
+            scname = _getprop(sub, 'cname', sname)
+            text = text.replace('%s', sname).replace('$s', sname)
+            text = text.replace('%S', scname).replace('$S', scname)
+
+        # --- Direct object tokens: %d / %D / $d / $D ---
+        if dob is not None:
+            dname = _getprop(dob, 'name', '')
+            dcname = _getprop(dob, 'cname', dname)
+            text = text.replace('%d', dname).replace('$d', dname)
+            text = text.replace('%D', dcname).replace('$D', dcname)
+
+        # --- Indirect object tokens: %i / %I / $i / $I ---
+        if iob is not None:
+            iname = _getprop(iob, 'name', '')
+            icname = _getprop(iob, 'cname', iname)
+            text = text.replace('%i', iname).replace('$i', iname)
+            text = text.replace('%I', icname).replace('$I', icname)
+
+        return text
+
+    # ----------------------------------------------------------------
+    # Pronoun substitution (single enactor)
+    # ----------------------------------------------------------------
+
+    def psub1(self, tstr, eobj=None):
+        """
+        Single-enactor pronoun substitution.
+
+        Replaces name and pronoun tokens in *tstr* using *eobj* (the
+        enactor -- typically the player performing an action).
+
+        Supported tokens::
+
+            %N   -> eobj.name          %CN  -> eobj.cname
+            %EPS -> he/she/they         %CEPS -> He/She/They
+            %EPO -> him/her/them        %CEPO -> Him/Her/Them
+            %EPP -> his/her/their       %CEPP -> His/Her/Their
+            %EPR -> himself/herself     %CEPR -> Himself/Herself
+
+        The ``%E``-prefixed tokens use the enactor's gender to select the
+        correct pronoun.  ``%CE``-prefixed tokens are the capitalised
+        variants.
+
+        Replacement order:
+            Reflexive (``%EPR``) is replaced before possessive (``%EPP``)
+            before objective (``%EPO``) before subjective (``%EPS``).
+            This prevents shorter tokens from matching inside longer ones
+            (e.g. ``%EPS`` matching the start of ``%EPSOMETHING``).
+
+        Args:
+            tstr (str): Template string with pronoun tokens.
+            eobj (MOOObject, optional): The enactor object. If ``None``,
+                the string is returned unchanged.
+
+        Returns:
+            str: Text with all enactor tokens replaced.
+
+        Example::
+
+            su.psub1("%CN draws %EPP sword.", eobj=player)
+            # Male:    "Aragorn draws his sword."
+            # Female:  "Arwen draws her sword."
+            # Neutral: "Golem draws its sword."
+        """
+        if eobj is None:
+            return tstr
+        pmap = _pronoun_map(eobj)
+
+        # Replace name tokens
+        pstr = tstr.replace('%N', _getprop(eobj, 'name', ''))
+        pstr = pstr.replace('%CN', _getprop(eobj, 'cname', _getprop(eobj, 'name', '')))
+
+        # Replace lowercase enactor pronouns (%EPS, %EPO, %EPP, %EPR)
+        # Only scan if '%E' is present (fast-path optimisation)
+        if '%E' in pstr:
+            # Order: longest tokens first to prevent partial matches
+            pstr = pstr.replace('%EPR', pmap.get('pr', 'itself'))
+            pstr = pstr.replace('%EPP', pmap.get('pp', 'its'))
+            pstr = pstr.replace('%EPO', pmap.get('po', 'it'))
+            pstr = pstr.replace('%EPS', pmap.get('ps', 'it'))
+
+        # Replace capitalised enactor pronouns (%CEPS, %CEPO, %CEPP, %CEPR)
+        if '%CE' in pstr:
+            pstr = pstr.replace('%CEPR', pmap.get('pr', 'itself').capitalize())
+            pstr = pstr.replace('%CEPP', pmap.get('pp', 'its').capitalize())
+            pstr = pstr.replace('%CEPO', pmap.get('po', 'it').capitalize())
+            pstr = pstr.replace('%CEPS', pmap.get('ps', 'it').capitalize())
+        return pstr
+
+    def psub1a(self, tstr, eobj=None, s1='', s2='', s3=''):
+        """
+        Single-enactor pronoun substitution with positional arguments.
+
+        Extends :meth:`psub1` by also replacing ``%1``, ``%2``, and
+        ``%3`` with the supplied string arguments.  This is useful for
+        verbs that need to insert arbitrary text alongside pronoun-
+        resolved output.
+
+        Args:
+            tstr (str): Template string.
+            eobj (MOOObject, optional): The enactor object.
+            s1 (str): Replacement for ``%1``.
+            s2 (str): Replacement for ``%2``.
+            s3 (str): Replacement for ``%3``.
+
+        Returns:
+            str: Fully substituted text.
+
+        Example::
+
+            su.psub1a("%CN says '%1' to %2.", eobj=player,
+                      s1="Hello!", s2="the crowd")
+            # => "Gandalf says 'Hello!' to the crowd."
+        """
+        pstr = self.psub1(tstr, eobj)
+        if s1:
+            pstr = pstr.replace('%1', s1)
+        if s2:
+            pstr = pstr.replace('%2', s2)
+        if s3:
+            pstr = pstr.replace('%3', s3)
+        return pstr
+
+    # ----------------------------------------------------------------
+    # Pronoun substitution (enactor + target)
+    # ----------------------------------------------------------------
+
+    def psub2(self, tstr, eobj=None, tobj=None):
+        """
+        Two-actor pronoun substitution (enactor + target).
+
+        First applies :meth:`psub1` for the enactor, then replaces
+        target-specific tokens using *tobj*.
+
+        Additional target tokens::
+
+            %T   -> tobj.name          %CT  -> tobj.cname
+            %OPS -> he/she/they         %COPS -> He/She/They
+            %OPO -> him/her/them        %COPO -> Him/Her/Them
+            %OPP -> his/her/their       %COPP -> His/Her/Their
+            %OPR -> himself/herself     %COPR -> Himself/Herself
+
+        The ``%O``-prefixed tokens use the **target's** gender, while
+        ``%E``-prefixed tokens (handled by psub1) use the **enactor's**
+        gender.
+
+        Args:
+            tstr (str): Template string with enactor and target tokens.
+            eobj (MOOObject, optional): The enactor (acting) object.
+            tobj (MOOObject, optional): The target object. If ``None``,
+                target tokens are left unresolved.
+
+        Returns:
+            str: Fully substituted text.
+
+        Example::
+
+            su.psub2("%CN attacks %T and hits %OPO!", eobj=player, tobj=orc)
+            # => "Gandalf attacks the orc and hits it!"
+        """
+        # First pass: resolve enactor tokens
+        pstr = self.psub1(tstr, eobj)
+        if tobj is None:
+            return pstr
+
+        tmap = _pronoun_map(tobj)
+
+        # Replace target name tokens
+        pstr = pstr.replace('%T', _getprop(tobj, 'name', ''))
+        pstr = pstr.replace('%CT', _getprop(tobj, 'cname', _getprop(tobj, 'name', '')))
+
+        # Replace lowercase target pronouns (%OPS, %OPO, %OPP, %OPR)
+        if '%O' in pstr:
+            pstr = pstr.replace('%OPR', tmap.get('pr', 'itself'))
+            pstr = pstr.replace('%OPP', tmap.get('pp', 'its'))
+            pstr = pstr.replace('%OPO', tmap.get('po', 'it'))
+            pstr = pstr.replace('%OPS', tmap.get('ps', 'it'))
+
+        # Replace capitalised target pronouns (%COPS, %COPO, %COPP, %COPR)
+        if '%CO' in pstr:
+            pstr = pstr.replace('%COPR', tmap.get('pr', 'itself').capitalize())
+            pstr = pstr.replace('%COPP', tmap.get('pp', 'its').capitalize())
+            pstr = pstr.replace('%COPO', tmap.get('po', 'it').capitalize())
+            pstr = pstr.replace('%COPS', tmap.get('ps', 'it').capitalize())
+        return pstr
+
+    def psub2a(self, tstr, eobj=None, tobj=None, s1='', s2='', s3=''):
+        """
+        Two-actor pronoun substitution with positional arguments.
+
+        Extends :meth:`psub2` by also replacing ``%1``, ``%2``, and
+        ``%3`` with the supplied string arguments.
+
+        Args:
+            tstr (str): Template string.
+            eobj (MOOObject, optional): The enactor object.
+            tobj (MOOObject, optional): The target object.
+            s1 (str): Replacement for ``%1``.
+            s2 (str): Replacement for ``%2``.
+            s3 (str): Replacement for ``%3``.
+
+        Returns:
+            str: Fully substituted text.
+
+        Example::
+
+            su.psub2a("%CN gives %1 to %T.", eobj=player, tobj=npc,
+                      s1="a golden ring")
+            # => "Frodo gives a golden ring to Samwise."
+        """
+        pstr = self.psub2(tstr, eobj, tobj)
+        if s1:
+            pstr = pstr.replace('%1', s1)
+        if s2:
+            pstr = pstr.replace('%2', s2)
+        if s3:
+            pstr = pstr.replace('%3', s3)
+        return pstr
+
+    # ----------------------------------------------------------------
+    # Output formatting helpers
+    # ----------------------------------------------------------------
+
+    def msg_list(self, string, targ_list, exclude=None):
+        """
+        Send a message string to every object in a target list.
+
+        This is a convenience wrapper around the ``notify`` builtin that
+        handles iteration and exclusion.  Commonly used for room-wide
+        messages where the acting player should be excluded.
+
+        Args:
+            string (str): The message text to send.
+            targ_list (list): List of MOOObject instances to notify.
+            exclude (MOOObject or list, optional): Object(s) to skip.
+                Can be a single object or a list.  ``None`` means
+                no exclusions.
+
+        Example::
+
+            su.msg_list("Gandalf leaves north.", room.contents, exclude=player)
+        """
+        if not isinstance(exclude, list):
+            exclude = [exclude] if exclude else []
+        from .builtins import notify
+        for obj in targ_list:
+            if obj not in exclude:
+                notify(obj, string)
+
+    def listtoenglish(self, targlist):
+        """
+        Join a list of strings into a natural English phrase.
+
+        Uses commas for three or more items, ``'and'`` before the last
+        item, and no Oxford comma (matching MOO convention).
+
+        Args:
+            targlist (list of str): The strings to join.
+
+        Returns:
+            str: A human-readable phrase, or an empty string for an
+            empty list.
+
+        Examples::
+
+            su.listtoenglish(["a sword"])
+            # => "a sword"
+
+            su.listtoenglish(["a sword", "a shield"])
+            # => "a sword and a shield"
+
+            su.listtoenglish(["a sword", "a shield", "a helm"])
+            # => "a sword, a shield and a helm"
+        """
+        length = len(targlist)
+        if length > 2:
+            return ', '.join(targlist[:-1]) + ' and ' + targlist[-1]
+        elif length == 2:
+            return ' and '.join(targlist)
+        elif length == 1:
+            return targlist[0]
+        return ''
+
+    def tlisttoenglish(self, targlist):
+        """
+        Join a list of game objects into an English phrase using their names.
+
+        Like :meth:`listtoenglish` but extracts ``obj.name`` from each
+        element first.  ``None`` entries in the list are silently skipped.
+
+        Args:
+            targlist (list of MOOObject): Objects whose names to join.
+
+        Returns:
+            str: A human-readable phrase of object names.
+
+        Example::
+
+            su.tlisttoenglish([sword_obj, shield_obj])
+            # => "a sword and a shield"
+        """
+        names = [obj.name for obj in targlist if obj]
+        return self.listtoenglish(names)
+
+    def listtomenu(self, itemlist, prefix=''):
+        """
+        Format a list of strings as a numbered menu for display.
+
+        Each item is numbered starting from 1, right-justified to 2
+        digits, with the first letter capitalised.  Lines after the
+        first are separated by newlines.
+
+        Args:
+            itemlist (list of str): Menu items. Empty/falsy entries are
+                skipped.
+            prefix (str, optional): String prepended before each line
+                number (e.g. spaces for indentation).
+
+        Returns:
+            str: The formatted menu as a single string.
+
+        Example::
+
+            su.listtomenu(["pick up sword", "look around", "go north"])
+            # =>  " 1. Pick up sword"
+            # => "\\n 2. Look around"
+            # => "\\n 3. Go north"
+        """
+        menu = ""
+        for ind, elem in enumerate(itemlist):
+            if not elem:
+                continue
+            # Capitalise the first letter of the item
+            rname = elem[0].upper() + elem[1:]
+            line = "{0}{1}{2}. {3}"
+            if ind:
+                # Prepend newline for all items after the first
+                line = line.format('\n', prefix, str(ind + 1).rjust(2), rname)
+            else:
+                line = line.format('', prefix, str(ind + 1).rjust(2), rname)
+            menu += line
+        return menu
+
+    def columnize(self, itemlist):
+        """
+        Format a list as two side-by-side numbered columns.
+
+        The list is split in half; the first half becomes the left
+        column and the second half the right column.  Each entry is
+        numbered sequentially and left-justified to 20 characters.
+
+        If the list has an odd number of items, a blank entry is
+        appended to balance the columns.
+
+        Args:
+            itemlist (list of str): Items to arrange in columns.
+
+        Returns:
+            list of str: Lines of the two-column display, ready to be
+            joined with newlines.
+
+        Example::
+
+            su.columnize(["sword", "shield", "helm", "boots"])
+            # => [" 1. sword             3. helm",
+            #     " 2. shield             4. boots"]
+        """
+        listlen = len(itemlist)
+        # Build numbered labels: " 1.", " 2.", etc.
+        nums = [f'{str(num).rjust(2)}.' for num in range(1, listlen + 1)]
+        slist = [f'{nums[i]} {item}' for i, item in enumerate(itemlist)]
+        # Pad to even length so both columns have equal rows
+        if listlen % 2:
+            slist.append('')
+        # Split into left and right halves
+        ind = int(listlen / 2 + .5)
+        slist1 = slist[:ind]
+        slist2 = slist[ind:]
+        # Pair each left entry with its right-column counterpart
+        return [f'{s.ljust(20)} {slist2[i]}' for i, s in enumerate(slist1)]
+
+    def wrapstringlist(self, stringlist, width=79):
+        """
+        Word-wrap each string in a list and join with newlines.
+
+        Uses Python's ``textwrap.fill`` for wrapping.  If any error
+        occurs during wrapping (e.g. non-string elements), an empty
+        string is returned.
+
+        Args:
+            stringlist (list of str): Lines to wrap.
+            width (int, optional): Maximum line width. Defaults to 79,
+                which is the traditional MUD terminal width.
+
+        Returns:
+            str: The wrapped and joined text, with leading/trailing
+            whitespace stripped.
+        """
+        try:
+            return '\n'.join([wfill(line, width) for line in stringlist]).strip()
+        except Exception:
+            return ''
+
+
+# ============================================================================
+# MODULE-LEVEL SINGLETON
+# ============================================================================
+
+# The canonical way to use StringUtils throughout MegaMOO.
+# Import as: ``from moo.string_utils import su``
+su = StringUtils()

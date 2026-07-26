@@ -1,0 +1,10 @@
+/* Merchant Setup Guide — standalone override of the manual print stylesheet.
+   Reuses manual.css wholesale, only retitling the running footer. */
+
+@import url("manual.css");
+
+@page {
+  @bottom-center {
+    content: "MegaMOO — Merchant Setup Guide";
+  }
+}

@@ -1,0 +1,23 @@
+# Databases
+# mm.db is the shipped starter database, so it is tracked (negated below).
+# Any other *.db is a developer's own world and stays out of the repo.
+*.db
+*.db-shm
+*.db-wal
+*.db.bak-*
+!mm.db
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# IDE/tools
+.claude/
+.agents/

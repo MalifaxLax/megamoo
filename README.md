@@ -1,0 +1,175 @@
+# MegaMOO
+
+A modern, from-scratch Python reimplementation of the [LambdaMOO](https://en.wikipedia.org/wiki/LambdaMOO) server — a persistent, multiplayer, fully programmable text world. Roughly 75,000 lines of Python built on `asyncio`, with **zero required third-party dependencies**: the core engine runs on the standard library alone.
+
+Where classic MOO servers make you program in a purpose-built MOO language, MegaMOO's in-world programming language is **Python itself**. Every verb — from `look` to your own game systems — is a plain Python file with the full standard library available, executed live against a persistent object database.
+
+## Highlights
+
+- **Async-first network core** — `asyncio` event loop serving Telnet and WebSocket simultaneously, with classic MUD protocol negotiation (MXP clickable links, GMCP, MSDP, MSSP) and ANSI-aware word wrapping that measures *visible* width, not byte width.
+- **Python as the MOO language** — verbs are Python source with a lightweight preprocessor: `#42` resolves to object 42, `$utils` to a system object. Full stdlib, native dicts/lists in properties, no DSL to learn.
+- **Live programming** — create and edit verbs from inside the game (`@adverb`, in-game eval) or as files on disk; a JSON-over-TCP API (off by default, localhost-only) supports external editors and tooling.
+- **SQLite persistence** — WAL-mode journal for crash recovery, normalized schema, lazy LRU object cache with automatic fallback, periodic checkpointing, ACID transactions.
+- **Hierarchical object model** — LambdaMOO-style single-parent inheritance with a flattened ancestor cache and cascading invalidation, so property lookups stay O(1) even in deep trees.
+- **A real command parser** — articles, ordinals (`get 2nd sword`), adjective–noun matching, possessives, prepositions, and switch syntax (`look/brief`), with separate matching modes for players and staff.
+- **Timed effects system** — tick-driven buffs, debuffs, damage-over-time and status conditions, persisted with the database and surviving restarts.
+- **Task scheduling** — every verb runs inside a managed task with time limits, suspension (`suspend(5)` resumes automatically), and fork-bomb protection.
+- **Emit substitution engine** — gender-aware message tokens (`%S jumps over %d`) render correctly for every observer: actor, target, and room each see properly conjugated, properly pronouned text.
+- **Accessibility as a first-class concern** — a per-player screenreader mode strips ANSI color and decoration from all output; server-side wrapping can be disabled for clients that reflow text themselves. See [Accessibility](#accessibility).
+
+## Quick start
+
+Requires Python 3.10+. No `pip install` needed for the core server.
+
+```
+python3 megamoo.py <database> [port]      # default port 7777
+telnet localhost 7777
+```
+
+Optional extras: `bcrypt` for stronger password hashing (salted SHA-256 fallback is built in), `websockets` for browser clients.
+
+> **Note:** the repository does not ship a starter world database; the server initializes its schema against a new database, but a packaged minimal core (rooms, character generation, base classes) is on the roadmap. See [Status](#status).
+
+## Architecture
+
+| Subsystem | Module | What it does |
+|---|---|---|
+| Server core | `moo/server.py` | Event loop, single-threaded verb execution via a one-worker executor, context propagation, graceful shutdown/restart |
+| Networking | `moo/network.py` | Telnet/WebSocket connections, protocol negotiation, color and wrapping |
+| Database | `moo/database.py` | SQLite persistence, object cache, checkpointing |
+| Object model | `moo/objects.py` | Inheritance, properties as native Python attributes, flags, tags |
+| Parser | `moo/parser.py` | Command → verb/direct-object/preposition/indirect-object resolution |
+| Verbs | `moo/verbs.py` | Verb compilation, preprocessing, caching, dispatch |
+| Matching | `moo/match_utils.py` | `pmatch`/`bmatch` natural-language object matching |
+| Tasks | `moo/tasks.py` | Time-limited execution, suspend/fork, scheduling |
+| Effects | `moo/effects.py` | Tick-driven buffs/debuffs with persistence |
+| Permissions | `moo/permissions.py` | Wizard/programmer/owner hierarchy, quotas |
+| Builtins | `moo/builtins.py` | The function library injected into every verb's namespace |
+
+Game content lives in `moo verbs/<object-number>/<verb-name>.py` — 200+ verb files covering player commands, staff/building tools (66 `@`-commands), character generation, and the edibles/liquids and merchant systems.
+
+## What a verb looks like
+
+`moo verbs/17/jump.py` — the `jump` command available in every IC room:
+
+```python
+"""
+Jump across a gap or obstacle.
+
+Usage: jump <exit>
+"""
+
+if not args:
+    pobj.msg("Jump what?")
+    return
+
+# RT check
+if (getattr(pobj, 'rt', None) or 0) > 0:
+    pobj.msg("You must wait.")
+    return
+
+pos = getattr(pobj, 'position', 0) or 0
+if pos:
+    pobj.msg("You can't do that in your current position.")
+    return
+
+# Match exit in room contents
+exit = pmatch(dobj, pobj, list(pobj.location.contents))
+if not exit or not getattr(exit, 'is_exit', False):
+    pobj.msg("Jump what?")
+    return
+
+if getattr(exit, 'jumpable', False):
+    call_verb(exit, 'invoke')
+elif getattr(exit, 'climbable', False):
+    pobj.msg("You have to climb that!")
+else:
+    pobj.msg("You can't jump that!")
+```
+
+No imports, no boilerplate: the verb namespace arrives pre-loaded with the acting player (`pobj`), parsed arguments (`args`, `dobj`, `iobj`), object matching (`pmatch`), cross-object calls (`call_verb`), and the rest of the builtin library. Objects are matched the way a player thinks — `jump gap`, `jump 2nd rope` — and the verb reads top to bottom like the action it performs.
+
+## Accessibility
+
+MegaMOO is developed by a quadriplegic (C1–C2) programmer using a head-pointer input device at about 30 words per minute, in collaboration with AI pair-programming tools. That vantage point shapes the engine:
+
+- **Screenreader mode** (`screenreader` command) strips all ANSI color and visual decoration from output, per player, persistently.
+- **ANSI-aware wrapping** computes visible text width so escape sequences never break line layout; server-side wrapping can also be disabled entirely (`WRAP_WIDTH = 0`) for screen readers and clients that reflow.
+- Text-native gameplay: everything in the world — movement, building, programming — is fully playable through assistive input at any typing speed, because a MOO rewards thought, not reflexes.
+
+Text worlds were the original accessible online games. MegaMOO treats keeping them that way as part of the engine's job.
+
+## MCP Server (AI Integration)
+
+Claude Code (or any MCP client) can drive the running game directly: execute commands as a TestBot character, inspect and edit live objects and verbs, and read server logs — all without touching the database by hand.
+
+### Architecture
+
+```
+Claude Code ──stdio──> tools/megamoo_mcp.py ──TCP/JSON──> ApiServer (port 7778)
+                         (MCP bridge)                       inside running MegaMOO
+                              │
+                              └──reads──> megamoo.log (works even when server is down)
+```
+
+`tools/megamoo_mcp.py` is a standalone FastMCP bridge. The game server gains no new dependencies.
+
+### One-time setup
+
+```bash
+pip install mcp
+python3 megamoo.py mm.db --api --api-token <token>        # enable the JSON API
+claude mcp add megamoo -e MEGAMOO_API_TOKEN=<token> -- python3 ~/sfdev/tools/megamoo_mcp.py
+```
+
+### Tools (17 total)
+
+**Game tools** — require the server to be running:
+
+| Tool | Description |
+|---|---|
+| `run_command` | Execute a game command as TestBot; returns all output (color stripped) |
+| `disconnect_testbot` | Cleanly unpuppet TestBot via the normal `on_unpuppet` path |
+| `get_object` | Full object info: name, parent, flags, properties, verbs |
+| `get_location` | Object's current location (objnum + name) |
+| `list_contents` | Contents of a room or container (objnum + name pairs) |
+| `list_verbs` | Verb names defined on an object, optionally including inherited |
+| `get_verb` | Source code of a verb |
+| `set_verb` | Write or replace a verb's source code |
+| `delete_verb` | Remove a verb from an object |
+| `list_properties` | Property names defined on an object, optionally including inherited |
+| `get_property` | Value of a single property |
+| `set_property` | Write a property value (any JSON-representable type) |
+| `eval_code` | Evaluate arbitrary Python in the game's verb context |
+| `search_verbs` | Full-text search across all verb source files |
+| `search_objects` | Search objects by name or description |
+
+**Disk tools** — work even when the server is down:
+
+| Tool | Description |
+|---|---|
+| `tail_log` | Last N lines of `megamoo.log`, with optional regex filter |
+| `server_status` | API reachability; if up, includes uptime and player count |
+
+### Notes
+
+- TestBot is auto-created on first `run_command` if no character named TestBot exists under `#5 ICharacter`. To use a specific character instead, set `testbot_objnum` in the API config section before starting the server.
+- The integration test suite (`python3 -m pytest tests/`) boots its own server on ports 7901/7902 against a scratch copy of `mm.db`, so it can run while a dev server is up. Two caveats: the test subprocess appends to the shared repo-root `megamoo.log`, and the `mm.db` snapshot is a plain file copy — if the live server is writing heavily at that moment, the copy could be torn. When in doubt, stop the server or run only the unit tests: `python3 -m pytest tests/ --ignore=tests/test_integration_api.py`.
+- Design spec: [docs/superpowers/specs/2026-06-12-mcp-server-design.md](docs/superpowers/specs/2026-06-12-mcp-server-design.md)
+
+## Status
+
+Active development. The engine runs a private in-progress game world (character generation, building tools, and the accessibility layer are all exercised daily); it has not yet had a public multiplayer deployment. Near-term roadmap:
+
+- Packaged starter database (core classes, chargen, a small starting area)
+- Web client polish on the WebSocket path
+- Documentation for the builtin library and verb-authoring conventions
+
+## Credits
+
+- **LambdaMOO** by Pavel Curtis et al. — the object model, permission system, and the idea that a world should be programmable from the inside.
+- **Evennia** — inspiration for network protocol handling and the tag system.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
