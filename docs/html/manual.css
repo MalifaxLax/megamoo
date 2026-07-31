@@ -1,0 +1,394 @@
+/* MegaMOO manual — shared styles. Light/dark aware, no external assets. */
+
+:root {
+    --bg:        #fbfaf8;
+    --bg-soft:   #f2efe9;
+    --panel:     #ffffff;
+    --ink:       #24211d;
+    --ink-soft:  #5c574f;
+    --ink-faint: #8a8378;
+    --rule:      #e2ddd3;
+    --accent:    #8a5a2b;
+    --accent-lo: #f0e6d8;
+    --code-bg:   #f4f1ea;
+    --warn-bg:   #fdf3e7;
+    --warn-edge: #c8873c;
+    --term-bg:   #211f1c;
+    --term-ink:  #e8e2d6;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg:        #16150f;
+        --bg-soft:   #1e1c17;
+        --panel:     #1c1a15;
+        --ink:       #e8e3d8;
+        --ink-soft:  #b3ac9d;
+        --ink-faint: #837c6e;
+        --rule:      #33302a;
+        --accent:    #d9a066;
+        --accent-lo: #2a241b;
+        --code-bg:   #211f1a;
+        --warn-bg:   #2a2118;
+        --warn-edge: #d9a066;
+        --term-bg:   #0f0e0b;
+        --term-ink:  #e8e2d6;
+    }
+}
+
+:root[data-theme="dark"] {
+    --bg:        #16150f;
+    --bg-soft:   #1e1c17;
+    --panel:     #1c1a15;
+    --ink:       #e8e3d8;
+    --ink-soft:  #b3ac9d;
+    --ink-faint: #837c6e;
+    --rule:      #33302a;
+    --accent:    #d9a066;
+    --accent-lo: #2a241b;
+    --code-bg:   #211f1a;
+    --warn-bg:   #2a2118;
+    --warn-edge: #d9a066;
+    --term-bg:   #0f0e0b;
+    --term-ink:  #e8e2d6;
+}
+
+:root[data-theme="light"] {
+    --bg:        #fbfaf8;
+    --bg-soft:   #f2efe9;
+    --panel:     #ffffff;
+    --ink:       #24211d;
+    --ink-soft:  #5c574f;
+    --ink-faint: #8a8378;
+    --rule:      #e2ddd3;
+    --accent:    #8a5a2b;
+    --accent-lo: #f0e6d8;
+    --code-bg:   #f4f1ea;
+    --warn-bg:   #fdf3e7;
+    --warn-edge: #c8873c;
+    --term-bg:   #211f1c;
+    --term-ink:  #e8e2d6;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter,
+          Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 6rem;
+}
+
+/* ---- masthead ---------------------------------------------------- */
+
+.masthead { margin-bottom: 3rem; }
+
+.wordmark {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: clamp(2.1rem, 7vw, 3rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 .4rem;
+    color: var(--ink);
+}
+.wordmark .moo { color: var(--accent); }
+
+.tagline {
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    margin: 0;
+}
+
+.badges {
+    margin-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+}
+.badge {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .74rem;
+    letter-spacing: .02em;
+    padding: .18rem .55rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    color: var(--ink-faint);
+    background: var(--bg-soft);
+    white-space: nowrap;
+}
+
+/* ---- typography -------------------------------------------------- */
+
+h2 {
+    font-size: 1.45rem;
+    margin: 3rem 0 .5rem;
+    padding-bottom: .4rem;
+    border-bottom: 1px solid var(--rule);
+    letter-spacing: -0.01em;
+}
+h3 {
+    font-size: 1.1rem;
+    margin: 2rem 0 .4rem;
+    letter-spacing: -0.01em;
+}
+p { margin: 0 0 1rem; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+strong { font-weight: 650; }
+
+.lede {
+    font-size: 1.12rem;
+    line-height: 1.6;
+    color: var(--ink);
+}
+
+ul, ol { padding-left: 1.3rem; margin: 0 0 1rem; }
+li { margin-bottom: .4rem; }
+
+code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .875em;
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: .08em .35em;
+    white-space: nowrap;
+}
+
+/* ---- terminal blocks --------------------------------------------- */
+
+.term {
+    background: var(--term-bg);
+    color: var(--term-ink);
+    border-radius: 8px;
+    padding: .9rem 1.1rem;
+    margin: 0 0 1.2rem;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .845rem;
+    line-height: 1.7;
+    border: 1px solid var(--rule);
+}
+.term code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+    color: inherit;
+    white-space: pre;
+}
+.term .p  { color: #7fb069; }              /* prompt $ */
+.term .c  { color: #8a8378; }              /* comment  */
+.term .o  { color: #9ec5e8; }              /* output   */
+
+/* ---- link cards -------------------------------------------------- */
+
+.cards {
+    display: grid;
+    gap: 1rem;
+    margin: 1.5rem 0 0;
+}
+@media (min-width: 40rem) {
+    .cards { grid-template-columns: 1fr 1fr; }
+}
+
+.card {
+    display: block;
+    padding: 1.3rem 1.4rem;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color .15s ease, transform .15s ease;
+}
+a.card:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+}
+.card .kicker {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .72rem;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+}
+.card h3 {
+    margin: .35rem 0 .4rem;
+    font-size: 1.15rem;
+    color: var(--accent);
+}
+.card p {
+    margin: 0;
+    font-size: .93rem;
+    color: var(--ink-soft);
+    line-height: 1.55;
+}
+.card.pending {
+    opacity: .62;
+    border-style: dashed;
+}
+.card.pending h3 { color: var(--ink-soft); }
+
+/* ---- callouts ---------------------------------------------------- */
+
+.note, .warn {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-lo);
+    padding: .85rem 1.1rem;
+    border-radius: 0 6px 6px 0;
+    margin: 0 0 1.2rem;
+    font-size: .95rem;
+}
+.note p:last-child, .warn p:last-child { margin-bottom: 0; }
+.warn {
+    border-left-color: var(--warn-edge);
+    background: var(--warn-bg);
+}
+.note .label, .warn .label {
+    display: block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .72rem;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: .3rem;
+}
+
+/* ---- tables ------------------------------------------------------ */
+
+.tablewrap { overflow-x: auto; margin: 0 0 1.2rem; }
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: .91rem;
+}
+th, td {
+    text-align: left;
+    padding: .5rem .7rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+}
+th {
+    font-size: .74rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    white-space: nowrap;
+}
+td code { white-space: nowrap; }
+
+/* ---- misc -------------------------------------------------------- */
+
+.crumb {
+    font-size: .88rem;
+    color: var(--ink-faint);
+    margin-bottom: 2rem;
+}
+.crumb a { color: var(--ink-soft); }
+
+.footer {
+    margin-top: 4rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--rule);
+    font-size: .85rem;
+    color: var(--ink-faint);
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.next {
+    margin-top: 3rem;
+    padding: 1.1rem 1.3rem;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: var(--bg-soft);
+}
+.next .kicker {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .72rem;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: .3rem;
+}
+.next p { margin: 0; font-size: .95rem; color: var(--ink-soft); }
+
+/* ---- in-page contents + section nav ------------------------------ */
+
+.toc {
+    margin: 2rem 0 1rem;
+    padding: 1.1rem 1.3rem 1.2rem;
+    background: var(--bg-soft);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+}
+.toc .kicker {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .72rem;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: .5rem;
+}
+.toc ol { margin: 0; padding-left: 1.2rem; }
+.toc li { margin-bottom: .25rem; font-size: .94rem; }
+
+/* sequential prev/next between section pages */
+.pagenav {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 3.5rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--rule);
+    flex-wrap: wrap;
+}
+.pagenav a {
+    text-decoration: none;
+    font-size: .93rem;
+    max-width: 48%;
+}
+.pagenav .dir {
+    display: block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .7rem;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: .15rem;
+}
+.pagenav .to-next { margin-left: auto; text-align: right; }
+
+/* compact list of sibling pages, shown on the section hub */
+.pagelist { display: grid; gap: .8rem; margin: 1.5rem 0 0; }
+.pagelist a {
+    display: block;
+    padding: 1rem 1.2rem;
+    border: 1px solid var(--rule);
+    border-radius: 9px;
+    background: var(--panel);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color .15s ease;
+}
+.pagelist a:hover { border-color: var(--accent); }
+.pagelist .n {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .72rem;
+    color: var(--ink-faint);
+}
+.pagelist h3 { margin: .2rem 0 .3rem; font-size: 1.05rem; color: var(--accent); }
+.pagelist p { margin: 0; font-size: .91rem; color: var(--ink-soft); line-height: 1.5; }

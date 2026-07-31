@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MegaMOO — Manual</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+    <h1 class="wordmark">Mega<span class="moo">MOO</span></h1>
+    <p class="tagline">A persistent, multiplayer, fully programmable text world — where the in-world language is Python itself.</p>
+    <div class="badges">
+        <span class="badge">Python 3 · asyncio</span>
+        <span class="badge">zero dependencies</span>
+        <span class="badge">SQLite persistence</span>
+        <span class="badge">Telnet + WebSocket</span>
+    </div>
+</header>
+
+<p class="lede">
+MegaMOO is a scratch-built server in the tradition of
+<a href="https://en.wikipedia.org/wiki/LambdaMOO">LambdaMOO</a>: a single
+long-running process that holds a living world of numbered objects — rooms,
+items, characters, exits — in a persistent SQLite database, and lets many
+players connect to it at once over plain Telnet or WebSocket. It keeps the
+ideas that made MOO worth copying — objects addressed by number, single-parent
+prototype inheritance, a natural-language command parser, and the ability to
+write and rewrite the world's behaviour from inside the world while it runs —
+but it is an original implementation on <code>asyncio</code> with no
+third-party dependencies, not a line-by-line port of the C original. The one
+change that matters most: where a classic MOO makes you program in a
+purpose-built MOO language, every MegaMOO verb — from <code>look</code> to
+<code>@dig</code> — is an ordinary Python file with the full standard library
+available, executed live against the object database. There is no DSL to
+learn and no build step; you edit a verb and the next player to type the
+command runs your new code.
+</p>
+
+<h2>Where to go next</h2>
+
+<div class="cards">
+
+    <a class="card" href="getting-started.html">
+        <span class="kicker">Run it</span>
+        <h3>Getting Started</h3>
+        <p>Copy the starter database and crank it up. Running several worlds
+           side by side, the JSON API, and wiring MegaMOO to an AI assistant
+           over MCP.</p>
+    </a>
+
+    <a class="card" href="developing.html">
+        <span class="kicker">Build in it</span>
+        <h3>Developing &amp; Building</h3>
+        <p>The MOO paradigm, objects and names, the verb parser and custom verb
+           types, live programming with no restart, the auth ladder, and the
+           full staff command reference.</p>
+    </a>
+
+</div>
+
+<div class="footer">
+    <span>MegaMOO developer manual</span>
+    <span>MIT licensed</span>
+</div>
+
+</div>
+</body>
+</html>

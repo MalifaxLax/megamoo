@@ -61,6 +61,7 @@ License: MIT
 import asyncio
 import collections
 import contextvars
+import errno
 import logging
 import os
 import signal
@@ -128,6 +129,48 @@ class ServerState:
         self.restart_with_api = True
 
 
+async def listen_walking_ports(handler, host: str, first_port: int,
+                               scan_limit: int, **kwargs):
+    """
+    Start a TCP listener on the first free port at or above ``first_port``.
+
+    Args:
+        handler:     Connection callback for ``asyncio.start_server``.
+        host (str):  Address to bind.
+        first_port (int): Preferred port -- tried before any other.
+        scan_limit (int): How many consecutive ports to try.  ``1`` pins
+            ``first_port`` exactly, so a conflict raises.  (Named apart
+            from ``start_server``'s own ``limit`` buffer argument, which
+            callers pass through ``**kwargs``.)
+        **kwargs:    Passed through to ``asyncio.start_server``.
+
+    Returns:
+        tuple: ``(server, port)`` -- the listener and the port it won.
+
+    Raises:
+        OSError: If every candidate port was in use.  Any *other* bind
+            error (bad host, permission denied) is raised immediately
+            rather than retried: it would repeat identically on all 50
+            ports and bury the real cause under a scan.
+    """
+    last_error = None
+    for port in range(first_port, min(first_port + scan_limit, 65536)):
+        try:
+            server = await asyncio.start_server(handler, host, port, **kwargs)
+        except OSError as e:
+            if e.errno != errno.EADDRINUSE:
+                raise
+            last_error = e
+            continue
+        return server, port
+
+    tried = (f"port {first_port}" if scan_limit == 1
+             else f"ports {first_port}-"
+                  f"{min(first_port + scan_limit - 1, 65535)}")
+    raise OSError(f"Could not bind {host}: {tried} already in use") \
+        from last_error
+
+
 # ============================================================
 # MAIN SERVER
 # ============================================================
@@ -164,6 +207,10 @@ class MegaMOOServer:
             connections, restart requested, etc.).
         loop (asyncio.AbstractEventLoop | None): The asyncio event loop.
             Set by ``run_server()`` after loop creation.
+        port (int | None): The telnet port actually bound, which may not
+            be ``config.network.port`` when that was taken and auto-port
+            selection moved the listener.  ``None`` until ``start()``
+            opens the listener.
         ticker_handler (TickerHandler): Manages periodic verb calls
             registered via the ``ticker`` builtin.  Created during
             ``start()``.
@@ -194,6 +241,9 @@ class MegaMOOServer:
         self.verb_executor = VerbExecutor(database)
         self.state = ServerState()
         self.loop: Optional[asyncio.AbstractEventLoop] = None
+        # The port the telnet listener actually bound; see start().  Only
+        # meaningful once the listener is up, hence None until then.
+        self.port: Optional[int] = None
         self._api_server: Optional[ApiServer] = None
         # Single-threaded pool: verbs run off the event loop but are
         # serialised so that database access is never concurrent.
@@ -233,8 +283,15 @@ class MegaMOOServer:
         6. **Wait** -- the coroutine suspends on ``_shutdown_event`` and
            only returns when ``shutdown()`` sets it.
 
+        Port selection mirrors the API server: ``network.port`` is tried
+        first, and if it is taken while ``network.auto_port`` is on the
+        next ``network.port_scan_limit - 1`` ports are tried in turn, so a
+        second database can be launched without hand-picking a port.  A
+        port named on the command line pins exactly (``auto_port`` off)
+        and a conflict is fatal.
+
         Raises:
-            OSError: If the TCP port is already in use.
+            OSError: If no candidate TCP port could be bound.
 
         Notes:
             This method is designed to be called exactly once via
@@ -255,15 +312,19 @@ class MegaMOOServer:
 
         # --- Phase 2: TCP listener ---
         host = self.config.network.host
-        port = self.config.network.port
+        first = self.config.network.port
+        scan = (self.config.network.port_scan_limit
+                if self.config.network.auto_port else 1)
 
         from .globals import MAX_COMMAND_LENGTH
-        self._tcp_server = await asyncio.start_server(
-            self._handle_connection,
-            host,
-            port,
+        self._tcp_server, port = await listen_walking_ports(
+            self._handle_connection, host, first, scan,
             limit=MAX_COMMAND_LENGTH * 2  # StreamReader buffer cap
         )
+
+        self.port = port
+        if port != first:
+            logger.warning(f"Port {first} in use; auto-selected {port}")
 
         self.state.running = True
         self.state.accepting_connections = True
@@ -990,8 +1051,9 @@ def run_server(database_path: str, port: Optional[int] = None,
 
     Args:
         database_path (str): Filesystem path to the database directory.
-        port (int | None): TCP port override.  If ``None``, the value
-            from the config file (or default) is used.
+        port (int | None): TCP port override.  Pins that exact port
+            (a conflict is then fatal).  If ``None``, the configured
+            port is the first candidate and a busy port is walked past.
         host (str | None): Bind-address override.
         config_path (str | None): Path to a YAML/JSON config file.
             If ``None``, built-in defaults are used.
@@ -1019,14 +1081,22 @@ def run_server(database_path: str, port: Optional[int] = None,
 
     # Command-line arguments override everything.
     if port:
+        # Same rule as --api-port: naming a port is a request for *that*
+        # port, so pin it and let a conflict fail loudly.  Auto-selection
+        # is for the case where the operator didn't care.
         config.network.port = port
+        config.network.auto_port = False
     if host:
         config.network.host = host
 
     if api_enabled:
         config.api.enabled = True
     if api_port is not None:
+        # An explicitly named port is a request for *that* port: pin it and
+        # let a bind conflict fail loudly.  Auto-selection is for the case
+        # where the operator didn't care (plain --api).
         config.api.port = api_port
+        config.api.auto_port = False
     if api_token is not None:
         config.api.auth_token = api_token
 
@@ -1109,6 +1179,7 @@ def run_server(database_path: str, port: Optional[int] = None,
             )
 
     # --- Run ---
+    failed = False
     try:
         loop.run_until_complete(server.start())
     except KeyboardInterrupt:
@@ -1118,6 +1189,7 @@ def run_server(database_path: str, port: Optional[int] = None,
     except Exception as e:
         logger.error(f"Server error: {e}", exc_info=True)
         loop.run_until_complete(server.shutdown(f"Server error: {e}"))
+        failed = True
     finally:
         loop.close()
 
@@ -1135,6 +1207,12 @@ def run_server(database_path: str, port: Optional[int] = None,
             argv.append('--api')
         logger.info("Restarting server (api=%s)...", server.state.restart_with_api)
         os.execv(sys.executable, [sys.executable] + argv)
+
+    # A server that died on the way up must not look like a clean run: a
+    # launcher (or a shell loop starting several databases) needs a non-zero
+    # status to notice, e.g. a pinned --api-port that was already taken.
+    if failed:
+        raise SystemExit(1)
         
 
 # ============================================================

@@ -192,13 +192,14 @@ Examples:
             '--api',
             action='store_true',
             default=False,
-            help='Enable the JSON API server (port 7778)'
+            help='Enable the JSON API server (first free port from 7778 up)'
         )
         parser.add_argument(
             '--api-port',
             type=int,
             default=None,
-            help='API server port (default: 7778)'
+            help='Pin the API to this exact port (fails if it is in use); '
+                 'omit to auto-select the first free port from 7778 up'
         )
         parser.add_argument(
             '--api-token',

@@ -91,12 +91,15 @@ License: MIT
 """
 
 import asyncio
+import errno
 import json
 import logging
+import os
 import re
 import io
 import sys
 from contextlib import redirect_stdout
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger('megamoo.api')
@@ -960,8 +963,13 @@ class ApiConnection:
         """
         Report server liveness, uptime, and connection count.
 
+        ``api_port`` is the port the API actually bound, which with
+        auto-selection need not be the configured one -- handy for
+        confirming which server a client is talking to.
+
         Returns:
-            dict: ``{'running', 'uptime_seconds', 'connected_players'}``.
+            dict: ``{'running', 'uptime_seconds', 'connected_players',
+            'database', 'api_port'}``.
 
         Raises:
             RuntimeError: If the API server has no game-server reference.
@@ -975,7 +983,9 @@ class ApiConnection:
         from .network import _player_connections
         return {'running': server.state.running,
                 'uptime_seconds': round(uptime, 1),
-                'connected_players': len(_player_connections)}
+                'connected_players': len(_player_connections),
+                'database': str(getattr(self.api.database, 'path', '')),
+                'api_port': self.api.port}
 
     async def _cmd_run_command(self, args: dict) -> dict:
         """
@@ -1066,6 +1076,9 @@ class ApiServer:
         database:       The live :class:`~moo.database.Database` instance.
         config:         The :class:`~moo.config.ApiConfig` with host, port,
                         and auth_token settings.
+        port:           The port actually bound.  With ``config.auto_port``
+                        this can differ from ``config.port`` -- read this,
+                        never ``config.port``, when reporting the address.
         _server:        The underlying :class:`asyncio.AbstractServer` (set
                         after :meth:`start`).
         _connections:   List of active :class:`ApiConnection` instances.
@@ -1091,6 +1104,7 @@ class ApiServer:
         self.database = database
         self.config = config
         self.server = server
+        self.port = config.port           # actual bound port; see start()
         self.testbot_conn = None          # VirtualConnection once activated
         self.testbot_lock = asyncio.Lock()  # serialize run_command calls
         self._server: Optional[asyncio.AbstractServer] = None
@@ -1100,16 +1114,132 @@ class ApiServer:
         """
         Start listening for API connections.
 
-        Binds to the host and port specified in ``self.config`` and begins
-        accepting new TCP connections.  Each connection is handled by
-        :meth:`_handle_connection` in its own asyncio task.
+        Binds to the host in ``self.config`` and begins accepting new TCP
+        connections; each is handled by :meth:`_handle_connection` in its
+        own asyncio task.
+
+        Port selection: ``config.port`` is tried first.  If it is already
+        taken and ``config.auto_port`` is on (the default), the next
+        ``config.port_scan_limit - 1`` ports are tried in turn, so a second
+        database can be launched with ``--api`` without hand-picking a free
+        port.  ``config.auto_port`` is off when the operator named a port
+        explicitly (``--api-port``), in which case a busy port is a hard
+        error rather than a silent move somewhere else.
+
+        The port that actually won is recorded in ``self.port`` and
+        published in the discovery file (see :meth:`_write_info_file`).
+
+        Raises:
+            OSError: If no candidate port could be bound.
         """
-        self._server = await asyncio.start_server(
-            self._handle_connection,
-            self.config.host,
-            self.config.port,
-        )
-        logger.info(f"API server listening on {self.config.host}:{self.config.port}")
+        first = self.config.port
+        limit = self.config.port_scan_limit if self.config.auto_port else 1
+        last_error = None
+
+        for port in range(first, min(first + limit, 65536)):
+            try:
+                self._server = await asyncio.start_server(
+                    self._handle_connection,
+                    self.config.host,
+                    port,
+                )
+            except OSError as e:
+                # EADDRINUSE is the only condition worth walking past: any
+                # other bind failure (bad host, permission denied) will
+                # repeat identically on every port.
+                if e.errno != errno.EADDRINUSE:
+                    raise
+                last_error = e
+                continue
+
+            self.port = port
+            if port != first:
+                logger.warning(
+                    f"API port {first} in use; auto-selected {port}"
+                )
+            logger.info(f"API server listening on {self.config.host}:{port}")
+            self._write_info_file()
+            return
+
+        # Fell off the end of the scan without binding anything.
+        tried = (f"port {first}" if limit == 1
+                 else f"ports {first}-{min(first + limit - 1, 65535)}")
+        raise OSError(
+            f"Could not start API server: {tried} already in use"
+        ) from last_error
+
+    # ---- Discovery file -----------------------------------------------------
+
+    def _info_path(self) -> Optional[Path]:
+        """
+        Resolve the discovery-file path, or ``None`` if disabled.
+
+        ``config.info_path`` wins when set; ``'-'`` disables the file.
+        Otherwise it is derived from the database path so that each
+        database advertises its own API (``sf.db`` -> ``sf.db.api.json``).
+        """
+        configured = (self.config.info_path or '').strip()
+        if configured == '-':
+            return None
+        if configured:
+            return Path(configured).expanduser()
+        db_path = getattr(self.database, 'path', None)
+        if not db_path:
+            return None
+        return Path(str(db_path) + '.api.json')
+
+    def _write_info_file(self):
+        """
+        Publish where the API is listening, for local tooling to find.
+
+        Written after a successful bind; holds the host/port actually in
+        use plus our pid, which lets readers spot a file left behind by a
+        crashed server.  Never fatal: an unwritable directory costs
+        discovery, not the API itself.
+        """
+        path = self._info_path()
+        if path is None:
+            return
+        db_path = str(getattr(self.database, 'path', ''))
+        info = {
+            'host': self.config.host,
+            'port': self.port,
+            'pid': os.getpid(),
+            # Absolute: the path is read by tools with a different working
+            # directory, and "sf.db" tells them nothing about which one.
+            'database': str(Path(db_path).resolve()) if db_path else '',
+            'auth_required': bool(self.config.auth_token),
+        }
+        # The telnet port the game itself bound -- also auto-selected, so
+        # a tool listing running servers can say where to point a client.
+        # The listener is up before the API starts, so this is the real
+        # port, not the configured first candidate.
+        game_port = getattr(self.server, 'port', None)
+        if isinstance(game_port, int):
+            info['game_port'] = game_port
+        try:
+            path.write_text(json.dumps(info, indent=2) + '\n',
+                            encoding='utf-8')
+            logger.info(f"API discovery file written: {path}")
+        except OSError as e:
+            logger.warning(f"Could not write API discovery file {path}: {e}")
+
+    def _remove_info_file(self):
+        """Remove our discovery file, if it is still ours to remove."""
+        path = self._info_path()
+        if path is None:
+            return
+        try:
+            # Only clean up a file describing *this* process: a restarted
+            # server may already have replaced it with its own.
+            info = json.loads(path.read_text(encoding='utf-8'))
+            if info.get('pid') not in (None, os.getpid()):
+                return
+            path.unlink()
+        except FileNotFoundError:
+            pass
+        except (OSError, ValueError) as e:
+            logger.warning(f"Could not remove API discovery file {path}: {e}")
 
     async def stop(self):
         """
@@ -1118,6 +1248,8 @@ class ApiServer:
         Closes the listening socket first (preventing new connections),
         then forcibly closes each active client connection.
         """
+        self._remove_info_file()
+
         if self._server:
             self._server.close()
             await self._server.wait_closed()

@@ -11,6 +11,9 @@ class StubConfig:
     testbot_objnum = 0
     host = '127.0.0.1'
     port = 0
+    auto_port = True
+    port_scan_limit = 50
+    info_path = '-'          # these tests never bind; advertise nothing
 
 
 def make_conn(database=None, server=None):

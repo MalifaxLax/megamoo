@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auth &amp; Hidden Verbs — MegaMOO Manual</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<p class="crumb"><a href="index.html">MegaMOO Manual</a> → <a href="developing.html">Developing &amp; Building</a></p>
+
+<h1 class="wordmark" style="font-size:clamp(1.7rem,5.5vw,2.2rem)">04 · Auth &amp; Hidden Verbs</h1>
+<p class="tagline">Who may do what, and what is not a command at all.</p>
+
+<nav class="toc">
+    <span class="kicker">On this page</span>
+    <ol>
+        <li><a href="#ladder">The gm ladder</a></li>
+        <li><a href="#enforce">Two enforcement mechanisms</a></li>
+        <li><a href="#hidden">Hidden verbs</a></li>
+        <li><a href="#shadow">Verb shadowing</a></li>
+    </ol>
+</nav>
+
+<!-- ================================================================= -->
+<h2 id="ladder">The gm ladder</h2>
+
+<p>
+Authority is stored as a list of <code>gmN</code> strings on an object's
+<code>auth</code> property. <code>auth_level()</code> returns the highest level
+present, and <code>sync_auth_flags()</code> keeps the object's
+<code>PROGRAMMER</code> and <code>WIZARD</code> flags consistent with it —
+gm3 and above sets <code>PROGRAMMER</code>, gm4 and above sets
+<code>WIZARD</code>.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Level</th><th>Role</th><th>Typical powers</th></tr></thead>
+<tbody>
+<tr><td><code>gm1</code></td><td>Basic builder</td><td><code>@color</code>, <code>@tel</code>, <code>hold</code>, <code>+show</code></td></tr>
+<tr><td><code>gm2</code></td><td>Advanced builder</td><td><code>@dig</code>, <code>@open</code>, <code>@desc</code>, <code>@name</code>, <code>@move</code>, <code>@delete</code></td></tr>
+<tr><td><code>gm3</code></td><td>Programmer</td><td><code>@adverb</code>, <code>@program</code>, <code>@set</code>, <code>eval</code>, <code>@make</code>, <code>@parent</code></td></tr>
+<tr><td><code>gm4</code></td><td>Wizard</td><td><code>@delplayer</code></td></tr>
+<tr><td><code>gm5</code></td><td>Super-wizard</td><td><code>@auth</code>, <code>@shutdown</code>, <code>@restart</code>, <code>@renumber</code>, <code>@reserve</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+Grant and revoke with <code>@auth &lt;player&gt; = add|remove &lt;level&gt;</code>.
+That command is gm5 only — the ability to hand out authority is itself the top
+of the ladder.
+</p>
+
+<p>
+The levels are cumulative in effect but stored as a list, so a character can
+hold <code>['gm1', 'gm4']</code>; <code>auth_level()</code> reports
+<code>4</code>. The shipped wizard <code>#100</code> carries
+<code>['gm5']</code>.
+</p>
+
+<!-- ================================================================= -->
+<h2 id="enforce">Two enforcement mechanisms</h2>
+
+<p>
+These are independent, and it is worth knowing which one you are relying on.
+</p>
+
+<h3>1. The guard clause</h3>
+
+<p>
+Most staff verbs simply begin by checking, which is why an unauthorised player
+gets a flat "Do what?" rather than a permission error — the verb declines to
+admit it exists:
+</p>
+
+<div class="term"><code>if auth_level(pobj) &lt; 3:
+    pobj.msg("Do what?")
+    return</code></div>
+
+<p>
+This is a convention, not a framework. It lives in the verb body, so it is
+visible in <code>+decompile</code> and easy to get wrong by omission. Every
+staff verb you write should open with one.
+</p>
+
+<h3>2. The verb's <code>auth</code> column</h3>
+
+<p>
+Separately, each verb row carries an auth level enforced by the engine
+<em>before the body runs at all</em>. Set it with:
+</p>
+
+<div class="term"><code>@verbauth #3.@telq = 3    <span class="c"># require gm3</span>
+@verbauth #3.@telq        <span class="c"># read the current setting</span>
+@adverb #3.@mycmd with auth=3   <span class="c"># or set it at creation</span></code></div>
+
+<p>
+Both walk the inheritance chain if the verb is not found locally. Belt and
+braces is normal: declare <code>auth=N</code> so the engine blocks the call, and
+keep the guard clause so the verb is safe if it is ever invoked
+programmatically.
+</p>
+
+<!-- ================================================================= -->
+<h2 id="hidden">Hidden verbs</h2>
+
+<p>
+Hiding is orthogonal to auth. A hidden verb is not invokable from the command
+line <em>by anyone</em>, regardless of level — it can only be reached
+programmatically through <code>call_verb()</code>.
+</p>
+
+<p>
+This is what internal hooks are for. <code>go_</code>, <code>at_post_move</code>,
+<code>_title</code>, <code>_resource</code> and the rest are machinery, not
+commands; a player typing <code>go_</code> should get nothing at all.
+</p>
+
+<div class="term"><code>@adverb/hidden #5.at_post_move   <span class="c"># create it hidden</span>
+@hideverb #5.at_post_move        <span class="c"># or hide it afterwards</span>
+@unhideverb #5.at_post_move      <span class="c"># reverse it</span></code></div>
+
+<p>
+By convention a leading underscore marks a verb as internal, and a trailing
+underscore marks a <a href="verbs.html#hooks">per-object hook</a>. Neither
+convention is the enforcement — <code>@hideverb</code> is. A hook you forget to
+hide is a command players can type.
+</p>
+
+<!-- ================================================================= -->
+<h2 id="shadow">Verb shadowing</h2>
+
+<p>
+A verb defined lower in the inheritance chain wins over one defined higher, and
+<strong>this happens silently</strong>. No warning, no log line. It is the
+intended mechanism — it is how a specific object overrides a shared prototype —
+but it is also the bug you will actually hit, because an accidental name
+collision looks exactly like an intentional override.
+</p>
+
+<p>
+When a command behaves in a way the code you are reading cannot explain, the
+question is always "which body is actually running?" Three commands answer it:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Command</th><th>Tells you</th></tr></thead>
+<tbody>
+<tr><td><code>+verbs &lt;object&gt;</code></td><td>What is attached to this object specifically.</td></tr>
+<tr><td><code>@examine &lt;object&gt;</code></td><td>Parent, owner, properties and verbs together.</td></tr>
+<tr><td><code>+decompile &lt;obj&gt;.&lt;verb&gt;</code></td><td>The source that is really being executed.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+The same trap catches consumables: a <code>drink</code> verb added to a vessel
+will shadow the shared one on the room prototype, and the shared one is where
+all the interesting behaviour lives. Prefer a <code>drink_</code> hook over a
+<code>drink</code> override unless you genuinely mean to replace the command.
+</p>
+
+<div class="pagenav">
+    <a href="live-coding.html"><span class="dir">Previous</span>03 · Live Programming</a>
+    <a class="to-next" href="commands.html"><span class="dir">Next</span>05 · Staff Command Reference</a>
+</div>
+
+<div class="footer">
+    <span><a href="developing.html">← Developing &amp; Building</a></span>
+    <span>04 · Auth &amp; Hidden Verbs</span>
+</div>
+
+</div>
+</body>
+</html>

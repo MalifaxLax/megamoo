@@ -81,7 +81,16 @@ class NetworkConfig:
     Attributes:
         host (str): Host address to bind to.  ``'0.0.0.0'`` listens on all
             interfaces; ``'127.0.0.1'`` restricts to localhost only.
-        port (int): TCP port number for the main telnet listener.
+        port (int): TCP port number for the main telnet listener.  With
+            ``auto_port`` on this is only the *first* port tried.
+        auto_port (bool): Whether a busy ``port`` makes the server scan
+            upward for the next free one instead of failing to boot.  On
+            by default so that a second database can be launched without
+            hand-assigning a port.  Naming a port on the command line
+            turns it off: a conflict then fails loudly rather than
+            putting the game somewhere players aren't looking.
+        port_scan_limit (int): How many consecutive ports to try when
+            ``auto_port`` is on (``port`` .. ``port + limit - 1``).
         max_connections (int): Maximum simultaneous TCP connections the server
             will accept.  New connections beyond this limit are refused.
         connection_timeout (int): Seconds of idle time before a connection is
@@ -102,6 +111,8 @@ class NetworkConfig:
     """
     host: str = '0.0.0.0'
     port: int = DEFAULT_PORT
+    auto_port: bool = True
+    port_scan_limit: int = 50
     max_connections: int = 100
     connection_timeout: int = 3600  # 1 hour
     max_players: int = 0  # 0 = unlimited
@@ -221,7 +232,21 @@ class ApiConfig:
     Attributes:
         enabled (bool): Whether to start the API server.  Defaults to
             ``False`` for security -- must be explicitly enabled.
-        port (int): TCP port the API server listens on.
+        port (int): TCP port the API server listens on.  With
+            ``auto_port`` on this is only the *first* port tried.
+        auto_port (bool): Whether a busy ``port`` makes the server scan
+            upward for the next free one instead of failing to boot.
+            On by default so that several databases can each be started
+            with ``--api`` without hand-assigning ports.  ``--api-port``
+            turns it off: naming a port means you want that exact port.
+        port_scan_limit (int): How many consecutive ports to try when
+            ``auto_port`` is on (``port`` .. ``port + limit - 1``).
+        info_path (str): Where to write the API discovery file -- a small
+            JSON document naming the host/port/pid the API actually bound,
+            so tools (``tools/megamoo_mcp.py``) can find a server whose
+            port was auto-selected.  Empty (default) means "derive it from
+            the database path" (``sf.db`` -> ``sf.db.api.json``); the
+            file is removed on clean shutdown.  Set to ``'-'`` to disable.
         host (str): Host address to bind.  Defaults to ``'127.0.0.1'``
             (localhost only) to prevent remote access by default.
         auth_token (str): A shared secret token that API clients must
@@ -238,6 +263,9 @@ class ApiConfig:
     """
     enabled: bool = False
     port: int = 7778
+    auto_port: bool = True
+    port_scan_limit: int = 50
+    info_path: str = ''
     host: str = '127.0.0.1'
     auth_token: str = ''
     testbot_objnum: int = 0
@@ -372,6 +400,9 @@ class ServerConfig:
         if not (1 <= self.network.port <= 65535):
             raise ValueError(f"Invalid port number: {self.network.port}")
 
+        if self.network.port_scan_limit < 1:
+            raise ValueError("network.port_scan_limit must be at least 1")
+
         if self.network.max_connections < 1:
             raise ValueError("max_connections must be at least 1")
 
@@ -397,6 +428,9 @@ class ServerConfig:
         # Validate API settings
         if self.api.enabled and not (1 <= self.api.port <= 65535):
             raise ValueError(f"Invalid API port number: {self.api.port}")
+
+        if self.api.port_scan_limit < 1:
+            raise ValueError("api.port_scan_limit must be at least 1")
 
         # Validate developer settings
         if self.dev.autoreload_interval <= 0:
@@ -589,8 +623,9 @@ class ServerConfig:
             MEGAMOO_<SECTION>_<SETTING>=value
 
         where ``<SECTION>`` is one of ``NETWORK``, ``DATABASE``, ``PROTOCOL``,
-        or a top-level setting name, and ``<SETTING>`` is the field name
-        within that section.  Multi-word settings use underscores.
+        ``DEV``, ``API``, or a top-level setting name, and ``<SETTING>``
+        is the field name within that section.  Multi-word settings use
+        underscores.
 
         Type conversion is automatic:
             - Strings that look like integers become ``int``.
@@ -603,7 +638,13 @@ class ServerConfig:
             MEGAMOO_NETWORK_PORT=8888           -> config.network.port = 8888
             MEGAMOO_DATABASE_PATH=/data/game.db -> config.database.path = '/data/game.db'
             MEGAMOO_PROTOCOL_ENABLE_MXP=false   -> config.protocol.enable_mxp = False
+            MEGAMOO_API_INFO_PATH=/tmp/x.json   -> config.api.info_path = '/tmp/x.json'
             MEGAMOO_DEBUG_MODE=true              -> config.debug_mode = True
+
+        Note:
+            ``MEGAMOO_API_TOKEN`` is *not* one of these -- the API's field
+            is ``auth_token``, and the name belongs to the MCP bridge.
+            Pass the server's token with ``--api-token``.
         """
         prefix = 'MEGAMOO_'
 
@@ -629,6 +670,8 @@ class ServerConfig:
                 setattr(self.protocol, setting, self._convert_env_value(value))
             elif section == 'dev' and hasattr(self.dev, setting):
                 setattr(self.dev, setting, self._convert_env_value(value))
+            elif section == 'api' and hasattr(self.api, setting):
+                setattr(self.api, setting, self._convert_env_value(value))
             elif hasattr(self, setting):
                 setattr(self, setting, self._convert_env_value(value))
 
