@@ -3,265 +3,158 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Live Programming — MegaMOO Manual</title>
+<title>Changing Things Live — MegaMOO Manual</title>
 <link rel="stylesheet" href="manual.css">
 </head>
 <body>
 <div class="wrap">
 
-<p class="crumb"><a href="index.html">MegaMOO Manual</a> → <a href="developing.html">Developing &amp; Building</a></p>
+<p class="crumb"><a href="index.html">MegaMOO Manual</a> → <a href="developing.html">Building Your World</a></p>
 
-<h1 class="wordmark" style="font-size:clamp(1.7rem,5.5vw,2.2rem)">03 · Live Programming</h1>
-<p class="tagline">Three ways to get code into a verb, all of them instant.</p>
+<h1 class="wordmark" style="font-size:clamp(1.7rem,5.5vw,2.2rem)">03 · Changing Things Live</h1>
+<p class="tagline">Rewrite a command while people are using it.</p>
 
 <nav class="toc">
     <span class="kicker">On this page</span>
     <ol>
-        <li><a href="#instant">Why there is no reload step</a></li>
-        <li><a href="#ingame">In-game: <code>@adverb</code> and <code>@program</code></a></li>
-        <li><a href="#disk">On disk: the auto-reload watcher</a></li>
-        <li><a href="#api">Through the API</a></li>
-        <li><a href="#ai">Working with an AI assistant</a></li>
+        <li><a href="#why">Why there is no restart</a></li>
+        <li><a href="#ingame">From inside the game</a></li>
+        <li><a href="#disk">From your own editor</a></li>
+        <li><a href="#ai">With an AI assistant</a></li>
     </ol>
 </nav>
 
 <!-- ================================================================= -->
-<h2 id="instant">Why there is no reload step</h2>
+<h2 id="why">Why there is no restart</h2>
 
 <p>
-A verb body is a row in the database, and the executor reads it at call time.
-There is no compiled artefact, no import cache, and no module graph to
-invalidate. The moment a verb's code changes, the next player to type that
-command runs the new version.
+Commands are not part of the program. They are stored in your world file, next
+to the rooms and the furniture, and they are read fresh each time someone types
+one. So changing a command is changing a thing in the world, not rebuilding the
+software — and it takes effect immediately, for everyone already logged in.
 </p>
 
 <p>
-This is not a convenience feature bolted on for developers — it is the direct
-consequence of storing code on objects, and it is what makes the
-<a href="developing.html#paradigm">MOO paradigm</a> work in practice. You can
-fix a broken verb while the player who tripped over it is still standing there.
+That is a genuinely different way to work. You do not reproduce a problem in a
+test copy: you stand next to the broken door, fix it, and try it again.
 </p>
 
 <div class="warn">
     <span class="label">Instant means instant</span>
-    <p>There is no staging area. The moment a verb body is saved it is live for
-       every connected player. On a world with people in it, test risky changes
-       on a copy — <code>megamoo.py mm.db scratch.db</code>, then
-       <code>./mm scratch.db</code>, which finds its own free ports alongside
-       the live world. Break it there.</p>
+    <p>There is no staging area. The moment you save a command it is live for
+       every connected player. On a world with people in it, try risky changes
+       on a copy first — <code>megamoo.py mm.db scratch.db</code>, then
+       <code>./mm scratch.db</code>, which finds its own free ports and runs
+       alongside the real one.</p>
 </div>
 
-<!-- ================================================================= -->
-<h2 id="ingame">In-game: <code>@adverb</code> and <code>@program</code></h2>
+<h2 id="ingame">From inside the game</h2>
 
 <p>
-Two commands, in that order. <code>@adverb</code> declares the verb — its names,
-abbreviation minimums, permissions, and auth level. <code>@program</code> opens
-the in-MOO editor for its body, which is where you type or paste Python.
+Two commands, in that order. <code>@adverb</code> creates the command;
+<code>@program</code> opens an editor for what it does. Paste in what you like.
 </p>
 
-<div class="term"><code>@adverb #123.go_
-@program #123.go_</code></div>
+<div class="term"><code><span class="p">&gt;</span> @adverb #123.go_
+<span class="p">&gt;</span> @program #123.go_</code></div>
 
-<h3>Declaring the verb</h3>
-
-<div class="term"><code>@adverb[/hidden] &lt;object&gt;.&lt;name[(min)][,alias...]&gt; [with &lt;perms&gt; [base] [min=N] [auth=N]]</code></div>
+<p>
+A few variations of the first one cover almost everything:
+</p>
 
 <div class="tablewrap">
 <table>
-<thead><tr><th>Example</th><th>Effect</th></tr></thead>
+<thead><tr><th>Written as</th><th>Gives you</th></tr></thead>
 <tbody>
-<tr><td><code>@adverb #7.look,l</code></td><td>Two names for one verb.</td></tr>
-<tr><td><code>@adverb #2.examine(3),look(1),l</code></td><td>Per-name abbreviation minimums.</td></tr>
-<tr><td><code>@adverb #2.examine,x with rx min=3</code></td><td>Permission string plus a global minimum.</td></tr>
-<tr><td><code>@adverb #15.reset with rwx base</code></td><td>Use <code>BaseVerb</code> instead of <code>MasterVerb</code>.</td></tr>
-<tr><td><code>@adverb/hidden #5.at_post_move</code></td><td>Create it already hidden — the right form for a hook.</td></tr>
-<tr><td><code>@adverb #3.@telq with rx auth=3</code></td><td>Require gm3 to invoke.</td></tr>
+<tr><td><code>@adverb #7.look,l</code></td><td>One command, two names.</td></tr>
+<tr><td><code>@adverb #2.examine(3),x</code></td><td><code>exa</code> is enough to fire it.</td></tr>
+<tr><td><code>@adverb/hidden #5.at_post_move</code></td><td>Hidden from players — the right form for a <a href="verbs.html#hooks">hook</a>.</td></tr>
+<tr><td><code>@adverb #3.@telq with rx auth=3</code></td><td>Only staff at level 3 may use it.</td></tr>
 </tbody>
 </table>
 </div>
 
 <p>
-Permission strings follow the usual pattern: <code>r</code> read,
-<code>w</code> write, <code>x</code> execute. <code>rx</code> is the default and
-is what almost every verb wants.
-</p>
-
-<h3>Editing the body</h3>
-
-<p>
-<code>@program &lt;object&gt;.&lt;verb&gt;</code> — aliased <code>@prog</code>
-and <code>@code</code> — opens the editor. Pasting a whole verb in at once works
-fine; this is the normal way to move code written elsewhere into the game.
-Related commands:
+And to see what is really there:
 </p>
 
 <div class="tablewrap">
 <table>
 <thead><tr><th>Command</th><th>Does</th></tr></thead>
 <tbody>
-<tr><td><code>+decompile &lt;obj&gt;.&lt;verb&gt;</code></td><td>Print the verb's source exactly as stored — the ground truth for what is running.</td></tr>
-<tr><td><code>+verbs &lt;obj&gt;</code></td><td>List the verbs actually attached to an object.</td></tr>
-<tr><td><code>@rmverb &lt;obj&gt;.&lt;verb&gt;</code></td><td>Delete a verb.</td></tr>
-<tr><td><code>@clear &lt;obj&gt;.&lt;verb&gt;</code></td><td>Clear a verb's body without removing the declaration.</td></tr>
+<tr><td><code>+verbs &lt;obj&gt;</code></td><td>List the commands attached to something.</td></tr>
+<tr><td><code>+decompile &lt;obj&gt;.&lt;verb&gt;</code></td><td>Print exactly what is running — the ground truth.</td></tr>
+<tr><td><code>@rmverb &lt;obj&gt;.&lt;verb&gt;</code></td><td>Delete one.</td></tr>
 </tbody>
 </table>
 </div>
 
-<!-- ================================================================= -->
-<h2 id="disk">On disk: the auto-reload watcher</h2>
+<h2 id="disk">From your own editor</h2>
 
 <p>
-Verb files live at
-<code>&lt;moo_verb_path&gt;/&lt;objnum&gt;/&lt;verb&gt;.py</code>, where the base
-path comes from the <code>#8.moo_verb_path</code> property. That property stores
-a dotted, home-relative path — <code>megamoo.moo verbs</code> expands to
-<code>~/megamoo/moo verbs</code>.
+The in-game editor is fine for small changes; for anything longer you will want
+a real editor. Commands can live as files on disk, under
+<code>moo verbs/&lt;object number&gt;/&lt;name&gt;.py</code>, and
+<code>./mm</code> watches that folder: save a file, and the running game picks
+it up within a couple of seconds. No reload command, no restart.
 </p>
 
-<div class="warn">
-    <span class="label">The database is the source of truth</span>
-    <p>Those files are developer-facing copies. Editing one does
-       <strong>nothing</strong> on its own — the running game reads the database,
-       not the disk. Something has to push the file in.</p>
-</div>
-
-<h3>The watcher</h3>
-
-<p>
-Set <code>MEGAMOO_DEV_AUTORELOAD_VERBS=true</code> — which is what
-<code>./mm</code> does — and the server polls the verb tree every two seconds,
-comparing modification times and pushing changed files into the live database.
-Save in your editor; the next invocation runs the new code.
-</p>
-
-<div class="term"><code><span class="p">$</span> ./mm mm.db
+<div class="term"><code><span class="p">$</span> ./mm mygame.db
 <span class="o">Verb auto-reload watching /Users/you/megamoo/moo verbs (every 2.0s)</span></code></div>
 
 <p>
-It is off in the code by default, which is what you want in production: a
-running world should not be rewritten by whatever is on disk. The launcher
-turns it on because a development world is exactly the case where you do want
-that. Starting the server any other way leaves it off unless you export the
-variable yourself — and it survives an in-game <code>@restart</code>, because
-the server re-execs with the environment it already had.
+To get an object's commands out onto disk in the first place,
+<code>@reload #123</code> once — the folder is created and the files appear.
+After that, editing them is enough.
 </p>
 
 <div class="note">
-    <span class="label">Syntax errors cannot break a running verb</span>
-    <p>The watcher compiles each changed file in isolation before installing it.
-       A syntax error is logged and the previously-working version keeps
-       serving. You will not take the game down with a stray colon — but do
-       watch the log, because a verb silently failing to update looks exactly
-       like a verb that did not change.</p>
+    <span class="label">The database is the original</span>
+    <p>The files are a convenient copy; what actually runs lives in your world
+       file. That is why a syntax error cannot take the game down — the broken
+       file is refused and the previous working version keeps serving — and why
+       copying a world to a new folder needs the watcher pointed at the new
+       path (<code>#8.moo_verb_path</code>) or your edits quietly stop
+       landing.</p>
 </div>
 
-<p>
-The initial scan only records modification times; it does not reload everything
-at boot, since the database already holds the current verbs. Only edits made
-while the server is running trigger a reload.
-</p>
-
-<h3>Loading files deliberately</h3>
-
-<div class="tablewrap">
-<table>
-<thead><tr><th>Command</th><th>Does</th></tr></thead>
-<tbody>
-<tr><td><code>@reload &lt;obj&gt;.&lt;verb&gt;</code></td><td>Load one verb from its file.</td></tr>
-<tr><td><code>@reload &lt;obj&gt;</code></td><td>Load every verb file for that object. If the directory does not exist yet, it is created and the object's verbs are <em>exported</em> to it.</td></tr>
-<tr><td><code>@reload all</code></td><td>Sweep every numbered directory. Existing verbs are updated; missing ones are created.</td></tr>
-</tbody>
-</table>
-</div>
+<h2 id="ai">With an AI assistant</h2>
 
 <p>
-The export behaviour is the easy way to get an object's verbs onto disk for
-editing in a real editor: <code>@reload #123</code> once, and the files appear.
-</p>
-
-<div class="note">
-    <span class="label">Watch the path when you copy a world</span>
-    <p><code>#8.moo_verb_path</code> travels with the database. Copy a world to
-       a differently-named directory and the watcher will still be pointed at
-       the old one — verbs keep working, since they live in the database, but
-       your disk edits quietly stop landing. Update the property after any
-       rename.</p>
-</div>
-
-<!-- ================================================================= -->
-<h2 id="api">Through the API</h2>
-
-<p>
-With the JSON API enabled (see
-<a href="getting-started.html#api">Getting Started</a>), <code>set_verb</code>
-writes directly to the live database — the same instant effect, driven by
-tooling rather than a person. <code>get_verb</code>, <code>list_verbs</code>,
-<code>search_verbs</code> and <code>delete_verb</code> round out the surface.
-This is what the MCP bridge is built on.
-</p>
-
-<!-- ================================================================= -->
-<h2 id="ai">Working with an AI assistant</h2>
-
-<p>
-Verbs are unusually well suited to being written with an AI assistant, for a
-specific reason: they are small, self-contained Python files with a fixed
-namespace and no imports to resolve. A verb is a single-file problem with a
-tightly bounded context.
+Commands suit this unusually well: each one is a short, self-contained file with
+no imports to chase. With the <a href="getting-started.html#api">tooling
+connection</a> open, an assistant is not reading your files and guessing — it is
+holding the live world. It can see what an object really has on it, write a
+command, run it as a test character, read what the game printed back, and check
+the log when something throws.
 </p>
 
 <p>
-With the MCP bridge connected, an assistant is not reading your repository and
-guessing — it is holding the live world. It can read what properties
-<code>#200</code> actually has, list the verbs a room really carries, write a
-verb with <code>set_verb</code>, run the command as a test character with
-<code>run_command</code>, read what the game printed back, and tail the log when
-it throws. The write–test–fix loop happens without a human in the middle
-retyping things.
-</p>
-
-<p>
-What makes that work well in practice:
+Three things make that work in practice:
 </p>
 
 <ul>
-<li><strong>Point it at a scratch world.</strong> Start the throwaway database
-    with <code>./mm scratch.db</code> — it finds its own ports — then tell the
-    assistant to work on <code>scratch</code>, so it edits that world and not
-    the one you care about. Ask it to confirm which database it is on before it
+<li><strong>Point it at a scratch world.</strong> Start a throwaway copy with
+    <code>./mm scratch.db</code> and tell the assistant to work on
+    <code>scratch</code>. Ask it to confirm which world it is on before it
     writes anything.</li>
-<li><strong>Say which object and which hook.</strong> "Add a <code>go_</code> to
-    <code>#123</code> that refuses passage unless the player carries the brass
-    key" is a complete specification. "Make the door locked" is not.</li>
-<li><strong>Name the conventions it cannot infer.</strong> Use <code>msg</code>
-    not <code>notify</code>; <code>pmatch</code> in player verbs; check
-    <code>existent</code>; return <code>True</code> from a hook to suppress the
-    default; missing properties are not <code>None</code>. A
-    <code>CLAUDE.md</code> in the repo carrying these rules pays for itself
-    immediately.</li>
-<li><strong>Have it verify by playing.</strong> The point of
-    <code>run_command</code> is that "it should work" becomes "here is the
-    output". Ask for the transcript.</li>
+<li><strong>Say which object and which behaviour.</strong> "Add a
+    <code>go_</code> to <code>#123</code> that refuses passage unless the player
+    is carrying the brass key" is a complete request. "Make the door locked" is
+    not.</li>
+<li><strong>Have it check its own work</strong> by playing — walk into the door,
+    read what the game said. A command that looks right and does nothing is the
+    common failure, and only playing it catches that.</li>
 </ul>
 
-<div class="warn">
-    <span class="label">The API is wizard access</span>
-    <p><code>set_verb</code> and <code>eval_code</code> run arbitrary Python
-       against the live database. An assistant holding that token can do
-       anything a super-wizard can, including to the world your players are
-       standing in. Scope it to a scratch database and keep the token out of
-       version control.</p>
-</div>
-
 <div class="pagenav">
-    <a href="verbs.html"><span class="dir">Previous</span>02 · Verbs &amp; the Parser</a>
-    <a class="to-next" href="auth.html"><span class="dir">Next</span>04 · Auth &amp; Hidden Verbs</a>
+    <a href="verbs.html"><span class="dir">Previous</span>02 · Commands &amp; Behaviour</a>
+    <a class="to-next" href="auth.html"><span class="dir">Next</span>04 · Who Can Do What</a>
 </div>
 
 <div class="footer">
-    <span><a href="developing.html">← Developing &amp; Building</a></span>
-    <span>03 · Live Programming</span>
+    <span><a href="developing.html">← Building Your World</a></span>
+    <span>03 · Changing Things Live</span>
 </div>
 
 </div>

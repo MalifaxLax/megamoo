@@ -42,29 +42,31 @@ these two — see [where verbs live](01-architecture.md#the-core-object-hierarch
 
 ### The 12-direction compass
 
-Directions are defined in `moo/globals.py`. The canonical short names, in index
-order 0–11 (`DNAMES`):
+Directions are defined in `moo/globals.py`. **`DNAMES`** holds the canonical
+token for each of the 12 direction slots, in index order 0–11. Note that these
+tokens are not uniformly short or long: the first four are spelled out, the rest
+are abbreviated.
 
-| Idx | Short | Full | Reverse |
+| Idx | `DNAMES` token | Also accepted | Reverse (`RETEXIT`) |
 |---|---|---|---|
-| 0 | `n` | north | south |
-| 1 | `s` | south | north |
-| 2 | `e` | east | west |
-| 3 | `w` | west | east |
-| 4 | `ne` | northeast | sw |
-| 5 | `nw` | northwest | se |
-| 6 | `se` | southeast | nw |
-| 7 | `sw` | southwest | ne |
-| 8 | `u` | up | down |
-| 9 | `d` | down | up |
-| 10 | `o` | out | — |
-| 11 | `in` | in | — |
+| 0 | `north` | `n` | `south` |
+| 1 | `south` | `s` | `north` |
+| 2 | `east` | `e` | `west` |
+| 3 | `west` | `w` | `east` |
+| 4 | `ne` | `northeast` | `sw` |
+| 5 | `nw` | `northwest` | `se` |
+| 6 | `se` | `southeast` | `nw` |
+| 7 | `sw` | `southwest` | `ne` |
+| 8 | `u` | `up` | `d` |
+| 9 | `d` | `down` | `u` |
+| 10 | `o` | `out` | — |
+| 11 | `in` | — | — |
 
-Players may type either the short or full form (`n` or `north`); the matcher
-resolves both via `DALIASES`. The `RETEXIT` table maps each direction to its
-opposite and is what `@dig`/`@open` use to auto-create the **return exit** — note
-`out` and `in` have no automatic reverse, so passages through them are created
-one-way unless you open both ends.
+Players may type either form (`n` or `north`, `u` or `up`); `DALIASES` pairs them
+and `DIRECTIONS` is the flat list of every accepted token. The `RETEXIT` table
+maps each direction to its opposite and is what `@dig`/`@open` use to auto-create
+the **return exit** — it has no entry for `o` or `in`, so passages through those
+are created one-way unless you open both ends.
 
 ### Room verbs
 

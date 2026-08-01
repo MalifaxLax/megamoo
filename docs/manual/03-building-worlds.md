@@ -7,7 +7,8 @@ commands are themselves verbs (on #3, `Base_Character`), built on the primitives
 described in [Writing Verbs](02-writing-verbs.md) — so the toolkit is just more
 MegaMOO, and you can extend it the same way.
 
-This document is a reference to the 64-command toolkit plus a worked example.
+This document is a reference to the in-game builder toolkit — around sixty
+commands — plus a worked example.
 
 - [Permissions](#permissions)
 - [A worked example](#a-worked-example)
@@ -140,7 +141,9 @@ in how the name renders in different grammatical positions.
 
 | Command | Level | What it does |
 |---|---|---|
-| `@adprop <object>.<prop> [= <value>]` | gm3 | Add a property. The value is evaluated as a Python expression first (`[]`, `0`, `{}`); if that fails it's stored as a string. |
+| `@adprop <object>.<prop> [= <value>]` | gm3 | Add a **new** property. The value is evaluated as a Python expression first (`[]`, `0`, `{}`); if that fails it's stored as a string. |
+| `@set <object>.<prop> [= <value>]` (`@val`) | gm3 | Set an **existing** property (local or inherited), or read it if `= <value>` is omitted. Same literal-then-string evaluation as `@adprop`. Records the previous value. |
+| `@unset <object>.<prop>` | gm3 | Revert the last `@set` on that property. |
 | `@rmprop <object>.<prop>` (`@remprop`) | gm3 | Remove a locally defined property (confirms). |
 | `@clear[/all] <object>[.<prop\|verb>]` | gm3 | Clear one local property/verb, or with `/all` every local property. |
 | `@adtag <object> = <category>[/<tag>]` | gm3 | Add a classification tag (e.g. `zone/haven`). |
@@ -179,10 +182,13 @@ entirely in-game *or* on disk, and the two stay in sync.
 |---|---|---|
 | `@adverb[/hidden] <obj>.<name[(min)][,alias...]> [with <perms> [base] [min=N] [auth=N]]` | gm3 | Add a verb. Names can carry a minimum-abbreviation length in parens; commas add aliases. `perms` defaults to `rx`; `auth=N` sets the minimum gm level to invoke; `/hidden` makes it non-invokable by players (for hooks). |
 | `@program <obj>.<verb>` | gm3 | Open the in-MOO line editor for a verb. On save it compiles, **installs the verb into the live server immediately, and writes the source to disk** — see [Hot coding](#hot-coding-no-reloads) below. |
-| `@reload <obj>.<verb>` / `@reload <obj>` / `@reload all` | gm3 | Pull verb source **from disk** into the running server — for changes made *outside* `@program` (external editor, MCP, `git pull`). On first use for an object it creates the per-object directory and exports existing verbs; `@reload all` scans every directory and loads/creates/updates. |
+| `@reload <obj>.<verb>` / `@reload <obj>` / `@reload all` | gm3 | Force a pull of verb source **from disk** into the running server. Rarely needed — the auto-reload watcher normally does this for you (see below). On first use for an object it creates the per-object directory and exports existing verbs; `@reload all` scans every directory and loads/creates/updates. |
 | `@rmverb <obj>.<verb>` | gm3 | Remove a locally defined verb (confirms). |
+| `@adalias <obj>.<verb> = <alias>` | gm3 | Add another name to an existing verb. Refuses a name already used by another verb on that object. |
+| `@rmalias <obj>.<verb> = <alias>` | gm3 | Drop one alias from a verb, along with its `@min` setting. Refuses to remove the primary (first) name — use `@rmverb` for that. |
 | `@min <obj>.<verb> = <N>` | gm3 | Set how many characters a player must type to match the verb. |
 | `@hideverb <obj>.<verb>` | gm3 | Hide a verb (e.g. an internal hook like `at_post_move`). |
+| `@unhideverb <obj>.<verb>` | gm3 | Un-hide a hidden verb, making it player-invokable again. |
 | `@verbauth <obj>.<verb> [= <level>]` | gm3 | View or set the minimum auth level required to invoke a verb. |
 
 ### Hot coding, no reloads
@@ -196,9 +202,18 @@ the object. The change is active on the *next* invocation of the verb. `@program
 and the on-disk copy never drift. If the code has a syntax error, nothing is
 installed and nothing is saved — the live verb keeps running.
 
-`@reload` is the reverse direction, and the **only** time you need it: when a verb
-file changed **on disk by some means other than `@program`**. You do *not* run
-`@reload` after `@program`.
+### Disk edits are hot too: the auto-reload watcher
+
+The disk direction is also automatic. The server runs a background watcher
+(`dev.autoreload_verbs`, **on by default**, polling every
+`dev.autoreload_interval` = 2 seconds) that compares file mtimes under
+`moo verbs/` and re-loads any verb whose file changed. Edit `moo verbs/17/wave.py`
+in a normal editor, save, and the change is live a couple of seconds later — no
+command, no restart.
+
+`@reload` is the manual version of that same disk→database pull. You need it only
+when you don't want to wait for the poll, or when the watcher is disabled in
+config. You do *not* run it after `@program`.
 
 ### The two editing loops
 
@@ -207,17 +222,21 @@ file changed **on disk by some means other than `@program`**. You do *not* run
 1. `@program #17.wave` — type the code, end with `.`.
 2. Done. It's compiled, live, and written to disk in one step.
 
-**On disk (then sync):**
+**On disk (also hot):**
 
 1. `@adverb #17.wave` to declare the verb if it doesn't exist yet.
 2. Edit `moo verbs/17/wave.py` in a normal editor — or via the
    [MCP integration](04-operations.md#the-mcp-integration), which exposes
    `get_verb` / `set_verb` to an AI assistant.
-3. `@reload #17.wave` to load the disk change into the live server. No restart.
+3. Save. The watcher picks it up within ~2 seconds. (`@reload #17.wave` if you
+   want it *now*.)
 
-Because verb source is plain files, the whole world's behavior is diff-able and
-version-controlled — while remaining editable live from inside the game, with no
-build, reload, or restart in the in-game loop.
+Because verb source is mirrored to plain files, the whole world's behavior is
+diff-able and version-controlled — while remaining editable live from inside the
+game, with no build or restart in either loop.
+
+> **What is *not* hot:** engine Python under `moo/` — builtins, verb types,
+> the parser, the namespace builder. Those changes need `@restart`.
 
 ---
 
@@ -229,6 +248,7 @@ build, reload, or restart in the in-game loop.
 | `+show <object>` | gm1 | Noun/name/id, the full parent chain and location chain, owner, flags, children, contents. |
 | `+props[/all] <object>` | gm3 | Local property names (or, with `/all`, the whole inheritance chain grouped by object). |
 | `+verbs[/all] <object>` | gm3 | Local verb names (or the full chain); `*` marks the minimum-abbreviation point. |
+| `+decompile <object>.<verb>` | gm3 | Print a verb's source (requires `r` permission on the verb). |
 | `@list [<start>] [to <end>]` | gm3 | Objects in a number range, with parent and name. |
 | `eval <expr>` / `/ <expr>` | gm3 | Evaluate arbitrary Python in the verb context. `/len(db.objects())`, `/pobj.objnum`. |
 | `+pron` | gm2 | Reference table of pronoun substitution tokens. |
@@ -298,17 +318,18 @@ The full toolkit grouped by purpose. Minimum level in parentheses.
 **Objects:** `@make`(3), `@delete`(2), `@name`(2), `@desc`(2), `@adjective`(2),
 `@article`(2), `@trailer`(2), `@title`(2)
 
-**Properties & tags:** `@adprop`(3), `@rmprop`/`@remprop`(3), `@clear`(3),
-`@adtag`(3), `@rmtag`(3)
+**Properties & tags:** `@adprop`(3), `@set`/`@val`(3), `@unset`(3),
+`@rmprop`/`@remprop`(3), `@clear`(3), `@adtag`(3), `@rmtag`(3)
 
 **Messages:** `@success`(2), `@osuccess`(2), `@failure`(2), `@ofailure`(2),
 `@drop`(2), `@odrop`(2)
 
-**Verb programming:** `@adverb`(3), `@program`(3), `@reload`(3), `@rmverb`(3),
-`@min`(3), `@hideverb`(3), `@verbauth`(3)
+**Verb programming:** `@adverb`(3), `@program`/`@code`/`@prog`(3), `@reload`(3),
+`@rmverb`(3), `@adalias`(3), `@rmalias`(3), `@min`(3), `@hideverb`(3),
+`@unhideverb`(3), `@verbauth`(3)
 
 **Inspection:** `@examine`(3), `@list`(3), `+show`(1), `+props`(3), `+verbs`(3),
-`eval` / `/`(3), `+pron`(2), `@color`(1)
+`+decompile`(3), `eval` / `/`(3), `+pron`(2), `@color`(1)
 
 **Structure & movement:** `@parent`(3), `@move`(2), `@tel`/`@telq`(1)
 

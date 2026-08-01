@@ -37,18 +37,25 @@ if not target:
     pobj.msg(f"Exit '{dobj}' not found in this room.")
     return
 
-# Verify it's a directional exit (child of #21)
-direxit = db.get_object(21)
+# Verify it's a directional exit (child of #21).
+# The inheritance link is `parent` (an objnum); there is no `_parent_id`
+# attribute, so reading that one ended the walk on the first step and no
+# exit ever qualified.  #0 is its own parent, hence the seen-set.
 obj = target
 is_direxit = False
-while obj:
+seen = set()
+while obj is not None and obj.objnum not in seen:
+    seen.add(obj.objnum)
     if obj.objnum == 21:
         is_direxit = True
         break
-    parent_num = getattr(obj, '_parent_id', None)
-    if parent_num is None or parent_num < 0:
-        break
-    obj = db.get_object(parent_num)
+    parent = getattr(obj, 'parent', None)
+    if hasattr(parent, 'objnum'):
+        obj = parent
+    elif isinstance(parent, int) and parent >= 0:
+        obj = db.get_object(parent)
+    else:
+        obj = None
 
 if not is_direxit:
     pobj.msg(f"%<245>#{target.objnum}:{target.name}%n is not a directional exit.")

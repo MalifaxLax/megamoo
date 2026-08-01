@@ -12,341 +12,141 @@
 <p class="crumb"><a href="index.html">← MegaMOO Manual</a></p>
 
 <h1 class="wordmark" style="font-size:clamp(1.8rem,6vw,2.4rem)">Getting Started</h1>
-<p class="tagline">Copy a database, crank it up, and you are running a world.</p>
+<p class="tagline">Copy a world, run it, walk around in it.</p>
 
-<h2>The whole idea</h2>
+<h2>A world is a file</h2>
 
 <p>
-A MegaMOO world <em>is</em> its database file. The engine is stateless between
-runs: the code in <code>moo/</code> is the machinery, and every room, object,
-character, and verb lives inside a single SQLite file. That one fact is what
-makes getting started trivial, and it is worth internalising before anything
-else, because it explains everything below.
+Everything in your world — every room, object, character, and command — lives
+in one file. The program in <code>moo/</code> is just the machinery that brings
+that file to life. Once you know this, the rest follows: to make a new world you
+<em>copy the file</em>. To back one up, you copy it again. To try something
+reckless, you copy it, wreck the copy, and delete it.
 </p>
 
 <p>
-The repository ships with <code>mm.db</code> — a starter world of 157 objects
-containing the core prototypes, the out-of-character lobby, a working character
-generator, one in-character room, and a wizard account. To start developing you
-copy that file and run the copy. That is the entire onboarding procedure.
+MegaMOO comes with <code>mm.db</code>: a small starter world with a lobby, a
+character generator, one room to stand in, and a wizard account. Copy it, then
+run the copy.
 </p>
 
 <div class="term"><code><span class="p">$</span> python3 megamoo.py mm.db mygame.db     <span class="c"># make your own world</span>
 <span class="p">$</span> ./mm mygame.db                          <span class="c"># run it</span></code></div>
 
 <p>
-Connect a MUD client — or just <code>telnet localhost 6770</code> — and log in
-as <code>wizard</code> with the password <code>megamoo</code>. You are standing
-in the lobby of a world that is entirely yours to break.
-</p>
-
-<p>
-<code>./mm</code> is the development launcher. Every run gets the same three
-things, none of which you have to type:
-</p>
-
-<ul>
-<li>the <a href="#api">JSON API</a> enabled, with the token from
-    <code>~/.megamoo/token</code> — which is what lets an
-    <a href="#mcp">AI assistant</a> drive the world;</li>
-<li><a href="live-coding.html#disk">verb auto-reload</a> on, so editing a file
-    under <code>moo verbs/</code> pushes it into the running game;</li>
-<li>no ports named, because the engine picks free ones.</li>
-</ul>
-
-<p>
-It is only a convenience wrapper — <code>python3 megamoo.py mygame.db</code>
-runs the same server with none of those three, which is the right choice for a
-world with players on it. But <code>./mm</code> is the form worth learning,
-because it is the one that does not change when you start running two worlds at
-once.
+Now connect. Any MUD client will do, or plain <code>telnet localhost 6770</code>.
+Log in as <code>wizard</code> with the password <code>megamoo</code>, and you
+are standing in a world that is entirely yours.
 </p>
 
 <div class="warn">
     <span class="label">Change this first</span>
-    <p>The shipped wizard password is public knowledge — it is written in this
-       manual. Change it with <code>setpass</code> before the server is
-       reachable by anyone but you.</p>
+    <p>The wizard password is <code>megamoo</code> on every copy, and it is
+       printed in this manual, so it is not a secret. Change it with
+       <code>setpass</code> before anyone else can reach your world.</p>
 </div>
 
-<h2>Copying a database</h2>
+<h2>Copying, in a little more detail</h2>
 
 <p>
-The two-argument form is a copy operation, not a launch. Given a source and a
-destination it loads the source read-only, writes a fresh database at the
-destination, copies every object across, prints where it put the result, and
-<strong>exits</strong>. It does not start the server. Running the new world is
-a separate second command.
-</p>
-
-<div class="term"><code><span class="p">$</span> python3 megamoo.py mm.db mygame.db
-<span class="o">Creating new database: mygame.db</span>
-<span class="o">Created database with 157 objects</span>
-<span class="o">Database created successfully at mygame.db</span>
-<span class="o">Use this database to start the server:</span>
-<span class="o">  python megamoo.py mygame.db</span></code></div>
-
-<p>
-Because a world is just a file, you can also copy one with <code>cp</code>. The
-built-in form is safer while a server is live, though: it opens the source
-read-only and rebuilds the target cleanly, whereas copying a running database
-with <code>cp</code> can capture a torn snapshot if the server happens to be
-writing at that moment.
+Giving <code>megamoo.py</code> two names means "copy the first to the second."
+It makes the new world, tells you where it put it, and stops. It does not start
+the server — running the new world is the second command.
 </p>
 
 <div class="warn">
     <span class="label">Name the copy carefully</span>
-    <p>The second positional argument is guessed, not declared. A name
-       containing a dot is only treated as a database if it ends in
-       <code>.db</code> — so <code>megamoo.py mm.db mygame.sqlite</code>
-       silently reads <code>mygame.sqlite</code> as a <em>hostname to bind
-       to</em> and creates nothing. A bare number is read as a port, so
-       <code>megamoo.py mm.db 7777</code> runs <code>mm.db</code> itself rather
-       than copying it. And an existing destination is overwritten with only a
-       logged warning — no prompt.</p>
+    <p>The second name has to end in <code>.db</code>. Anything else is quietly
+       read as something other than a filename, and no copy is made. A bare
+       number is read as a port, so <code>megamoo.py mm.db 7777</code>
+       <em>runs</em> <code>mm.db</code> rather than copying it. And an existing
+       file at the destination is overwritten without asking.</p>
 </div>
 
-<h2 id="multi">Running several worlds at once</h2>
+<h2 id="multi">Running more than one world</h2>
 
 <p>
-Nothing in the engine is global. Each server process owns exactly one database
-file and its own listening ports, so you can run as many worlds side by side as
-you like: a stable world for players, a scratch copy for an experiment you
-expect to ruin, and a third holding last week's backup so you can compare
-behaviour between them. They share no state and cannot interfere with each
-other.
+Each world is a separate program with its own file, so you can run several at
+once and they cannot touch each other: the real one, a scratch copy you are
+about to ruin, and last week's backup for comparison. Start each the same way.
 </p>
 
-<div class="term"><code><span class="p">$</span> ./mm mm.db &amp;         <span class="c"># the stable world  — game 6770, API 7778</span>
-<span class="p">$</span> ./mm scratch.db &amp;    <span class="c"># somewhere to break things — game 6771, API 7779</span>
-<span class="p">$</span> ./mm backup.db &amp;     <span class="c"># last week, for comparison — game 6772, API 7780</span></code></div>
+<div class="term"><code><span class="p">$</span> ./mm mygame.db &amp;      <span class="c"># the real one</span>
+<span class="p">$</span> ./mm scratch.db &amp;     <span class="c"># somewhere to break things</span></code></div>
 
 <p>
-The same command three times, with nothing to keep distinct. A world starts at
-the configured port (6770 for the game, 7778 for the API) and, if that one is
-taken, moves up to the next free one, saying so in the log:
-<code>Port 6770 in use; auto-selected 6771</code>. You are told where each world
-landed rather than having to decide in advance.
+You do not assign ports. The first world takes 6770, the next takes 6771, and
+each one says which it got when it starts. If you need a specific number —
+because you told people where to connect, or a firewall expects it — ask for it
+and you will get it or an error, never a silent move:
 </p>
 
+<div class="term"><code><span class="p">$</span> ./mm mygame.db 6777</code></div>
+
+<h2>What <code>./mm</code> does for you</h2>
+
 <p>
-This is the workflow the copy command exists to serve. Testing a risky change
-does not mean backing up and restoring — it means copying the file, running the
-copy, and deleting it when you are done.
+<code>./mm</code> is a convenience wrapper. Every run gets three things you
+would otherwise have to arrange yourself:
 </p>
 
-<div class="note">
-    <span class="label">Which port did it get?</span>
-    <p>The startup log says, and so does the discovery file described below —
-       and if you are working through an AI assistant, <code>list_servers</code>
-       tells you every running world with its game and API port. Naming a port
-       yourself still works and still wins: <code>./mm mm.db --port 6777</code>
-       pins that exact port, and a collision then fails the boot instead of
-       moving the world somewhere your players are not looking.</p>
-</div>
-
-<h2>Command-line reference</h2>
-
-<div class="tablewrap">
-<table>
-<thead><tr><th>Form</th><th>Effect</th></tr></thead>
-<tbody>
-<tr><td><code>./mm world.db</code></td><td>Run <code>world.db</code> with the API on, on the first free ports. Extra flags are passed through.</td></tr>
-<tr><td><code>./mm</code></td><td>Same, for the only <code>.db</code> here — it will not guess between several.</td></tr>
-<tr><td><code>megamoo.py world.db</code></td><td>Run <code>world.db</code> on the first free port from 6770 up.</td></tr>
-<tr><td><code>megamoo.py world.db 7777</code></td><td>Run it on exactly port 7777; a collision is a startup error.</td></tr>
-<tr><td><code>megamoo.py world.db localhost 7777</code></td><td>Run it bound to a specific host and port.</td></tr>
-<tr><td><code>megamoo.py src.db new.db</code></td><td>Copy <code>src.db</code> to <code>new.db</code>, then exit.</td></tr>
-<tr><td><code>-i</code> / <code>--input</code></td><td>Source database (flag form of the first positional).</td></tr>
-<tr><td><code>-o</code> / <code>--output</code></td><td>Destination for a copy (flag form of the second).</td></tr>
-<tr><td><code>-p</code> / <code>--port</code></td><td>Pin the Telnet port instead of taking the first free one.</td></tr>
-<tr><td><code>--host</code></td><td>Address to bind (default <code>0.0.0.0</code>).</td></tr>
-<tr><td><code>--log-level</code></td><td><code>DEBUG</code>, <code>INFO</code>, <code>WARNING</code>, <code>ERROR</code>.</td></tr>
-<tr><td><code>--api</code></td><td>Enable the JSON API on the first free port from 7778 up (see below).</td></tr>
-<tr><td><code>--api-token</code></td><td>Shared secret the API requires.</td></tr>
-<tr><td><code>--api-port</code></td><td>Pin the API to an exact port instead of auto-selecting one.</td></tr>
-</tbody>
-</table>
-</div>
-
-<h2 id="api">The JSON API</h2>
+<ul>
+<li>free ports, as above;</li>
+<li><a href="live-coding.html#disk">verb auto-reload</a>, so editing a command's
+    file changes the running game;</li>
+<li>the <a href="#api">tooling connection</a> switched on, with a password kept
+    in <code>~/.megamoo/token</code>.</li>
+</ul>
 
 <p>
-Beyond the player-facing Telnet port, a server can expose a second,
-line-oriented JSON API for tooling. It is <strong>off by default</strong>, binds
-to <code>127.0.0.1</code> only, and requires a token. <code>./mm</code> turns it
-on for you and supplies the token:
+For a world with real players in it, <code>python3 megamoo.py mygame.db</code>
+runs the same server with none of the three — which is what you want once you
+are no longer editing it live.
 </p>
 
-<div class="term"><code><span class="p">$</span> ./mm mm.db
-<span class="o">mm: generated a new API token in /Users/you/.megamoo/token</span>
-<span class="o">Server listening on 0.0.0.0:6770</span>
-<span class="o">API server listening on 127.0.0.1:7778</span></code></div>
+<h2 id="api">Letting tools — and an AI assistant — into your world</h2>
 
 <p>
-The token is generated once, on first run, and kept in
-<code>~/.megamoo/token</code> — one secret shared by every world on the machine
-and by the MCP bridge below, so nothing has to be re-registered when you rotate
-it or add a world. Starting the server by hand is the same thing spelled out:
-</p>
-
-<div class="term"><code><span class="p">$</span> python3 megamoo.py mm.db --api --api-token "$(cat ~/.megamoo/token)"</code></div>
-
-<p>
-The API runs inside the same event loop as the game, so its handlers hold a
-direct reference to the live database. Changes made through it take effect
-immediately, in the running world, with no reload — which is precisely what
-makes it useful as a tooling surface rather than an administrative afterthought.
-</p>
-
-<h3>You do not assign ports</h3>
-
-<p>
-Neither port is yours to allocate. The game starts at 6770 and the API at 7778,
-and each walks upward to the first free one, so running a second world is the
-same command again:
-</p>
-
-<div class="term"><code><span class="p">$</span> ./mm mm.db
-<span class="o">Server listening on 0.0.0.0:6770</span>
-<span class="o">API server listening on 127.0.0.1:7778</span>
-<span class="p">$</span> ./mm scratch.db
-<span class="o">Port 6770 in use; auto-selected 6771</span>
-<span class="o">API port 7778 in use; auto-selected 7779</span></code></div>
-
-<p>
-The pair each world settled on is written to a <strong>discovery file</strong> —
-host, API port, <code>game_port</code>, pid, database path — so tools can find a
-server instead of being told where it is. The MCP bridge below reads it. It is
-deleted when the server shuts down, and one left behind by a crash is ignored,
-because the pid in it no longer names a live process.
+Alongside the door players use, a world can open a second, private door for
+software. It is off unless you ask for it, it only accepts connections from
+your own machine, and it needs the password mentioned above.
+<code>./mm</code> switches it on.
 </p>
 
 <p>
-<code>megamoo.py</code> writes that file beside the database
-(<code>mm.db</code> → <code>mm.db.api.json</code>). <code>./mm</code> writes it
-into <code>~/.megamoo/run/</code> instead, which is what lets tooling see worlds
-you started from other directories; the bridge looks in both places.
-</p>
-
-<div class="note">
-    <span class="label">When you do want a specific port</span>
-    <p><code>--port 6777</code> and <code>--api-port 7900</code> pin those exact
-       ports and turn the search off — naming a port means you want <em>that</em>
-       port, so a collision is a startup error (<code>address already in
-       use</code>, non-zero exit) rather than a silent move somewhere else. Use
-       them when something outside MegaMOO — a firewall rule, a tunnel, a DNS
-       entry, a fixed client config — depends on the number.</p>
-</div>
-
-<h2 id="mcp">MCP: driving the world from an AI assistant</h2>
-
-<p>
-MCP — the Model Context Protocol — is a standard way for an AI coding assistant
-to call tools that someone else has written. MegaMOO ships one at
-<code>tools/megamoo_mcp.py</code>: a small bridge that presents the JSON API as
-a set of MCP tools, so an assistant such as Claude Code can inspect and modify
-your running world directly instead of guessing at it from source files.
-</p>
-
-<p>
-The point is that the assistant is looking at the <em>live world</em> rather
-than the repository. It can read the actual property values on object #200,
-list the verbs a room really has, run a command as a test character and read
-what the game printed back, and tail the server log after a verb throws. Work
-that would otherwise be a loop of "edit a file, restart, reconnect, retype the
-command, squint at the output" collapses into the assistant doing it and
+The reason to care is that an AI assistant can then work <em>in your live
+world</em> rather than guessing from files. It can look at what is actually on
+object #200, run a command as a test character and read what the game printed
+back, fix a command that just threw an error, and check the log. The
+edit–restart–reconnect–retype loop collapses into asking for the change and
 reading the result.
 </p>
 
-<div class="tablewrap">
-<table>
-<thead><tr><th>Tool</th><th>What it does</th></tr></thead>
-<tbody>
-<tr><td><code>run_command</code></td><td>Execute a game command as a test character and return the output.</td></tr>
-<tr><td><code>get_object</code>, <code>get_location</code>, <code>list_contents</code></td><td>Inspect objects and where things are.</td></tr>
-<tr><td><code>list_verbs</code>, <code>get_verb</code>, <code>set_verb</code>, <code>delete_verb</code></td><td>Read and rewrite verb code in the live database.</td></tr>
-<tr><td><code>list_properties</code>, <code>get_property</code>, <code>set_property</code></td><td>Read and write properties.</td></tr>
-<tr><td><code>search_verbs</code>, <code>search_objects</code></td><td>Search the world by pattern or name.</td></tr>
-<tr><td><code>eval_code</code></td><td>Evaluate arbitrary Python against the live database.</td></tr>
-<tr><td><code>tail_log</code>, <code>server_status</code></td><td>Read the log and check whether the game is up.</td></tr>
-<tr><td><code>list_servers</code>, <code>use_database</code></td><td>See every running world, and choose which one to work on.</td></tr>
-</tbody>
-</table>
-</div>
-
 <p>
-Register the bridge with your assistant once. There is nothing to fill in — no
-port, no token:
+If you use Claude Code, connect it once and you are done:
 </p>
 
 <div class="term"><code><span class="p">$</span> claude mcp add megamoo -- python3 ~/megamoo/tools/megamoo_mcp.py</code></div>
 
 <p>
-The token comes from <code>~/.megamoo/token</code>, the same file
-<code>./mm</code> starts every world with. Set
-<code>-e MEGAMOO_API_TOKEN=…</code> if you would rather be explicit; the
-environment wins over the file.
-</p>
-
-<p>
-The bridge holds one lazy, auto-reconnecting connection, so it survives the
-game restarting underneath it. If the server is down entirely, the world-facing
-tools return a clear error rather than hanging — while <code>tail_log</code> and
-<code>server_status</code> keep working, since they read from disk. That is
-usually exactly when you need them.
-</p>
-
-<p>
-The bridge works out the address each time it connects, reading the discovery
-file the running server wrote — so it follows a world that came back on a
-different port without being re-registered. In order:
-<code>MEGAMOO_API_PORT</code> if you set one, then a world chosen with
-<code>use_database</code>, then <code>MEGAMOO_API_INFO</code> (a named discovery
-file), then <code>MEGAMOO_DB</code> (that database's file), then the only live
-discovery file it can find, then 7778.
-</p>
-
-<h3>Working on one world when several are running</h3>
-
-<p>
-With one world up, discovery is unambiguous and there is nothing to configure.
-With several, tell the assistant which you mean, in words:
-</p>
-
-<div class="term"><code><span class="p">you:</span> what worlds are running?
-<span class="o">assistant: two — mm.db (game 6770, API 7778) and scratch.db (game 6771, API 7779).</span>
-<span class="p">you:</span> work on scratch
-<span class="o">assistant: now on /Users/you/megamoo/scratch.db.</span></code></div>
-
-<p>
-That is <code>list_servers</code> and <code>use_database</code>. The choice
-holds for the rest of the conversation, takes effect on the next call, and needs
-no restart of the assistant or the bridge. <code>scratch</code>,
-<code>scratch.db</code> and a full path all name the same world.
+No port and no password in that line: it finds the running world by itself, and
+keeps working when the world restarts on a different port. With several worlds
+running, ask it which are up and which to work on — "what worlds are running?"
+and "work on scratch" are enough.
 </p>
 
 <div class="warn">
-    <span class="label">Know which world it is editing</span>
-    <p>Which database the assistant is pointed at decides which world your next
-       verb rewrite lands in — worth confirming before you let it write
-       anything. <code>server_status</code> always reports the database and port
-       it is actually talking to, and if several servers are advertising and
-       nothing says which, the bridge refuses to guess and lists what it found
-       rather than picking one.</p>
-</div>
-
-<div class="warn">
-    <span class="label">Treat the API as wizard access</span>
-    <p><code>eval_code</code> and <code>set_verb</code> execute arbitrary Python
-       against the live database. Anyone holding the token effectively owns the
-       world. Keep it localhost-only, never commit it, and do not enable the API
-       on a public-facing instance without understanding that.</p>
+    <span class="label">This door is wizard access</span>
+    <p>Anything coming through it can run any code against your world. Keep it
+       on your own machine, do not share the token, and do not switch it on for
+       a world strangers can reach. If you are letting an assistant work,
+       confirm which world it is pointed at before you let it write anything —
+       "scratch" and "the real one" are one word apart.</p>
 </div>
 
 <div class="pagenav">
     <a href="index.html"><span class="dir">Previous</span>MegaMOO Manual</a>
-    <a class="to-next" href="developing.html"><span class="dir">Next</span>Developing &amp; Building</a>
+    <a class="to-next" href="developing.html"><span class="dir">Next</span>Building Your World</a>
 </div>
 
 <div class="footer">

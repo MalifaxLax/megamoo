@@ -34,7 +34,7 @@ effects = getattr(this, 'effects', None) or []
 if effects and (effects_per_bite or uses < 1):
     chance = getattr(this, 'effect_chance', 100) or 100
     if _random.randint(1, 100) <= chance:
-        eu.trigger_all(pobj, effects)
+        $eu.trigger_all(pobj, effects)
 
 # Drinking messages (while uses remain)
 if uses > 0:

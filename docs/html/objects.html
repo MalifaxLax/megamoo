@@ -3,263 +3,151 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Objects, Names &amp; Numbers — MegaMOO Manual</title>
+<title>Making Things — MegaMOO Manual</title>
 <link rel="stylesheet" href="manual.css">
 </head>
 <body>
 <div class="wrap">
 
-<p class="crumb"><a href="index.html">MegaMOO Manual</a> → <a href="developing.html">Developing &amp; Building</a></p>
+<p class="crumb"><a href="index.html">MegaMOO Manual</a> → <a href="developing.html">Building Your World</a></p>
 
-<h1 class="wordmark" style="font-size:clamp(1.7rem,5.5vw,2.2rem)">01 · Objects, Names &amp; Numbers</h1>
-<p class="tagline">What things are, what they are called, and what number they get.</p>
+<h1 class="wordmark" style="font-size:clamp(1.7rem,5.5vw,2.2rem)">01 · Making Things</h1>
+<p class="tagline">Rooms, doors, and objects — built from inside the world.</p>
 
 <nav class="toc">
     <span class="kicker">On this page</span>
     <ol>
-        <li><a href="#prototypes">Prototypes and inheritance</a></li>
-        <li><a href="#names">Nouns and <code>name_mod_list</code></a></li>
-        <li><a href="#matching">How the matcher finds an object</a></li>
-        <li><a href="#numbers">Object numbers, <code>@fon</code> and <code>@foff</code></a></li>
+        <li><a href="#numbers">Everything has a number</a></li>
+        <li><a href="#rooms">Rooms and doors</a></li>
+        <li><a href="#things">Things</a></li>
+        <li><a href="#names">Naming, and why it matters</a></li>
     </ol>
 </nav>
 
 <!-- ================================================================= -->
-<h2 id="prototypes">Prototypes and inheritance</h2>
+<h2 id="numbers">Everything has a number</h2>
 
 <p>
-Every object has exactly one parent, and inherits that parent's verbs and
-property defaults. The shipped database is a shallow tree of prototypes you
-build on rather than replace:
+Every room, door, person and object in your world has a number:
+<code>#1</code>, <code>#200</code>, <code>#4051</code>. You will use those
+numbers constantly, because they are how you point at something precisely —
+there may be four swords in the room, but there is only one <code>#4051</code>.
+</p>
+
+<p>
+To find out what something is, stand near it and ask:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> +show sword          <span class="c"># quick summary, including its number</span>
+<span class="p">&gt;</span> @examine #4051       <span class="c"># everything: what it is, what it can do</span></code></div>
+
+<p>
+Things are also built <em>from</em> other things. A chair is made from the
+furniture prototype, a bottle from the container one. Whatever you build from,
+your new object starts out able to do everything that one could — so a chair you
+make can be sat on without you arranging anything.
+</p>
+
+<h2 id="rooms">Rooms and doors</h2>
+
+<p>
+Dig a room, then connect it. Digging creates the room off to one side; it is the
+exits that put it on the map.
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @dig ICRoom = The Old Library
+<span class="o">Created room #412.</span>
+<span class="p">&gt;</span> @open north to #412       <span class="c"># a compass exit from where you stand</span></code></div>
+
+<p>
+Exits come in kinds, and the kind decides how players deal with it:
 </p>
 
 <div class="tablewrap">
 <table>
-<thead><tr><th>Object</th><th>Is the parent of</th></tr></thead>
+<thead><tr><th>To make</th><th>Use</th></tr></thead>
 <tbody>
-<tr><td><code>#1</code> Root_Object</td><td>Everything. Carries <code>msg</code>, <code>msg_room</code>, <code>_title</code>.</td></tr>
-<tr><td><code>#10</code> BaseObject</td><td>The root of in-world things.</td></tr>
-<tr><td><code>#11</code> object</td><td>Generic scenery; rooms and exits descend from it.</td></tr>
-<tr><td><code>#12</code> item</td><td>Anything carriable.</td></tr>
-<tr><td><code>#15</code> BaseRoom</td><td><code>#16</code> OCRoom (out-of-character) and <code>#17</code> ICRoom.</td></tr>
-<tr><td><code>#20</code> BaseExit</td><td><code>#21</code> directional, <code>#22</code> walkable, <code>#23</code> closable, <code>#24</code> climbable, <code>#25</code> jumpable.</td></tr>
-<tr><td><code>#26</code> BaseContainer</td><td><code>#27</code> chests, <code>#28</code> cups and vessels.</td></tr>
-<tr><td><code>#30</code> BaseFurniture</td><td>Chairs, beds, tables.</td></tr>
-<tr><td><code>#35</code> BaseWearable</td><td>Clothing.</td></tr>
-<tr><td><code>#90</code> / <code>#91</code></td><td>Edibles and drinkables.</td></tr>
-<tr><td><code>#92</code> BaseMerchant</td><td>Shopkeeper price books.</td></tr>
-<tr><td><code>#3</code> Base_Character</td><td><code>#4</code> OCharacter, <code>#5</code> ICharacter. Carries every staff verb.</td></tr>
+<tr><td>A compass direction</td><td><code>@open north to #412</code></td></tr>
+<tr><td>Something you walk through — a gate, an arch</td><td><code>@gopen gate to #412</code></td></tr>
+<tr><td>A door that opens, closes and locks</td><td><code>@dopen oak door to #412</code></td></tr>
+<tr><td>Stairs or a ladder, to be climbed</td><td><code>@copen stairs to #412</code></td></tr>
+<tr><td>A gap, to be jumped</td><td><code>@jopen chasm to #412</code></td></tr>
 </tbody>
 </table>
 </div>
 
 <p>
-Create children with <code>@make &lt;parent&gt; = &lt;name&gt;</code>, and
-reparent with <code>@parent &lt;object&gt; = &lt;new parent&gt;</code>. The rule
-of thumb: if two objects need the same behaviour, it belongs on a shared parent.
-If exactly one object needs it, it belongs on that object — see the
-<a href="verbs.html#hooks"><code>verb_</code> hooks</a>.
+Each of these makes the return exit as well. Add <code>/noret</code> for a
+one-way trip.
+</p>
+
+<h2 id="things">Things</h2>
+
+<p>
+<code>@make</code> takes what to build from, and what to call it:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @make item = sword
+<span class="p">&gt;</span> @desc sword = A plain iron blade, notched near the hilt.</code></div>
+
+<p>
+Useful starting points are <code>item</code> (anything carriable),
+<code>object</code> (scenery that stays put), <code>BaseContainer</code> (things
+that hold other things), <code>BaseFurniture</code> and
+<code>BaseWearable</code>. <code>@examine</code> on something that already
+behaves the way you want will tell you what it was built from, which is usually
+the fastest way to find the right one.
 </p>
 
 <div class="note">
-    <span class="label">Defining versus setting</span>
-    <p>A property must be <em>defined</em> on the prototype for children to
-       inherit it. Setting a property on a template that was never defined
-       there can silently fail to propagate to clones — if a spawned object is
-       mysteriously missing a value, check that the parent actually declares
-       it with <code>@adprop</code>.</p>
+    <span class="label">Shared behaviour goes on the parent</span>
+    <p>If every lantern in your world should do something, put it on a lantern
+       prototype and build the lanterns from that. If exactly <em>one</em>
+       lantern is strange, put it on that lantern — see
+       <a href="verbs.html#hooks">making one object behave differently</a>.</p>
 </div>
 
-<!-- ================================================================= -->
-<h2 id="names">Nouns and <code>name_mod_list</code></h2>
+<h2 id="names">Naming, and why it matters</h2>
 
 <p>
-An object's displayed name is not typed in directly. It is <em>composed</em>
-from a base noun plus a five-slot list called <code>name_mod_list</code>:
+You do not type a display name in directly. You give an object a noun, and
+optionally an article, up to three adjectives, and a trailer — and the game
+assembles the name from those parts.
 </p>
 
-<div class="term"><code>[article, adj1, adj2, adj3, trailer]
-
-['a',   'old',  '',    '',  ''        ]  ->  "an old sword"
-['the', '',     '',    '',  ''        ]  ->  "the sword"
-['',    '',     '',    '',  '(broken)']  ->  "sword (broken)"</code></div>
+<div class="term"><code><span class="p">&gt;</span> @name #4051 = sword
+<span class="p">&gt;</span> @adjective #4051 = old rusty
+<span class="o">"an old rusty sword"</span></code></div>
 
 <p>
-The <code>_title</code> verb on <code>#1</code> reassembles
-<code>obj.name</code> and <code>obj.cname</code> (the capitalised form) from
-these parts whenever they change, and corrects <code>a</code> to <code>an</code>
-automatically based on the first letter of whatever follows. Note that the
-correction keys off the <em>adjective</em> when one is present — which is why
-"a old sword" becomes "an old sword" rather than tracking the noun.
+It sorts out <em>a</em> and <em>an</em> for you as the adjectives change. The
+reason for the fuss is that this is also how players refer to things. Because
+<em>rusty</em> is kept as a fact about the sword rather than buried in a line of
+text, all of these find it — and <code>get 2nd sword</code> picks the second one
+in the room:
 </p>
 
-<div class="tablewrap">
-<table>
-<thead><tr><th>Command</th><th>Slot it edits</th></tr></thead>
-<tbody>
-<tr><td><code>@name obj = sword</code></td><td>The <code>noun</code> itself.</td></tr>
-<tr><td><code>@article obj = the</code></td><td>Slot 0.</td></tr>
-<tr><td><code>@adjective obj = old rusty</code></td><td>Slots 1–3 (up to three; omit the value to clear).</td></tr>
-<tr><td><code>@trailer obj = (broken)</code></td><td>Slot 4.</td></tr>
-<tr><td><code>@title obj</code></td><td>Rebuild the display name from the current parts.</td></tr>
-</tbody>
-</table>
-</div>
-
-<p>
-This structure exists to serve the matcher. Because adjectives are discrete
-slots rather than words baked into a name string, <code>blue</code> is a fact
-about the object that can be tested, not a substring that has to be guessed at.
-</p>
+<div class="term"><code><span class="p">&gt;</span> get sword
+<span class="p">&gt;</span> get rusty sword
+<span class="p">&gt;</span> get the old rusty sword</code></div>
 
 <div class="warn">
-    <span class="label">Match words come from the noun</span>
-    <p>Containers are titled bare on purpose. A case of whiskey is "a case", not
-       "a case of fire whiskey", because the title feeds the matcher — put the
-       contents in the title and <code>drink whiskey</code> starts matching the
-       box. Describe contents in the description or via <code>look in</code>,
-       never in the name.</p>
+    <span class="label">Keep contents out of names</span>
+    <p>A case of whiskey should be called "a case", not "a case of fire
+       whiskey". Names are what players type at, so putting the contents in the
+       name means <code>drink whiskey</code> starts matching the box instead.
+       Say what is inside in the description, or let them
+       <code>look in</code> it.</p>
 </div>
-
-<div class="note">
-    <span class="label">Native attributes, not properties</span>
-    <p><code>noun</code> and <code>aliases</code> are columns on the object row,
-       not properties. Never <code>@adprop</code> them — set <code>noun</code>
-       directly. Adding a property that shadows a native attribute produces
-       confusing, hard-to-trace behaviour.</p>
-</div>
-
-<!-- ================================================================= -->
-<h2 id="matching">How the matcher finds an object</h2>
-
-<p>
-When a player types <code>get the 2nd blue sword</code>, the matcher decomposes
-that into three parts and tests candidates against all of them:
-</p>
-
-<div class="term"><code>"sword"            ->  noun="sword"  adjectives=[]        ordinal=0
-"blue sword"       ->  noun="sword"  adjectives=["blue"]  ordinal=0
-"2nd blue sword"   ->  noun="sword"  adjectives=["blue"]  ordinal=1</code></div>
-
-<p>
-The last token is the noun; everything before it is an adjective that must
-appear, in order, in the candidate's name or its <code>adjectives</code>
-property. A leading ordinal (<code>2nd</code>, <code>third</code>,
-<code>3</code>) selects the Nth match. Articles are ignored.
-</p>
-
-<p>
-There are two entry points, with deliberately different powers:
-</p>
-
-<div class="tablewrap">
-<table>
-<thead><tr><th>Function</th><th>Use in</th><th>Understands</th></tr></thead>
-<tbody>
-<tr><td><code>bmatch()</code></td><td>Staff verbs</td><td><code>me</code>, <code>here</code>, <code>my X</code>, ordinals, adjectives, <strong>plus <code>#N</code> dbrefs and <code>$constants</code></strong>.</td></tr>
-<tr><td><code>pmatch()</code></td><td>Player verbs</td><td>The same, <strong>minus</strong> <code>#N</code> and <code>$name</code>.</td></tr>
-</tbody>
-</table>
-</div>
-
-<div class="term"><code><span class="c"># search room + inventory</span>
-bmatch("sword", pobj, pobj.contents + pobj.location.contents)
-
-<span class="c"># search inside a specific container</span>
-bmatch("gem", pobj, chest.contents)
-
-<span class="c"># "my" restricts to the player's own things</span>
-bmatch("my key", pobj, [])</code></div>
-
-<div class="warn">
-    <span class="label">Use the right matcher</span>
-    <p>Calling <code>bmatch()</code> in a player-facing verb hands every player
-       the ability to act on any object in the database by number — reaching
-       into locked rooms, other people's inventories, anywhere. Player verbs use
-       <code>pmatch()</code>. This is the single easiest security mistake to
-       make in MegaMOO.</p>
-</div>
-
-<div class="note">
-    <span class="label">Also check <code>existent</code></span>
-    <p>Every unhidden player verb should verify <code>obj.existent == True</code>
-       after matching and treat a false result as no match. Recycled objects can
-       linger in a candidate list; this is the guard against acting on a corpse.</p>
-</div>
-
-<p>
-Rooms match exits through <code>match_exit</code> on <code>#15</code>, which
-uses <code>pmatch()</code> and therefore supports ordinals — <code>go 2 door</code>
-works in a room with two doors.
-</p>
-
-<!-- ================================================================= -->
-<h2 id="numbers">Object numbers, <code>@fon</code> and <code>@foff</code></h2>
-
-<p>
-New objects take <strong>the lowest unused, unreserved number</strong> — not the
-next number after the highest. Delete <code>#150</code> and the next thing you
-create becomes <code>#150</code>, landing in the middle of whatever range you
-had carefully laid out. Reservation is how you stop that.
-</p>
-
-<p>
-Reserved numbers are skipped by <code>create()</code> entirely. The starter
-database uses this: the gaps below <code>#201</code> are reserved, so a
-developer's first <code>@dig</code> lands at <code>#201</code> rather than
-filling a hole at <code>#50</code>.
-</p>
-
-<h3>Reserving a block outright</h3>
-
-<div class="term"><code>@reserve #500 to #599        <span class="c"># hands off this range</span>
-@reserve /free #500 to #599  <span class="c"># release it</span>
-@reserve /list               <span class="c"># show reserved blocks</span></code></div>
-
-<h3>A personal working range: <code>@fon</code> / <code>@foff</code></h3>
-
-<p>
-This pair exists for a builder who wants a private stretch of numbers to work
-in. Each staff member has a <code>free_obj</code> range on their character, and
-the two commands toggle whether the unused numbers in it are protected.
-</p>
-
-<div class="term"><code>@fon/set 500 to 599   <span class="c"># claim a personal range</span>
-@foff                 <span class="c"># RESERVE the unused numbers in it — protect them</span>
-@fon                  <span class="c"># UNRESERVE them — release for general use</span>
-@fon/list             <span class="c"># show what's currently reserved and unused</span>
-@fon/clear            <span class="c"># forget the range</span></code></div>
-
-<div class="warn">
-    <span class="label">The names read backwards</span>
-    <p><code>@foff</code> — "free off" — <em>reserves</em>, switching allocation
-       off for those numbers. <code>@fon</code> — "free on" — <em>unreserves</em>,
-       making them freely allocatable again. The verb is about whether the
-       numbers are <em>free to take</em>, not about whether your reservation is
-       on. Nearly everyone gets this backwards once.</p>
-</div>
-
-<p>
-The working pattern: <code>@fon/set</code> your range once, <code>@foff</code>
-to protect it while you build so nobody else's <code>@dig</code> lands inside
-it, and <code>@fon</code> when you are finished and the leftovers can go back
-into circulation.
-</p>
-
-<p>
-<code>@renumber &lt;object&gt; to &lt;n&gt;</code> (gm5) moves an existing object
-to a specific number. It does not chase down references stored in other objects'
-properties — exits, <code>plist</code>, globals — so verify afterwards.
-</p>
 
 <div class="pagenav">
-    <a href="developing.html"><span class="dir">Previous</span>Developing &amp; Building</a>
-    <a class="to-next" href="verbs.html"><span class="dir">Next</span>02 · Verbs &amp; the Parser</a>
+    <a href="developing.html"><span class="dir">Previous</span>Building Your World</a>
+    <a class="to-next" href="verbs.html"><span class="dir">Next</span>02 · Commands &amp; Behaviour</a>
 </div>
 
 <div class="footer">
-    <span><a href="developing.html">← Developing &amp; Building</a></span>
-    <span>01 · Objects, Names &amp; Numbers</span>
+    <span><a href="developing.html">← Building Your World</a></span>
+    <span>01 · Making Things</span>
 </div>
 
 </div>

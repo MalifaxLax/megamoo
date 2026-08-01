@@ -423,7 +423,7 @@ optional — the `cdrink` verb has a sensible fallback for each. The live
 | `value` | `57` | The unit price. Poured to order prices every serving from it (`value × mult`); `_cost` also falls back to it when a filled stock cup has no value of its own. |
 | `ceemits` | (see below) | Four message pools: `[player_prep, room_prep, player_raw, room_raw]`. |
 | `prepared` | `True` | Picks the prep pair vs. the raw pair from `ceemits`. Default `False`. |
-| `effects` | `[('drunk', 2, 60)]` | Effect tuples passed to `eu.trigger_all`. |
+| `effects` | `[('drunk', 2, 60)]` | Effect tuples passed to `$eu.trigger_all`. |
 | `effect_chance` | `75` | Percent chance effects apply. Default `100`. |
 | `effects_per_bite` | `False` | `False` = effects only on the last drink. Default `True`. |
 | `rt_dice` | `[1, 7, 0]` | Round-time dice `[num, sides, offset]`. Default `[1, 7, 0]`. |

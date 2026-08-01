@@ -3,176 +3,114 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Auth &amp; Hidden Verbs — MegaMOO Manual</title>
+<title>Who Can Do What — MegaMOO Manual</title>
 <link rel="stylesheet" href="manual.css">
 </head>
 <body>
 <div class="wrap">
 
-<p class="crumb"><a href="index.html">MegaMOO Manual</a> → <a href="developing.html">Developing &amp; Building</a></p>
+<p class="crumb"><a href="index.html">MegaMOO Manual</a> → <a href="developing.html">Building Your World</a></p>
 
-<h1 class="wordmark" style="font-size:clamp(1.7rem,5.5vw,2.2rem)">04 · Auth &amp; Hidden Verbs</h1>
-<p class="tagline">Who may do what, and what is not a command at all.</p>
+<h1 class="wordmark" style="font-size:clamp(1.7rem,5.5vw,2.2rem)">04 · Who Can Do What</h1>
+<p class="tagline">Handing out building rights without handing over the world.</p>
 
 <nav class="toc">
     <span class="kicker">On this page</span>
     <ol>
-        <li><a href="#ladder">The gm ladder</a></li>
-        <li><a href="#enforce">Two enforcement mechanisms</a></li>
-        <li><a href="#hidden">Hidden verbs</a></li>
-        <li><a href="#shadow">Verb shadowing</a></li>
+        <li><a href="#ladder">The five levels</a></li>
+        <li><a href="#hidden">Commands players should not see</a></li>
     </ol>
 </nav>
 
 <!-- ================================================================= -->
-<h2 id="ladder">The gm ladder</h2>
+<h2 id="ladder">The five levels</h2>
 
 <p>
-Authority is stored as a list of <code>gmN</code> strings on an object's
-<code>auth</code> property. <code>auth_level()</code> returns the highest level
-present, and <code>sync_auth_flags()</code> keeps the object's
-<code>PROGRAMMER</code> and <code>WIZARD</code> flags consistent with it —
-gm3 and above sets <code>PROGRAMMER</code>, gm4 and above sets
-<code>WIZARD</code>.
+Staff powers come in five steps, each including everything below it. Giving
+someone <code>gm2</code> makes them a builder who can dig rooms and name things,
+but not write code or hand out powers to anyone else.
 </p>
 
 <div class="tablewrap">
 <table>
-<thead><tr><th>Level</th><th>Role</th><th>Typical powers</th></tr></thead>
+<thead><tr><th>Level</th><th>They are</th><th>And can</th></tr></thead>
 <tbody>
-<tr><td><code>gm1</code></td><td>Basic builder</td><td><code>@color</code>, <code>@tel</code>, <code>hold</code>, <code>+show</code></td></tr>
-<tr><td><code>gm2</code></td><td>Advanced builder</td><td><code>@dig</code>, <code>@open</code>, <code>@desc</code>, <code>@name</code>, <code>@move</code>, <code>@delete</code></td></tr>
-<tr><td><code>gm3</code></td><td>Programmer</td><td><code>@adverb</code>, <code>@program</code>, <code>@set</code>, <code>eval</code>, <code>@make</code>, <code>@parent</code></td></tr>
-<tr><td><code>gm4</code></td><td>Wizard</td><td><code>@delplayer</code></td></tr>
-<tr><td><code>gm5</code></td><td>Super-wizard</td><td><code>@auth</code>, <code>@shutdown</code>, <code>@restart</code>, <code>@renumber</code>, <code>@reserve</code></td></tr>
+<tr><td><code>gm1</code></td><td>Trusted player</td><td>Teleport, hold things, inspect objects.</td></tr>
+<tr><td><code>gm2</code></td><td>Builder</td><td>Dig rooms, make exits, name and describe things, move and delete them.</td></tr>
+<tr><td><code>gm3</code></td><td>Programmer</td><td>Make objects, write commands, set properties, run code.</td></tr>
+<tr><td><code>gm4</code></td><td>Wizard</td><td>Remove player accounts.</td></tr>
+<tr><td><code>gm5</code></td><td>Owner</td><td>Grant levels, restart and shut down the server.</td></tr>
 </tbody>
 </table>
 </div>
 
-<p>
-Grant and revoke with <code>@auth &lt;player&gt; = add|remove &lt;level&gt;</code>.
-That command is gm5 only — the ability to hand out authority is itself the top
-of the ladder.
-</p>
+<div class="term"><code><span class="p">&gt;</span> @auth Ana = add gm2        <span class="c"># Ana can now build</span>
+<span class="p">&gt;</span> @auth Ana = remove gm2</code></div>
 
 <p>
-The levels are cumulative in effect but stored as a list, so a character can
-hold <code>['gm1', 'gm4']</code>; <code>auth_level()</code> reports
-<code>4</code>. The shipped wizard <code>#100</code> carries
-<code>['gm5']</code>.
+Only <code>gm5</code> may run that command — the power to hand out authority is
+itself the top of the ladder. Your wizard account starts there.
 </p>
 
-<!-- ================================================================= -->
-<h2 id="enforce">Two enforcement mechanisms</h2>
-
-<p>
-These are independent, and it is worth knowing which one you are relying on.
-</p>
-
-<h3>1. The guard clause</h3>
-
-<p>
-Most staff verbs simply begin by checking, which is why an unauthorised player
-gets a flat "Do what?" rather than a permission error — the verb declines to
-admit it exists:
-</p>
-
-<div class="term"><code>if auth_level(pobj) &lt; 3:
-    pobj.msg("Do what?")
-    return</code></div>
-
-<p>
-This is a convention, not a framework. It lives in the verb body, so it is
-visible in <code>+decompile</code> and easy to get wrong by omission. Every
-staff verb you write should open with one.
-</p>
-
-<h3>2. The verb's <code>auth</code> column</h3>
-
-<p>
-Separately, each verb row carries an auth level enforced by the engine
-<em>before the body runs at all</em>. Set it with:
-</p>
-
-<div class="term"><code>@verbauth #3.@telq = 3    <span class="c"># require gm3</span>
-@verbauth #3.@telq        <span class="c"># read the current setting</span>
-@adverb #3.@mycmd with auth=3   <span class="c"># or set it at creation</span></code></div>
-
-<p>
-Both walk the inheritance chain if the verb is not found locally. Belt and
-braces is normal: declare <code>auth=N</code> so the engine blocks the call, and
-keep the guard clause so the verb is safe if it is ever invoked
-programmatically.
-</p>
-
-<!-- ================================================================= -->
-<h2 id="hidden">Hidden verbs</h2>
-
-<p>
-Hiding is orthogonal to auth. A hidden verb is not invokable from the command
-line <em>by anyone</em>, regardless of level — it can only be reached
-programmatically through <code>call_verb()</code>.
-</p>
-
-<p>
-This is what internal hooks are for. <code>go_</code>, <code>at_post_move</code>,
-<code>_title</code>, <code>_resource</code> and the rest are machinery, not
-commands; a player typing <code>go_</code> should get nothing at all.
-</p>
-
-<div class="term"><code>@adverb/hidden #5.at_post_move   <span class="c"># create it hidden</span>
-@hideverb #5.at_post_move        <span class="c"># or hide it afterwards</span>
-@unhideverb #5.at_post_move      <span class="c"># reverse it</span></code></div>
-
-<p>
-By convention a leading underscore marks a verb as internal, and a trailing
-underscore marks a <a href="verbs.html#hooks">per-object hook</a>. Neither
-convention is the enforcement — <code>@hideverb</code> is. A hook you forget to
-hide is a command players can type.
-</p>
-
-<!-- ================================================================= -->
-<h2 id="shadow">Verb shadowing</h2>
-
-<p>
-A verb defined lower in the inheritance chain wins over one defined higher, and
-<strong>this happens silently</strong>. No warning, no log line. It is the
-intended mechanism — it is how a specific object overrides a shared prototype —
-but it is also the bug you will actually hit, because an accidental name
-collision looks exactly like an intentional override.
-</p>
-
-<p>
-When a command behaves in a way the code you are reading cannot explain, the
-question is always "which body is actually running?" Three commands answer it:
-</p>
-
-<div class="tablewrap">
-<table>
-<thead><tr><th>Command</th><th>Tells you</th></tr></thead>
-<tbody>
-<tr><td><code>+verbs &lt;object&gt;</code></td><td>What is attached to this object specifically.</td></tr>
-<tr><td><code>@examine &lt;object&gt;</code></td><td>Parent, owner, properties and verbs together.</td></tr>
-<tr><td><code>+decompile &lt;obj&gt;.&lt;verb&gt;</code></td><td>The source that is really being executed.</td></tr>
-</tbody>
-</table>
+<div class="note">
+    <span class="label">"Do what?" is the usual refusal</span>
+    <p>Staff commands do not announce themselves to people who may not use
+       them. Someone without the level who tries one gets the same
+       <code>Do what?</code> as if they had typed nonsense, rather than a
+       message advertising that a powerful command exists. That is
+       deliberate.</p>
 </div>
 
 <p>
-The same trap catches consumables: a <code>drink</code> verb added to a vessel
-will shadow the shared one on the room prototype, and the shared one is where
-all the interesting behaviour lives. Prefer a <code>drink_</code> hook over a
-<code>drink</code> override unless you genuinely mean to replace the command.
+When you write a command of your own, say what it requires as you make it and
+the game will refuse it before your code runs at all:
 </p>
+
+<div class="term"><code><span class="p">&gt;</span> @adverb #3.@mycmd with auth=3
+<span class="p">&gt;</span> @verbauth #3.@mycmd = 3     <span class="c"># or set it afterwards</span></code></div>
+
+<h2 id="hidden">Commands players should not see</h2>
+
+<p>
+Some things that look like commands are really machinery — the
+<a href="verbs.html#hooks">hooks</a> that let one door behave oddly, for
+instance. Nobody should be able to type <code>go_</code> and fire one directly,
+whatever their level.
+</p>
+
+<p>
+Hiding is separate from levels: a hidden command cannot be typed by
+<em>anyone</em>, and can only be reached by other code.
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @adverb/hidden #5.at_post_move   <span class="c"># create it hidden</span>
+<span class="p">&gt;</span> @hideverb #5.at_post_move        <span class="c"># or hide it afterwards</span>
+<span class="p">&gt;</span> @unhideverb #5.at_post_move      <span class="c"># and back again</span></code></div>
+
+<p>
+Names ending in an underscore are hooks by convention, and names starting with
+one are internal. The convention is a reminder, not a rule — a hook you forget
+to hide is a command your players can type.
+</p>
+
+<div class="warn">
+    <span class="label">Watch for name collisions</span>
+    <p>A command attached to an object beats one inherited from further up, and
+       this happens <strong>silently</strong>. That is the intended mechanism —
+       it is how one object overrides shared behaviour — but it is also what
+       actually catches people out. If a command has stopped behaving the way it
+       does elsewhere, look for a same-named one closer to hand:
+       <code>+verbs &lt;object&gt;</code>.</p>
+</div>
 
 <div class="pagenav">
-    <a href="live-coding.html"><span class="dir">Previous</span>03 · Live Programming</a>
-    <a class="to-next" href="commands.html"><span class="dir">Next</span>05 · Staff Command Reference</a>
+    <a href="live-coding.html"><span class="dir">Previous</span>03 · Changing Things Live</a>
+    <a class="to-next" href="commands.html"><span class="dir">Next</span>05 · Command Reference</a>
 </div>
 
 <div class="footer">
-    <span><a href="developing.html">← Developing &amp; Building</a></span>
-    <span>04 · Auth &amp; Hidden Verbs</span>
+    <span><a href="developing.html">← Building Your World</a></span>
+    <span>04 · Who Can Do What</span>
 </div>
 
 </div>

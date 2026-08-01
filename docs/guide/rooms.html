@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rooms &amp; Exits — MegaMOO Guide</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<p class="crumb"><a href="index.html">← MegaMOO Guide</a></p>
+
+<h1 class="wordmark" style="font-size:clamp(1.8rem,6vw,2.4rem)">Rooms &amp; Exits</h1>
+<p class="tagline">Digging rooms, connecting them, and what players see as they move.</p>
+
+<nav class="toc">
+    <span class="kicker">On this page</span>
+    <ol>
+        <li><a href="#dig">Digging a room</a></li>
+        <li><a href="#directional">Directional exits: @vopen and @open</a></li>
+        <li><a href="#named">Named exits: gates, doors, stairs, chasms</a></li>
+        <li><a href="#messages">Exit messages</a></li>
+    </ol>
+</nav>
+
+<h2 id="dig">Digging a room</h2>
+
+<p>
+<code>@dig</code> takes a room <em>type</em> and an optional name:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @dig ic = The Old Library
+<span class="o">Created room #412: The Old Library</span></code></div>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Type</th><th>Is</th><th>Use for</th></tr></thead>
+<tbody>
+<tr><td><code>ic</code></td><td>In-character room</td><td>The world itself. This is the usual answer.</td></tr>
+<tr><td><code>ooc</code></td><td>Out-of-character room</td><td>Lobbies, help areas, staff space.</td></tr>
+<tr><td><code>room</code></td><td>Plain base room</td><td>When you want neither of the above.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+Two switches are worth knowing. <code>@dig/types</code> lists the available
+types, and <code>@dig/tel</code> teleports you into the new room as soon as it
+is made:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @dig/tel ic = The Old Library</code></div>
+
+<p>
+A new room is not attached to anything. It exists, but there is no way to walk
+to it until you make an exit — that is the next step, and it is where the
+important decision is.
+</p>
+
+<h2 id="directional">Directional exits: @vopen and @open</h2>
+
+<p>
+There are two ways to make a compass exit, and they differ in a way that
+matters for the long-term health of your world.
+</p>
+
+<h3>@vopen — virtual, and what you should normally use</h3>
+
+<div class="term"><code><span class="p">&gt;</span> @vopen north to #412
+<span class="o">You created a new virtual north exit to #412:The Old Library.</span></code></div>
+
+<p>
+A virtual exit is not an object. The connection is recorded in a property on
+the room itself — the destination and the movement messages, stored in a single
+list slot for that direction. Nothing is created, and nothing is added to the
+room's contents.
+</p>
+
+<p>
+That is the whole advantage, and it compounds. A world built with
+<code>@vopen</code> has rooms containing only the things that are actually
+<em>in</em> them. Object numbers are not consumed by scaffolding. Listing a
+room's contents shows furniture and items rather than a dozen invisible exit
+objects, and every tool that walks the world stays fast and readable.
+</p>
+
+<div class="note">
+    <span class="label">@vopen requires a destination</span>
+    <p>You must give it a room that already exists:
+       <code>@vopen north to #412</code>. Dig the destination first, note its
+       number, then connect. If a virtual exit already exists in that
+       direction, MegaMOO tells you — and if it points somewhere else, it asks
+       before overwriting.</p>
+</div>
+
+<h3>@open — a real exit object</h3>
+
+<div class="term"><code><span class="p">&gt;</span> @open north to #412
+<span class="p">&gt;</span> @open south              <span class="c"># unlinked for now</span></code></div>
+
+<p>
+<code>@open</code> creates an actual exit object and puts it in the room. It can
+be created unlinked and connected later, and — because it is an object — it can
+carry properties and its own behaviour.
+</p>
+
+<p>
+Reach for it when the exit needs to be a <em>thing</em>: when you want to give
+it custom messages, hang behaviour on it, or have players interact with it
+directly. For a plain connection between two rooms, <code>@vopen</code> does the
+same job without leaving an object behind.
+</p>
+
+<p>
+The difference is visible the moment you look at the room. A virtual exit is
+marked <code>(v)</code> and belongs to the room; an object exit shows up with a
+number, because it is a thing lying there:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @vopen north to #205
+<span class="p">&gt;</span> @open south to #205
+<span class="p">&gt;</span> look
+<span class="o">Obvious Exits: `north`(v) -&gt; #205, #206:`a south` -&gt; #205</span>
+                     <span class="c">^ no object          ^ an object in the room</span></code></div>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th></th><th><code>@vopen</code></th><th><code>@open</code></th></tr></thead>
+<tbody>
+<tr><td>Creates an object</td><td>No</td><td>Yes</td></tr>
+<tr><td>Appears in room contents</td><td>No</td><td>Yes</td></tr>
+<tr><td>Destination</td><td>Required</td><td>Optional — can link later</td></tr>
+<tr><td>Custom messages</td><td>Via <code>@virtualize</code>, below</td><td>Directly</td></tr>
+<tr><td>Can carry behaviour</td><td>No</td><td>Yes</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="named">Named exits: gates, doors, stairs, chasms</h2>
+
+<p>
+Not every exit is a compass direction. These four create exits players refer to
+by name, and the one you choose decides how players get through it:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Command</th><th>Makes</th><th>Players</th></tr></thead>
+<tbody>
+<tr><td><code>@gopen gate to #412</code></td><td>A walkable exit</td><td><code>go gate</code></td></tr>
+<tr><td><code>@dopen oak door to #412</code></td><td>A door</td><td>Open, close, lock and unlock it</td></tr>
+<tr><td><code>@copen stairs to #412</code></td><td>A climbable exit</td><td><code>climb stairs</code></td></tr>
+<tr><td><code>@jopen chasm to #412</code></td><td>A jumpable exit</td><td><code>jump chasm</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+All four create the return exit at the destination automatically. Add
+<code>/noret</code> for a one-way trip:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @gopen/noret trapdoor to #412</code></div>
+
+<p>
+These all create objects — a door has to be an object, since it has a state
+players can change. <code>@dopen</code> requires a destination; the others can
+be linked later. Remove any exit with <code>@rmexit</code>.
+</p>
+
+<h2 id="messages">Exit messages</h2>
+
+<p>
+Three messages are shown when someone uses an exit, and each goes to a
+different audience:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Message</th><th>Seen by</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td><code>success</code></td><td>The person moving</td><td>—</td></tr>
+<tr><td><code>osuccess</code></td><td>Everyone else</td><td>The room being left</td></tr>
+<tr><td><code>odrop</code></td><td>Everyone else</td><td>The room being entered</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+So a single move produces three different lines of text, and the room you walk
+into sees you arrive. Set them with:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @success gate = You slip through the gate.
+<span class="p">&gt;</span> @osuccess gate = %S slips through the gate.
+<span class="p">&gt;</span> @odrop gate = %S arrives, breathing hard.</code></div>
+
+<p>
+<code>@success</code> and <code>@osuccess</code> shorten to <code>@succ</code>
+and <code>@osucc</code>; <code>@odrop</code> is already short. Give no message
+to clear one. <code>%S</code> stands in for whoever is moving, capitalised.
+</p>
+
+<h3>The defaults</h3>
+
+<p>
+Every exit starts with sensible messages already filled in, using the direction
+you gave it:
+</p>
+
+<div class="term"><code>success    You %MODE %1.               ->  "You walk north."
+osuccess   %S %OMODE %1.               ->  "Ana walks north."
+odrop      %S %OMODE in from the %1.   ->  "Ana walks in from the south."</code></div>
+
+<p>
+<code>%MODE</code> and <code>%OMODE</code> are filled in at the moment someone
+moves, with how they are moving — walk, walks; fly, flies. Notice that
+<code>odrop</code> uses the <em>reverse</em> direction, because to the room being
+entered the traveller comes in from the opposite side.
+</p>
+
+<h3>Custom messages on a directional exit</h3>
+
+<p>
+The message commands work on exit <em>objects</em>, so they cannot target a
+virtual exit — there is no object to name. If you want your own wording
+<em>and</em> a room free of exit objects, use all three commands in order:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @open east to #204
+<span class="o">You created a new exit #207:east. Exit linked to: #204:The Old Library</span>
+<span class="p">&gt;</span> @succ east = You duck through the low arch.
+<span class="p">&gt;</span> @osucc east = %S ducks through the low arch.
+<span class="p">&gt;</span> @odrop east = %S ducks in, brushing off dust.
+<span class="p">&gt;</span> @virtualize east
+<span class="o">Converted #207:an east (east) to virtual exit -&gt; #204:The Old Library.</span>
+<span class="o">Exit object #207 recycled.</span>
+<span class="p">&gt;</span> look
+<span class="o">Obvious Exits: `east`(v) -&gt; #204</span></code></div>
+
+<p>
+<code>@virtualize</code> moves the destination and all three messages into the
+room and recycles the exit object. You end up with exactly what
+<code>@vopen</code> would have built — carrying your wording instead of the
+defaults. This is the recommended way to make a directional exit that both
+reads well and leaves nothing behind.
+</p>
+
+<div class="pagenav">
+    <a href="objects.html"><span class="dir">Previous</span>Naming &amp; Creating Objects</a>
+    <a class="to-next" href="verbs.html"><span class="dir">Next</span>Verbs</a>
+</div>
+
+<div class="footer">
+    <span><a href="index.html">← MegaMOO Guide</a></span>
+    <span>Rooms &amp; Exits</span>
+</div>
+
+</div>
+</body>
+</html>

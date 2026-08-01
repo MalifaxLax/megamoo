@@ -124,7 +124,7 @@ are the conventional layout new content builds against:
 | #10 | BaseObject | #1 | Base for all game objects |
 | #11 | object | #10 | Generic object; defines the spatial put/get/look hooks |
 | #12 | item | #11 | Carriable item |
-| #14 | (login room) | — | OOC staging room where new connections arrive |
+| #14 | (login room) | #16 | OOC staging room where new connections arrive (`LOGIN_ROOM` in `moo/globals.py`) |
 | #15 | BaseRoom | #11 | Base room; `gmove` / `match_exit` |
 | #16 | OCRoom | #15 | OOC room; `go` / `look` |
 | #17 | ICRoom | #15 | IC room; `go` / `look` plus round-time checks |
@@ -173,20 +173,27 @@ stripped/negotiated, and the resulting command string is handed to the parser.
 
 1. Strip a leading `@` or `+` prefix if present (builder/utility commands).
 2. Detect the `/expr` eval shortcut and route it to the `eval` verb.
-3. Find the verb by searching the **player, then the player's location, then the
-   direct and indirect objects**, walking inheritance at each step. In practice
-   the player object only contributes staff verbs (from #3); the everyday
-   commands — `look`, `go`, `get`, `inventory` — are found on the room
-   (#16/#17), which is why a player standing in any room has the full command
-   set even though nothing is defined on the player itself.
+3. Find the verb by searching, in order, the **player**, the **player's
+   location**, the **other objects in that room**, and finally the **player's
+   inventory** — walking the inheritance chain at each step and stopping at the
+   first match. In practice the player object only contributes staff verbs (from
+   #3); the everyday commands — `look`, `go`, `get`, `inventory` — are found on
+   the room (#16/#17), which is why a player standing in any room has the full
+   command set even though nothing is defined on the player itself.
 4. Pull off MUSH-style switches (`look/brief` → verb `look`, switches
    `['brief']`).
 5. Split the remainder into a direct object, a preposition, and an indirect
-   object (`get <dobj> from <iobj>`), recording both the resolved object numbers
-   and the raw strings.
+   object (`get <dobj> from <iobj>`).
 
 The result carries `verb`, `verb_obj` (where the verb was found),
 `dobj`/`dobjstr`, `prep`, `iobj`/`iobjstr`, `argstr`, `args`, and `switches`.
+
+The parser also *attempts* object resolution, recording object numbers in
+`ParseResult.dobj` / `.iobj`. **Those numbers are then discarded**: the verb
+type's parse (step 4 below) overwrites the namespace's `dobj`/`iobj` with plain
+strings, and the `ParseResult` is consulted only as a fallback if that parse
+fails. Verbs match their own objects — see
+[Matching objects](02-writing-verbs.md#matching-objects).
 
 ### 3. Verb lookup
 
@@ -195,18 +202,24 @@ honoring local overrides, the resolved-verb cache, minimum abbreviations, and
 the hidden flag. It returns the defining object number and the verb definition —
 the latter pointing at the `.py` source to execute.
 
-### 4. Task creation and namespace setup
+### 4. Namespace setup and dispatch
 
-The verb does not run inline on the network thread. A **task** is created
-(`moo/tasks.py`) capturing the MOO context (player, this, caller, verb, args,
-dobj/prep/iobj), queued, and dispatched on the single verb-execution worker.
+The verb does not run inline on the event loop. `execute_command()` builds the
+namespace and hands the compiled code to a dedicated
+`ThreadPoolExecutor(max_workers=1)` — the single verb-execution worker — guarded
+by a 30-second `COMMAND_TIMEOUT`.
 
-When the task runs, `build_verb_namespace()` (`moo/verb_namespace.py`) constructs
-the local scope the verb code will see: a curated set of safe Python builtins,
-the core context variables (`pobj`, `this`, `db`, `args`, …), permission-checked
-`getattr`/`setattr`, the parsed command parts, messaging defaults, and the full
-MOO builtin library (`pmatch`, `call_verb`, `create`, `move`, `suspend`, …, plus
-the inherited `obj.msg` / `obj.msg_room` messaging verbs). This is enumerated in
+> A top-level player command does **not** go through the task queue. Nothing in
+> this path creates a `Task`. The queue and `VerbExecutor` (`moo/verbs.py`) serve
+> the *other* entry points — work scheduled by `delay()` / `fork()` — which is
+> also where `TaskLimits` applies. See [the task system](#the-task-system).
+
+`build_verb_namespace()` (`moo/verb_namespace.py`) constructs the scope the verb
+code will see: the injected Python builtins, the core context variables (`pobj`,
+`this`, `db`, `args`, …), permission-checked `getattr`/`setattr`, the parsed
+command parts, messaging defaults, and the full MOO builtin library (`pmatch`,
+`call_verb`, `create`, `move`, `delay`, …, plus the inherited `obj.msg` /
+`obj.msg_room` messaging verbs). This is enumerated in
 [Writing Verbs](02-writing-verbs.md#the-verb-namespace).
 
 The parsed command parts in that namespace are produced by the verb's **verb
@@ -258,20 +271,31 @@ The lifecycle above assumes a logged-in player. Getting there:
 
 ## The task system
 
-Every verb runs inside a managed **task** (`moo/tasks.py`), which is what makes
-in-world programming safe to expose:
+**Scheduled** work runs inside a managed **task** (`moo/tasks.py`) — the queue
+behind `delay()` and `fork()`:
 
-- **Resource limits** (`TaskLimits`): a tick budget, a wall-clock budget, a
-  maximum verb-call stack depth (50), and a maximum fork depth (10). A runaway
-  or maliciously recursive verb is bounded rather than able to wedge the server.
-- **`suspend(seconds)`** parks the task and automatically resumes it later — used
-  for delays, animations, and cooldowns without blocking anything else.
-- **`fork(...)`** schedules independent follow-up work, with fork-depth limits to
-  prevent fork bombs.
-- **State machine:** `PENDING → RUNNING → COMPLETED`, with `SUSPENDED` (resumable)
-  and `ERROR` / `ABORTED` terminal/branch states.
+- **Resource limits** (`TaskLimits`): a tick budget (100,000), a wall-clock
+  budget (5s), a maximum verb-call stack depth (50), and a maximum fork depth
+  (10).
+- **`delay(seconds, code, context)`** schedules a code string to run later
+  without blocking. **`fork(seconds, code, context)`** does the same for
+  independent follow-up work, with fork-depth limits to prevent fork bombs.
+  **`pause(seconds)`** is the blocking alternative — it sleeps the shared worker,
+  and is capped at 30s.
+- **State machine:** `PENDING → RUNNING → COMPLETED`, with `SUSPENDED` (used by
+  the scheduler for not-yet-due work) and `ERROR` / `ABORTED` states.
 
-See [Writing Verbs](02-writing-verbs.md#tasks-suspend-and-fork) for the
+Two caveats worth stating plainly:
+
+- **There is no `suspend()` builtin.** Verb code cannot park itself mid-execution
+  and resume in place; `SUSPENDED` is an internal scheduler state, not an API.
+- **`TaskLimits` does not bound top-level player commands**, which bypass the
+  queue (see [step 4](#4-namespace-setup-and-dispatch)). Their guard is the
+  30-second `COMMAND_TIMEOUT`, plus `MAX_VERB_DEPTH` inside `call_verb`. A verb
+  that spins for 29 seconds will stall every other player, because all verb code
+  shares one worker thread.
+
+See [Writing Verbs](02-writing-verbs.md#timing-pause-delay-and-fork) for the
 author-facing API.
 
 ---
@@ -287,19 +311,25 @@ State lives in **SQLite** (`moo/database.py`), not in a flat memory image:
   pressure, so a large world does not require holding every object in memory.
 - **Checkpointing:** the server periodically writes checkpoint snapshots
   (interval and retention are configurable; see
-  [Operations](04-operations.md#configuration)) into a `db_checkpoints/`
-  directory, pruning old ones.
+  [Operations](04-operations.md#configuration)) into a `<dbname>_checkpoints/`
+  directory beside the database file — `mm.db` checkpoints into
+  `mm_checkpoints/` — pruning old ones.
 - **Database creation:** pointing the server at a non-existent database, or
   giving a template plus an output path, initializes a new database; see
   [Operations](04-operations.md#creating-a-database).
 
-A note on what is *not* in the database: **verb source lives on disk** under
-`moo verbs/<objnum>/<verbname>.py`, resolved relative to the `moo_verb_path`
-config stored on #8. Editing a verb in-game with `@program` compiles and installs
-it live *and* writes the file (hot coding — no reload step); `@reload` covers the
-reverse, pulling in verbs edited on disk. This is what makes it practical to edit
-verbs in a normal editor (or via the MCP integration) and keep them under version
-control. See [Hot coding](03-building-worlds.md#hot-coding-no-reloads).
+**Verb source is stored twice, deliberately.** The authoritative copy at runtime
+is the `code` column of the `verbs` table — that is what the engine compiles and
+executes. It is *mirrored* to disk under `moo verbs/<objnum>/<verbname>.py`,
+resolved relative to the `moo_verb_path` config stored on #8, so the world's
+behavior is diff-able and version-controlled.
+
+The two are kept in sync from both directions: `@program` compiles, installs into
+the live database, and writes the file in one step; and a background watcher
+(on by default, polling every 2s) re-loads any verb file whose mtime changes on
+disk, so edits from an external editor, `git pull`, or the MCP bridge go live
+without a command. `@reload` forces that same disk→database pull on demand. See
+[Hot coding](03-building-worlds.md#hot-coding-no-reloads).
 
 ---
 
@@ -337,8 +367,9 @@ connections, timers, and the API are all coroutines on one event loop, but verb
 code runs on a single one-worker executor so that the object database is only
 ever mutated by one verb at a time. This sidesteps the entire class of data races
 that a multi-threaded object store would invite, and it matches the MOO mental
-model: the world advances one action at a time. Long-running work cooperates via
-`suspend`/`fork` and the task scheduler rather than by blocking the loop.
+model: the world advances one action at a time. Long-running work should be
+handed to `delay()` / `fork()` and the task scheduler rather than blocking that
+worker — `pause()` blocks it, and so does any slow verb.
 
 The trade-off — a single CPU core for verb execution — is the right one for a
 text world, where the work per command is tiny and correctness of shared state

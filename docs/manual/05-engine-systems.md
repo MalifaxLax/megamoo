@@ -168,17 +168,22 @@ characters carry no live tickers.
 
 Effects are timed, repeating, optionally-stacking modifiers — poison ticking
 damage, regeneration restoring it, intoxication wearing off — built on top of the
-ticker. The whole system is one utility object: **#53**, aliased **`$eu`** (and
-also injected as `eu`). Source: `moo/effects.py`, with the callable verbs in
-`moo verbs/53/`.
+ticker. The whole system is one utility object: **#53**, reached as **`$eu`**.
+Source: `moo/effects.py`, with the callable verbs in `moo verbs/53/`.
+
+> **Write `$eu`, not `eu`.** There is no bare `eu` name in the verb namespace.
+> `$eu` is a [named object constant](02-writing-verbs.md#named-object-constants):
+> the preprocessor rewrites it to `db.get_object(0).eu`, which resolves to #53.
+> The namespace does also carry the manager module as `_effects`, but `$eu` is
+> the form to use.
 
 ### API
 
 ```python
-eu.trigger(pobj, name, ticks, interval, *args, **kwargs)
-eu.trigger_all(pobj, effects_list)
-eu.cancel(pobj, name=None)
-eu.list_active(pobj)
+$eu.trigger(pobj, name, ticks, interval, *args, **kwargs)
+$eu.trigger_all(pobj, effects_list)
+$eu.cancel(pobj, name=None)
+$eu.list_active(pobj)
 ```
 
 | Method | Purpose |
@@ -189,8 +194,8 @@ eu.list_active(pobj)
 | `list_active(pobj)` | Return the active effects on `pobj` (name, remaining, tick, interval). |
 
 ```python
-eu.trigger(pobj, "poison", 5, 3, damage=10)        # 5 ticks, every 3s, 10 dmg each
-eu.trigger_all(pobj, [("poison", 5, 3, 10), ("regen", 10, 6)])
+$eu.trigger(pobj, "poison", 5, 3, damage=10)       # 5 ticks, every 3s, 10 dmg each
+$eu.trigger_all(pobj, [("poison", 5, 3, 10), ("regen", 10, 6)])
 ```
 
 ### Effect callbacks
@@ -212,7 +217,7 @@ pobj.msg("The world sways around you." if remaining else "Your head begins to cl
 ```
 
 Adding a new effect type is therefore just: write a `do_<name>` verb on #53, then
-`eu.trigger(pobj, "<name>", ...)` from anywhere.
+`$eu.trigger(pobj, "<name>", ...)` from anywhere.
 
 ### Stacking and persistence
 

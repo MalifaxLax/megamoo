@@ -1,4 +1,4 @@
-### MegaMOO Developer Manual
+# MegaMOO Developer Manual
 
 MegaMOO is a **scratch-built native-Python codebase** in the tradition of
 [LambdaMOO](https://en.wikipedia.org/wiki/LambdaMOO) — a persistent, multiplayer,
@@ -99,9 +99,9 @@ else:
 ```
 
 No imports, no boilerplate. The verb namespace arrives pre-loaded with the
-acting player (`pobj`), the parsed command (`args`, `dobj`, `iobj`), object
-matching (`pmatch`), cross-object calls (`call_verb`), and the rest of the
-builtin library. Objects are matched the way a player thinks — `jump gap`,
+acting player (`pobj`), the parsed command text (`args`, `dobj`, `iobj` — all
+strings), object matching (`pmatch`, which turns that text into objects),
+cross-object calls (`call_verb`), and the rest of the builtin library. Objects are matched the way a player thinks — `jump gap`,
 `jump 2nd rope` — and the verb reads top to bottom like the action it performs.
 [Writing Verbs](02-writing-verbs.md) explains every name in that namespace.
 
@@ -129,7 +129,8 @@ with what it buys and what it costs.
    **write and edit from inside the running game** with the `@program` verb: on
    save it compiles and installs the verb into the live world (and writes the file
    to disk) in one step — **no reload, no restart, no build.** The change is live
-   on the next invocation. Because the language is Python, the barrier to
+   on the next invocation. The reverse direction is hot too: a background watcher
+   picks up verb files edited on disk within a couple of seconds. Because the language is Python, the barrier to
    contributing is low and the pool of potential authors is everyone who already
    knows Python.
 
@@ -187,4 +188,4 @@ with what it buys and what it costs.
 
 ## License
 
-##### MIT — see [LICENSE](../../LICENSE).
+MIT — see [LICENSE](../../LICENSE).

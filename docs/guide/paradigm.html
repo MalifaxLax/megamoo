@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The MOO Paradigm — MegaMOO Guide</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<p class="crumb"><a href="index.html">← MegaMOO Guide</a></p>
+
+<h1 class="wordmark" style="font-size:clamp(1.8rem,6vw,2.4rem)">The MOO Paradigm</h1>
+<p class="tagline">Why this shape suits virtual worlds.</p>
+
+<h2>The world contains its own code</h2>
+
+<p>
+In most game engines the world and the program are separate. Content sits in
+data files, behaviour sits in a compiled program, and changing either means
+stopping the game, rebuilding, and starting it again.
+</p>
+
+<p>
+A MOO does not work that way. The world is a set of numbered objects held in a
+live database — and the code that gives those objects behaviour is stored
+<em>on the objects themselves</em>, in the same database. There is no separate
+program holding the rules. A room knows how to be looked at because it carries
+the instructions for being looked at.
+</p>
+
+<p>
+The consequence is that building and programming become the same activity,
+performed with the same commands, at the same time, on a world that is running
+with people in it.
+</p>
+
+<h2>The four ideas</h2>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Idea</th><th>What it means</th></tr></thead>
+<tbody>
+<tr><td><strong>Objects have numbers</strong></td><td>Every room, exit, item and character is an object with a permanent number — <code>#17</code>, <code>#412</code>. Names are for players; numbers are how you refer to something exactly.</td></tr>
+<tr><td><strong>Single-parent inheritance</strong></td><td>Every object is made from one other object and inherits its behaviour. A chair made from the furniture prototype can be sat on before you write anything.</td></tr>
+<tr><td><strong>Verbs live on objects</strong></td><td>A command is a small Python file attached to an object. <code>look</code> is not a feature of the engine; it is a verb sitting on the room prototypes.</td></tr>
+<tr><td><strong>A natural-language parser</strong></td><td>Players type <code>put the blue sword in the oak chest</code>, and the engine splits that into a verb, a direct object, a preposition and an indirect object before your code runs.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>Why this is right for virtual worlds</h2>
+
+<h3>Behaviour lives with the thing that has it</h3>
+
+<p>
+A virtual world is mostly exceptions. One door is locked. One statue answers
+questions. One cup refills itself. In a conventional engine each exception is a
+special case somewhere in a central system, and those special cases accumulate
+until the movement code knows about every strange door in the world.
+</p>
+
+<p>
+Here, the strange door carries its own instructions and nothing else changes.
+The general case stays simple no matter how many exceptions you add, because
+each exception is attached to the object that is exceptional.
+</p>
+
+<h3>Inheritance keeps that from becoming chaos</h3>
+
+<p>
+The counterpart to per-object behaviour is shared behaviour. Write the common
+case once on a prototype and every object made from it gets it. Change the
+prototype and they all change together. The rhythm of building is: define the
+common case on a parent, override the exception on the one object that needs
+it.
+</p>
+
+<h3>Nothing has to stop</h3>
+
+<p>
+Because behaviour is data in the database, changing it takes effect at once.
+You do not reproduce a problem in a test copy and deploy a fix. You stand next
+to the broken door, fix it, and try the door again — while players are walking
+around you.
+</p>
+
+<h3>Growth is incremental</h3>
+
+<p>
+You are never building an application that will one day contain a world. The
+world exists from the first minute; you add one room, one object, one behaviour
+at a time, and it is always running. That is why MOO worlds get built at all:
+the next step is always small.
+</p>
+
+<div class="note">
+    <span class="label">One thing to unlearn</span>
+    <p>Everyday commands are not attached to players. In MegaMOO they live on
+       the <em>room</em> prototypes, because the room is what decides what is
+       possible inside it. If you go looking for <code>look</code> on a
+       character, you will not find it. Character objects carry only staff
+       commands.</p>
+</div>
+
+<div class="pagenav">
+    <a href="index.html"><span class="dir">Previous</span>What MegaMOO Is</a>
+    <a class="to-next" href="getting-started.html"><span class="dir">Next</span>Getting Started</a>
+</div>
+
+<div class="footer">
+    <span><a href="index.html">← MegaMOO Guide</a></span>
+    <span>The MOO Paradigm</span>
+</div>
+
+</div>
+</body>
+</html>

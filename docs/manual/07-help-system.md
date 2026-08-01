@@ -1,4 +1,4 @@
-### 07 — The Help System
+# 07 — The Help System
 
 The in-game `help` command is the player's and builder's window into the world.
 This chapter documents how it resolves a request, where help content lives, and

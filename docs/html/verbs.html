@@ -3,364 +3,190 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Verbs &amp; the Parser — MegaMOO Manual</title>
+<title>Commands &amp; Behaviour — MegaMOO Manual</title>
 <link rel="stylesheet" href="manual.css">
 </head>
 <body>
 <div class="wrap">
 
-<p class="crumb"><a href="index.html">MegaMOO Manual</a> → <a href="developing.html">Developing &amp; Building</a></p>
+<p class="crumb"><a href="index.html">MegaMOO Manual</a> → <a href="developing.html">Building Your World</a></p>
 
-<h1 class="wordmark" style="font-size:clamp(1.7rem,5.5vw,2.2rem)">02 · Verbs &amp; the Parser</h1>
-<p class="tagline">From a typed line to your code, and how to bend the path.</p>
+<h1 class="wordmark" style="font-size:clamp(1.7rem,5.5vw,2.2rem)">02 · Commands &amp; Behaviour</h1>
+<p class="tagline">Every command in the game is a short file you can open and change.</p>
 
 <nav class="toc">
     <span class="kicker">On this page</span>
     <ol>
-        <li><a href="#pipeline">The command pipeline</a></li>
-        <li><a href="#mastverb">MasterVerb and the verb-type system</a></li>
-        <li><a href="#custom">Writing a custom verb type</a></li>
-        <li><a href="#namespace">Inside a verb: the injected namespace</a></li>
-        <li><a href="#hooks">The <code>verb_</code> hook convention</a></li>
+        <li><a href="#what">What a command actually is</a></li>
+        <li><a href="#pipeline">How a typed line reaches your code</a></li>
+        <li><a href="#inside">What you get to work with</a></li>
+        <li><a href="#hooks">Making one object behave differently</a></li>
     </ol>
 </nav>
 
 <!-- ================================================================= -->
-<h2 id="pipeline">The command pipeline</h2>
+<h2 id="what">What a command actually is</h2>
 
 <p>
-When a player sends a line, the server resolves it in stages. Understanding the
-order matters, because it explains both why abbreviations work and why a verb
-you just added is sometimes shadowed by one you forgot about.
+A command is called a <strong>verb</strong>, and a verb is a small Python file
+attached to an object. When someone types <code>look</code>, the game finds the
+verb named <code>look</code> and runs its file. That is the whole idea. There is
+no separate language to learn and no build step — save the file, and the next
+person to type the command runs your new version.
 </p>
 
-<ol>
-<li><strong>Split the command word</strong> from the rest of the line. Anything
-    after the first space is the raw argument string.</li>
-<li><strong>Strip MUSH-style switches.</strong> <code>look/brief north</code>
-    yields verb <code>look</code> with <code>switches = ['brief']</code>.</li>
-<li><strong>Find a matching verb</strong> by walking the object's own verbs and
-    then up the inheritance chain, checking the command word against each
-    verb's key and aliases.</li>
-<li><strong>Parse the arguments</strong> using the matched verb's type,
-    populating <code>dobj</code>, <code>prep</code>, <code>iobj</code> and
-    friends.</li>
-<li><strong>Run</strong> <code>at_pre_cmd()</code>, then <code>func()</code>,
-    then <code>at_post_cmd()</code>.</li>
-</ol>
+<div class="term"><code><span class="c"># the `read` verb on a book</span>
+if not args:
+    pobj.msg("Read what?")
+    return
 
-<h3>Abbreviation matching</h3>
+pobj.msg(this.text or "There is nothing written on it.")</code></div>
 
 <p>
-Each verb name carries a <code>min</code> — the fewest characters that will
-match it. A <code>min</code> of 0 demands the full name. With
-<code>min=3</code>, <code>@cre</code> fires <code>@create</code>. The
-<code>@</code> and <code>+</code> prefixes are matched separately and must
-agree, so <code>@cre</code> will never reach a verb named <code>create</code>.
+Two things are worth noticing. Nothing is imported: <code>pobj</code> (the
+person typing), <code>this</code> (the object the verb is on) and
+<code>args</code> (whatever they typed after the command) are simply there.
+And the file reads top to bottom like the action it describes — check for a
+problem, say something, stop.
 </p>
 
-<div class="term"><code>@min #2.examine = 3           <span class="c"># 'exa' now matches</span>
-@adverb #2.examine(3),look(1),l   <span class="c"># or set it at creation</span></code></div>
+<h2 id="pipeline">How a typed line reaches your code</h2>
 
 <p>
-Object resolution — turning <code>the 2nd blue sword</code> into an actual
-object — is covered in
-<a href="objects.html#matching">Objects, Names &amp; Numbers</a>.
+When someone sends a line, the game splits off the first word, looks for a verb
+of that name — first on the objects nearby, then on what those objects inherit
+from — and runs it, having already broken the rest of the line into useful
+pieces for you.
 </p>
 
-<!-- ================================================================= -->
-<h2 id="mastverb">MasterVerb and the verb-type system</h2>
-
 <p>
-Every verb is backed by a <em>verb type</em> — a class that decides how the
-argument string is dissected before your code runs. There are two in the base
-hierarchy:
+Names can be abbreviated. Each verb says how few letters will do: with three,
+<code>@cre</code> is enough for <code>@create</code>. Set it when you make the
+verb, or afterwards:
 </p>
 
-<div class="term"><code>BaseVerb              Minimal. Lifecycle hooks, name matching. No argument parsing.
-  └── MasterVerb      Adds full direct-object / preposition / indirect-object parsing.</code></div>
+<div class="term"><code><span class="p">&gt;</span> @min #2.examine = 3           <span class="c"># 'exa' now matches</span></code></div>
+
+<div class="note">
+    <span class="label">Why a new command sometimes seems ignored</span>
+    <p>The search stops at the first match. If a verb of that name already
+       exists somewhere closer — on the object rather than what it inherits
+       from — yours never gets a turn. It is nearly always a name collision,
+       not a broken file.</p>
+</div>
+
+<h2 id="inside">What you get to work with</h2>
 
 <p>
-<strong>MasterVerb is the default and the right answer nearly always.</strong>
-Its <code>parse()</code> splits the arguments on the first recognised
-preposition and hands your code a structured view:
-</p>
-
-<div class="term"><code>Input                        dobj          prep         iobj
----------------------------  ------------  -----------  ---------
-sword                        'sword'       ''           ''
-blue sword from chest        'blue sword'  'from'       'chest'
-under old chest              'old chest'   'under'      ''
-ball from under old bed      'ball'        'from under' 'old bed'
-#10 = Rusty Sword            '#10'         '='          'Rusty Sword'</code></div>
-
-<p>
-Single-character prepositions — <code>=</code>, <code>:</code>, <code>?</code>,
-<code>.</code> — are tried first and do not need surrounding spaces, which is
-what makes <code>@desc #14=A room</code> parse identically to
-<code>@desc #14 = A room</code>. A second preposition, if present, populates
-<code>prep2</code> and <code>dobj2</code>.
+Every verb file starts with these already available:
 </p>
 
 <div class="tablewrap">
 <table>
-<thead><tr><th>Attribute</th><th>Holds</th></tr></thead>
+<thead><tr><th>You get</th><th>Which is</th></tr></thead>
 <tbody>
-<tr><td><code>dobj</code> / <code>dobjlist</code></td><td>Direct object, as a string and as words.</td></tr>
-<tr><td><code>prep</code> / <code>preplist</code></td><td>The first preposition found.</td></tr>
-<tr><td><code>iobj</code> / <code>iobjlist</code></td><td>Indirect object.</td></tr>
-<tr><td><code>prep2</code> / <code>dobj2</code> / <code>dobjlist2</code></td><td>A second preposition and what follows it.</td></tr>
-<tr><td><code>lhs</code> / <code>rhs</code></td><td>Everything left / right of the first preposition.</td></tr>
-<tr><td><code>switches</code></td><td>MUSH-style switches from <code>verb/sw1/sw2</code>.</td></tr>
-<tr><td><code>arglist</code></td><td>The whole argument string split into words.</td></tr>
-<tr><td><code>match</code></td><td>The regex match object, or <code>None</code>.</td></tr>
+<tr><td><code>pobj</code></td><td>The person who typed the command.</td></tr>
+<tr><td><code>this</code></td><td>The object the verb is attached to.</td></tr>
+<tr><td><code>location</code></td><td>The room they are standing in.</td></tr>
+<tr><td><code>args</code></td><td>Everything typed after the command word.</td></tr>
+<tr><td><code>dobj</code> / <code>iobj</code></td><td>The line already split around words like <em>from</em>, <em>in</em> and <em>to</em> — in <code>put sword in chest</code>, the sword and the chest. These are <em>text</em>, not objects.</td></tr>
+<tr><td><code>pmatch()</code></td><td>Turns that text into a real object the way a player means it — <code>the 2nd blue sword</code> included.</td></tr>
+<tr><td><code>call_verb()</code>, <code>move()</code>, <code>create()</code>, <code>search()</code></td><td>The everyday tools. The rest of Python's standard library works too.</td></tr>
 </tbody>
 </table>
 </div>
 
-<p>
-Reach for <strong>BaseVerb</strong> only when standard parsing is actively in
-your way — a verb whose argument is a free-form sentence that must not be split
-on the word "to", say, or one that wants a regex of its own. You then own
-<code>parse()</code> entirely.
-</p>
-
-<!-- ================================================================= -->
-<h2 id="custom">Writing a custom verb type</h2>
+<h3 id="messaging">Saying things</h3>
 
 <p>
-A verb type is an ordinary Python class registered in a global registry keyed by
-dotted path. The database stores that string in the verb's
-<code>parent_type</code> column and resolves it back to the class on load, which
-is why a type must be importable at startup — put it in a module under
-<code>moo/</code>.
-</p>
-
-<div class="term"><code><span class="c"># moo/my_verb_types.py</span>
-import re
-from .verb_types import MasterVerb, register_verb_type
-
-@register_verb_type
-class WhisperVerb(MasterVerb):
-    key       = 'whisper'
-    aliases   = ['wh']
-    min       = 2                      <span class="c"># 'wh' is enough</span>
-    help_text = 'Whisper privately to someone in the room.'
-    perms     = 'rx'
-
-    <span class="c"># Split on 'to' only, ignoring every other preposition,</span>
-    <span class="c"># so "whisper meet me at the gate to guard" works.</span>
-    rexp = re.compile(r'\s+to\s+')
-
-    def func(self):
-        target = pmatch(self.iobj, self.pobj, self.location.contents)
-        if not target:
-            self.pobj.msg("Whisper to whom?")
-            return
-        self.pobj.msg(f'You whisper to {target.name}: {self.dobj}')
-        target.msg(f'{self.pobj.name} whispers: {self.dobj}')</code></div>
-
-<h3>The lifecycle</h3>
-
-<div class="tablewrap">
-<table>
-<thead><tr><th>Method</th><th>Override it to</th></tr></thead>
-<tbody>
-<tr><td><code>at_pre_cmd()</code></td><td>Set up, or veto the command before it runs.</td></tr>
-<tr><td><code>parse()</code></td><td>Dissect <code>self.args</code>. <strong>This is the reason to write a type at all.</strong></td></tr>
-<tr><td><code>func()</code></td><td>Do the work.</td></tr>
-<tr><td><code>at_post_cmd()</code></td><td>Clean up afterwards.</td></tr>
-</tbody>
-</table>
-</div>
-
-<h3>Class attributes</h3>
-
-<div class="tablewrap">
-<table>
-<thead><tr><th>Attribute</th><th>Meaning</th></tr></thead>
-<tbody>
-<tr><td><code>key</code></td><td>Primary verb name.</td></tr>
-<tr><td><code>aliases</code></td><td>Alternative names.</td></tr>
-<tr><td><code>min</code></td><td>Characters needed to match; <code>0</code> means the full name.</td></tr>
-<tr><td><code>rexp</code></td><td>A compiled regex used instead of the standard preposition set.</td></tr>
-<tr><td><code>help_text</code></td><td>One-line help string.</td></tr>
-<tr><td><code>perms</code></td><td>Permission string, default <code>'rx'</code>.</td></tr>
-</tbody>
-</table>
-</div>
-
-<p>
-Attach a verb to the new type by passing its dotted path when you create the
-verb, or build a class at runtime with the <code>define_verb()</code> factory
-when it is not known until the game is running:
-</p>
-
-<div class="term"><code>DrinkVerb = define_verb(
-    'drink',
-    aliases = ['sip', 'quaff'],
-    min     = 2,
-    parent  = 'moo.verb_types.MasterVerb',
-    func    = lambda self: self.pobj.msg(f'You drink from {self.dobj}.'),
-)</code></div>
-
-<div class="warn">
-    <span class="label">A new type needs a restart</span>
-    <p>Verb <em>code</em> is data and loads instantly. A verb <em>type</em> is a
-       Python class in the <code>moo/</code> package, imported at boot — adding
-       one is the rare case that genuinely requires bouncing the server. Plan
-       types up front; iterate on verb bodies freely.</p>
-</div>
-
-<!-- ================================================================= -->
-<h2 id="namespace">Inside a verb: the injected namespace</h2>
-
-<p>
-Verb files are not modules and have no imports of their own for game state.
-Instead the executor builds a namespace and runs your code inside it. Everything
-below is simply <em>there</em>:
-</p>
-
-<div class="tablewrap">
-<table>
-<thead><tr><th>Group</th><th>Names</th></tr></thead>
-<tbody>
-<tr><td>Context</td><td><code>pobj</code> (the player), <code>this</code> (the object the verb is on), <code>caller</code>, <code>location</code>, <code>db</code>, <code>verb</code>, <code>args</code>, <code>argstr</code></td></tr>
-<tr><td>Parsed parts</td><td><code>dobj</code>, <code>prep</code>, <code>iobj</code>, <code>dobj2</code>, <code>prep2</code>, <code>lhs</code>, <code>rhs</code>, <code>switches</code>, <code>arglist</code>, <code>dobjlist</code>, <code>iobjlist</code></td></tr>
-<tr><td>Game builtins</td><td><code>move()</code>, <code>msg_room()</code>, <code>call_verb()</code>, <code>create()</code>, <code>recycle()</code>, <code>notify()</code>, <code>force()</code>, <code>search()</code>, <code>find()</code>, <code>auth_level()</code>, <code>pmatch()</code>, <code>bmatch()</code></td></tr>
-<tr><td>Messaging defaults</td><td><code>sub</code>, <code>dob</code>, <code>iob</code>, <code>uob</code>, <code>exclude</code></td></tr>
-<tr><td>Utilities</td><td><code>su</code> (string utils), <code>_effects</code> (effects manager)</td></tr>
-<tr><td>Safe Python</td><td>A curated subset — <code>len</code>, <code>str</code>, <code>range</code>, <code>sorted</code>, and so on. <code>open</code>, <code>eval</code>, <code>exec</code>, <code>compile</code> and <code>__import__</code> are deliberately absent.</td></tr>
-</tbody>
-</table>
-</div>
-
-<p>
-Two pieces of source rewriting happen before execution. <code>#42</code> becomes
-a live object reference, and <code>$name</code> resolves a system constant
-(<code>$eu</code> is the effects utility, <code>$item</code> the item
-prototype). You can still <code>import re</code> or <code>import random</code> —
-the standard library is available — but reach for the injected builtins rather
-than poking the database directly.
-</p>
-
-<h3>Messaging</h3>
-
-<p>
-Send text with <code>obj.msg(...)</code> and <code>obj.msg_room(...)</code>,
-never the raw <code>notify()</code> builtin. <code>msg</code> wraps
-<code>notify</code> and is overridable per object, which is how a deafened
-character or a screenreader user gets different treatment for free. Pass
-<code>sub=pobj, dob=dobj, iob=iobj</code> so the substitution engine can render
-pronouns and object names correctly for each observer.
+Use <code>msg</code> to tell one person something and <code>msg_room</code> to
+tell everyone else. Pass along who is involved, and the game writes each
+observer their own correct version — "You pick up the lamp" for them, "Ana picks
+up the lamp" for everyone watching:
 </p>
 
 <div class="term"><code>pobj.msg("You pick up %d.", sub=pobj, dob=item)
 pobj.location.msg_room("%S picks up %d.", exclude=[pobj], sub=pobj, dob=item)</code></div>
 
-<p>
-Tokens take either a <code>%</code> or <code>$</code> prefix. Objects go through
-<code>dob</code>/<code>iob</code> as <code>%d</code>/<code>%i</code>; raw
-strings — numbers, coin words — go through <code>s0=</code>/<code>s1=</code>
-kwargs and render as <code>%0</code>/<code>%1</code>. Gender pronouns are
-<code>%ps</code>, <code>%po</code> and friends. <code>+pron</code> in-game
-prints the full table.
-</p>
-
-<div class="note">
-    <span class="label">Three gotchas worth knowing early</span>
-    <p><strong>Missing properties are not <code>None</code>.</strong> Reading an
-       absent property returns a <code>_null_attr</code> sentinel that is falsy
-       and whose repr is <code>'None'</code> — but <code>is None</code> is
-       <em>always</em> False against it. Test with <code>== None</code>, plain
-       falsiness, or <code>or</code>.</p>
-    <p><strong>Never reassign a <code>call_verb</code> kwarg name.</strong> Read
-       it into a new variable first; rebinding the parameter corrupts the call
-       context.</p>
-    <p><strong>Escape <code>%</code> in raw output.</strong> Verbs that print
-       stored values verbatim must double them to <code>%%</code>, or the
-       substitution engine will eat them — <code>%i</code> is ANSI inverse.</p>
-</div>
-
 <!-- ================================================================= -->
-<h2 id="hooks">The <code>verb_</code> hook convention</h2>
+<h2 id="hooks">Making one object behave differently</h2>
 
 <p>
-This is the mechanism that makes per-object behaviour possible without
-special-casing anything centrally, and it is the most important idea in this
-chapter.
+This is the most useful idea in the manual, so it is worth the two minutes.
 </p>
 
 <p>
-Shared commands live on the room prototypes. Before doing the default thing,
-they offer the matched object a chance to handle the command itself by calling a
-verb of the same name with a trailing underscore. If that hook exists and
-returns a truthy value, the shared verb stops. If it does not exist, the call
-fails harmlessly and the default proceeds.
+Ordinary commands like <code>go</code> and <code>get</code> live in one shared
+place, not on every object. Before doing the usual thing, a shared command
+offers the object a chance to handle it — by looking for a verb with the same
+name and a trailing underscore. If that hook exists and returns <code>True</code>,
+the shared command stops there. If there is no hook, nothing happens and the
+normal behaviour continues.
 </p>
 
-<div class="term"><code><span class="c"># in the shared `go` verb on #16 (OCRoom)</span>
-try:
-    result = call_verb(exit, 'go_')      <span class="c"># does this exit want to handle it?</span>
-    if result:
-        return                            <span class="c"># yes — we're done</span>
-except Exception:
-    pass                                  <span class="c"># no such verb: carry on normally</span>
+<div class="term"><code><span class="c"># inside the shared `go` command</span>
+result = call_verb(exit, 'go_')     <span class="c"># does this exit want to handle it?</span>
+if result:
+    return                          <span class="c"># yes — we're done</span>
 
-call_verb(exit, 'invoke')                 <span class="c"># the default: walk through it</span></code></div>
+call_verb(exit, 'invoke')           <span class="c"># the default: walk through it</span></code></div>
 
 <p>
-The portal in the lobby is exactly this. <code>#51</code> is an ordinary exit,
-but it carries a <code>go_</code> verb that presents a character menu and
-puppets the player into their selection, then returns <code>True</code> so the
-normal "walk through the exit" behaviour never runs. Nothing in the movement
-system knows the portal is special. The chargen arch on <code>#7</code> works
-the same way.
+The portal in the lobby is exactly this. It is an ordinary exit that happens to
+carry a <code>go_</code> verb: it shows a character menu, puts you into the
+character you pick, and returns <code>True</code> so the usual "walk through it"
+never runs. Nothing in the movement code knows the portal is special.
+</p>
+
+<p>
+So the recipe for <em>this one door needs to do something strange</em> is never
+to edit the movement code. It is <code>@adverb #123.go_</code>, write what
+should happen, and return <code>True</code> to replace the normal behaviour — or
+nothing at all to let it carry on afterwards. The exception lives on the thing
+that is exceptional.
 </p>
 
 <div class="tablewrap">
 <table>
-<thead><tr><th>Hook</th><th>Lives on</th><th>Fires when</th></tr></thead>
+<thead><tr><th>Hook</th><th>On</th><th>Fires when</th></tr></thead>
 <tbody>
-<tr><td><code>go_</code></td><td>An exit</td><td>Someone tries to traverse it.</td></tr>
-<tr><td><code>eat_</code> / <code>drink_</code></td><td>Edibles / liquids</td><td>Consumed.</td></tr>
-<tr><td><code>look_</code></td><td>Any object</td><td>Examined.</td></tr>
+<tr><td><code>go_</code></td><td>An exit</td><td>Someone tries to go through it.</td></tr>
+<tr><td><code>look_</code></td><td>Anything</td><td>It is examined.</td></tr>
+<tr><td><code>eat_</code> / <code>drink_</code></td><td>Food, drink</td><td>It is consumed.</td></tr>
 <tr><td><code>in_get</code> / <code>in_put</code> / <code>in_look</code></td><td>Containers</td><td>Something is taken from, put in, or looked in.</td></tr>
-<tr><td><code>on_get</code> / <code>on_put</code> / <code>on_look</code></td><td>Any object</td><td>Something is taken from or put on top of it.</td></tr>
-<tr><td><code>under_get</code> / <code>under_put</code> / <code>under_look</code></td><td>Any object</td><td>Something is taken from or put underneath it.</td></tr>
-<tr><td><code>behind_get</code> / <code>behind_put</code> / <code>behind_look</code></td><td>Any object</td><td>Same, for behind.</td></tr>
+<tr><td><code>on_</code> / <code>under_</code> / <code>behind_</code> variants</td><td>Anything</td><td>The same, for on top of, underneath and behind.</td></tr>
 <tr><td><code>sit_</code> / <code>lay_</code></td><td>Furniture</td><td>Sat or lain on.</td></tr>
-<tr><td><code>wear_</code> / <code>remove_</code></td><td>Wearables</td><td>Worn or removed.</td></tr>
-<tr><td><code>open_</code> / <code>close_</code> / <code>lock_</code> / <code>unlock_</code></td><td>Closables</td><td>Operated.</td></tr>
-<tr><td><code>enter_func</code> / <code>exit_func</code></td><td>Rooms, containers</td><td>Something enters or leaves.</td></tr>
-<tr><td><code>at_post_move</code></td><td>Characters</td><td>After a move completes.</td></tr>
+<tr><td><code>wear_</code> / <code>remove_</code></td><td>Clothing</td><td>Worn or taken off.</td></tr>
+<tr><td><code>open_</code> / <code>close_</code> / <code>lock_</code> / <code>unlock_</code></td><td>Doors, lids</td><td>Operated.</td></tr>
+<tr><td><code>enter_func</code> / <code>exit_func</code></td><td>Rooms, containers</td><td>Something goes in or out.</td></tr>
 </tbody>
 </table>
 </div>
 
-<p>
-So the recipe for "this one door needs to do something unusual" is never to edit
-the movement code. It is: <code>@adverb #123.go_</code>, write the behaviour,
-return <code>True</code> to suppress the default or a falsy value to let it run
-anyway. The exception lives on the exception.
-</p>
-
 <div class="note">
     <span class="label">Hooks should be hidden</span>
     <p>A hook is machinery, not a command — a player typing <code>go_</code>
-       should get nothing. Create them with <code>@adverb/hidden</code>, or hide
-       them afterwards with <code>@hideverb</code>. See
-       <a href="auth.html#hidden">Auth &amp; Hidden Verbs</a>.</p>
+       should get nothing at all. Make them with <code>@adverb/hidden</code>, or
+       hide them afterwards with <code>@hideverb</code>. See
+       <a href="auth.html#hidden">Who Can Do What</a>.</p>
+</div>
+
+<div class="note">
+    <span class="label">Going further</span>
+    <p>Commands can also change <em>how the typed line is broken up</em> before
+       your code sees it, and run set-up and clean-up steps around it. That is
+       engine work rather than world-building: see <em>Writing Verbs</em> in
+       <code>docs/manual/</code> for the verb-type system.</p>
 </div>
 
 <div class="pagenav">
     <a href="objects.html"><span class="dir">Previous</span>01 · Objects, Names &amp; Numbers</a>
-    <a class="to-next" href="live-coding.html"><span class="dir">Next</span>03 · Live Programming</a>
+    <a class="to-next" href="live-coding.html"><span class="dir">Next</span>03 · Changing Things Live</a>
 </div>
 
 <div class="footer">
-    <span><a href="developing.html">← Developing &amp; Building</a></span>
-    <span>02 · Verbs &amp; the Parser</span>
+    <span><a href="developing.html">← Building Your World</a></span>
+    <span>02 · Commands &amp; Behaviour</span>
 </div>
 
 </div>

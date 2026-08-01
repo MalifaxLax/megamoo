@@ -12,7 +12,7 @@ document is the reference for what you can rely on inside that file.
 - [Messaging and emit substitution](#messaging-and-emit-substitution)
 - [Calling other verbs](#calling-other-verbs)
 - [Creating and changing objects](#creating-and-changing-objects)
-- [Tasks: suspend and fork](#tasks-suspend-and-fork)
+- [Timing: pause, delay, and fork](#timing-pause-delay-and-fork)
 - [Interactive verbs with `yield`](#interactive-verbs-with-yield)
 - [Permission-checked attribute access](#permission-checked-attribute-access)
 - [Conventions and idioms](#conventions-and-idioms)
@@ -70,27 +70,57 @@ verb defined on a sword, `this` is the sword and `pobj` is whoever swung it.
 
 ### Parsed command parts
 
+**Every one of these is a string (or a list of strings). None of them is a
+resolved object.** `dobj` and `dobjstr` are the *same string*, as are `iobj` and
+`iobjstr` — the pair exists for familiarity, not because one is matched. Turning
+text into an object is always your verb's job; see
+[Matching objects](#matching-objects).
+
 | Name | What it is |
 |---|---|
-| `dobj` / `dobjstr` | Direct object: the matched object (or object number), and the raw text. |
-| `iobj` / `iobjstr` | Indirect object: matched object and raw text. |
+| `dobj` / `dobjstr` | Direct-object **text**. Identical values. |
+| `iobj` / `iobjstr` | Indirect-object **text**. Identical values. |
 | `prep` / `preplist` | The preposition (`'in'`, `'on'`, `'from'`, …) and its tokens. |
 | `dobjlist` / `iobjlist` | The dobj/iobj strings split into tokens. |
-| `dobj2` / `prep2` | Secondary object/preposition for multi-preposition commands. |
+| `dobj2` / `prep2` | Secondary object text / preposition for multi-preposition commands. |
 | `lhs` / `rhs` | Left/right of the preposition, for assignment-style verbs (`@desc x = y`). |
 | `arglist` | `argstr` split on whitespace. |
 | `switches` | Slash switches: `look/brief` → `['brief']`. |
+| `match` | The preposition regex match object, or `None`. |
 
-For `put gem in box`, you get `dobjstr='gem'`, `prep='in'`, `iobjstr='box'`, and —
-once you match them — `dobj`/`iobj` as objects.
+For `put gem in box` you get `dobj == dobjstr == 'gem'`, `prep == 'in'`, and
+`iobj == iobjstr == 'box'`. To act on the gem you must match it yourself:
 
-### Safe Python builtins
+```python
+gem = pmatch(dobj, pobj, list(pobj.contents))
+```
 
-A curated subset of Python builtins is injected (`moo/verb_namespace.py`):
-`len`, `str`, `int`, `float`, `bool`, `list`, `dict`, `set`, `tuple`, `type`,
-`range`, `enumerate`, `zip`, `map`, `filter`, `reversed`, `sorted`, `sum`, `min`,
-`max`, `abs`, `round`, `all`, `any`, `isinstance`, `print`. (`open`, `exec`,
-`eval`, `__import__`, etc. are deliberately not in the default set.)
+> The command parser (`moo/parser.py`) *does* attempt its own object resolution
+> and records object numbers on the `ParseResult`, but those numbers are
+> discarded: the verb type's string parse overwrites them when the namespace is
+> built. Its `ArgSpec` enum (`NONE`/`ANY`/`THIS`) is vestigial for the same
+> reason — `VerbDef` has no `dobj_spec`/`iobj_spec` fields to declare, so the
+> permissive defaults always apply.
+
+### Python builtins
+
+A curated set is injected by name (`SAFE_PYTHON_BUILTINS` in
+`moo/verb_namespace.py`): `len`, `str`, `int`, `float`, `bool`, `list`, `dict`,
+`set`, `tuple`, `type`, `range`, `enumerate`, `zip`, `map`, `filter`, `reversed`,
+`sorted`, `sum`, `min`, `max`, `abs`, `round`, `all`, `any`, `isinstance`,
+`print` — plus the permission-checking `getattr`/`setattr` wrappers and a plain
+`hasattr`.
+
+> **This is a convenience layer, not a security boundary.** The namespace is a
+> plain dict with no `__builtins__` key, and CPython injects the real builtins
+> module into any such dict at `exec()` time. So `import`, `open`, `eval`,
+> `exec`, and `__import__` all work inside verb code, and
+> `import builtins; builtins.getattr(...)` sidesteps the permission wrappers.
+> The engine relies on this: `@adverb` itself does `import re` and `import os` to
+> write verb stubs to disk. Treat verb code as **trusted** code — the `gm3` tier
+> that can write verbs is effectively root on the server, which is why
+> [the permission ladder](04-operations.md#the-permission-ladder) matters more
+> than the builtin list.
 
 ### The MOO builtin library
 
@@ -107,15 +137,17 @@ Injected from `moo/builtins.py`. Grouped by purpose:
 `verbs(obj)`.
 
 **Calling & scheduling:** `call_verb(obj, verb_name, ..., **kwargs)`,
-`suspend(seconds)`, `fork(...)`.
+`pause(seconds)`, `delay(seconds, code, context)`, `fork(seconds, code, context)`
+— see [Timing](#timing-pause-delay-and-fork).
 
 **Messaging:** `obj.msg(message, ...)` and `room.msg_room(message, ...)` are the
 verbs you call from verb code (defined on #1, so every object has them);
 `broadcast(message, ...)` reaches everyone connected. See
 [Messaging](#messaging-and-emit-substitution).
 
-**Matching:** `pmatch`, `bmatch`, `match`, `omatch`, plus helpers
-`strip_articles`, `parse_ordinal`, `name_match`, `adj_match`.
+**Matching:** `pmatch`, `bmatch`, `match`, `match_all`, `omatch`, `smatch`, plus
+helpers `strip_articles`, `parse_ordinal`, `name_match`, `adj_match`,
+`prep_match`, `split_on_prep`.
 
 **Search:** `search(query, ...)` / `find(query, ...)`.
 
@@ -127,8 +159,9 @@ covered in [Engine Systems](05-engine-systems.md).
 
 **Helper modules:** `su` (string utilities — emit/pronoun substitution),
 `ou` (object utilities — `make_room`, `make_object`, …),
-`eu` / `_effects` (the [effects manager](05-engine-systems.md#the-effects-system)),
-and `globals` (the `moo.globals` module of shared constants).
+`_effects` (the [effects manager](05-engine-systems.md#the-effects-system) — note
+there is no bare `eu`; use `$eu`), and `globals` (the `moo.globals` module of
+shared constants — this shadows Python's `globals()` builtin).
 
 ---
 
@@ -168,10 +201,16 @@ without hardcoding its number:
 ```python
 # Instead of memorizing that the wearable base is #35:
 glove = create(parent=$wearable)     # → create(parent=db.get_object(0).wearable)
-if dobj.parent == $container:        # readable, refactor-proof
+if target.parent == $chest:          # readable, refactor-proof
     ...
 $eu.trigger(pobj, 'poison', 5, 3)    # $eu → db.get_object(0).eu  (the effects object, #53)
 ```
+
+The constants defined on #0 in the shipped database are `$bed`, `$chair`,
+`$chest`, `$eu`, `$furniture`, `$globals`, `$hat`, `$item`, `$obj`, `$pants`,
+`$shirt`, `$shoes`, `$table`, and `$wearable`. A `$name` with no matching
+property on #0 does not error — it reads as the falsy `_null_attr` sentinel, so a
+typo fails silently. Check the live list with `+props #0`.
 
 This is the same indirection LambdaMOO's `$foo` corewords provide: a layer of
 named aliases over raw object numbers, so verb code reads in terms of *roles*
@@ -185,10 +224,11 @@ constants is simply whatever properties exist on #0; inspect it live with
 `+props #0`. Use short, lowercase names that name the role, and avoid Python
 keywords or builtin names.
 
-> Note: `eu` (the effects manager) and `su`/`ou` (string and object utilities)
-> are *also* injected directly into the namespace, so you can write `eu.trigger(...)`
-> without the `$`. The `$` form is the portable one for referencing *prototype
-> objects* by role.
+> Note: `su` and `ou` (string and object utilities) are injected directly into
+> the namespace, so you write `su.wrap(...)` / `ou.make_room(...)` with no `$`.
+> The effects manager is **not**: there is no bare `eu` name in the namespace.
+> Reach it as `$eu` (which rewrites to `db.get_object(0).eu`, i.e. #53), or via
+> the injected `_effects` module object.
 
 ### Function wrapping
 
@@ -221,10 +261,14 @@ possessives (`my sword` restricts to inventory), keywords (`me`, `here`), dbrefs
 
 | Function | Returns | Use when |
 |---|---|---|
-| `pmatch(inp, pobj, candidates)` | The single best match, or `None`. | **Player verbs.** This is the default. |
-| `bmatch(inp, pobj, candidates)` | A list of all matches. | **Staff verbs** and anywhere you want every match. |
-| `match(inp, candidates)` | Name-only match (no keywords/refs). | Low-level matching against an explicit list. |
-| `omatch(inp, pobj)` | Keyword/ref only (`me`, `here`, `#N`, `$name`). | When you only want references, not names. |
+| `pmatch(inp, pobj, candidates)` | The single best match, or `None`. | **Player verbs.** Supports `me`, `here`, `my <X>` — but deliberately **not** `#N` or `$name`, so players can't reach arbitrary objects. |
+| `bmatch(inp, pobj, candidates, db=None)` | The single best match, or `None`. | **Staff verbs.** Same as `pmatch` plus `#N` / `$name` dbref support. |
+| `match(inp, candidates)` | The single best name match, or `None` (no keywords/refs). | Low-level matching against an explicit list. |
+| `match_all(inp, candidates)` | A **list** of every name match. | When you genuinely want all matches. |
+| `omatch(inp, pobj, db=None)` | Keyword/ref only (`me`, `here`, `#N`, `$name`). | When you only want references, not names. |
+
+Note that `bmatch` returns one object, not a list — the difference from `pmatch`
+is dbref support, not arity. `match_all` is the one that returns a list.
 
 Name matching understands how players actually talk:
 
@@ -255,32 +299,108 @@ Staff verbs on #3 use `bmatch` and generally skip that check.
 
 The parsed command parts your verb reads (`dobj`, `prep`, `iobj`, `switches`,
 `lhs`/`rhs`, …) don't appear by magic — they're produced by the verb's **verb
-type**, a small, swappable class that owns the *parse* step. Every verb has one,
-named by its `parent_type` (default `moo.verb_types.MasterVerb`). Coders can
-replace it, so a verb can parse its argument string however it likes. The classes
-live in `moo/verb_types.py`.
+type**, a small, swappable class that owns the *parse* step and nothing else.
+Every verb has one, named by its `parent_type`: a dotted-path string stored in
+the `parent_type` column of the `verbs` table, defaulting to
+`moo.verb_types.MasterVerb`. The classes live in `moo/verb_types.py`.
+
+Verb types are **engine Python**, not verb code. Changing one is a server-source
+change, not something you can do from `@program` — see
+[Adding a custom type](#adding-a-custom-type) below. In day-to-day work you will
+use one of the two that ship, and most likely never think about this at all.
 
 ### How a verb runs
 
-Before your verb's code executes, the engine (`moo/verb_namespace.py`) resolves
-the verb's `parent_type` to a class, instantiates it, sets the runtime context
-(`pobj`, `args`, `cmdstring`, switches…), and calls these lifecycle hooks in
-order:
+Before your verb's code executes, `_instantiate_verb_type()`
+(`moo/verb_namespace.py`) resolves the verb's `parent_type` to a class via
+`resolve_verb_type()`, instantiates it, sets the runtime context on the instance
+(`pobj`, `this`, `location`, `db`, `cmdstring`, `raw`, `args`, and any injected
+switches), and calls:
 
-1. **`at_pre_cmd()`** — pre-parse setup (e.g. an early permission check).
-2. **`parse()`** — turn `self.args` into structured attributes.
-3. **your verb body** — runs with those attributes available in its namespace.
-4. **`at_post_cmd()`** — cleanup / logging / side effects.
+```python
+inst.parse()
+```
 
-The attributes `parse()` populates on the instance are exactly what
-[the namespace](#the-verb-namespace) exposes to your code. If the verb type can't
-be instantiated or `parse()` raises, the engine falls back to a default parse so
-the verb still gets sensible `dobj`/`prep`/`iobj` values.
+The attributes `parse()` leaves on the instance are then copied into
+[the namespace](#the-verb-namespace) your code sees. If the class can't be
+instantiated or `parse()` raises, the engine logs a warning and falls back to
+simple string-split defaults, so the verb still runs with sensible
+`dobj`/`prep`/`iobj` values.
+
+### The lifecycle
+
+Three of the four methods on `BaseVerb` are wired to the engine, and they fire
+around **every** execution of the verb — player commands, `call_verb` chains,
+and engine-invoked hooks like `go_` alike:
+
+```
+at_pre_cmd()      setup; return True to veto the command
+parse()           split self.args into the standard slots
+<the .py body>    your verb file — skipped if at_pre_cmd vetoed
+at_post_cmd()     cleanup; runs even if the body raised or was vetoed
+```
+
+- **`at_pre_cmd()` runs before `parse()`**, which is what makes it the place for
+  a check that should abort without paying for parsing — and equally why
+  `dobj`/`prep`/`iobj` are *not* available to it yet. Return `True` to skip the
+  body, the same "return True suppresses the default" convention the
+  [hook system](05-engine-systems.md#hooks) uses.
+- **`at_post_cmd()` always runs.** It reads the outcome off `self`: `self.result`
+  (the body's return value), `self.error` (the exception, or `None`), and
+  `self.vetoed`.
+- **Both fail safe.** An exception in `at_pre_cmd()` is logged and the command
+  proceeds — one broken hook on a shared type must not silently swallow every
+  command using it. An exception in `at_post_cmd()` is logged and swallowed, so
+  cleanup can't replace the failure it was reacting to.
+
+> **`func()` is still not called by anything.** Your verb's `.py` file *is* the
+> body; there is no `func()` to override. It survives on `BaseVerb` only so that
+> existing subclasses keep importing.
+
+#### Example: one roundtime check instead of thirty
+
+Every IC action verb opens with the same four lines — if the character is still
+in roundtime, refuse. A verb type turns that into a property of the verb rather
+than a paragraph each one repeats:
+
+```python
+# in moo/verb_types.py (engine source)
+@register_verb_type
+class TimedVerb(MasterVerb):
+    """An action a character in roundtime cannot take."""
+
+    def at_pre_cmd(self):
+        rt = getattr(self.pobj, 'rt', 0) or 0
+        if rt > 0:
+            self.pobj.msg(f"You must wait {rt} more seconds.")
+            return True          # veto — the verb body never runs
+```
+
+Attach it and the check is inherited, with nothing left in the verb body:
+
+```python
+add_verb(weapon, ['swing'], parent_type='moo.verb_types.TimedVerb')
+```
+
+Three things make this work where a plain early `return` in each verb would not:
+
+- **The body never starts.** A veto is not an early return inside your code; the
+  `.py` file is not executed at all, so there is no path through it that can
+  forget the check.
+- **It covers `call_verb` too.** A combat verb reached from another verb gets the
+  same gate, which a copy-pasted guard at the top of player-facing verbs misses.
+- **`or 0` is load-bearing.** A missing property reads back as the `_null_attr`
+  sentinel, which is falsy but is *not* `None` — `rt is None` is always `False`,
+  and comparing the sentinel with `> 0` raises.
+
+Because `at_pre_cmd()` runs before `parse()`, this pattern suits checks about the
+*actor* — roundtime, position, stun, permissions. A check that needs to know
+*what was targeted* has no `dobj` yet and belongs in the body.
 
 ### The two built-in types
 
 ```
-BaseVerb        Minimal — parse() is a no-op; self.args is the raw string.
+BaseVerb        Minimal — parse() is a no-op; args is the raw string.
   └─ MasterVerb Standard dobj / prep / iobj / switches parsing (the default).
 ```
 
@@ -288,53 +408,95 @@ BaseVerb        Minimal — parse() is a no-op; self.args is the raw string.
   off the verb name, finds the first preposition, and splits the rest into
   `dobj` / `prep` / `iobj` (plus `lhs`/`rhs`, a second preposition, and the
   list forms). This is what almost every verb wants.
-- **`BaseVerb`** is "bring your own parser": its `parse()` does nothing, so
-  `self.args` is just the raw argument string for you to interpret. Use it for
+- **`BaseVerb`** is "bring your own parser": its `parse()` does nothing, so every
+  parsed slot arrives empty — including **`arglist`**, which is `[]` rather than
+  the split arguments. Only `args` / `argstr` are populated (they come from the
+  namespace builder, not the verb type), so `args.split()` is on you. Use it for
   verbs whose syntax doesn't fit the dobj/prep/iobj mould.
 
-### Three levels of customization
+Remember that even under `MasterVerb` the parsed slots are **strings** — see
+[Parsed command parts](#parsed-command-parts). A verb type splits text; it never
+resolves objects. Matching is always your verb's job.
 
-**1. Swap the preposition regex (`rexp`).** `MasterVerb.parse()` uses the verb's
-`rexp` instead of the global `PREP_REGEX` when one is set — the lightest way to
-change which words/separators split `dobj` from `iobj`.
+### Adding a custom type
 
-**2. Override `parse()`.** Take full control of how `self.args` becomes structured
-attributes. Set whatever your verb body will read:
+There are two knobs, in increasing order of effort.
+
+**1. Swap the preposition regex (`rexp`).** `MasterVerb.parse()` uses the class's
+`rexp` in place of the global `PREP_REGEX` when one is set — the lightest way to
+change which words or separators split `dobj` from `iobj`.
+
+**2. Subclass and override `parse()`.** Take full control of how `args` is split.
+
+There is one rule that is easy to get wrong: **`parse()` must write its results
+into the standard slot names, because the engine harvests a fixed list.**
+`_parse_verb_inst_into_namespace()` copies exactly these attributes off the
+instance and nothing else:
+
+```
+dobj  dobjlist  prep  preplist  iobj  iobjlist
+dobj2  dobjlist2  prep2  lhs  rhs  arglist  match  switches
+```
+
+An attribute you invent — `self.field`, `self.value` — is **silently dropped**;
+your verb body will never see it. (`dobjstr` and `iobjstr` are derived from
+`dobj`/`iobj` at harvest time, so setting them directly does nothing either.)
+
+So a `name: value` parser reuses the existing slots rather than inventing new
+ones:
 
 ```python
-from moo.verb_types import MasterVerb, register_verb_type
-
+# in moo/verb_types.py (engine source)
 @register_verb_type
 class KeyValueVerb(MasterVerb):
     """Parse 'name: value' pairs instead of dobj/prep/iobj."""
     def parse(self):
-        key, _, val = self.args.partition(':')
-        self.field = key.strip()
-        self.value = val.strip()
+        key, sep, val = self.args.partition(':')
+        self.dobj = key.strip()          # reads as dobj / dobjstr
+        self.prep = ':' if sep else ''
+        self.iobj = val.strip()          # reads as iobj / iobjstr
+        self.lhs, self.rhs = self.dobj, self.iobj
+        self.dobjlist = self.dobj.split()
+        self.iobjlist = self.iobj.split()
+        self.arglist = self.args.split()
+        self.switches = getattr(self, '_injected_switches', []) or []
 ```
 
-**3. Start from `BaseVerb`.** When there's no standard structure at all, inherit
-`BaseVerb` and parse `self.args` yourself.
+Anything you don't set keeps the empty default from `MasterVerb.__init__`, so a
+partial `parse()` degrades to blank slots rather than raising.
 
-### Registering and attaching a custom type
+`@register_verb_type` is a **Python class decorator in engine source — not an
+in-game `@`-command.** It records the class in a registry keyed by its dotted
+path (`moo.verb_types.KeyValueVerb`) so `resolve_verb_type()` can find it by
+string. Registration is a fast path, not a requirement: `resolve_verb_type()`
+falls back to importing the module and doing a `getattr` for any path it doesn't
+already know.
 
-Verb types live in a registry keyed by dotted path. Register a class with the
-`@register_verb_type` decorator (shown above); the engine resolves it later via
-`resolve_verb_type(path)`. Attach it to a verb by setting its `parent_type`:
+Because this is engine code, the workflow is:
 
-```python
-# From verb code, attach a registered type to a new verb:
-add_verb(this, ['setfield'], parent_type='yourmodule.KeyValueVerb')
-```
+1. Add the class to `moo/verb_types.py` (or another module under `moo/` that the
+   server process can import).
+2. **Restart the server** (`@restart`). The auto-reload watcher only covers
+   `moo verbs/`; engine modules are not hot-reloaded.
+3. Attach it to a verb by setting that verb's `parent_type`.
 
-`define_verb(key, parent='...', rexp=..., parse=..., func=...)` is the factory the
-engine uses to build verb classes at runtime (hot-reload, in-game creation); it
-takes the same `parse`/`rexp`/`parent` knobs directly.
+Three ways to set `parent_type`:
 
-In-game, `@adverb … base` selects `BaseVerb` instead of the default `MasterVerb`
-(see [Building Worlds](03-building-worlds.md#programming-verbs)); attaching an
-arbitrary *custom* registered type is done from verb code with `add_verb(...,
-parent_type=…)` or `define_verb(...)`.
+| How | Reaches |
+|---|---|
+| `@adverb <obj>.<name> with <perms> base` | `BaseVerb` only — the in-game toolkit has no syntax for an arbitrary type. |
+| `add_verb(obj, names, parent_type='moo.verb_types.KeyValueVerb')` from verb code | Any importable type. This is the normal route. |
+| The JSON API `set_verb` request with a `parent_type` field | Any importable type. Note the **MCP `set_verb` tool does not expose it** — it passes only `objnum`/`verb`/`code`. |
+
+### What the verb type does *not* control
+
+`moo/verb_types.py` also defines `define_verb()`, `BaseVerb.matches()`,
+`to_dict()`/`from_dict()`, and the class attributes `key`, `aliases`, `min`,
+`perms`, and `help_text`. **None of these are used by the running engine** —
+nothing calls `define_verb()`, and verb identity lives entirely on the `VerbDef`
+(`moo/verbs.py`), which has its own `names`, `min_lengths`, `matches()`, `perms`,
+`hidden`, and `auth`. Setting them on a custom verb type has no effect; set them
+with `@adverb` / `@min` / `@verbauth` instead.
 
 ---
 
@@ -446,27 +608,48 @@ for common world-building shapes, and the `@`-command toolkit in
 
 ---
 
-## Tasks: suspend and fork
+## Timing: pause, delay, and fork
 
-Because verbs are real code running in a shared world, every verb runs inside a
-task with limits (`moo/tasks.py`): a tick budget, a wall-clock budget, a verb
-stack depth of 50, and a fork depth of 10.
+Three builtins schedule work. The distinction that matters is **blocking vs.
+not**: verb code runs on a single shared worker thread, so anything that blocks
+stops the whole world.
 
-- **`suspend(seconds)`** parks the verb and resumes it automatically later. Use it
-  for delays and pacing without blocking other players:
+| Builtin | Blocking? | Use for |
+|---|---|---|
+| `pause(seconds)` | **Yes** — sleeps the shared worker | Short beats in a sequence you accept freezing for. Capped at 30s. |
+| `delay(seconds, code, context)` | No | The normal way to schedule later work. |
+| `fork(seconds, code, context)` | No | Independent follow-up that runs as its own task. |
 
-  ```python
-  pobj.msg("You begin picking the lock...")
-  suspend(3)
-  pobj.msg("...click. The lock opens.")
-  ```
+`delay` and `fork` take the deferred work as a **code string** plus a `context`
+dict of the names it should see — they do not take a callable:
 
-- **`fork(...)`** schedules independent follow-up work that runs as its own task.
+```python
+pobj.msg("You begin picking the lock...")
+delay(3, 'pobj.msg("...click. The lock opens.")', {'player': pobj, 'pobj': pobj})
+```
 
-- **Round time** (the `rt` property) is the gameplay-level cooldown layered on top
-  of this: most action verbs early-return if `pobj.rt > 0` and call a helper to
-  set round time after acting. That is a game convention, distinct from the task
-  scheduler's hard limits.
+`context` must contain `'player'`; `delay`/`fork` raise `ValueError` without it.
+Deferred code is preprocessed exactly like verb source (so `#N` and `$name` work)
+and re-runs on the same single worker.
+
+> There is **no `suspend()`** in the verb namespace. The task system
+> (`moo/tasks.py`) has a `SUSPENDED` state that `delay`/`fork` drive internally,
+> but verb code cannot park itself mid-execution and resume where it left off.
+> To pause a *conversation*, use [`yield`](#interactive-verbs-with-yield); to
+> pause *work*, use `delay`.
+
+**Task limits.** `TaskLimits` (`moo/tasks.py`) defines a tick budget (100,000), a
+wall-clock budget (5s), a verb-call stack depth of 50, and a fork depth of 10.
+These bound *queued tasks* — the ones `delay`/`fork` create. A top-level player
+command does not go through the task queue at all (see
+[the request lifecycle](01-architecture.md#the-request-lifecycle)); its guard is
+the 30-second `COMMAND_TIMEOUT`, and the stack-depth limit is enforced separately
+by `call_verb` via `MAX_VERB_DEPTH`.
+
+**Round time** (the `rt` property) is the gameplay-level cooldown layered on top
+of all this: most action verbs early-return if `pobj.rt > 0` and call a helper to
+set round time after acting. That is a game convention, distinct from the
+scheduler's limits.
 
 ---
 

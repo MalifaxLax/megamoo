@@ -32,14 +32,34 @@ world.
 
 ## Starting the server
 
-The entry point is `megamoo.py`:
+For everyday development use the launcher, which needs nothing but a database:
 
 ```bash
-python3 megamoo.py sf.db
+./mm mm.db
 ```
 
-That loads the database `sf.db` and listens for Telnet on the **default port
-6770** (`DEFAULT_PORT` in `moo/globals.py`). Connect with any MUD client or:
+It enables the API, passes the shared token from `~/.megamoo/token` (generated on
+first run), turns on verb auto-reload, and names no ports — so a second database
+is started exactly the same way, with no arguments to keep distinct:
+
+```bash
+./mm ~/megamoo/mm.db
+```
+
+With no argument at all it picks the only `.db` in the repo root, and says so
+rather than guessing when there are several. Anything after the database is
+passed through to `megamoo.py` (`./mm mm.db --log-level DEBUG`).
+
+The launcher is a thin wrapper over the real entry point, `megamoo.py`:
+
+```bash
+python3 megamoo.py mm.db
+```
+
+That loads the database `mm.db` and listens for Telnet on the **default port
+6770** (`DEFAULT_PORT` in `moo/globals.py`) — or the next free port above it; see
+[Port selection and discovery](#port-selection-and-discovery). Connect with any
+MUD client or:
 
 ```bash
 telnet localhost 6770
@@ -50,17 +70,19 @@ You'll see the splash screen and the prompt
 
 > **Port note:** the project README's quick-start uses `7777` as an *example*
 > value, but the actual built-in default is `6770`. Pass `--port` (or a
-> positional port) to choose explicitly.
+> positional port) to pin one explicitly — which also turns off the search for
+> a free port, so a conflict fails the boot instead of moving the game
+> somewhere players aren't looking.
 
 The argument parser supports both a LambdaMOO-style positional form and modern
 flags, and is smart about positional arguments — a second positional that is all
 digits is treated as a port, a hostname-like token as the bind host:
 
 ```bash
-python3 megamoo.py sf.db                     # db, default host/port
-python3 megamoo.py sf.db 7777                # db on port 7777
-python3 megamoo.py sf.db localhost 7777      # db, bind localhost, port 7777
-python3 megamoo.py --input sf.db --port 8888 --host 127.0.0.1
+python3 megamoo.py mm.db                     # db, default host/port
+python3 megamoo.py mm.db 7777                # db on port 7777
+python3 megamoo.py mm.db localhost 7777      # db, bind localhost, port 7777
+python3 megamoo.py --input mm.db --port 8888 --host 127.0.0.1
 ```
 
 On startup the server prints a banner with the version, loads the database, opens
@@ -109,11 +131,11 @@ Two things to do on first login, before anything else:
 |---|---|---|
 | `database` (positional) / `--input`, `-i` | — (required) | Database file to load. |
 | `new_database` (positional) / `--output`, `-o` | — | Create a new database from the template (see below). |
-| `port` (positional) / `--port`, `-p` | `6770` | TCP port for the Telnet listener. |
+| `port` (positional) / `--port`, `-p` | first free from `6770` up | TCP port for the Telnet listener. Naming one pins it: a conflict then fails the boot. |
 | `--host` | `0.0.0.0` | Bind address. |
 | `--config`, `-c` | — | Path to a `ServerConfig` JSON file (see [Configuration](#configuration)). |
-| `--api` | off | Enable the JSON API server. |
-| `--api-port` | `7778` | API server port. |
+| `--api` | off | Enable the JSON API server (first free port from `7778` up). |
+| `--api-port` | auto | Pin the API to this exact port; fails if it is in use. |
 | `--api-token` | — | Shared secret API clients must present. |
 | `--log-level` | `INFO` | `DEBUG`, `INFO`, `WARNING`, or `ERROR`. |
 | `--version`, `-v` | — | Print the version and exit. |
@@ -152,8 +174,11 @@ Two distinct files are easy to confuse:
   unrelated document/vector-search tool (embeddings model, chunk size). The
   server does not read it.
 - **The server's `--config` expects a `ServerConfig` JSON** with `network`,
-  `database`, `protocol`, and `api` sections, matching the dataclasses in
+  `database`, `protocol`, `api`, and `dev` sections, matching the dataclasses in
   `moo/config.py`. Anything omitted falls back to the documented default.
+  `ServerConfig` also carries top-level scalars — `server_name`, `motd`,
+  `login_welcome`, `display_screen`, `max_command_length`, `enable_color`,
+  `debug_mode`, `log_level`.
 
 A representative config (all values shown are the defaults):
 
@@ -162,6 +187,8 @@ A representative config (all values shown are the defaults):
   "network": {
     "host": "0.0.0.0",
     "port": 6770,
+    "auto_port": true,
+    "port_scan_limit": 50,
     "max_connections": 100,
     "connection_timeout": 3600,
     "max_players": 0,
@@ -185,9 +212,16 @@ A representative config (all values shown are the defaults):
   "api": {
     "enabled": false,
     "port": 7778,
+    "auto_port": true,
+    "port_scan_limit": 50,
+    "info_path": "",
     "host": "127.0.0.1",
     "auth_token": "",
     "testbot_objnum": 0
+  },
+  "dev": {
+    "autoreload_verbs": true,
+    "autoreload_interval": 2.0
   }
 }
 ```
@@ -196,6 +230,10 @@ Notes on the fields that matter most in practice:
 
 - **`network.max_players: 0`** means unlimited; `max_connections` bounds raw
   sockets.
+- **`network.auto_port`** lets a busy `port` move the listener up to the next
+  free one instead of failing the boot, which is what makes a second database a
+  one-word command. Set it `false` (or name a port on the command line) when the
+  server must be reachable at a fixed address.
 - **`database.auto_save_interval` (5 min)** is the in-memory-to-disk save;
   **`checkpoint_interval` (1 hr)** writes pruned recovery snapshots; the two are
   independent. `backup_on_start` takes a full copy before the server begins
@@ -203,6 +241,11 @@ Notes on the fields that matter most in practice:
 - **`api.host` defaults to `127.0.0.1`** — keep it that way unless you really mean
   to expose the API, and always set a strong `auth_token`. `testbot_objnum` pins
   the API's driver character (see [MCP](#the-mcp-integration)).
+- **`dev.autoreload_verbs` is `true` by default.** A background watcher polls
+  `moo verbs/` every `dev.autoreload_interval` seconds and hot-loads any verb file
+  whose mtime changed, so external edits go live without `@reload` (see
+  [the auto-reload watcher](03-building-worlds.md#disk-edits-are-hot-too-the-auto-reload-watcher)).
+  Set it to `false` if you want disk edits to land only when explicitly pulled.
 
 The config validates on load: SSL requires a cert/key, an enabled API requires a
 valid port, etc.
@@ -255,8 +298,9 @@ issue saves — property writes are persisted through automatically (see
 - **Auto-save** flushes memory to disk every `auto_save_interval` seconds
   (default 300).
 - **Checkpoints** are written every `checkpoint_interval` seconds (default 3600)
-  into a `db_checkpoints/` directory, with `max_checkpoints` retained and optional
-  gzip.
+  into a directory named after the database file and placed beside it —
+  `mm.db` → `mm_checkpoints/`, holding `checkpoint_<timestamp>.sqlite` snapshots
+  — with `max_checkpoints` retained and optional gzip.
 - **`backup_on_start`** copies the database before the server begins writing.
 - The WAL files (`*.db-wal`, `*.db-shm`) alongside the database are normal SQLite
   artifacts; don't delete them out from under a running server.
@@ -289,10 +333,13 @@ unpuppet every connected character before disconnecting:
 ```
 
 `@restart` re-executes the server process after a clean save, so it picks up
-engine code changes that require a full reload. You rarely need it for game
-content: verbs written in-game with `@program` are already live (hot-coded, no
-restart), and verbs edited on disk are pulled in with `@reload` — both without
-downtime. See [Hot coding](03-building-worlds.md#hot-coding-no-reloads).
+changes to **engine Python under `moo/`** — builtins, verb types, the parser, the
+namespace builder. That is the one category that is not hot.
+
+You almost never need it for game content: verbs written in-game with `@program`
+are live immediately, and verbs edited on disk are hot-loaded by the auto-reload
+watcher within a couple of seconds (or on demand with `@reload`). See
+[Hot coding](03-building-worlds.md#hot-coding-no-reloads).
 
 ---
 
@@ -304,13 +351,55 @@ control plane for external tooling — editors, scripts, and the MCP bridge. Ena
 it with a token:
 
 ```bash
-python3 megamoo.py sf.db --api --api-token <token>
+python3 megamoo.py mm.db --api --api-token <token>
 ```
 
 The API authenticates with the shared `auth_token` and drives a dedicated
 character (`testbot_objnum`, auto-provisioned if unset — see below). Keep
 `api.host` at `127.0.0.1` unless you have a specific reason to expose it, and
 always set a strong token.
+
+### Port selection and discovery
+
+You do not assign ports by hand — neither the game's nor the API's. Each starts
+at its configured port (6770 and 7778) and, if that is taken, walks upward to
+the first free one, so every database is launched with the same command:
+
+```bash
+./mm mm.db          # game on 6770, API on 7778
+./mm scratch.db     # game on 6771, API on 7779 — nothing to coordinate
+```
+
+Each move is logged (`Port 6770 in use; auto-selected 6771`,
+`API port 7778 in use; auto-selected 7779`), and the pair that won is written to
+a **discovery file**:
+
+```json
+{ "host": "127.0.0.1", "port": 7779, "pid": 38506,
+  "database": "/Users/you/megamoo/mm.db", "auth_required": true,
+  "game_port": 6771 }
+```
+
+`port` is the API's; `game_port` is the telnet port a MUD client connects to.
+Local tooling reads this instead of hard-coding a port — the MCP bridge does so
+automatically (see below). The file is removed on clean shutdown, and one left
+behind by a crash is ignored because its `pid` no longer names a live process.
+`server_status` also reports the live `api_port` and `database`.
+
+Where it is written depends on how the server was started. `megamoo.py` puts it
+beside the database (`mm.db` → `mm.db.api.json`); `./mm` redirects it to
+`~/.megamoo/run/` so that tooling can see servers started from *other* checkouts
+too, under a filename built from the database's full path. The bridge searches
+both places.
+
+Settings, per section: `network.auto_port` / `network.port_scan_limit` for the
+game listener and `api.auto_port` / `api.port_scan_limit` for the API (default
+50 ports each); `api.info_path` overrides the discovery file's location, and
+`"-"` disables it.
+
+Naming a port opts out of the search on that listener — `--port 6777` or
+`--api-port 7900` mean you want *that* port, so a conflict is a startup error
+(non-zero exit) rather than a silent move elsewhere.
 
 ---
 
@@ -335,9 +424,14 @@ dependencies.
 
 ```bash
 pip install mcp
-python3 megamoo.py sf.db --api --api-token <token>
-claude mcp add megamoo -e MEGAMOO_API_TOKEN=<token> -- python3 ~/sfdev/tools/megamoo_mcp.py
+./mm mm.db
+claude mcp add megamoo -- python3 ~/megamoo/tools/megamoo_mcp.py
 ```
+
+No token in the registration: the bridge falls back to `~/.megamoo/token`, the
+same file `./mm` launches every database with, so rotating it needs no config
+edit. Pass `-e MEGAMOO_API_TOKEN=<token>` if you'd rather set it explicitly —
+the environment wins.
 
 ### Tools
 
@@ -359,7 +453,42 @@ claude mcp add megamoo -e MEGAMOO_API_TOKEN=<token> -- python3 ~/sfdev/tools/meg
 | Tool | Description |
 |---|---|
 | `tail_log` | Last N lines of `megamoo.log`, with an optional regex filter. |
-| `server_status` | API reachability; if up, uptime and player count. |
+| `server_status` | API reachability; if up, uptime, player count, and the database/port in use. |
+| `list_servers` | Every running server: database, telnet port, API port. |
+| `use_database` | Point the bridge at one of them for the rest of the session. |
+
+### Working with several databases
+
+Nothing is pinned to one database. With more than one server up, ask the
+assistant which are running and which to work on:
+
+> **you:** what MegaMOO servers are running?
+> **assistant:** *(`list_servers`)* two — `mm.db` (game 6770, API 7778) and
+> `scratch.db` (game 6771, API 7779).
+> **you:** switch to scratch
+> **assistant:** *(`use_database("scratch")`)* now on `/Users/you/megamoo/scratch.db`.
+
+`use_database` accepts `mm`, `mm.db`, or a full path, takes effect on the next
+call, and needs no restart of the client or the bridge. An empty string returns
+it to auto-discovery.
+
+### Finding the server
+
+The bridge resolves the API address on every (re)connect, so it follows a server
+that restarted onto a different port without restarting the MCP process:
+
+1. `MEGAMOO_API_PORT` — an explicit pin, skipping discovery.
+2. A database selected this session with `use_database`.
+3. `MEGAMOO_API_INFO` — a named discovery file.
+4. `MEGAMOO_DB` — that database's discovery file (`<db>.api.json`).
+5. The only live discovery file in `~/.megamoo/run/` or the repo root — the
+   everyday case: one server up, on whatever port it selected.
+6. Otherwise port 7778.
+
+With several servers advertising and no hint, the bridge refuses to guess and
+lists what it found. `MEGAMOO_DB` is still there for a permanent default, but
+`use_database` is the everyday answer — it costs a sentence instead of a config
+edit.
 
 ### Notes
 
