@@ -1422,9 +1422,17 @@ def make_call_verb(pobj, db, _depth=0):
         from .verbs import preprocess_verb_code
         from .verb_context import set_verb_context, clear_verb_context
         processed = preprocess_verb_code(verb_def.code)
+        from .verb_namespace import verb_body_vetoed, run_at_post_cmd
         token = set_verb_context(pobj, db, _depth + 1)
         try:
-            exec(compile(processed, f'<verb {clean_verb_name}>', 'exec'), ns)
+            # The lifecycle applies to verb-to-verb calls too: at_pre_cmd()
+            # ran when this namespace was built, and may have vetoed.
+            if not verb_body_vetoed(ns):
+                exec(compile(processed, f'<verb {clean_verb_name}>', 'exec'), ns)
+            run_at_post_cmd(ns, ns.get('result'))
+        except Exception as e:
+            run_at_post_cmd(ns, error=e)
+            raise
         finally:
             clear_verb_context(token)
 

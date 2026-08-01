@@ -934,16 +934,26 @@ class MegaMOOServer:
             compiled = compile(processed_code, f'<verb {verb_def.names[0]}>', 'exec')
             # depth=0 because this is a top-level player command, not a
             # verb calling another verb.
+            from .verb_namespace import verb_body_vetoed, run_at_post_cmd
             token = set_verb_context(player, self.database, depth=0)
             try:
-                loop = asyncio.get_running_loop()
-                # Snapshot contextvars so verb-context propagates into
-                # the worker thread.
-                ctx = contextvars.copy_context()
-                await asyncio.wait_for(
-                    loop.run_in_executor(
-                        self._verb_thread_pool, ctx.run, exec, compiled, namespace),
-                    timeout=COMMAND_TIMEOUT)
+                # at_pre_cmd() ran while the namespace was built and may
+                # have vetoed the command; skipping the body still runs
+                # at_post_cmd below.
+                if not verb_body_vetoed(namespace):
+                    loop = asyncio.get_running_loop()
+                    # Snapshot contextvars so verb-context propagates into
+                    # the worker thread.
+                    ctx = contextvars.copy_context()
+                    await asyncio.wait_for(
+                        loop.run_in_executor(
+                            self._verb_thread_pool, ctx.run, exec, compiled,
+                            namespace),
+                        timeout=COMMAND_TIMEOUT)
+                run_at_post_cmd(namespace, namespace.get('result'))
+            except Exception as e:
+                run_at_post_cmd(namespace, error=e)
+                raise
             finally:
                 clear_verb_context(token)
 

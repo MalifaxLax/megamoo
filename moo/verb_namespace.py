@@ -320,13 +320,27 @@ def _instantiate_verb_type(verb_def, pobj, this_obj, location, db,
                            injected_switches=None):
     """
     Instantiate the verb's parent class, populate its runtime context,
-    run its ``parse()`` method, and return the instance.
+    run ``at_pre_cmd()`` and ``parse()``, and return the instance.
 
     This bridges the verb definition (stored in the database) and the
     verb-type class (defined in ``verb_types.py``).  The verb_def's
     ``parent_type`` attribute is resolved to a class, an instance is
     created, and its ``parse()`` method is called to populate the
     structured command parts (dobj, prep, iobj, etc.).
+
+    ``at_pre_cmd()`` runs first, before parsing, as its docstring has
+    always promised -- which is what makes it the place for a check
+    that should abort without the cost of parsing, and equally why the
+    parsed slots are not available to it yet.  Returning ``True``
+    vetoes the command: the flag is recorded on the instance as
+    ``_vetoed`` and the execution sites skip the verb body (see
+    :func:`verb_body_vetoed`).
+
+    A hook that raises is logged and otherwise ignored -- the command
+    proceeds.  Failing open matches the rest of the verb system (a
+    broken ``parse()`` falls back to string splitting rather than
+    killing the command), and the alternative is that one typo in a
+    shared verb type silently swallows every command using it.
 
     Args:
         verb_def:           The verb definition object (with a
@@ -363,6 +377,18 @@ def _instantiate_verb_type(verb_def, pobj, this_obj, location, db,
             inst._injected_switches = injected_switches
         inst.raw = args
         inst.args = args.strip() if args else ''
+
+        # Lifecycle: at_pre_cmd() -> parse() -> verb body -> at_post_cmd().
+        # Isolated from parsing so a broken hook cannot cost the verb its
+        # parsed arguments.
+        inst._vetoed = False
+        try:
+            inst._vetoed = bool(inst.at_pre_cmd())
+        except Exception as e:
+            logger.error(
+                f"at_pre_cmd failed on {type(inst).__name__} "
+                f"for verb '{verb_name}': {e}", exc_info=True)
+
         inst.parse()
         return inst
     except Exception as e:
@@ -541,6 +567,10 @@ def build_verb_namespace(
             injected_switches=injected_switches,
         )
 
+    # Kept so the execution sites can run the rest of the lifecycle
+    # (veto check, at_post_cmd) against the same instance that parsed.
+    namespace['_verb_inst'] = verb_inst
+
     if verb_inst is not None:
         # Verb-type parse succeeded -- use its structured results
         _parse_verb_inst_into_namespace(verb_inst, namespace)
@@ -597,3 +627,73 @@ def build_verb_namespace(
     namespace['kwargs'] = dict(extra) if extra else {}
 
     return namespace
+
+
+# =============================================================================
+# Public API -- verb lifecycle around the body
+# =============================================================================
+
+def verb_body_vetoed(namespace: Dict[str, Any]) -> bool:
+    """
+    Whether ``at_pre_cmd()`` asked for this command to be dropped.
+
+    The hook ran during namespace construction (before ``parse()``);
+    this reports its verdict to the execution site, which skips the
+    verb body when it is ``True``.  Returning ``True`` to suppress the
+    default behaviour is the same convention the hook system uses.
+
+    Args:
+        namespace: A namespace from :func:`build_verb_namespace`.
+
+    Returns:
+        bool: ``True`` if the verb body should not run.  A namespace
+        with no verb-type instance (verb-type resolution failed, or no
+        verb_def was supplied) is never vetoed -- a command should not
+        vanish because its type could not be built.
+    """
+    inst = namespace.get('_verb_inst')
+    return bool(getattr(inst, '_vetoed', False)) if inst is not None else False
+
+
+def run_at_post_cmd(namespace: Dict[str, Any], result: Any = None,
+                    error: Optional[BaseException] = None) -> None:
+    """
+    Run the verb type's ``at_post_cmd()`` hook after the body.
+
+    Called from every verb execution site, including when the body
+    raised or was vetoed -- "cleanup that always happens" is the only
+    version of a post hook worth having.  The outcome is published on
+    the instance first, so the documented zero-argument signature still
+    holds and a hook that wants the outcome can read it:
+
+    * ``self.result``  -- the verb's return value (``None`` if it raised
+      or was vetoed)
+    * ``self.error``   -- the exception, or ``None``
+    * ``self.vetoed``  -- whether ``at_pre_cmd()`` suppressed the body
+
+    Args:
+        namespace: A namespace from :func:`build_verb_namespace`.
+        result:    The verb body's return value, if it ran.
+        error:     The exception the body raised, if any.
+
+    Notes:
+        Errors from the hook are logged and swallowed.  This runs on
+        the way out -- often already on an error path -- and a raising
+        cleanup hook must not replace the original failure with its
+        own.
+    """
+    inst = namespace.get('_verb_inst')
+    if inst is None:
+        return
+    hook = getattr(inst, 'at_post_cmd', None)
+    if hook is None:
+        return
+    try:
+        inst.result = result
+        inst.error = error
+        inst.vetoed = bool(getattr(inst, '_vetoed', False))
+        hook()
+    except Exception as e:
+        import logging
+        logging.getLogger('megamoo.verb_namespace').error(
+            f"at_post_cmd failed on {type(inst).__name__}: {e}", exc_info=True)

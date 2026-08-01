@@ -5,8 +5,7 @@ This module defines the class hierarchy for verb types -- the reusable
 command-parsing classes that verbs inherit from.  Every verb attached to
 a MOO object is backed by a *verb type* that controls how the player's
 input is parsed into structured parts (direct object, preposition,
-indirect object, switches, etc.) before the verb's ``func()`` method
-is called.
+indirect object, switches, etc.) before the verb's code body runs.
 
 Class hierarchy
 ---------------
@@ -16,16 +15,16 @@ Class hierarchy
     BaseVerb              Minimal verb -- bring-your-own parser.
       +-- MasterVerb      Standard dobj / prep / iobj parsing (most verbs).
 
-* **BaseVerb** provides the lifecycle hooks (``at_pre_cmd``, ``parse``,
-  ``func``, ``at_post_cmd``), command matching (prefix matching with
-  ``min`` chars), serialisation (``to_dict`` / ``from_dict``), and a
-  convenience ``msg()`` method.
+* **BaseVerb** provides the lifecycle hooks the engine calls
+  (``at_pre_cmd``, ``parse``, ``at_post_cmd``) plus unused scaffolding
+  kept for compatibility -- ``func``, command matching, serialisation
+  (``to_dict`` / ``from_dict``) -- and a convenience ``msg()`` method.
 
 * **MasterVerb** extends ``BaseVerb`` with full natural-language command
   parsing identical in spirit to LambdaMOO's ``this none/any/this``
   spec or Evennia's ``MuxCommand``.  After ``parse()``, attributes like
   ``dobj``, ``prep``, ``iobj``, ``switches``, ``lhs``/``rhs``, etc.
-  are populated and available inside ``func()``.
+  are populated and harvested into the verb body's namespace.
 
 Verb-type registry
 ------------------
@@ -220,12 +219,18 @@ class BaseVerb:
     Lifecycle
     ---------
 
-    The verb handler calls these methods in order::
+    The engine calls these in order, around every verb execution --
+    player commands, ``call_verb`` chains, and engine-invoked hooks
+    alike::
 
-        verb.at_pre_cmd()   # setup hook
+        verb.at_pre_cmd()   # setup; return True to veto the command
         verb.parse()        # parse self.args into structured parts
-        verb.func()         # execute the verb logic
-        verb.at_post_cmd()  # cleanup hook
+        <the verb's .py body>
+        verb.at_post_cmd()  # cleanup; always runs
+
+    ``func()`` is **not** part of that sequence and is never called: a
+    verb's body is the code stored on its ``VerbDef``, not a method
+    here.  It survives only so that existing subclasses do not break.
     """
 
     # --- class-level defaults ---
@@ -328,15 +333,28 @@ class BaseVerb:
 
     def at_pre_cmd(self):
         """
-        Called before :meth:`parse`.
+        Called before :meth:`parse`, on every execution of this verb.
 
-        Override in subclasses for pre-parse setup (e.g. permission
-        checks that should abort before parsing).
+        Override for setup, or for a check that should abort before the
+        cost of parsing -- which is also why the parsed slots
+        (``dobj``, ``prep``, ``iobj``) are not populated yet.  Use
+        :meth:`parse` or the verb body for anything that needs them.
+
+        Returns:
+            Returning ``True`` **vetoes the command**: the verb body is
+            skipped entirely, as with the hook system's convention for
+            suppressing a default.  Any other value (including
+            ``None``) lets it run.
+
+        Notes:
+            An exception here is logged and the command proceeds.  One
+            broken hook on a shared verb type must not silently swallow
+            every command that uses it.
         """
 
     def parse(self):
         """
-        Called after runtime context is set, before :meth:`func`.
+        Called after :meth:`at_pre_cmd`, before the verb body runs.
 
         The default implementation does nothing -- ``self.args`` is
         already available as a plain string.  Override in subclasses
@@ -346,20 +364,32 @@ class BaseVerb:
 
     def func(self):
         """
-        Main verb execution -- override in every subclass.
+        Dead scaffolding -- **the engine never calls this**.
 
-        This is where the verb's game logic lives.  By the time
-        ``func()`` is called, all runtime context attributes
-        (``self.pobj``, ``self.args``, etc.) and any parse results
-        are fully populated.
+        A verb's logic lives in its own ``.py`` file, executed as the
+        verb body; there is no method here to override.  Kept only so
+        that subclasses defining it keep importing.  For behaviour
+        around the body use :meth:`at_pre_cmd` / :meth:`at_post_cmd`.
         """
 
     def at_post_cmd(self):
         """
-        Called after :meth:`func`.
+        Called after the verb body, on every execution of this verb.
 
-        Override in subclasses for cleanup, logging, or triggering
-        side effects that should happen after the verb completes.
+        Override for cleanup, logging, or side effects that should
+        follow the verb.  It runs whatever happened -- including when
+        the body raised, or never ran because :meth:`at_pre_cmd` vetoed
+        it -- so cleanup here can be relied on.  The outcome is
+        published on the instance first:
+
+        * ``self.result``  -- the body's return value, or ``None``
+        * ``self.error``   -- the exception it raised, or ``None``
+        * ``self.vetoed``  -- whether :meth:`at_pre_cmd` suppressed it
+
+        Notes:
+            An exception here is logged and swallowed: this often runs
+            on an error path, and a raising cleanup hook must not
+            replace the failure it was reacting to.
         """
 
     # -----------------------------------------------------------------

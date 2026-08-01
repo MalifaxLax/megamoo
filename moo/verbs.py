@@ -770,18 +770,26 @@ class VerbExecutor:
         namespace = self._create_namespace(context, verb_def)
 
         # --- Execute ---
+        from .verb_namespace import verb_body_vetoed, run_at_post_cmd
         try:
             # Lazy compilation: compile now if not already done
             if not verb_def.compiled_code:
                 verb_def.compile()
 
-            # Run the compiled code inside the prepared namespace.
-            # The wrapper function ``_verb_()`` runs the user's code and
-            # stores its return value in ``namespace['result']``.
-            exec(verb_def.compiled_code, namespace)
+            # at_pre_cmd() already ran during namespace construction; it
+            # may have asked for the body to be skipped.
+            if verb_body_vetoed(namespace):
+                result = None
+            else:
+                # Run the compiled code inside the prepared namespace.
+                # The wrapper function ``_verb_()`` runs the user's code and
+                # stores its return value in ``namespace['result']``.
+                exec(verb_def.compiled_code, namespace)
 
-            # Retrieve the verb's return value (set by ``result = _verb_()``)
-            result = namespace.get('result', None)
+                # Retrieve the verb's return value (set by ``result = _verb_()``)
+                result = namespace.get('result', None)
+
+            run_at_post_cmd(namespace, result)
 
             # Charge ticks against the task's budget (simplified: 100 per verb)
             task.tick(100)
@@ -789,6 +797,7 @@ class VerbExecutor:
             return result
 
         except Exception as e:
+            run_at_post_cmd(namespace, error=e)
             # --- Error handling ---
             logger.error(f"Error executing verb {verb_def.names[0]}: {e}")
             logger.error(traceback.format_exc())
