@@ -22,6 +22,7 @@
         <li><a href="#matching">How players refer to objects</a></li>
         <li><a href="#zero">#0 and the $ shortcuts</a></li>
         <li><a href="#make">Creating an object</a></li>
+        <li><a href="#tags">Tags</a></li>
     </ol>
 </nav>
 
@@ -245,6 +246,78 @@ asked.
        <code>@art</code>, <code>@adj</code>, <code>@trail</code>. Any
        abbreviation long enough to be unambiguous works —
        <code>@adje</code> is the same command as <code>@adj</code>.</p>
+</div>
+
+<h2 id="tags">Tags</h2>
+
+<p>
+A tag is a label you stick on an object so that your own code can find it or
+test for it later. Players never see tags. They are for you: marking which zone
+a room belongs to, which items count as light sources, which doors a quest
+should unlock.
+</p>
+
+<p>
+Tags come in <strong>categories</strong>. Write the category before a slash, and
+the tag after it:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @adtag lantern = zone/haven
+<span class="o">Added tag 'haven' in category 'zone' to #202:a lantern.</span>
+<span class="p">&gt;</span> @adtag lantern = lightsource
+<span class="o">Added tag 'lightsource' to #202:a lantern.</span></code></div>
+
+<p>
+Leave the category off and the tag goes into <code>general</code>. A category
+can hold as many tags as you like, so an object can be in two zones at once:
+</p>
+
+<div class="term"><code>{'zone': ['haven', 'docks'], 'general': ['lightsource']}</code></div>
+
+<p>
+Remove one the same way. Naming the category removes only that tag, leaving the
+rest of the category alone:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @rmtag lantern = zone/docks
+<span class="o">Removed tag 'docks' from category 'zone' on #202:a lantern.</span></code></div>
+
+<h3>Using tags in a verb</h3>
+
+<p>
+This is the point of them. Every object has a <code>tags</code> handler your
+code can ask:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Write</th><th>To get</th></tr></thead>
+<tbody>
+<tr><td><code>this.tags.has('haven', 'zone')</code></td><td><code>True</code> if it carries that tag in that category.</td></tr>
+<tr><td><code>this.tags.has('lightsource')</code></td><td>The same, for an uncategorised tag.</td></tr>
+<tr><td><code>this.tags.get('zone')</code></td><td>Every tag in one category, as a list.</td></tr>
+<tr><td><code>this.tags.all()</code></td><td>The whole lot, as a dictionary.</td></tr>
+<tr><td><code>this.tags.add('haven', 'zone')</code></td><td>Add one from code.</td></tr>
+<tr><td><code>this.tags.remove('haven', 'zone')</code></td><td>Remove one from code.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+So a torch-lighting verb can refuse anything that is not a light source, and a
+zone-wide event can act on the rooms it should:
+</p>
+
+<div class="term"><code>if not target.tags.has('lightsource'):
+    pobj.msg("You can't light that.")
+    return</code></div>
+
+<div class="note">
+    <span class="label">Seeing an object's tags</span>
+    <p><code>@examine &lt;object&gt;</code> lists them, shown as
+       <code>._tags</code> — they are kept in a hidden property, which is why
+       <code>+show</code> and <code>+props</code> do not mention them. Both tag
+       commands need <code>gm3</code>.</p>
 </div>
 
 <div class="pagenav">
