@@ -21,3 +21,6 @@ __pycache__/
 # IDE/tools
 .claude/
 .agents/
+
+# Checkpoint snapshots (runtime)
+*_checkpoints/
