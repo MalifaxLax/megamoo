@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verbs — MegaMOO Guide</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<p class="crumb"><a href="index.html">← MegaMOO Guide</a></p>
+
+<h1 class="wordmark" style="font-size:clamp(1.8rem,6vw,2.4rem)">Verbs</h1>
+<p class="tagline">Where commands live, and how to add your own.</p>
+
+<nav class="toc">
+    <span class="kicker">On this page</span>
+    <ol>
+        <li><a href="#where">Where verbs live</a></li>
+        <li><a href="#auth">Staff verbs and the auth system</a></li>
+        <li><a href="#exceptions">Exception verbs</a></li>
+        <li><a href="#parsing">Verb types and parsing</a></li>
+        <li><a href="#hidden">Hidden verbs</a></li>
+        <li><a href="#adding">Adding a verb</a></li>
+        <li><a href="#disk">Editing verbs on disk</a></li>
+        <li><a href="#ai">Writing verbs with an AI assistant</a></li>
+    </ol>
+</nav>
+
+<h2 id="where">Where verbs live</h2>
+
+<p>
+A verb is a command, stored as a short Python file attached to an object.
+</p>
+
+<p>
+Everyday commands — <code>look</code>, <code>go</code>, <code>get</code>,
+<code>open</code> — are attached to the <strong>room prototypes</strong>, not to
+players. That is the key idea: a verb on a room is offered to everyone standing
+in that room. Walk into a room and you can use its commands; walk out and you
+cannot.
+</p>
+
+<p>
+The two room prototypes are <code>#16</code> for out-of-character rooms and
+<code>#17</code> for in-character ones. Put a verb on <code>#17</code> and every
+IC room in your world has it. Put it on one room, and only that room does.
+</p>
+
+<div class="note">
+    <span class="label">Why rooms and not players</span>
+    <p>The room is what decides what is possible inside it. A lobby should not
+       offer <code>attack</code>; an underwater room might offer
+       <code>swim</code>. Attaching commands to the place rather than the person
+       makes that natural instead of a special case.</p>
+</div>
+
+<h2 id="auth">Staff verbs and the auth system</h2>
+
+<p>
+Staff commands are the exception. All 73 of them live on <code>#3</code>, the
+base character object, so every character inherits them — and they are kept in
+check by an authority level rather than by where you are standing.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Level</th><th>They are</th><th>And can</th></tr></thead>
+<tbody>
+<tr><td><code>gm1</code></td><td>Trusted player</td><td>Teleport, hold things, inspect objects.</td></tr>
+<tr><td><code>gm2</code></td><td>Builder</td><td>Dig rooms, make exits, name and describe things, move and delete them.</td></tr>
+<tr><td><code>gm3</code></td><td>Programmer</td><td>Make objects, write verbs, set properties, reserve numbers, run code.</td></tr>
+<tr><td><code>gm4</code></td><td>Wizard</td><td>Remove player accounts.</td></tr>
+<tr><td><code>gm5</code></td><td>Owner</td><td>Grant levels, reserve number blocks, restart and shut down.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="term"><code><span class="p">&gt;</span> @auth Ana = add gm2
+<span class="p">&gt;</span> @auth Ana = remove gm2</code></div>
+
+<p>
+Only <code>gm5</code> may grant levels — the power to hand out authority is
+itself the top of the ladder. Levels are cumulative: <code>gm3</code> can do
+everything <code>gm1</code> and <code>gm2</code> can.
+</p>
+
+<p>
+Each staff verb begins by checking the level and, if the player is short, simply
+answers <code>Do what?</code> — the same reply as a command that does not exist.
+Staff commands do not advertise themselves to people who cannot use them.
+</p>
+
+<p>
+Your own verbs can require a level too. Set it when you create the verb and the
+engine refuses the command before your code runs:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @adverb #3.@mycmd with auth=3
+<span class="p">&gt;</span> @verbauth #3.@mycmd = 3     <span class="c"># or afterwards</span></code></div>
+
+<h2 id="exceptions">Exception verbs</h2>
+
+<p>
+This is how one object behaves unlike every other object of its kind, and it is
+the most useful pattern in MegaMOO.
+</p>
+
+<p>
+A shared verb does its normal job, but first it offers the object a chance to
+handle the command itself — by calling a verb of the same name with a trailing
+underscore. If that <strong>exception verb</strong> exists and returns
+<code>True</code>, the shared verb stops. If the object has no such verb,
+nothing happens and the normal behaviour continues.
+</p>
+
+<h3>A worked example: the statue and the bookcase</h3>
+
+<p>
+Say you want a <code>pull</code> command. Normally it just reports that nothing
+happens, with slightly different wording depending on what was pulled. Put this
+on <code>#17</code> and every IC room has it:
+</p>
+
+<div class="term"><code><span class="c"># the shared `pull` verb on #17</span>
+if not dobj:
+    pobj.msg("Pull what?")
+    return
+
+target = pmatch(dobj, pobj, list(pobj.location.contents) + list(pobj.contents))
+if not target:
+    pobj.msg("You don't see that here.")
+    return
+
+<span class="c"># Does this particular object know how to be pulled?</span>
+try:
+    if call_verb(target, 'pull_'):
+        return
+except KeyError:
+    pass
+
+<span class="c"># Default behaviour, varying by what was pulled.</span>
+if getattr(target, 'is_exit', False):
+    pobj.msg("You tug at %d, but it does not budge.", dob=target)
+else:
+    pobj.msg("You pull %d. Nothing happens.", dob=target)
+    pobj.location.msg_room("%S pulls %d.", exclude=[pobj], sub=pobj, dob=target)</code></div>
+
+<p>
+Now the exception. A marble statue in the library gets its own
+<code>pull_</code>, and pulling its arm swings a bookcase aside:
+</p>
+
+<div class="term"><code><span class="c"># the `pull_` exception verb on the statue, #204</span>
+bookcase = pmatch("bookcase", pobj, list(this.location.contents))
+if not bookcase:
+    return False
+
+if not getattr(bookcase, 'closed', 0):
+    pobj.msg("The statue's arm is already down.")
+    return True
+
+pobj.msg("The statue's arm swings down with a grinding of stone.")
+pobj.location.msg_room("%S pulls the statue's outstretched arm.",
+                       exclude=[pobj], sub=pobj)
+call_verb(bookcase, 'open_')
+pobj.location.msg_room("The bookcase swings away from the wall, revealing a passage.")
+return True</code></div>
+
+<p>
+And in play:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> pull statue
+<span class="o">The statue's arm swings down with a grinding of stone.</span>
+<span class="o">You open a bookcase.</span>
+<span class="o">The bookcase swings away from the wall, revealing a passage.</span>
+<span class="p">&gt;</span> pull statue
+<span class="o">The statue's arm is already down.</span>
+<span class="p">&gt;</span> pull bookcase
+<span class="o">You tug at a bookcase, but it does not budge.</span>
+<span class="p">&gt;</span> go bookcase
+<span class="o">Hidden Passage</span></code></div>
+
+<p>
+Notice what did <em>not</em> happen. Nothing in <code>pull</code> knows the
+statue exists. The bookcase has no special code either — it is an ordinary door.
+The exception lives on the object that is exceptional, and everything else stays
+simple.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Inside an exception verb</th><th>Is</th></tr></thead>
+<tbody>
+<tr><td><code>pobj</code></td><td>The person who typed the command.</td></tr>
+<tr><td><code>this</code></td><td>The object the exception is attached to — the statue.</td></tr>
+<tr><td><code>return True</code></td><td>"I handled it" — the shared verb stops.</td></tr>
+<tr><td>Return nothing</td><td>The shared verb carries on with its normal behaviour.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+Shared verbs pass extra information when the exception needs it — the shipped
+<code>give</code> passes the recipient as <code>call_verb(item, 'give_',
+dobj=recipient)</code>, and <code>lock</code> passes the key. The exception
+reads them as <code>dobj</code> and <code>iobj</code>, exactly as a normal verb
+would.
+</p>
+
+<p>
+The engine ships exceptions for most everyday actions:
+<code>go_</code>, <code>look_</code>, <code>get_</code>, <code>drop_</code>,
+<code>eat_</code>, <code>drink_</code>, <code>open_</code>, <code>close_</code>,
+<code>lock_</code>, <code>wear_</code>, <code>remove_</code>, and the
+<code>in_</code>/<code>on_</code>/<code>under_</code>/<code>behind_</code>
+container variants.
+</p>
+
+<h2 id="parsing">Verb types and parsing</h2>
+
+<p>
+Before your verb runs, the typed line is broken into pieces. That job belongs to
+the verb's <strong>type</strong>, and almost every verb uses the standard one,
+<strong>MasterVerb</strong>.
+</p>
+
+<p>
+MasterVerb splits the line at the first preposition it finds:
+</p>
+
+<div class="term"><code>put the blue sword in the oak chest
+     `--------------'    `-------------'
+            dobj                 iobj
+                      prep = "in"</code></div>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>You get</th><th>Holding</th></tr></thead>
+<tbody>
+<tr><td><code>dobj</code></td><td>The direct object — what the command acts on.</td></tr>
+<tr><td><code>prep</code></td><td>The preposition found: <em>in</em>, <em>from</em>, <em>to</em>, <em>on</em>…</td></tr>
+<tr><td><code>iobj</code></td><td>The indirect object — what follows the preposition.</td></tr>
+<tr><td><code>lhs</code> / <code>rhs</code></td><td>Everything left and right of the preposition.</td></tr>
+<tr><td><code>args</code></td><td>The whole line after the command word.</td></tr>
+<tr><td><code>switches</code></td><td>Options typed as <code>look/brief</code>.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+These are <strong>text</strong>, not objects. Turning <code>"blue sword"</code>
+into an actual object is <code>pmatch</code>'s job, and it stays your verb's
+decision — which is why a verb can choose to search the room, your hands, or
+inside a container.
+</p>
+
+<p>
+Single-character prepositions work without spaces, which is why
+<code>@desc #14=A room</code> parses the same as
+<code>@desc #14 = A room</code>.
+</p>
+
+<h3>When you need a custom type</h3>
+
+<p>
+Write your own type when the standard split gets in the way. The usual reason is
+a command whose argument is free text that must not be broken at a preposition:
+a <code>whisper</code> that would otherwise split "meet me at the gate" at
+<em>at</em>, or a command taking <code>name: value</code> pairs.
+</p>
+
+<p>
+A custom type is a small Python class in the engine's source that overrides one
+method — <code>parse()</code> — and writes its results into the same named
+slots. Because it is engine code rather than a verb, adding one needs a server
+restart, and it is a rare thing to need. Full details are in
+<em>Writing Verbs</em> in <code>docs/manual/</code>.
+</p>
+
+<h3>Running something before and after every use</h3>
+
+<p>
+A verb type can also wrap the verbs that use it. Two methods fire around
+<em>every</em> use of such a verb — whether typed by a player, reached through
+<code>call_verb</code>, or triggered as an exception:
+</p>
+
+<div class="term"><code>at_pre_cmd()      <span class="c">before the verb; return True to cancel it</span>
+at_post_cmd()     <span class="c">after the verb, even if it failed</span></code></div>
+
+<p>
+The use for this is a check that many verbs share. Rather than opening thirty
+combat verbs with the same "are you still recovering?" guard, give them a type
+that does it once:
+</p>
+
+<div class="term"><code><span class="c"># in the engine source</span>
+class TimedVerb(MasterVerb):
+    def at_pre_cmd(self):
+        rt = getattr(self.pobj, 'rt', 0) or 0
+        if rt &gt; 0:
+            self.pobj.msg(f"You must wait {rt} more seconds.")
+            return True          <span class="c"># the verb never runs</span></code></div>
+
+<p>
+The verb body does not start at all, so there is no path through your code that
+can forget the check — and it applies to verbs reached from other verbs, which
+a guard pasted at the top of each one would miss. Use it for facts about the
+<em>actor</em>: recovering, stunned, seated. A check that needs to know what was
+targeted belongs in the verb itself.
+</p>
+
+<h2 id="hidden">Hidden verbs</h2>
+
+<p>
+Exception verbs are machinery, not commands. Nobody should be able to type
+<code>pull_</code> and fire one directly — it would run without the checks the
+shared verb does first, and it makes no sense as a command in its own right.
+</p>
+
+<p>
+Hiding is separate from authority levels: a hidden verb cannot be typed by
+<em>anyone</em>, whatever their level, and can only be reached by other code.
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @adverb/hidden #204.pull_     <span class="c"># create it hidden — the right way</span>
+<span class="p">&gt;</span> @hideverb #204.pull_          <span class="c"># or hide it afterwards</span>
+<span class="p">&gt;</span> @unhideverb #204.pull_</code></div>
+
+<p>
+The trailing underscore is a naming convention that reminds you; it is
+<code>@hideverb</code> that actually enforces it. A hook you forget to hide is a
+command your players can type.
+</p>
+
+<h2 id="adding">Adding a verb</h2>
+
+<p>
+Two commands, in this order. <code>@adverb</code> creates the verb;
+<code>@program</code> opens an editor for its code.
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @adverb #17.pull
+<span class="p">&gt;</span> @program #17.pull</code></div>
+
+<h3>Aliases and minimums</h3>
+
+<p>
+A verb can answer to several names, and each name can be abbreviated. The number
+in brackets is the fewest letters that will do:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @adverb #17.examine(3),look(1),l
+<span class="c">  examine, exa, look, l all work — but 'ex' does not</span></code></div>
+
+<p>
+A minimum of 0 — the default — means the name must be typed in full. Set one
+later with <code>@min #17.examine = 3</code>. Abbreviations count the
+<code>@</code>: <code>@article</code> with a minimum of 4 answers to
+<code>@art</code>.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Command</th><th>Does</th></tr></thead>
+<tbody>
+<tr><td><code>+verbs &lt;obj&gt;</code></td><td>List the verbs on an object.</td></tr>
+<tr><td><code>+decompile &lt;obj&gt;.&lt;verb&gt;</code></td><td>Show the code exactly as stored — the ground truth.</td></tr>
+<tr><td><code>@rmverb &lt;obj&gt;.&lt;verb&gt;</code></td><td>Delete a verb.</td></tr>
+<tr><td><code>@min &lt;obj&gt;.&lt;verb&gt; = &lt;n&gt;</code></td><td>Set the abbreviation minimum.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="warn">
+    <span class="label">Name collisions are silent</span>
+    <p>A verb attached to an object beats one inherited from further up, with no
+       warning. That is the intended mechanism — it is how one object overrides
+       shared behaviour — but it is also the thing that actually catches people
+       out. If a command has stopped behaving the way it does elsewhere, look
+       for a same-named verb closer to hand with <code>+verbs</code>.</p>
+</div>
+
+<h3>Who may read and run it</h3>
+
+<p>
+Every verb carries a short permission string, and the default —
+<code>rx</code> — is what you want almost every time: anyone may
+<strong>r</strong>ead its code, anyone may e<strong>x</strong>ecute it. Add
+<code>w</code> only if others should be able to rewrite it.
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @adverb #17.pull with rx      <span class="c"># the default, spelled out</span></code></div>
+
+<p>
+Permissions are about the verb's code. Whether a <em>player</em> may use the
+command is decided by <code>auth</code>, above, and by
+<a href="#hidden">hiding</a>.
+</p>
+
+<h2 id="disk">Editing verbs on disk</h2>
+
+<p>
+The in-game editor is fine for a few lines. For anything longer you will want
+your own editor, and verbs can live as ordinary files:
+</p>
+
+<div class="term"><code>moo verbs/17/pull.py          <span class="c"># the shared pull verb</span>
+moo verbs/204/pull_.py        <span class="c"># the statue's exception</span></code></div>
+
+<p>
+The folder is named after the object's number, the file after the verb. When
+you start a world with <code>./mm</code>, MegaMOO watches that tree and loads
+changes within about two seconds — save the file and the next player to type
+the command runs your new code. No reload, no restart.
+</p>
+
+<p>
+To get an object's verbs onto disk in the first place, use <code>@reload</code>
+once. If the folder does not exist it is created and the object's existing
+verbs are written into it:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Command</th><th>Does</th></tr></thead>
+<tbody>
+<tr><td><code>@reload #204</code></td><td>Creates the folder if needed and exports the object's verbs, then loads what is there.</td></tr>
+<tr><td><code>@reload #204.pull_</code></td><td>Loads one verb from its file.</td></tr>
+<tr><td><code>@reload all</code></td><td>Sweeps every folder and loads everything.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+You only need <code>@reload</code> when a file changed by some means other than
+the watcher — a <code>git pull</code>, say. After an ordinary save, the watcher
+has already done it.
+</p>
+
+<div class="note">
+    <span class="label">The database is the original</span>
+    <p>The files are a convenient copy; what actually runs lives in your world
+       file. That is why a syntax error cannot take the game down — the broken
+       file is refused and the previous working version keeps serving. It is
+       also why the path matters: the world remembers where its verb folder is
+       (<code>#8.moo_verb_path</code>, <code>megamoo.moo verbs</code> by
+       default). Copy a world into a differently-named folder and your disk
+       edits quietly stop landing, because the world is still watching the old
+       one.</p>
+</div>
+
+<h2 id="ai">Writing verbs with an AI assistant</h2>
+
+<p>
+Verbs suit this unusually well. Each one is a short, self-contained file with a
+fixed set of variables available and no imports to resolve — a small, bounded
+problem. With the tooling connection open, an assistant holds the live world: it
+can write the verb, run it as a test character, read what the game printed back,
+and fix it, without you retyping anything.
+</p>
+
+<p>
+Three things make it work in practice:
+</p>
+
+<ul>
+<li><strong>Work on a scratch world.</strong> Start a copy with
+    <code>./mm scratch.db</code> and have the assistant confirm which world it
+    is on before it writes.</li>
+<li><strong>Name the object and the behaviour.</strong> "Add a
+    <code>pull_</code> to <code>#204</code> that opens the bookcase and reveals
+    the passage" is a complete request. "Make the statue do something" is
+    not.</li>
+<li><strong>Have it verify by playing.</strong> Ask it to pull the statue and
+    show you the output. A verb that looks right and does nothing is the common
+    failure, and only playing it catches that.</li>
+</ul>
+
+<div class="pagenav">
+    <a href="rooms.html"><span class="dir">Previous</span>Rooms &amp; Exits</a>
+    <a class="to-next" href="numbers.html"><span class="dir">Next</span>Object Numbers &amp; Zones</a>
+</div>
+
+<div class="footer">
+    <span><a href="index.html">← MegaMOO Guide</a></span>
+    <span>Verbs</span>
+</div>
+
+</div>
+</body>
+</html>

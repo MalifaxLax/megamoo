@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A World That Moves — MegaMOO Guide</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<p class="crumb"><a href="index.html">← MegaMOO Guide</a></p>
+
+<h1 class="wordmark" style="font-size:clamp(1.8rem,6vw,2.4rem)">A World That Moves</h1>
+<p class="tagline">Things that happen on their own: tickers and effects.</p>
+
+<nav class="toc">
+    <span class="kicker">On this page</span>
+    <ol>
+        <li><a href="#tickers">Tickers — an object doing something repeatedly</a></li>
+        <li><a href="#effects">Effects — a temporary state on a character</a></li>
+        <li><a href="#which">Which one do I want?</a></li>
+    </ol>
+</nav>
+
+<p>
+Everything so far happens because a player typed something. A world where
+nothing moves unless someone pokes it feels like a museum. Two systems let
+things happen on their own.
+</p>
+
+<h2 id="tickers">Tickers</h2>
+
+<p>
+A ticker calls a verb on an object over and over, every so many seconds, until
+you stop it. Start one from any verb:
+</p>
+
+<div class="term"><code>ticker_add(30, 'at_regen', pobj, 'regen')
+<span class="c">        ^        ^       ^      ^</span>
+<span class="c">   seconds    verb   object   a name for this ticker</span></code></div>
+
+<p>
+Every thirty seconds, that calls the <code>at_regen</code> verb on the player.
+The last argument is a label so one object can run several tickers at once and
+you can stop them individually:
+</p>
+
+<div class="term"><code>ticker_remove(pobj, 'regen')     <span class="c"># stop that one</span>
+ticker_remove_all(pobj)          <span class="c"># stop all of this object's tickers</span></code></div>
+
+<h3>An example: a torch that burns down</h3>
+
+<p>
+First, a rule that catches everyone out: <strong>a verb can change a property
+but cannot invent one.</strong> Anything your verb writes to has to exist
+first, and running a ticker on an object needs one more —
+<code>tickers</code>, where the subscription is kept. Declare all three before
+writing any code:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @adprop torch.fuel = 0
+<span class="p">&gt;</span> @adprop torch.lit = 0
+<span class="p">&gt;</span> @adprop torch.tickers = {}</code></div>
+
+<p>
+Skip this and the verb fails at the first assignment with
+<code>Permission denied: cannot create 'fuel'</code> — a confusing message for
+what is really a missing declaration.
+</p>
+
+<p>
+Now light the torch. It starts a ticker on itself; each tick reduces its fuel,
+and when the fuel runs out it goes dark and stops its own ticker:
+</p>
+
+<div class="term"><code><span class="c"># the `light_` exception verb on the torch</span>
+this.fuel = 20
+ticker_add(60, 'burn', this, 'burn')
+pobj.msg("The torch catches with a soft rush.")
+return True</code></div>
+
+<div class="term"><code><span class="c"># the `burn` verb on the torch — called once a minute</span>
+this.fuel = (getattr(this, 'fuel', 0) or 0) - 1
+
+if this.fuel &lt;= 0:
+    ticker_remove(this, 'burn')
+    this.location.msg_room("The torch gutters and dies.")
+    this.lit = False
+elif this.fuel == 5:
+    this.location.msg_room("The torch is burning low.")</code></div>
+
+<p>
+Watched with a two-second tick instead of a minute, that runs:
+</p>
+
+<div class="term"><code><span class="o">fuel 4 → 3 → 2   "The torch is burning low."</span>
+<span class="o">fuel 1 → 0       "The torch gutters and dies."   (ticker removed)</span></code></div>
+
+<div class="note">
+    <span class="label">Keep tickers cheap and few</span>
+    <p>A ticker runs forever until something removes it, so always give a
+       verb a way to stop its own. Prefer one ticker doing a small amount of
+       work to many tickers doing almost nothing — a room can tick for
+       everything in it.</p>
+</div>
+
+<h2 id="effects">Effects</h2>
+
+<p>
+An effect is a temporary state on a character that fires a set number of times
+and then ends by itself — drunk, poisoned, blessed, regenerating. You do not
+manage the countdown; the effects system does.
+</p>
+
+<div class="term"><code>$eu.trigger(pobj, 'intoxicate', 3, 60)
+<span class="c">            ^        ^          ^  ^</span>
+<span class="c">          who    effect name  times  seconds apart</span></code></div>
+
+<p>
+That applies the intoxicate effect three times, a minute apart, and then it is
+over. Each effect is a verb named <code>do_&lt;name&gt;</code> on
+<code>$eu</code>, the effects object — the shipped world includes
+<code>do_intoxicate</code>, and you add your own the same way.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Call</th><th>Does</th></tr></thead>
+<tbody>
+<tr><td><code>$eu.trigger(who, name, times, interval)</code></td><td>Starts one effect.</td></tr>
+<tr><td><code>$eu.trigger_all(who, effects)</code></td><td>Starts a whole list at once — the form food and drink use.</td></tr>
+<tr><td><code>$eu.cancel(who, name)</code></td><td>Ends an effect early.</td></tr>
+<tr><td><code>$eu.list_active(who)</code></td><td>What is currently running on them.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+Lists are written as one tuple per effect, which is exactly what you put on a
+piece of food or a drink:
+</p>
+
+<div class="term"><code>effects = [('intoxicate', 3, 60)]      <span class="c"># name, times, seconds apart</span></code></div>
+
+<p>
+The character sees the effect arrive, repeat, and wear off on its own:
+</p>
+
+<div class="term"><code><span class="o">A warm, dizzy feeling washes over you.</span>
+<span class="o">The world spins around you...</span>
+<span class="o">The world spins around you...</span>
+<span class="o">Your head begins to clear.</span></code></div>
+
+<div class="warn">
+    <span class="label">The character needs a <code>tickers</code> property</span>
+    <p>Effects are timed, so applying one starts a ticker on the character. A
+       character without a <code>tickers</code> property fails with
+       <code>Permission denied: cannot create 'tickers'</code> the moment an
+       effect lands — including when they eat or drink something that carries
+       one. <code>@adprop &lt;character&gt;.tickers = {}</code> fixes it.</p>
+</div>
+
+<h2 id="which">Which one do I want?</h2>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Use a ticker when</th><th>Use an effect when</th></tr></thead>
+<tbody>
+<tr><td>An <em>object</em> should keep doing something — a torch burning, a fountain splashing, a shop restocking.</td><td>A <em>character</em> is temporarily in some state that should wear off on its own.</td></tr>
+<tr><td>You decide when it stops.</td><td>It stops itself after the count you gave.</td></tr>
+<tr><td>You write the verb it calls, on the object.</td><td>You write the effect once on <code>$eu</code>, and anything can apply it.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="pagenav">
+    <a href="numbers.html"><span class="dir">Previous</span>Object Numbers &amp; Zones</a>
+    <a class="to-next" href="shops.html"><span class="dir">Next</span>Food, Drink &amp; Shops</a>
+</div>
+
+<div class="footer">
+    <span><a href="index.html">← MegaMOO Guide</a></span>
+    <span>A World That Moves</span>
+</div>
+
+</div>
+</body>
+</html>

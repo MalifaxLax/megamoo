@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting Started — MegaMOO Guide</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<p class="crumb"><a href="index.html">← MegaMOO Guide</a></p>
+
+<h1 class="wordmark" style="font-size:clamp(1.8rem,6vw,2.4rem)">Getting Started</h1>
+<p class="tagline">Copy a world, start it, log in.</p>
+
+<nav class="toc">
+    <span class="kicker">On this page</span>
+    <ol>
+        <li><a href="#copy">Copying and naming a world</a></li>
+        <li><a href="#start">Starting a world</a></li>
+        <li><a href="#login">Logging in</a></li>
+        <li><a href="#several">Running several worlds at once</a></li>
+    </ol>
+</nav>
+
+<h2 id="copy">Copying and naming a world</h2>
+
+<p>
+A world is a single file. MegaMOO ships with <code>mm.db</code>, a starter world
+containing the base object library, an out-of-character lobby, a character
+generator, one in-character room, and a wizard account.
+</p>
+
+<p>
+Do not build in <code>mm.db</code>. Copy it, and build in the copy — so you
+always have a clean starting world to go back to. Give
+<code>megamoo.py</code> two filenames: the world to copy from, and the name of
+the new world.
+</p>
+
+<div class="term"><code><span class="p">$</span> python3 megamoo.py mm.db mygame.db
+<span class="o">Creating new database: mygame.db</span>
+<span class="o">Created database with 157 objects</span>
+<span class="o">Database created successfully at mygame.db</span></code></div>
+
+<p>
+This copies and then <strong>exits</strong>. It does not start the server —
+that is the next command.
+</p>
+
+<div class="warn">
+    <span class="label">Three rules for the new name</span>
+    <p>The new name <strong>must end in <code>.db</code></strong>. A name
+       ending in anything else is read as a hostname, and no copy is made. A
+       name that is only digits is read as a port, so
+       <code>megamoo.py mm.db 7777</code> <em>runs</em> <code>mm.db</code>
+       instead of copying it. And if a file of that name already exists it is
+       overwritten without a prompt.</p>
+</div>
+
+<h2 id="start">Starting a world</h2>
+
+<p>
+Use the <code>./mm</code> launcher and give it the world to run:
+</p>
+
+<div class="term"><code><span class="p">$</span> ./mm mygame.db
+<span class="o">Server listening on 0.0.0.0:6770</span>
+<span class="o">API server listening on 127.0.0.1:7778</span></code></div>
+
+<p>
+Two ports are reported. The first is where players connect. The second is a
+private door for tooling on your own machine, which is what lets an AI
+assistant work inside the running world.
+</p>
+
+<p>
+You do not choose either number: the launcher takes the first free port from
+6770 for the game and 7778 for the API, and tells you what it got. If you need
+a specific port — because you have told people where to connect — ask for it,
+and you will either get that port or a clear error:
+</p>
+
+<div class="term"><code><span class="p">$</span> ./mm mygame.db 6777</code></div>
+
+<p>
+Stop a world with <kbd>Ctrl-C</kbd> in its terminal, or from inside the game
+with <code>@shutdown</code>.
+</p>
+
+<div class="note">
+    <span class="label">What <code>./mm</code> adds</span>
+    <p>It switches on the tooling API, supplies its password from
+       <code>~/.megamoo/token</code>, and turns on verb auto-reload so edits to
+       command files land in the running game. For a public world with real
+       players, run <code>python3 megamoo.py mygame.db</code> instead — the same
+       server with none of those three.</p>
+</div>
+
+<h2 id="login">Logging in</h2>
+
+<p>
+Connect with any MUD client, or with telnet:
+</p>
+
+<div class="term"><code><span class="p">$</span> telnet localhost 6770</code></div>
+
+<p>
+Log in as <code>wizard</code> with the password <code>megamoo</code>. You arrive
+in the lobby with full authority over the world.
+</p>
+
+<div class="warn">
+    <span class="label">Change the wizard password immediately</span>
+    <p>Every copy of the starter world has the same wizard password, and it is
+       printed in this guide. Use <code>setpass</code> before your world is
+       reachable by anyone else.</p>
+</div>
+
+<h2 id="several">Running several worlds at once</h2>
+
+<p>
+Each world is a separate process with its own file, so worlds cannot interfere
+with each other. Running two or three at once is normal practice: the world you
+care about, a scratch copy for trying things that might go badly, and perhaps
+last week's backup for comparison.
+</p>
+
+<div class="term"><code><span class="p">$</span> ./mm mygame.db &amp;      <span class="c"># game 6770, API 7778</span>
+<span class="p">$</span> ./mm scratch.db &amp;     <span class="c"># game 6771, API 7779</span>
+<span class="p">$</span> ./mm backup.db &amp;      <span class="c"># game 6772, API 7780</span></code></div>
+
+<p>
+The same command each time, with nothing to keep track of — each world takes
+the next free ports and reports them. Connect to whichever you want by port:
+<code>telnet localhost 6771</code> reaches the scratch copy.
+</p>
+
+<p>
+This is what makes copying worlds useful in practice. Testing a risky change
+does not mean backing up and restoring. It means copying the file, running the
+copy alongside the original, breaking it freely, and deleting it when you are
+done.
+</p>
+
+<div class="note">
+    <span class="label">Which world am I in?</span>
+    <p>With several running it is worth being deliberate. The port you
+       connected to tells you, and so does the world's name in its own terminal.
+       If you are working with an AI assistant, ask it to confirm which world it
+       is pointed at before you let it change anything — "scratch" and "the real
+       one" are one word apart.</p>
+</div>
+
+<div class="pagenav">
+    <a href="paradigm.html"><span class="dir">Previous</span>The MOO Paradigm</a>
+    <a class="to-next" href="objects.html"><span class="dir">Next</span>Naming &amp; Creating Objects</a>
+</div>
+
+<div class="footer">
+    <span><a href="index.html">← MegaMOO Guide</a></span>
+    <span>Getting Started</span>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Food, Drink &amp; Shops — MegaMOO Guide</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<p class="crumb"><a href="index.html">← MegaMOO Guide</a></p>
+
+<h1 class="wordmark" style="font-size:clamp(1.8rem,6vw,2.4rem)">Food, Drink &amp; Shops</h1>
+<p class="tagline">Things players consume, and the merchants who sell them.</p>
+
+<nav class="toc">
+    <span class="kicker">On this page</span>
+    <ol>
+        <li><a href="#edible">Food</a></li>
+        <li><a href="#drink">Drink</a></li>
+        <li><a href="#merchant">Merchants</a></li>
+        <li><a href="#vessels">Poured to order</a></li>
+    </ol>
+</nav>
+
+<h2 id="edible">Food</h2>
+
+<p>
+Build an edible from <code>#90 BaseEdible</code> and the <code>eat</code>
+command works on it immediately — you write no code at all. What you set are
+properties describing how it behaves as it is eaten.
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @make #90 = apple
+<span class="p">&gt;</span> @set apple.uses = 3
+<span class="p">&gt;</span> @set apple.effects = [('intoxicate', 2, 60)]</code></div>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Property</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>uses</code></td><td>How many bites it takes. The item is destroyed on the last one.</td></tr>
+<tr><td><code>effects</code></td><td><a href="living-world.html#effects">Effects</a> applied as it is eaten, as a list of <code>(name, times, interval)</code>.</td></tr>
+<tr><td><code>effect_chance</code></td><td>Percentage chance the effects apply at all. Defaults to always.</td></tr>
+<tr><td><code>effects_per_bite</code></td><td>Whether effects land on every bite, or only the last one.</td></tr>
+<tr><td><code>finish</code> / <code>ofinish</code></td><td>What the eater, and everyone else, sees when it is finished.</td></tr>
+<tr><td><code>eemits</code></td><td>The messages for each bite — to the eater and to the room.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+When a player types <code>eat apple</code>, the shared <code>eat</code> command
+calls the <code>eat_</code> <a href="verbs.html#exceptions">exception</a> that
+<code>#90</code> provides. That is where the counting down, the effects and the
+messages happen. If you want one particular pie to do something unusual, give
+that pie its own <code>eat_</code>.
+</p>
+
+<h2 id="drink">Drink</h2>
+
+<p>
+Drink works the same way, from <code>#91 BaseDrinkable</code>, with one
+difference worth understanding: <strong>a drink is a liquid inside a
+container</strong>. The liquid is the thing built from <code>#91</code>; the cup
+or bottle holding it is built from <code>#28 CupContainer</code>.
+</p>
+
+<div class="term"><code>a shot glass          <span class="c">← #28 CupContainer, what the player holds</span>
+  └── fire whiskey    <span class="c">← #91 BaseDrinkable, what they actually drink</span></code></div>
+
+<p>
+That separation is what lets the same whiskey be sold by the glass, the bottle
+or the case, and what lets an empty glass still be an object. The liquid carries
+the same properties as food — <code>uses</code>, <code>effects</code>,
+<code>finish</code> — and <code>drink</code> calls its <code>drink_</code>
+exception.
+</p>
+
+<div class="warn">
+    <span class="label">Containers are named for the container</span>
+    <p>A glass of whiskey is called "a shot glass", never "a shot glass of fire
+       whiskey". Names are what players type at, so putting the contents in the
+       name makes <code>drink whiskey</code> match the glass instead of the
+       liquid. Players see what is in it with <code>look in glass</code>.</p>
+</div>
+
+<h2 id="merchant">Merchants</h2>
+
+<p>
+A merchant turns a room into a shop. The key idea is unexpected and worth
+stating plainly: <strong>the merchant is a price book, not a person.</strong> It
+has no location and nobody can see it. The shopkeeper players talk to is an
+entry in the merchant's list of speech, not a walking object.
+</p>
+
+<p>
+A room becomes a shop by pointing at one. Rooms do not start with a
+<code>merchant</code> property, so the first time you must <em>add</em> it
+rather than set it:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @adprop here.merchant = #250
+<span class="o">Property 'merchant' added to #204:Test Tavern = '#250'</span></code></div>
+
+<p>
+<code>@set</code> changes a property that already exists; <code>@adprop</code>
+creates one. Using <code>@set</code> here answers
+<code>merchant doesn't exist on #204</code>, and the shop then reports
+<code>There is no one to buy from here.</code></p>
+
+<p>
+Buying is a two-step conversation, which gives players a chance to hear the
+price before committing:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Player types</th><th>What happens</th></tr></thead>
+<tbody>
+<tr><td><code>buy whiskey</code></td><td>The shop finds the item in its stock and <strong>quotes a price</strong>. Nothing changes hands.</td></tr>
+<tr><td><code>offer</code></td><td>Pays the asking price. The shop checks their coin and their free hands, <strong>mints a fresh copy</strong> of the item into their hand, and takes the money.</td></tr>
+<tr><td><code>offer 5 silver</code></td><td>Names a specific bid. Below the asking price it is refused.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+Stock is never depleted, because nothing is taken off a shelf — each sale mints
+a new copy from the item the merchant holds as its template. A tavern does not
+run out of whiskey unless you decide it should.
+</p>
+
+<h2 id="vessels">Poured to order</h2>
+
+<p>
+A bar could stock a glass of whiskey, a bottle of whiskey and a case of whiskey
+as three separate items. It is better to stock the whiskey once and let the
+merchant know which vessels it can be served in — each with a size multiplier —
+so the price follows the measure:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> buy whiskey
+<span class="o">"That'll be two silver," she says.</span>
+<span class="p">&gt;</span> buy bottle of whiskey
+<span class="o">"A bottle? Ten silver."</span></code></div>
+
+<p>
+The sale then mints the vessel, pours the liquid into it, and names it
+correctly — one entry in the price book covering every measure you sell. A
+whole purchase, start to finish:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> buy rum
+<span class="o">A burly barkeep says, "Lessee 'ere, a tankard of spiced rum costs 20 plats.</span>
+<span class="o">Ye want one?" If you would like to purchase a tankard of spiced rum make an 'offer'.</span>
+<span class="p">&gt;</span> offer
+<span class="p">&gt;</span> inventory
+<span class="o">You have a tankard in your right hand.</span>
+<span class="p">&gt;</span> drink tankard
+<span class="o">You take a drink of spiced rum from a tankard.</span></code></div>
+
+<p>
+The tankard did not exist a moment earlier, and the twenty plats have gone from
+the buyer's purse.
+</p>
+
+<div class="warn">
+    <span class="label">Buyers need to be set up</span>
+    <p>A shop writes to several properties on the buyer — what they have
+       haggled for, what is in their hands, their money. A character missing any
+       of them fails with <code>Permission denied: cannot create 'pending_buy'</code>
+       or similar, part-way through a sale. <code>@initchar &lt;character&gt;</code>
+       adds the full set. Run it on any character that predates your shop, and
+       on test characters, before you go looking for a bug in the merchant.</p>
+</div>
+
+<div class="note">
+    <span class="label">The full walkthrough</span>
+    <p>Merchants have more moving parts than anything else in this guide: the
+       price book, the shopkeeper's lines, coin types, vessels and buying by
+       the case. <code>docs/manual/merchant-guide.md</code> is a step-by-step
+       build of a working bar, with the complete property reference and a
+       troubleshooting section. Start there when you build your first
+       shop.</p>
+</div>
+
+<div class="pagenav">
+    <a href="living-world.html"><span class="dir">Previous</span>A World That Moves</a>
+    <a class="to-next" href="index.html"><span class="dir">Back to</span>MegaMOO Guide</a>
+</div>
+
+<div class="footer">
+    <span><a href="index.html">← MegaMOO Guide</a></span>
+    <span>Food, Drink &amp; Shops</span>
+</div>
+
+</div>
+</body>
+</html>

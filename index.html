@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MegaMOO — Guide</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+    <h1 class="wordmark">Mega<span class="moo">MOO</span></h1>
+    <p class="tagline">An AI-enabled engine for building multiplayer text worlds.</p>
+    <div class="badges">
+        <span class="badge">Python 3 · one process</span>
+        <span class="badge">no dependencies</span>
+        <span class="badge">SQLite persistence</span>
+        <span class="badge">telnet + websocket</span>
+    </div>
+</header>
+
+<h2>What MegaMOO is</h2>
+
+<p class="lede">
+MegaMOO is a text-based virtual world engine — a complete reimplementation of
+the LambdaMOO server in Python 3. It hosts a shared, programmable world that
+players connect to over telnet or websocket, where they move between rooms,
+handle objects, and talk to each other. Builders and programmers extend that
+world <em>while it is running</em>, by writing code directly into the live
+database.
+</p>
+
+<p>
+It combines the object-oriented model LambdaMOO proved in 1990 with modern
+Python: <code>asyncio</code> networking, SQLite persistence, and the full
+standard library available inside the world's own code.
+</p>
+
+<h3>A small footprint and nothing to install</h3>
+
+<p>
+MegaMOO is one Python process and one database file. There is no web server to
+configure, no database server to administer, no package manager to satisfy, and
+no build step. The engine has <strong>zero third-party dependencies</strong> —
+it runs on a stock Python 3 install. Copy the folder to a machine, run one
+command, and the world is up.
+</p>
+
+<p>
+That matters more than it sounds. It means a world costs nothing to keep
+running, can live on a laptop or the cheapest VPS you can rent, and can be
+backed up by copying a single file. It also means you can run five worlds at
+once on one machine without them interfering with each other.
+</p>
+
+<h3>Built to be worked on with an AI assistant</h3>
+
+<p>
+MegaMOO exposes its live world through a local API, so an AI assistant can work
+<em>inside</em> the running game rather than guessing at it from source files.
+Connected that way, an assistant can read what an object really holds, write a
+new command, run it as a test character, read exactly what the game printed
+back, and check the log when something breaks — then fix it, with the world
+still running and players still connected.
+</p>
+
+<p>
+The engine's design happens to suit this unusually well. Every command is a
+short, self-contained Python file with a fixed set of variables available and no
+imports to resolve, so a single command is a small, bounded problem — the kind
+an assistant handles reliably. World-building stops being a slow
+edit–restart–reconnect loop and becomes a conversation.
+</p>
+
+<h3>What you get out of the box</h3>
+
+<div class="tablewrap">
+<table>
+<tbody>
+<tr><td>Verb code is <strong>pure Python</strong></td><td>No purpose-built MOO language to learn.</td></tr>
+<tr><td><strong>SQLite</strong> persistence</td><td>Your whole world is one portable file.</td></tr>
+<tr><td><strong>Hot reload</strong></td><td>Change a command; the next player to type it runs the new version. No restart.</td></tr>
+<tr><td><strong>ANSI colour</strong></td><td>16, 256, and hex RGB.</td></tr>
+<tr><td><strong>MUD protocols</strong></td><td>GMCP, MSDP, MSSP, MXP.</td></tr>
+<tr><td><strong>Effects and tickers</strong></td><td>Timed buffs, debuffs, and scheduled behaviour.</td></tr>
+<tr><td><strong>Accessibility</strong></td><td>Per-player screenreader mode that strips colour and decoration.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>Where to go next</h2>
+
+<div class="cards">
+
+    <a class="card" href="paradigm.html">
+        <span class="kicker">First</span>
+        <h3>The MOO Paradigm</h3>
+        <p>Why a world that contains its own code is the right shape for
+           building virtual places.</p>
+    </a>
+
+    <a class="card" href="getting-started.html">
+        <span class="kicker">Then</span>
+        <h3>Getting Started</h3>
+        <p>Copying and naming a world, starting it, and running several at
+           once.</p>
+    </a>
+
+    <a class="card" href="objects.html">
+        <span class="kicker">Build</span>
+        <h3>Naming &amp; Creating Objects</h3>
+        <p>How a name is assembled, how players refer to things, and the
+           commands that make them.</p>
+    </a>
+
+    <a class="card" href="rooms.html">
+        <span class="kicker">Build</span>
+        <h3>Rooms &amp; Exits</h3>
+        <p>Digging rooms, connecting them, and the messages players see as
+           they move.</p>
+    </a>
+
+    <a class="card" href="verbs.html">
+        <span class="kicker">Build</span>
+        <h3>Verbs</h3>
+        <p>Where commands live, staff authority, and giving one object
+           behaviour of its own.</p>
+    </a>
+
+    <a class="card" href="numbers.html">
+        <span class="kicker">Organise</span>
+        <h3>Object Numbers &amp; Zones</h3>
+        <p>Reserving a block of numbers so a zone stays together.</p>
+    </a>
+
+    <a class="card" href="living-world.html">
+        <span class="kicker">Bring to life</span>
+        <h3>A World That Moves</h3>
+        <p>Tickers and effects — things that happen without a player typing
+           anything.</p>
+    </a>
+
+    <a class="card" href="shops.html">
+        <span class="kicker">Bring to life</span>
+        <h3>Food, Drink &amp; Shops</h3>
+        <p>Edibles, drinkables and the merchant system.</p>
+    </a>
+
+</div>
+
+<div class="footer">
+    <span>MegaMOO guide</span>
+    <span>MIT licensed</span>
+</div>
+
+</div>
+</body>
+</html>

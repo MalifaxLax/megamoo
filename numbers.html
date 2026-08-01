@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Object Numbers &amp; Zones — MegaMOO Guide</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<p class="crumb"><a href="index.html">← MegaMOO Guide</a></p>
+
+<h1 class="wordmark" style="font-size:clamp(1.8rem,6vw,2.4rem)">Object Numbers &amp; Zones</h1>
+<p class="tagline">Keeping a zone's numbers together instead of scattered.</p>
+
+<nav class="toc">
+    <span class="kicker">On this page</span>
+    <ol>
+        <li><a href="#assigned">How numbers get assigned</a></li>
+        <li><a href="#why">Why you would reserve a block</a></li>
+        <li><a href="#how">Reserving with @foff and @fon</a></li>
+        <li><a href="#example">A worked example: building a zone</a></li>
+    </ol>
+</nav>
+
+<h2 id="assigned">How numbers get assigned</h2>
+
+<p>
+Every object has a permanent number. When you make something, MegaMOO gives it
+the lowest free number it can find. That is fine for a lamp or a chair, but it
+means that a zone built over several sessions ends up scattered — the tavern is
+<code>#204</code>, its cellar is <code>#251</code>, and the room you added last
+week is <code>#198</code>, because other things were being made in between.
+</p>
+
+<h2 id="why">Why you would reserve a block</h2>
+
+<p>
+Reserving a block of numbers keeps a zone together. If the harbour district is
+<code>#500</code>–<code>#599</code>, then a number in the 500s tells you at a
+glance which part of the world you are looking at, and a builder working on the
+forest at <code>#600</code> cannot accidentally take one of your numbers.
+</p>
+
+<p>
+This is worth doing for anything you think of as a unit — a district, a dungeon,
+a questline — and not worth doing for scenery.
+</p>
+
+<div class="note">
+    <span class="label">Some numbers are already spoken for</span>
+    <p>The starter world reserves several low blocks for future core objects.
+       Run <code>@fon/list</code> to see them before choosing where your zone
+       goes; picking a high, round number is the simplest way to stay clear.</p>
+</div>
+
+<h2 id="how">Reserving with @foff and @fon</h2>
+
+<p>
+Two commands, and the naming is the only confusing part. Think of a number as
+<strong>free</strong> when the engine is allowed to hand it out automatically:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Command</th><th>Does</th></tr></thead>
+<tbody>
+<tr><td><code>@fon/set 500 to 599</code></td><td>Sets the block you are working with. Do this first.</td></tr>
+<tr><td><code>@foff</code></td><td><strong>Free off</strong> — reserves every unused number in the block. The engine stops handing them out.</td></tr>
+<tr><td><code>@fon</code></td><td><strong>Free on</strong> — releases the block's unused numbers back for normal use.</td></tr>
+<tr><td><code>@fon/list</code></td><td>Shows every reserved unused number, grouped into ranges.</td></tr>
+<tr><td><code>@fon/clear</code></td><td>Forgets the block you set. Does not release anything.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+Both need <code>gm3</code>. Reserving only affects numbers that are still
+unused — objects that already exist are untouched.
+</p>
+
+<p>
+Owners with <code>gm5</code> can also reserve a block directly, without setting
+it as their working range:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @reserve #500 to #599
+<span class="p">&gt;</span> @reserve /free #500 to #599
+<span class="p">&gt;</span> @reserve /list</code></div>
+
+<h2 id="example">A worked example: building a zone</h2>
+
+<p>
+You are about to build a harbour district and want it to live in the 500s.
+</p>
+
+<p><strong>1. Claim the block.</strong></p>
+
+<div class="term"><code><span class="p">&gt;</span> @fon/set 500 to 520
+<span class="o">Set free_obj range to #500-#520 (21 objects).</span>
+<span class="p">&gt;</span> @foff
+<span class="o">Reserved 21 unused object numbers in #500-#520.</span></code></div>
+
+<p>
+From now on nothing lands there by accident. Anything you or another builder
+creates gets a number from outside the block:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @make $item = probe
+<span class="o">Created #207:a probe, added to inventory.</span>   <span class="c"># skipped the 500s</span></code></div>
+
+<p><strong>2. Build, then move each piece into the block.</strong> New objects
+still arrive with whatever number was free, so put them where you want them:</p>
+
+<div class="term"><code><span class="p">&gt;</span> @renumber #207 to #500
+<span class="o">Renumbered #207 to #500:a probe.</span></code></div>
+
+<p>
+Work through the zone this way and the harbour ends up at <code>#500</code>,
+<code>#501</code>, <code>#502</code> and so on, in the order you built it.
+<code>@renumber</code> needs <code>gm5</code>.
+</p>
+
+<p><strong>3. Give back what you did not use.</strong> When the zone is
+finished, release the leftovers so they are not held out of circulation
+forever:</p>
+
+<div class="term"><code><span class="p">&gt;</span> @fon
+<span class="o">Unreserved 21 unused object numbers in #500-#520.</span></code></div>
+
+<p>
+The numbers you actually used are objects now, so they are unaffected. Only the
+empty ones go back into the pool.
+</p>
+
+<div class="note">
+    <span class="label">Check your work</span>
+    <p><code>@fon/list</code> at any point shows what is currently held,
+       grouped into ranges — the quickest way to see whether your block is
+       reserved and how much of it you have left.</p>
+</div>
+
+<div class="pagenav">
+    <a href="verbs.html"><span class="dir">Previous</span>Verbs</a>
+    <a class="to-next" href="living-world.html"><span class="dir">Next</span>A World That Moves</a>
+</div>
+
+<div class="footer">
+    <span><a href="index.html">← MegaMOO Guide</a></span>
+    <span>Object Numbers &amp; Zones</span>
+</div>
+
+</div>
+</body>
+</html>
