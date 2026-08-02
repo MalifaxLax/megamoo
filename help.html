@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Help System — MegaMOO Guide</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<p class="crumb"><a href="index.html">← MegaMOO Guide</a></p>
+
+<h1 class="wordmark" style="font-size:clamp(1.8rem,6vw,2.4rem)">The Help System</h1>
+<p class="tagline">How players find out how your world works.</p>
+
+<nav class="toc">
+    <span class="kicker">On this page</span>
+    <ol>
+        <li><a href="#two">Two sources, one command</a></li>
+        <li><a href="#ladder">What <code>help</code> looks for</a></li>
+        <li><a href="#topics">Writing topics</a></li>
+        <li><a href="#categories">Categories</a></li>
+        <li><a href="#objects">Documenting an object</a></li>
+    </ol>
+</nav>
+
+<h2 id="two">Two sources, one command</h2>
+
+<p>
+Players type <code>help</code>. What comes back is drawn from two places, and
+knowing which is which saves you a lot of writing:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Source</th><th>Covers</th><th>Who writes it</th></tr></thead>
+<tbody>
+<tr><td><strong>Verb docstrings</strong></td><td>Commands.</td><td>Nobody, separately — the comment at the top of a verb <em>is</em> its help.</td></tr>
+<tr><td><strong>The topic library on <code>#54</code></strong></td><td>Everything that is not a command: your world's rules, its history, how combat works, what a newcomer should do first.</td><td>You, as editable prose.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+That split is the good part. A command can never drift out of date, because its
+help is the same text the person who wrote it read. And prose about your world
+lives as data you can rewrite while the game runs, without touching code.
+</p>
+
+<h2 id="ladder">What <code>help</code> looks for</h2>
+
+<p>
+Typing <code>help</code> on its own prints an index. Typing
+<code>help &lt;word&gt;</code> tries three things in order and stops at the first
+hit:
+</p>
+
+<ol>
+<li>A <strong>topic</strong> of that name on <code>#54</code>.</li>
+<li>A <strong>sub-topic</strong> inside one of the categories there.</li>
+<li>A <strong>command</strong> of that name that the player can reach — its
+    docstring is printed.</li>
+</ol>
+
+<div class="term"><code><span class="p">&gt;</span> help look
+<span class="o">look</span>
+<span class="o">Look at your surroundings or examine something in the room.</span>
+<span class="o">Usage: look [object]</span></code></div>
+
+<p>
+Because topics are checked first, a topic named <code>look</code> would hide the
+<code>look</code> command's help. Give topics names that are not command names.
+</p>
+
+<h2 id="topics">Writing topics</h2>
+
+<p>
+A topic is a property on <code>#54</code>. The property name is the word players
+type. Create it with <code>@adprop</code>:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @adprop #54.rules = "Be excellent to each other. No harassment, no cheating."
+<span class="o">Property 'rules' added to #54:help_utils = 'Be excellent to each other...'</span>
+<span class="p">&gt;</span> help rules
+<span class="o">rules</span>
+<span class="o">Be excellent to each other. No harassment, no cheating.</span></code></div>
+
+<p>
+To revise it later, <code>@set</code> — which changes a property that already
+exists, where <code>@adprop</code> creates one:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @set #54.rules = "Be excellent. No cheating. No spoilers in public channels."</code></div>
+
+<p>
+Keep the name a single lowercase word, since it is exactly what a player has to
+type. The starter world ships with no topics at all — the library is yours to
+fill.
+</p>
+
+<h2 id="categories">Categories</h2>
+
+<p>
+A topic whose value is a dictionary becomes a category: an index of sub-topics,
+each reachable on its own.
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @adprop #54.magic = {'spells': 'Casting consumes mana.', 'mana': 'Mana regenerates while resting.'}</code></div>
+
+<div class="term"><code><span class="p">&gt;</span> help magic
+<span class="o">magic</span>
+<span class="o">mana, spells</span>
+<span class="p">&gt;</span> help spells
+<span class="o">magic &gt; spells</span>
+<span class="o">Casting consumes mana.</span></code></div>
+
+<p>
+Only the category name appears in the main index, so categories are how you keep
+that index short while still letting people reach every piece directly.
+</p>
+
+<h2 id="objects">Documenting an object</h2>
+
+<p>
+Staff at <code>gm3</code> and above can attach an explanation to any object with
+a <code>help_text</code> property, and read it back with <code>help #</code> and
+the number. Players cannot — to them the command does not exist.
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @adprop #202.help_text = "A brass model of the heavens. Turn the crank to advance it."
+<span class="p">&gt;</span> help #202
+<span class="o">#202 (an orrery)</span>
+<span class="o">A brass model of the heavens. Turn the crank to advance it.</span></code></div>
+
+<p>
+This is for the things a builder needs reminding about six months later: a
+machine with an odd trigger, a fixture other people will have to maintain.
+<code>help #202.pull</code> reads a specific verb's help, but only for a verb
+defined <em>on that object</em> — inherited commands are not found this way.
+</p>
+
+<div class="warn">
+    <span class="label">Hide your hooks, or they clutter the index</span>
+    <p>The index lists every command in reach, and
+       <a href="verbs.html#exceptions">exception verbs</a> are commands as far
+       as it is concerned. Anything not hidden shows up there — the starter
+       world's own index is noisy with internal names like
+       <code>_title</code> and <code>behind_get</code> for exactly this reason.
+       Create hooks with <code>@adverb/hidden</code> and your help index stays
+       readable.</p>
+</div>
+
+<div class="pagenav">
+    <a href="verbs.html"><span class="dir">Previous</span>Verbs</a>
+    <a class="to-next" href="numbers.html"><span class="dir">Next</span>Object Numbers &amp; Zones</a>
+</div>
+
+<div class="footer">
+    <span><a href="index.html">← MegaMOO Guide</a></span>
+    <span>The Help System</span>
+</div>
+
+</div>
+</body>
+</html>
