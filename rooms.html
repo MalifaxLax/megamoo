@@ -4,6 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rooms &amp; Exits — MegaMOO Guide</title>
+<!-- seo:begin -->
+<meta name="description" content="Digging rooms, linking them with exits and doors, and controlling what players see as they move through your world.">
+<link rel="canonical" href="https://malifaxlax.github.io/megamoo/rooms.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MegaMOO">
+<meta property="og:title" content="Rooms & Exits — MegaMOO Guide">
+<meta property="og:description" content="Digging rooms, linking them with exits and doors, and controlling what players see as they move through your world.">
+<meta property="og:url" content="https://malifaxlax.github.io/megamoo/rooms.html">
+<meta property="og:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Rooms & Exits — MegaMOO Guide">
+<meta name="twitter:description" content="Digging rooms, linking them with exits and doors, and controlling what players see as they move through your world.">
+<meta name="twitter:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
+<link rel="icon" href="https://malifaxlax.github.io/megamoo/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="https://malifaxlax.github.io/megamoo/apple-touch-icon.png">
+<!-- seo:end -->
 <link rel="stylesheet" href="manual.css">
 </head>
 <body>
@@ -149,7 +167,7 @@ by name, and the one you choose decides how players get through it:
 <thead><tr><th>Command</th><th>Makes</th><th>Players</th></tr></thead>
 <tbody>
 <tr><td><code>@gopen gate to #412</code></td><td>A walkable exit</td><td><code>go gate</code></td></tr>
-<tr><td><code>@dopen oak door to #412</code></td><td>A door</td><td>Open, close, lock and unlock it</td></tr>
+<tr><td><code>@dopen door to #412</code></td><td>A door</td><td>Open, close, lock and unlock it</td></tr>
 <tr><td><code>@copen stairs to #412</code></td><td>A climbable exit</td><td><code>climb stairs</code></td></tr>
 <tr><td><code>@jopen chasm to #412</code></td><td>A jumpable exit</td><td><code>jump chasm</code></td></tr>
 </tbody>
@@ -168,6 +186,22 @@ These all create objects — a door has to be an object, since it has a state
 players can change. <code>@dopen</code> requires a destination; the others can
 be linked later. Remove any exit with <code>@rmexit</code>.
 </p>
+
+<div class="note">
+    <span class="label">Creation commands take a bare noun</span>
+    <p>Never put an adjective in the name you give a creation command. Make the
+       exit with its noun alone, then add the adjective afterwards:</p>
+    <div class="term"><code><span class="p">&gt;</span> @dopen door to #412
+<span class="o">You created a new closable exit #413:door.</span>
+<span class="p">&gt;</span> @adj #413 = oak
+<span class="o">Adjectives reset to 'oak'. Object title: 'an oak door'.</span></code></div>
+    <p>The same rule applies to <code>@gopen</code>, <code>@copen</code>,
+       <code>@jopen</code>, <code>@open</code>, <code>@vopen</code>,
+       <code>@make</code> and <code>@name</code>. Players still refer to it as
+       <code>oak door</code> — the adjective becomes a match word once
+       <code>@adj</code> has set it. Remember the return exit is a separate
+       object: adjective that side too.</p>
+</div>
 
 <h2 id="messages">Exit messages</h2>
 
