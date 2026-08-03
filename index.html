@@ -43,6 +43,15 @@ Python: <code>asyncio</code> networking, SQLite persistence, and the full
 standard library available inside the world's own code.
 </p>
 
+<p>
+<strong>A browser client is included.</strong> Start a world with
+<code>--web</code> and players can play it in a browser with no client to
+install — a terminal with colour and clickable exits, a map that draws
+itself as they explore, and their own triggers and aliases in Lua or
+JavaScript. Telnet players and browser players share the same world.
+See <a href="web-client.html">The Web Client</a>.
+</p>
+
 <h3>A small footprint and nothing to install</h3>
 
 <p>
@@ -50,7 +59,9 @@ MegaMOO is one Python process and one database file. There is no web server to
 configure, no database server to administer, no package manager to satisfy, and
 no build step. The engine has <strong>zero third-party dependencies</strong> —
 it runs on a stock Python 3 install. Copy the folder to a machine, run one
-command, and the world is up.
+command, and the world is up. (The one vendored library anywhere in the
+project is the Lua interpreter the browser client's optional scripting host
+uses; it ships as a static file, so there is still nothing to install.)
 </p>
 
 <p>
@@ -89,6 +100,7 @@ edit–restart–reconnect loop and becomes a conversation.
 <tr><td><strong>Hot reload</strong></td><td>Change a command; the next player to type it runs the new version. No restart.</td></tr>
 <tr><td><strong>ANSI colour</strong></td><td>16, 256, and hex RGB.</td></tr>
 <tr><td><strong>MUD protocols</strong></td><td>GMCP, MSDP, MSSP, MXP.</td></tr>
+<tr><td><strong>Browser client</strong></td><td>Terminal, automap and player scripting, served by the game itself.</td></tr>
 <tr><td><strong>Effects and tickers</strong></td><td>Timed buffs, debuffs, and scheduled behaviour.</td></tr>
 <tr><td><strong>Accessibility</strong></td><td>Per-player screenreader mode that strips colour and decoration.</td></tr>
 </tbody>
@@ -165,6 +177,13 @@ edit–restart–reconnect loop and becomes a conversation.
         <h3>Command Reference</h3>
         <p>Every staff command, grouped by what it is for, with the level each
            one needs.</p>
+    </a>
+
+    <a class="card" href="web-client.html">
+        <span class="kicker">Reference</span>
+        <h3>The Web Client</h3>
+        <p>Playing in a browser, the out-of-band data stream, player
+           scripting, and extending the client yourself.</p>
     </a>
 
 </div>

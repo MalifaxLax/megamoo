@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Web Client — MegaMOO Guide</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<p class="crumb"><a href="index.html">← MegaMOO Guide</a></p>
+
+<h1 class="wordmark" style="font-size:clamp(1.8rem,6vw,2.4rem)">The Web Client</h1>
+<p class="tagline">Playing in a browser, and extending the client yourself.</p>
+
+<nav class="toc">
+    <span class="kicker">On this page</span>
+    <ol>
+        <li><a href="#running">Turning it on</a></li>
+        <li><a href="#what">What players get</a></li>
+        <li><a href="#files">The files</a></li>
+        <li><a href="#wiring">Wiring it up</a></li>
+        <li><a href="#protocol">The wire protocol</a></li>
+        <li><a href="#oob">Out-of-band data</a></li>
+        <li><a href="#scripting">Player scripting</a></li>
+        <li><a href="#extending">Extending the client</a></li>
+        <li><a href="#public">Putting it on the internet</a></li>
+    </ol>
+</nav>
+
+<h2 id="running">Turning it on</h2>
+
+<p>
+MegaMOO ships a browser client in the <code>web/</code> folder. The game
+server serves it itself — there is no web server to install and no build
+step. Add <code>--web</code> when you start a world:
+</p>
+
+<pre><code>python megamoo.py mm.db --web</code></pre>
+
+<p>
+The client takes the first free port from 8888 up, and the startup log tells
+you which one it got:
+</p>
+
+<pre><code>Web client listening on 0.0.0.0:8888</code></pre>
+
+<p>
+Open <code>http://localhost:8888/</code> and you get the login screen. Use
+<code>--web-port 9000</code> to pin an exact port instead; a named port is a
+request for <em>that</em> port, so a conflict fails loudly rather than
+quietly landing somewhere you weren't expecting.
+</p>
+
+<div class="note">
+    <span class="label">One port, both halves</span>
+    <p>The same listener serves the static files and accepts the WebSocket
+       on <code>/ws</code>. Players connecting this way share the world with
+       telnet players — same database, same rooms, same conversation. The
+       transport is the only difference.</p>
+</div>
+
+<h2 id="what">What players get</h2>
+
+<p>
+The terminal behaves the way a MUD client should: scrollback with the
+world's colours, command history on the up and down arrows, and exits you
+can click. Passwords are masked automatically — the server flags the
+prompt, since a WebSocket has no equivalent of telnet's echo suppression.
+</p>
+
+<p>
+A dropped connection reconnects on its own, with a backoff, so a server
+restart doesn't cost anyone their tab.
+</p>
+
+<h3>The map</h3>
+
+<p>
+A map of the world draws itself in the corner as players explore. It covers
+<strong>in-character rooms only</strong> — the entry hall and chargen never
+appear, and the panel hides while a player is standing in one.
+</p>
+
+<p>
+The map is exact rather than approximate. Every room reports its own object
+number, and the server derives a canonical <code>(x, y, z)</code> for each
+room once, by walking the exit graph: one cell per compass direction, one
+level per <code>u</code>/<code>d</code>. Because that layout comes from the
+world rather than from the route a player happened to walk, every player's
+map has the same shape, loops close correctly, and up and down are real
+levels.
+</p>
+
+<p>
+What the server does <em>not</em> send is where each exit leads. That would
+hand players the topology of rooms they have never visited, so unexplored
+exits draw as short stubs — a visible frontier rather than a spoiler.
+</p>
+
+<h2 id="files">The files</h2>
+
+<p>
+Everything the browser loads lives in <code>web/</code>. It is plain HTML,
+CSS and JavaScript with no bundler, so editing a file and reloading the page
+is the whole development loop.
+</p>
+
+<div class="tablewrap">
+<table>
+<tr><th>File</th><th>What it does</th></tr>
+<tr><td><code>index.html</code></td><td>Page structure</td></tr>
+<tr><td><code>client.css</code></td><td>All styling, including the colour classes the server emits</td></tr>
+<tr><td><code>client.js</code></td><td>Socket, scrollback, input line, event bus, public API</td></tr>
+<tr><td><code>automap.js</code></td><td>The corner map</td></tr>
+<tr><td><code>panels.js</code></td><td>Renders script-declared UI panels</td></tr>
+<tr><td><code>scripting.js</code></td><td>Script manager, host registry, the API scripts call</td></tr>
+<tr><td><code>scripts-ui.js</code></td><td>The Scripts dialog</td></tr>
+<tr><td><code>hosts/js-worker.js</code></td><td>JavaScript scripting host</td></tr>
+<tr><td><code>hosts/lua.js</code></td><td>Lua scripting host</td></tr>
+<tr><td><code>vendor/wasmoon/</code></td><td>Lua 5.4 compiled to WebAssembly (MIT)</td></tr>
+</table>
+</div>
+
+<p>
+The server half is <code>moo/web/</code>: <code>server.py</code> (static
+files and the WebSocket upgrade), <code>connection.py</code> (one player's
+session, mirroring the telnet connection), <code>websocket.py</code> (RFC
+6455 framing) and <code>color.py</code>, which turns the world's colour
+codes into HTML. Room coordinates come from <code>moo/roommap.py</code>.
+</p>
+
+<div class="note">
+    <span class="label">On dependencies</span>
+    <p>The engine itself has no third-party dependencies and never will.
+       The one exception anywhere in the project is
+       <code>web/vendor/wasmoon/</code> — the Lua interpreter used by the
+       optional Lua scripting host, vendored so there is still nothing to
+       install. It is a static file the server already serves, and it is
+       downloaded by the browser only when a player actually enables a Lua
+       script.</p>
+</div>
+
+<h2 id="wiring">Wiring it up</h2>
+
+<p>
+Three things connect: the server has to serve the client, the page has to
+load its modules in the right order, and your world has to tell the client
+what it wants shown.
+</p>
+
+<h3>1. The server</h3>
+
+<p>
+<code>--web</code> is the whole server side. It reads
+<code>network.websocket_enabled</code>, so you can turn it on permanently in
+a config file instead:
+</p>
+
+<pre><code>{
+  "network": {
+    "websocket_enabled": true,
+    "websocket_port": 8888,
+    "websocket_allowed_origins": []
+  }
+}</code></pre>
+
+<p>
+The static files are served from the <code>web/</code> folder next to
+<code>megamoo.py</code>. Moving or renaming that folder is the one thing
+that will break the client, since the path is resolved relative to the
+engine.
+</p>
+
+<h3>2. The page</h3>
+
+<p>
+<code>index.html</code> loads the modules in a fixed order, and the order is
+load-bearing:
+</p>
+
+<pre><code>&lt;script src="automap.js"&gt;&lt;/script&gt;
+&lt;script src="panels.js"&gt;&lt;/script&gt;
+&lt;script src="scripting.js"&gt;&lt;/script&gt;
+&lt;script src="hosts/js-worker.js"&gt;&lt;/script&gt;
+&lt;script src="hosts/lua.js"&gt;&lt;/script&gt;
+&lt;script src="scripts-ui.js"&gt;&lt;/script&gt;
+&lt;script src="client.js"&gt;&lt;/script&gt;</code></pre>
+
+<p>
+<code>scripting.js</code> defines the host registry, so the two hosts must
+load after it to register themselves. <code>client.js</code> loads
+<strong>last</strong>: it opens the socket and attaches every module, so
+anything it attaches has to already exist. A module added after
+<code>client.js</code> is simply never wired in — which looks like the
+module being broken rather than misplaced.
+</p>
+
+<p>
+Each module exposes an object with an <code>attach(api)</code> method, and
+the bottom of <code>client.js</code> connects them:
+</p>
+
+<pre><code>if (window.Automap) window.Automap.attach(api);
+if (window.MegaMOOScripting) window.MegaMOOScripting.attach(api);</code></pre>
+
+<p>
+The guards mean a module you delete costs you that feature and nothing else.
+</p>
+
+<h3>3. Your world</h3>
+
+<p>
+Two things the client reads that are yours to set.
+</p>
+
+<p>
+<strong>The map needs in-character rooms.</strong> It only draws rooms whose
+<code>is_icroom</code> is true — defined on <code>#17 ICRoom</code> and
+inherited, so any room descended from it is mapped and OOC rooms are not. A
+world whose playable rooms don't descend from <code>#17</code> gets no map
+at all, which is the usual reason for an empty corner.
+</p>
+
+<p>
+<strong>Anything else is a GMCP package you send.</strong> From a verb:
+</p>
+
+<pre><code>from moo.network import get_connection_for_player
+conn = get_connection_for_player(player.objnum)
+if conn and hasattr(conn, 'send_gmcp_sync'):
+    conn.send_gmcp_sync('Char.Vitals', {'hp': 42, 'max': 100})</code></pre>
+
+<p>
+The <code>hasattr</code> check is what makes this safe for telnet players
+too — they have no <code>send_gmcp_sync</code>, so the same code runs
+harmlessly for everyone. See <a href="#extending">Extending the client</a>
+for drawing the result.
+</p>
+
+<h2 id="protocol">The wire protocol</h2>
+
+<p>
+Everything crosses the socket as JSON. From the server:
+</p>
+
+<pre><code>{"type": "text",   "data": "&lt;html&gt;"}
+{"type": "prompt", "data": "&gt; "}
+{"type": "echo",   "enabled": false}
+{"type": "gmcp",   "package": "Room.Info", "data": {}}</code></pre>
+
+<p>
+And from the client:
+</p>
+
+<pre><code>{"type": "input", "data": "look"}
+{"type": "gmcp",  "package": "...", "data": {}}</code></pre>
+
+<p>
+<code>text</code> arrives as HTML because <code>moo/web/color.py</code> has
+already converted the world's <code>%</code> colour codes — and any ANSI a
+verb emitted — into spans, escaping everything else. That module is the only
+thing in the system that produces markup, which is what keeps a player who
+names themselves <code>&lt;script&gt;</code> from being a problem.
+</p>
+
+<p>
+<code>echo</code> is the WebSocket stand-in for telnet's <code>IAC WILL
+ECHO</code>: the server sends <code>enabled: false</code> ahead of a password
+prompt and the client masks the next line.
+</p>
+
+<h2 id="oob">Out-of-band data</h2>
+
+<p>
+Out-of-band data is anything the server tells the client that isn't meant to
+be printed — the room you just entered, your vitals, whatever your world
+wants to publish. MegaMOO sends it as GMCP packages, and the client
+republishes <em>every</em> package on its event bus, whether or not it knows
+what the package means:
+</p>
+
+<pre><code>MegaMOO.on('gmcp', ({package, data}) =&gt; { ... });   // everything
+MegaMOO.on('gmcp:Room.Info', (data) =&gt; { ... });    // one package</code></pre>
+
+<p>
+That matters when you extend the world. Send a new package from a verb and
+it is immediately visible to the client and to every player script — no
+client change required.
+</p>
+
+<pre><code>conn.send_gmcp_sync('Char.Vitals', {'hp': 42, 'max': 100})</code></pre>
+
+<p>
+The package MegaMOO sends today is <code>Room.Info</code>, carrying the
+room's number, name, description, obvious exits, map coordinates, and
+whether it is in-character.
+</p>
+
+<h2 id="scripting">Player scripting</h2>
+
+<p>
+Players can write their own triggers, aliases and heads-up displays from the
+<em>Scripts</em> button, in either <strong>Lua</strong> or
+<strong>JavaScript</strong>. Both get an identical API, so logic ports
+between them.
+</p>
+
+<div class="tablewrap">
+<table>
+<tr><th>Call</th><th>Does</th></tr>
+<tr><td><code>moo.echo(text)</code></td><td>Write a line to the scrollback</td></tr>
+<tr><td><code>moo.send(command)</code></td><td>Send a command as if typed</td></tr>
+<tr><td><code>moo.send_gmcp(pkg, data)</code></td><td>Send a client-to-server package</td></tr>
+<tr><td><code>moo.on(event, fn)</code></td><td>Subscribe to a client event</td></tr>
+<tr><td><code>moo.trigger(pattern, fn)</code></td><td>Run <code>fn</code> on matching output</td></tr>
+<tr><td><code>moo.alias(pattern, fn)</code></td><td>Claim matching input before it is sent</td></tr>
+<tr><td><code>moo.timer(ms, fn)</code></td><td>Repeating timer</td></tr>
+<tr><td><code>moo.storage.get/set</code></td><td>Persistent, per-script storage</td></tr>
+<tr><td><code>moo.panel(id, spec)</code></td><td>Declare or update a UI panel</td></tr>
+</table>
+</div>
+
+<pre><code>moo.on('gmcp:Room.Info', function(room)
+  moo.panel('where', {title = 'Location', body = {
+    type = 'stack',
+    children = {
+      {type = 'text', text = room.name, strong = true},
+      {type = 'text', text = 'exits: ' .. tostring(#room.exits), muted = true},
+    },
+  }})
+end)
+
+moo.alias('^h$', function() moo.send('go north') end, {regex = true})</code></pre>
+
+<p>
+Scripts never produce markup. A panel is <em>described</em> as data — a
+small tree of widgets: <code>text</code>, <code>bar</code>,
+<code>gauge</code>, <code>row</code>, <code>stack</code>,
+<code>table</code> — which trusted client code renders. Colours are chosen
+from a fixed set of names rather than given as CSS. A script cannot express
+markup, so it cannot inject any.
+</p>
+
+<h3>Which language to offer</h3>
+
+<p>
+The two hosts differ in how their sandbox is built, and it matters:
+</p>
+
+<ul>
+    <li><strong>JavaScript</strong> runs in a Web Worker with
+        <code>fetch</code>, <code>WebSocket</code>,
+        <code>XMLHttpRequest</code>, <code>importScripts</code>,
+        <code>indexedDB</code> and <code>Worker</code> itself removed. That
+        last one matters — leave it in place and a script spawns a nested
+        worker to get a fresh global with everything restored. It is a
+        <em>blocklist</em>: correct as far as it goes, and only as good as
+        the list.</li>
+    <li><strong>Lua</strong> runs in a real Lua 5.4 VM with no bridge to
+        JavaScript at all. Its isolation is a property of the interpreter
+        rather than a list somebody maintains, and its standard library is
+        trimmed to what a game script needs.</li>
+</ul>
+
+<p>
+So: JavaScript is fine for scripts a player wrote themselves. For a script
+pack passed between players — which is how MUD scripting has always
+worked — prefer Lua. A hostile JavaScript script that finds a reference the
+blocklist missed runs as that player, in their session. The client says as
+much when someone picks JavaScript.
+</p>
+
+<h2 id="extending">Extending the client</h2>
+
+<p>
+The client is deliberately small and unbundled. Everything hangs off one
+event bus, so most additions are a new file that subscribes to it.
+</p>
+
+<h3>Adding a panel of your own</h3>
+
+<p>
+Suppose your world sends a <code>Char.Vitals</code> package from a verb.
+A new file that draws it is about this long:
+</p>
+
+<pre><code>// web/vitals.js
+(function () {
+  const el = document.getElementById('vitals');
+
+  window.Vitals = {
+    attach(api) {
+      api.on('gmcp:Char.Vitals', (v) =&gt; {
+        el.hidden = false;
+        el.textContent = `${v.hp} / ${v.max}`;
+      });
+    },
+  };
+})();</code></pre>
+
+<p>
+Add the element to <code>index.html</code>, load the script before
+<code>client.js</code>, and attach it at the bottom of
+<code>client.js</code> where the other modules attach:
+</p>
+
+<pre><code>if (window.Vitals) window.Vitals.attach(api);</code></pre>
+
+<p>
+That is the whole pattern. <code>automap.js</code> is a longer worked
+example of exactly this shape, and a good one to read before writing your
+own.
+</p>
+
+<h3>The API a module gets</h3>
+
+<p>
+<code>window.MegaMOO</code> is the same object player scripts talk to
+through their host:
+</p>
+
+<div class="tablewrap">
+<table>
+<tr><th>Call</th><th>Does</th></tr>
+<tr><td><code>on(event, fn)</code></td><td>Subscribe. Events: <code>text</code>, <code>line</code>, <code>prompt</code>, <code>input</code>, <code>gmcp</code>, <code>gmcp:&lt;Package&gt;</code>, <code>connect</code>, <code>disconnect</code></td></tr>
+<tr><td><code>send(command)</code></td><td>Send a command</td></tr>
+<tr><td><code>sendGmcp(pkg, data)</code></td><td>Send a package</td></tr>
+<tr><td><code>echo(text)</code></td><td>Write a line to the scrollback</td></tr>
+<tr><td><code>intercept(fn)</code></td><td>Claim input before it is sent</td></tr>
+<tr><td><code>connected</code></td><td>Whether the socket is open</td></tr>
+</table>
+</div>
+
+<p>
+Use <code>line</code> rather than <code>text</code> when you want to match
+on output: <code>text</code> fires per network message, which is not the
+same as per line, while <code>line</code> fires once per completed line of
+plain text with the markup already stripped.
+</p>
+
+<h3>Sending a new package from the world</h3>
+
+<p>
+From a verb, reach the player's connection and send:
+</p>
+
+<pre><code>from moo.network import get_connection_for_player
+conn = get_connection_for_player(player.objnum)
+if conn and hasattr(conn, 'send_gmcp_sync'):
+    conn.send_gmcp_sync('Char.Vitals', {'hp': 42, 'max': 100})</code></pre>
+
+<p>
+Telnet connections have no <code>send_gmcp_sync</code>, which is why the
+check is there — the same code is then safe for every player regardless of
+how they connected.
+</p>
+
+<div class="note">
+    <span class="label">Reloading your changes</span>
+    <p>Anything under <code>web/</code> is read from disk per request, so
+       editing a file and reloading the page is enough. Anything under
+       <code>moo/</code> needs the server restarted. The client watches for
+       this: it reconnects a dropped socket <em>without</em> reloading the
+       page, so after a restart it checks whether the files changed and puts
+       a banner up when the page it is running has been superseded.</p>
+</div>
+
+<h2 id="public">Putting it on the internet</h2>
+
+<p>
+Two things change when the client is reachable from outside your machine.
+</p>
+
+<p>
+First, name the origins allowed to open a socket:
+</p>
+
+<pre><code>python megamoo.py mm.db --web --web-origins https://play.example.com</code></pre>
+
+<p>
+Without that, any page a logged-in player happens to visit can open an
+authenticated socket to your world in their name. The browser same-origin
+policy does <em>not</em> cover WebSockets, which is what makes this
+necessary rather than paranoid. On localhost you can leave it off.
+</p>
+
+<p>
+Second, put it behind a TLS-terminating proxy. The client picks
+<code>wss://</code> or <code>ws://</code> from the page's own scheme, so
+serving the page over HTTPS is all it takes — there is nothing to configure
+in the client. The socket does need the upgrade headers passed through:
+</p>
+
+<pre><code>server {
+    listen 443 ssl;
+    server_name play.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8888;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host       $host;
+        proxy_read_timeout 1h;
+    }
+}</code></pre>
+
+<p>
+The long read timeout matters: a player idling in a room sends nothing for
+minutes at a time, and a proxy's default timeout will drop them.
+</p>
+
+<div class="pagenav">
+    <a href="commands.html"><span class="dir">Previous</span>Command Reference</a>
+    <a class="to-next" href="index.html"><span class="dir">Next</span>Back to the Guide</a>
+</div>
+
+<div class="footer">
+    <span><a href="index.html">← MegaMOO Guide</a></span>
+    <span>The Web Client</span>
+</div>
+
+</div>
+</body>
+</html>
