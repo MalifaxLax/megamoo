@@ -4,6 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Naming &amp; Creating Objects — MegaMOO Guide</title>
+<!-- seo:begin -->
+<meta name="description" content="How a MegaMOO object's name is assembled from article, adjectives and noun, and why that decides what players can type.">
+<link rel="canonical" href="https://malifaxlax.github.io/megamoo/objects.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MegaMOO">
+<meta property="og:title" content="Naming & Creating Objects — MegaMOO Guide">
+<meta property="og:description" content="How a MegaMOO object's name is assembled from article, adjectives and noun, and why that decides what players can type.">
+<meta property="og:url" content="https://malifaxlax.github.io/megamoo/objects.html">
+<meta property="og:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Naming & Creating Objects — MegaMOO Guide">
+<meta name="twitter:description" content="How a MegaMOO object's name is assembled from article, adjectives and noun, and why that decides what players can type.">
+<meta name="twitter:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
+<link rel="icon" href="https://malifaxlax.github.io/megamoo/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="https://malifaxlax.github.io/megamoo/apple-touch-icon.png">
+<!-- seo:end -->
 <link rel="stylesheet" href="manual.css">
 </head>
 <body>
@@ -172,7 +190,8 @@ the prototype ever moves, <code>#0</code> is updated once and every
 <h2 id="make">Creating an object</h2>
 
 <p>
-<code>@make</code> takes the object to build from, and a name:
+<code>@make</code> takes the object to build from, and a name — the bare noun, with
+no adjective on it. Adjectives are added afterwards with <code>@adj</code>:
 </p>
 
 <div class="term"><code><span class="p">&gt;</span> @make $item = sword
