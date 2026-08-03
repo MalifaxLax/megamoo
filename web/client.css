@@ -1,0 +1,675 @@
+/*
+ * MegaMOO web client — styling.
+ *
+ * Two jobs:
+ *
+ *   1. The colour classes moo/web/color.py generates.  That module emits
+ *      class names only (cr, cG, ch, c245, bg17 ...) and deliberately
+ *      leaves the actual colours to this file.  The 16 basic codes are
+ *      written out below; the 256-colour cube is generated at runtime by
+ *      client.js, since 512 hand-written rules would be unmaintainable.
+ *
+ *   2. The client chrome: terminal pane, input row, map and script
+ *      panels — dark, monospace, deliberately close to the game's own
+ *      terminal look.
+ */
+
+/* ========================================================================
+   Design tokens
+   ======================================================================== */
+
+:root {
+  --bg:            #0c0e11;
+  --bg-raised:     #14171c;
+  --bg-sunken:     #08090b;
+  --border:        #242a33;
+  --border-bright: #333c48;
+
+  --fg:            #c8ccd4;
+  --fg-dim:        #7c8695;
+  --fg-faint:      #4c5563;
+
+  --accent:        #d9a441;   /* amber: brand, prompt, focus */
+  --own:           #59c46a;   /* your team */
+  --foe:           #d9564e;   /* opponents */
+  --neutral:       #5b90d6;   /* unclaimed orbs */
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          Menlo, Consolas, "DejaVu Sans Mono", monospace;
+
+  --line-height: 1.45;
+  --pad: 12px;
+}
+
+/* ========================================================================
+   Frame
+   ======================================================================== */
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/var(--line-height) var(--mono);
+  overscroll-behavior: none;
+}
+
+#app {
+  display: grid;
+  /* Fixed header and input row; the stage takes whatever is left, which
+     is what keeps the input reachable on a phone without the page
+     itself scrolling. */
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100dvh;
+}
+
+/* --- top bar --- */
+
+#topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pad);
+  padding: 8px var(--pad);
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+  padding-top: max(8px, env(safe-area-inset-top));
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  font-size: 12px;
+}
+
+.brand-accent { color: var(--accent); }
+
+.status {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status--online     { color: var(--own); }
+.status--connecting { color: var(--accent); }
+.status--offline    { color: var(--foe); }
+
+/* --- stale-client banner --- */
+
+#stale-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px var(--pad);
+  font-size: 13px;
+  color: var(--bg);
+  background: var(--accent);
+}
+
+#stale-banner button {
+  font: inherit;
+  font-size: 12px;
+  color: var(--bg);
+  background: transparent;
+  border: 1px solid rgb(0 0 0 / 0.4);
+  border-radius: 3px;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+
+#stale-banner button:hover { background: rgb(0 0 0 / 0.12); }
+
+#stale-dismiss {
+  margin-left: auto;
+  border: 0 !important;
+  font-size: 16px !important;
+  line-height: 1;
+}
+
+/* --- stage --- */
+
+#stage {
+  position: relative;
+  min-height: 0;
+  display: grid;
+}
+
+#terminal-pane {
+  grid-area: 1 / 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+[hidden] { display: none !important; }
+
+/* ========================================================================
+   Terminal
+   ======================================================================== */
+
+#terminal-pane { position: relative; }
+
+#scrollback {
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--pad);
+  /* Game output is column-aligned ASCII: preserve every space, but still
+     wrap rather than force a horizontal scrollbar on a narrow screen. */
+  white-space: pre-wrap;
+  word-break: break-word;
+  scrollbar-color: var(--border-bright) transparent;
+}
+
+.line { min-height: 1px; }
+
+/* Locally echoed commands, so the player can see what they sent. */
+.line--echo { color: var(--fg-faint); }
+.line--echo::before { content: "> "; color: var(--accent); opacity: 0.5; }
+
+/* Client-generated notices (connection state), kept visually distinct
+   from anything the game itself said. */
+.line--client {
+  color: var(--fg-faint);
+  font-style: italic;
+}
+
+#scroll-latest {
+  position: absolute;
+  right: var(--pad);
+  bottom: var(--pad);
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--bg);
+  background: var(--accent);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.5);
+}
+
+/* ========================================================================
+   Input row
+   ======================================================================== */
+
+#input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px var(--pad);
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border);
+}
+
+#prompt {
+  color: var(--accent);
+  font-weight: 700;
+  white-space: pre;
+  flex: none;
+}
+
+#cmd {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+#cmd:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#cmd:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========================================================================
+   Script manager  (see scripts-ui.js)
+   ======================================================================== */
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.topbar-button {
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  background: transparent;
+  border: 1px solid var(--border-bright);
+  border-radius: 3px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.topbar-button:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+#scripts-dialog {
+  width: min(680px, 92vw);
+  max-height: 86vh;
+  padding: 0 20px 20px;
+  color: var(--fg);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  font: inherit;
+}
+
+#scripts-dialog::backdrop {
+  background: rgb(0 0 0 / 0.65);
+}
+
+.dialog-close-form {
+  display: flex;
+  justify-content: flex-end;
+  position: sticky;
+  top: 0;
+  padding-top: 8px;
+  background: var(--bg-raised);
+}
+
+.dialog-close {
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--fg-faint);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.dialog-close:hover { color: var(--fg); }
+
+.dialog-title {
+  margin: 0 0 14px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+
+.scripts-list {
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scripts-empty {
+  color: var(--fg-faint);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.scripts-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 5px 6px;
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+.scripts-item--editing { background: var(--bg-sunken); }
+
+.scripts-item-name {
+  font: inherit;
+  text-align: left;
+  color: var(--fg);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scripts-item-name:hover { color: var(--accent); }
+
+.scripts-item-lang {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+.scripts-item-remove {
+  font: inherit;
+  font-size: 11px;
+  color: var(--fg-faint);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.scripts-item-remove:hover { color: var(--foe); }
+
+.script-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.script-editor-row {
+  display: flex;
+  gap: 8px;
+}
+
+#script-name { flex: 1; }
+
+#script-name,
+#script-language,
+#script-source {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 6px 8px;
+}
+
+#script-source {
+  width: 100%;
+  resize: vertical;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+
+#script-name:focus,
+#script-language:focus,
+#script-source:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.script-warning {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--accent);
+}
+
+.script-editor-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.script-editor-actions button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--border-bright);
+  border-radius: 3px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.script-editor-actions .button-primary {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+/* ========================================================================
+   Script panels  (see panels.js)
+   ------------------------------------------------------------------------
+   Rendered from a widget vocabulary, never from script-supplied markup.
+   ======================================================================== */
+
+/* Upper-right overlay stack: map first, then script panels. */
+#corner {
+  grid-area: 1 / 1;
+  align-self: start;
+  justify-self: end;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(280px, 42vw);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: var(--pad);
+  pointer-events: none;   /* overlays are readouts; don't block the terminal */
+}
+
+#script-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* --- automap --- */
+
+.automap {
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--bg-raised) 92%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.4);
+}
+
+.automap-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+  padding: 0 2px;
+}
+
+.automap-room {
+  font-size: 11px;
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automap-reset {
+  flex: none;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.automap-reset:hover { color: var(--foe); }
+
+#automap-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 2px;
+  image-rendering: pixelated;
+}
+
+.script-panel {
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--bg-raised) 92%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.4);
+}
+
+.script-panel-title {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+.panel-stack { display: flex; flex-direction: column; gap: 4px; }
+.panel-row   { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.panel-space { height: 8px; }
+
+.panel-text { font-size: 13px; white-space: pre-wrap; }
+.panel-text--muted  { color: var(--fg-dim); }
+.panel-text--strong { font-weight: 700; }
+
+.panel-bar {
+  display: grid;
+  grid-template-columns: 3.4em minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.panel-bar-label { color: var(--fg-dim); }
+
+.panel-bar-track {
+  position: relative;
+  height: 12px;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.panel-bar-fill { height: 100%; background: var(--own); }
+
+.panel-bar-value {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  text-shadow: 0 0 3px #000, 0 0 3px #000;
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-gauge {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.panel-gauge-label { color: var(--fg-dim); }
+.panel-gauge-value { font-variant-numeric: tabular-nums; }
+
+.panel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.panel-table th,
+.panel-table td {
+  padding: 2px 4px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-table th {
+  color: var(--fg-faint);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ========================================================================
+   MOO colour codes  (see moo/web/color.py)
+   ------------------------------------------------------------------------
+   Nesting matters: the converter emits <span class="ch"><span class="cr">
+   for %h%r, so intensity and colour must live on separate properties or
+   one would clobber the other.
+   ======================================================================== */
+
+.cx { color: #33383f; }   /* black / dark grey */
+.cr { color: #c25450; }
+.cg { color: #63a95f; }
+.cy { color: #bd9445; }
+.cb { color: #5178b5; }
+.cm { color: #a463b0; }
+.cc { color: #4fa3a8; }
+.cw { color: #b6bcc6; }
+
+.cX { color: #6a7381; }   /* bright variants */
+.cR { color: #f0655f; }
+.cG { color: #78d972; }
+.cY { color: #e8c15c; }
+.cB { color: #6fa4ee; }
+.cM { color: #cd82db; }
+.cC { color: #64d0d6; }
+.cW { color: #f2f5fa; }
+
+/* Backtick-marked exits and objects. The telnet client turns these into
+   MXP clickable links; here they are click targets too (see client.js). */
+.clickable {
+  color: #8a8a8a;
+  cursor: pointer;
+  text-decoration: underline dotted transparent;
+}
+
+.clickable:hover {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}
+
+.ch { font-weight: 700; }              /* highlight */
+.cu { text-decoration: underline; }
+.ci { font-style: italic; }
+.cv { background: var(--fg); color: var(--bg); }   /* ANSI 7: inverse */
+
+/* Flash: honoured only for players who haven't asked for less motion. */
+.cf { animation: moo-flash 1s steps(2, end) infinite; }
+
+@keyframes moo-flash {
+  50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cf { animation: none; opacity: 1; font-weight: 700; }
+  .panel-bar-fill { transition: none; }
+}

@@ -105,9 +105,21 @@ class NetworkConfig:
         ssl_cert (str): Filesystem path to the PEM-encoded SSL certificate.
         ssl_key (str): Filesystem path to the PEM-encoded SSL private key.
         websocket_enabled (bool): Whether to start a WebSocket listener in
-            addition to the telnet listener.
-        websocket_port (int): Port for the WebSocket listener (used only when
-            ``websocket_enabled`` is ``True``).
+            addition to the telnet listener.  This listener also serves the
+            browser client's static files.
+        websocket_port (int): First port tried for the WebSocket listener
+            (used only when ``websocket_enabled`` is ``True``).  With
+            ``websocket_auto_port`` on this is only the *first* candidate.
+        websocket_auto_port (bool): Whether a busy ``websocket_port`` makes
+            the server scan forward for a free one.  Turned off when the
+            operator names a port explicitly, so a conflict fails loudly.
+        websocket_allowed_origins (list): Browser ``Origin`` values allowed
+            to open a WebSocket.  Empty (the default) accepts any origin,
+            which is right for localhost development.  On a public
+            deployment, list your site's origins -- otherwise any web page
+            the player visits can open an authenticated socket to your
+            server in their name (cross-site WebSocket hijacking; the
+            same-origin policy does *not* cover WebSockets).
     """
     host: str = '0.0.0.0'
     port: int = DEFAULT_PORT
@@ -122,6 +134,8 @@ class NetworkConfig:
     ssl_key: str = ''
     websocket_enabled: bool = False
     websocket_port: int = 8888
+    websocket_auto_port: bool = True
+    websocket_allowed_origins: list = field(default_factory=list)
 
 
 # =============================================================================

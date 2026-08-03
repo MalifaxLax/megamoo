@@ -538,6 +538,14 @@ def puppet(target: Union[int, MOOObject]) -> bool:
     finally:
         clear_verb_context(token)
 
+    # Announce the room over GMCP.  Puppeting relocates with move_to()
+    # rather than the move() builtin, so nothing else does -- which left
+    # a browser client showing whatever room it last heard about.  Going
+    # in-character that meant the map never appeared; coming back out it
+    # meant the map kept showing the in-character world while the player
+    # stood in the OOC lobby.
+    _send_room_gmcp(target_obj, last_loc)
+
     logger.info(f"puppet(): done. conn.player_obj=#{conn.player_obj.objnum}, "
                 f"keys={list(_player_connections.keys())}")
 
@@ -915,10 +923,27 @@ def _send_room_gmcp(obj, dest_num):
                     continue
             if getattr(c, 'is_exit', False) and getattr(c, 'is_obvious', False):
                 exits.append(getattr(c, 'name', ''))
+        # ``num`` is the room's identity, which is what lets a client map
+        # the world exactly rather than guessing from room names (which
+        # repeat).  ``coords`` is its cell in the canonical layout derived
+        # from the exit graph (moo/roommap.py), so every client places the
+        # world identically.  ``ic`` distinguishes in-character rooms from
+        # the OOC entry hall -- it is ``is_icroom``, defined True on #17
+        # and inherited, and OOC rooms return _null_attr, which is falsy
+        # but is *not* ``None``, so this must test truthiness.
+        #
+        # Deliberately *not* included: where each exit leads.  The
+        # destinations are sitting right there in room.dexits, but sending
+        # them would hand the player the topology of rooms they have never
+        # visited.  A client maps what it has actually seen.
+        from .roommap import coords_for
         conn.send_gmcp_sync('Room.Info', {
+            'num': dest_num,
             'name': getattr(room, 'name', ''),
             'desc': getattr(room, 'description', ''),
             'exits': exits,
+            'coords': coords_for(_database, dest_num),
+            'ic': bool(getattr(room, 'is_icroom', False)),
         })
     except Exception:
         pass

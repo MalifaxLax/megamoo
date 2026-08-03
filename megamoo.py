@@ -207,6 +207,27 @@ Examples:
             help='API authentication token'
         )
         parser.add_argument(
+            '--web',
+            action='store_true',
+            default=False,
+            help='Enable the browser client: serves the web client and '
+                 'accepts WebSocket players (first free port from 8888 up)'
+        )
+        parser.add_argument(
+            '--web-port',
+            type=int,
+            default=None,
+            help='Pin the web client to this exact port (fails if it is in '
+                 'use); omit to auto-select the first free port from 8888 up'
+        )
+        parser.add_argument(
+            '--web-origins',
+            default=None,
+            help='Comma-separated list of browser origins allowed to open a '
+                 'WebSocket (e.g. https://play.example.com). Omit on '
+                 'localhost; set it when serving the client publicly'
+        )
+        parser.add_argument(
             '--log-level',
             choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
             default='INFO',
@@ -374,7 +395,10 @@ Examples:
                        config_path=args.config_file,
                        api_enabled=args.api,
                        api_port=args.api_port,
-                       api_token=args.api_token)
+                       api_token=args.api_token,
+                       web_enabled=args.web,
+                       web_port=args.web_port,
+                       web_origins=args.web_origins)
             
             return 0
             

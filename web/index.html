@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>MegaMOO</title>
+<link rel="stylesheet" href="client.css">
+</head>
+<body>
+
+<div id="app">
+
+  <header id="topbar">
+    <span class="brand">Mega<span class="brand-accent">MOO</span></span>
+    <span class="topbar-right">
+      <button id="scripts-open" type="button" class="topbar-button">Scripts</button>
+      <span id="conn-status" class="status status--connecting">connecting</span>
+    </span>
+  </header>
+
+  <!-- Shown when the files on disk change under a page that is still
+       running the old ones. Persistent rather than a scrollback line,
+       which would scroll away unread. -->
+  <div id="stale-banner" hidden>
+    <span>A newer client is available.</span>
+    <button id="stale-reload" type="button">Reload</button>
+    <button id="stale-dismiss" type="button" aria-label="Dismiss">&times;</button>
+  </div>
+
+  <main id="stage">
+
+    <!-- Plain MUD output.  Lines arrive as pre-escaped HTML from
+         moo/web/color.py, which is the only source of markup here. -->
+    <section id="terminal-pane" aria-label="Game output">
+      <div id="scrollback" role="log" aria-live="polite" aria-atomic="false"></div>
+      <button id="scroll-latest" type="button" hidden>Jump to latest &darr;</button>
+    </section>
+
+    <!-- Corner overlays: the world map, then any script-declared panels. -->
+    <aside id="corner" aria-label="Overlays">
+
+      <section id="automap" class="automap" aria-label="Map" hidden>
+        <header class="automap-head">
+          <span id="automap-room" class="automap-room"></span>
+          <button id="automap-reset" type="button" class="automap-reset"
+                  title="Forget the map">reset</button>
+        </header>
+        <canvas id="automap-canvas" role="img"
+                aria-label="Map of rooms you have visited"></canvas>
+      </section>
+
+      <!-- Panels declared by user scripts, rendered from a widget
+           vocabulary by panels.js. Scripts never produce markup. -->
+      <div id="script-panels" hidden></div>
+
+    </aside>
+
+  </main>
+
+  <!-- Script manager. A <dialog> so Escape and focus trapping come for
+       free rather than being reimplemented. -->
+  <dialog id="scripts-dialog">
+    <form method="dialog" class="dialog-close-form">
+      <button class="dialog-close" aria-label="Close">&times;</button>
+    </form>
+
+    <h2 class="dialog-title">Scripts</h2>
+
+    <ul id="scripts-list" class="scripts-list"></ul>
+
+    <div class="script-editor">
+      <div class="script-editor-row">
+        <input id="script-name" type="text" placeholder="Script name"
+               aria-label="Script name" autocomplete="off">
+        <select id="script-language" aria-label="Language"></select>
+      </div>
+      <textarea id="script-source" rows="12" spellcheck="false"
+                aria-label="Script source"
+                placeholder="-- Lua, or JavaScript. The API is the same in both:&#10;--   moo.echo, moo.send, moo.trigger, moo.alias,&#10;--   moo.timer, moo.storage, moo.panel, moo.on"></textarea>
+      <p id="script-warning" class="script-warning" hidden></p>
+      <div class="script-editor-actions">
+        <button id="script-save" type="button" class="button-primary">Save &amp; run</button>
+        <button id="script-new" type="button">New</button>
+      </div>
+    </div>
+  </dialog>
+
+  <form id="input-row" autocomplete="off">
+    <label for="cmd" id="prompt" aria-label="Prompt">&gt;</label>
+    <input id="cmd" type="text" name="cmd"
+           autocomplete="off" autocapitalize="off"
+           autocorrect="off" spellcheck="false"
+           aria-label="Command input">
+  </form>
+
+</div>
+
+<!-- Order matters: scripting.js defines the host registry the two hosts
+     register into, and client.js boots everything once they are present.
+     wasmoon itself is loaded lazily by the Lua host, only if a Lua script
+     is actually enabled — it is ~420KB and most sessions never need it. -->
+<script src="automap.js"></script>
+<script src="panels.js"></script>
+<script src="scripting.js"></script>
+<script src="hosts/js-worker.js"></script>
+<script src="hosts/lua.js"></script>
+<script src="scripts-ui.js"></script>
+<script src="client.js"></script>
+</body>
+</html>

@@ -57,10 +57,19 @@ from .websocket import (
     encode_frame, decode_frame,
     encode_close, encode_pong, OP_TEXT, OP_CLOSE, OP_PING,
 )
-from .color import moo_colors_to_html
+from .color import moo_colors_to_html, ansi_to_html
 
 # Matches backtick-wrapped clickable markers: `north`, `open door`, etc.
 _CLICKABLE_RE = re.compile(r'`([^`\n]+)`')
+
+# Password prompts, so the browser can mask the next line of input.
+#
+# Telnet hides passwords with IAC WILL ECHO; there is no such channel over
+# a WebSocket, so the server flags the prompt instead and the client masks
+# its input box.  Recognising the prompt here rather than in JavaScript
+# keeps it next to login.py's wording, and means an explicit echo-control
+# API could replace it later without touching the client.
+_PASSWORD_PROMPT_RE = re.compile(r'password[^a-z]*:\s*$', re.IGNORECASE)
 
 if TYPE_CHECKING:
     from ..server import MegaMOOServer
@@ -233,17 +242,37 @@ class WebSocketConnection:
             # Move to the login room and announce arrival
             from ..globals import LOGIN_ROOM
             from ..objects import ObjectFlags
-            try:
-                player.set_property('last_location', LOGIN_ROOM)
-            except KeyError:
-                player.add_property('last_location', LOGIN_ROOM)
+            from ..builtins import msg_room, _send_room_gmcp
+
             player.set_flag(ObjectFlags.PLAYER)
-            if self.server.database.valid(LOGIN_ROOM):
-                player.move_to(LOGIN_ROOM, self.server.database)
-                from ..builtins import msg_room
-                login_room = self.server.database.get_object(LOGIN_ROOM)
-                msg_room(login_room, f"{player.name} arrives.", exclude=[player])
+
+            if handler.reconnect:
+                # Session takeover: the character stays exactly where it
+                # is.  Moving it would drag an in-character player out of
+                # the world and into the OOC entry hall -- and, worse,
+                # overwrite the ``last_location`` that puppet() uses to
+                # put them back, so every later trip through the portal
+                # would return them to the lobby instead of the game.
+                # This mirrors PlayerConnection._handle_login.
+                logger.info(f"Web player {player.name} reconnected (takeover)")
+            else:
+                try:
+                    player.set_property('last_location', LOGIN_ROOM)
+                except KeyError:
+                    player.add_property('last_location', LOGIN_ROOM)
+                if self.server.database.valid(LOGIN_ROOM):
+                    player.move_to(LOGIN_ROOM, self.server.database)
+                    login_room = self.server.database.get_object(LOGIN_ROOM)
+                    msg_room(login_room, f"{player.name} arrives.",
+                             exclude=[player])
+
             self.server.database.save_object(player)
+
+            # move_to() is the raw relocation, not the move() builtin, so
+            # nothing has announced this room over GMCP.  Sent for the
+            # room the player is *actually* in, which on a takeover is
+            # wherever they left off rather than the login room.
+            _send_room_gmcp(player, player._location_id)
 
             return True
 
@@ -400,9 +429,13 @@ class WebSocketConnection:
         Send a message to the web client as a JSON WebSocket text frame.
 
         By default, MOO color codes in the message are converted to
-        HTML ``<span>`` tags via ``moo_colors_to_html()``.  Pass
-        ``raw=True`` to skip color conversion (e.g. for pre-formatted
-        HTML).
+        HTML ``<span>`` tags via ``moo_colors_to_html()``.
+
+        ``raw=True`` means the caller has already formatted the message
+        *for a terminal* -- the login splash, a full-screen frame -- so
+        it carries ANSI escapes rather than MOO codes.  Those go through
+        ``ansi_to_html()`` instead.  Either way the text content is
+        escaped: nothing reaches the browser as unfiltered markup.
 
         The message is sent as a JSON object::
 
@@ -412,17 +445,28 @@ class WebSocketConnection:
             message:     The text message to send.
             add_newline: If ``True`` (default), appends a newline if the
                          message doesn't already end with one.
-            raw:         If ``True``, skip MOO color-to-HTML conversion.
+            raw:         If ``True``, treat the message as ANSI terminal
+                         output rather than MOO-coded text.
         """
         if self._disconnected:
             return
 
         if not raw:
-            # Strip backtick markers and dim the text (web clients don't use MXP)
-            message = _CLICKABLE_RE.sub(r'<span style="color:#8a8a8a">\1</span>', message)
+            # A password prompt masks exactly the next line the player
+            # types; the client re-enables echo on submit, so there is no
+            # matching "echo on" to send.
+            if _PASSWORD_PROMPT_RE.search(message):
+                await self._send_echo(False)
             html = moo_colors_to_html(message)
         else:
-            html = message
+            html = ansi_to_html(message)
+
+        # Backtick markers become dim spans (web clients don't use MXP).
+        # This must run *after* the colour converter: that converter
+        # escapes <, > and &, so substituting markup ahead of it turned
+        # the spans into visible &lt;span ...&gt; text on the page.
+        # Backticks survive escaping untouched, so matching here is safe.
+        html = _CLICKABLE_RE.sub(r'<span class="clickable">\1</span>', html)
 
         if add_newline and not html.endswith('\n'):
             html += '\n'
@@ -435,6 +479,24 @@ class WebSocketConnection:
             self._disconnected = True
         except Exception as e:
             logger.error(f"Error sending to web client: {e}")
+            self._disconnected = True
+
+    async def _send_echo(self, enabled: bool):
+        """
+        Tell the client whether to show what the player is typing.
+
+        The WebSocket equivalent of telnet's IAC WILL/WONT ECHO.  Sent as
+        ``{"type": "echo", "enabled": false}`` ahead of a password prompt;
+        the client masks its input box and restores it once the line is
+        submitted.
+        """
+        if self._disconnected:
+            return
+        payload = json.dumps({"type": "echo", "enabled": enabled})
+        try:
+            self.writer.write(encode_frame(payload))
+            await self.writer.drain()
+        except (BrokenPipeError, ConnectionResetError, OSError):
             self._disconnected = True
 
     async def _send_prompt(self, prompt: str):

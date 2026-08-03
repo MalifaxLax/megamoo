@@ -124,6 +124,22 @@ def moo_colors_to_html(text: str) -> str:
     pos = 0
 
     while pos < len(text):
+        # --- Try an ANSI escape ---
+        # Game text is not purely MOO-coded: some verbs embed a literal
+        # ANSI sequence to restore a colour after the telnet layer's
+        # clickable-marker handling emits a reset (the \x1b[38;5;245m in
+        # moo verbs/15/rlook.py).  Handling both notations in this one
+        # pass is what makes that work -- converting ANSI to MOO codes
+        # first cannot, because a colour immediately followed by a letter
+        # ("\x1b[31mred" -> "%rred") is not a MOO code at all.
+        if text[pos] == '\x1b':
+            match = _ANSI_RE.match(text, pos)
+            if match:
+                html, open_spans = _ansi_to_spans(match.group(), open_spans)
+                result.append(html)
+                pos = match.end()
+                continue
+
         # --- Try extended code: %<...> ---
         if text[pos] == '%' and pos + 1 < len(text) and text[pos + 1] == '<':
             close = text.find('>', pos + 2)
@@ -228,3 +244,88 @@ def _extended_to_span(inner: str) -> str | None:
             return f'<span class="{cls}">'
 
     return None
+
+
+# =============================================================================
+# ANSI -> HTML (the "raw" send path)
+# =============================================================================
+
+# One ANSI escape sequence: CSI (ESC [) with parameters and a final letter,
+# or one of the short two-character escapes (ESC c, ESC 7, ...).
+_ANSI_RE = re.compile(r'\x1b(?:\[[0-9;?]*[A-Za-z]|[()][A-Za-z0-9]|[A-Za-z0-9])')
+
+# SGR parameter -> CSS class, using the same palette client.css defines
+# for MOO codes so ANSI and MOO output stay visually consistent.
+_SGR_CLASSES = {
+    '1': 'ch', '3': 'ci', '4': 'cu', '5': 'cf', '7': 'cv',
+    '30': 'cx', '31': 'cr', '32': 'cg', '33': 'cy',
+    '34': 'cb', '35': 'cm', '36': 'cc', '37': 'cw',
+    '90': 'cX', '91': 'cR', '92': 'cG', '93': 'cY',
+    '94': 'cB', '95': 'cM', '96': 'cC', '97': 'cW',
+}
+
+
+def _ansi_to_spans(seq: str, open_spans: int) -> tuple[str, int]:
+    """
+    Convert one ANSI escape sequence to HTML, tracking open spans.
+
+    Args:
+        seq:        A single escape sequence, e.g. ``"\x1b[38;5;245m"``.
+        open_spans: How many spans are currently open.
+
+    Returns:
+        ``(html, open_spans)`` -- the markup this sequence produces and
+        the updated open-span count.  Non-SGR escapes (cursor moves,
+        screen clears, charset selection) produce no markup: a scrollback
+        pane has nothing to do with them.
+    """
+    if not seq.endswith('m'):
+        return '', open_spans
+
+    out = []
+    params = seq[2:-1].split(';')
+    i = 0
+    while i < len(params):
+        p = params[i]
+        if p in ('', '0'):
+            # Reset closes everything, exactly as %n does.
+            out.append('</span>' * open_spans)
+            open_spans = 0
+        elif p in ('38', '48') and params[i + 1:i + 2] == ['5']:
+            # 38;5;N / 48;5;N -- xterm-256 fore/background.
+            code = params[i + 2] if len(params) > i + 2 else ''
+            if code.isdigit() and 0 <= int(code) <= 255:
+                prefix = 'bg' if p == '48' else 'c'
+                out.append(f'<span class="{prefix}{int(code)}">')
+                open_spans += 1
+            i += 2
+        else:
+            cls = _SGR_CLASSES.get(p)
+            if cls:
+                out.append(f'<span class="{cls}">')
+                open_spans += 1
+        i += 1
+    return ''.join(out), open_spans
+
+
+def ansi_to_html(text: str) -> str:
+    """
+    Convert terminal output containing ANSI escapes to browser HTML.
+
+    ``send(..., raw=True)`` means the caller has already formatted the
+    message *for a terminal* -- the login splash, a full-screen frame --
+    not "this is trusted HTML".  No caller in the codebase has ever passed
+    HTML.  Passing those bytes through verbatim would put raw ``ESC[``
+    sequences on the page and leave any ``<`` in the payload unescaped.
+
+    The literal ``%`` is doubled first: in pure terminal output a percent
+    sign is an ordinary character, and must not be read as the start of a
+    MOO colour code by the shared converter.
+
+    Args:
+        text: Terminal output, possibly containing ANSI escapes.
+
+    Returns:
+        HTML string with all text content escaped.
+    """
+    return moo_colors_to_html(text.replace('%', '%%'))

@@ -77,6 +77,12 @@ _CONTENT_TYPES = {
     '.woff2': 'font/woff2',
     '.woff': 'font/woff',
     '.ttf': 'font/ttf',
+    # The Lua scripting host's interpreter.  This exact type is required:
+    # WebAssembly.instantiateStreaming rejects anything else, so serving it
+    # as octet-stream silently breaks Lua scripting.
+    '.wasm': 'application/wasm',
+    '.map': 'application/json',
+    '.txt': 'text/plain; charset=utf-8',
 }
 
 
@@ -107,7 +113,7 @@ class WebServer:
     """
 
     def __init__(self, server: 'MegaMOOServer', host: str, port: int,
-                 static_dir: str):
+                 static_dir: str, allowed_origins=None, scan_limit: int = 1):
         """
         Initialise the web server.
 
@@ -117,13 +123,20 @@ class WebServer:
                         execution).
             host:       Address to bind to (e.g. ``'0.0.0.0'``,
                         ``'127.0.0.1'``).
-            port:       TCP port to listen on.
+            port:       First TCP port to try.
             static_dir: Filesystem path to the directory containing the
                         web client's static files.
+            allowed_origins: Browser origins permitted to open a
+                        WebSocket.  Accepts a list, or a comma-separated
+                        string (which is what an environment variable
+                        delivers).  Empty/``None`` allows any origin.
+            scan_limit: How many consecutive ports to try.  ``1`` pins
+                        ``port`` exactly, so a conflict raises.
         """
         self._server = server
         self._host = host
         self._port = port
+        self._scan_limit = scan_limit
         self._static_dir = Path(static_dir)
         self._tcp_server = None
         self._connections: set = set()
@@ -131,6 +144,14 @@ class WebServer:
         self._conn_timestamps: dict = {}
         self._conn_rate_limit = 5       # max connections per window
         self._conn_rate_window = 10.0   # window in seconds
+        # Origin allow-list.  A bare string arrives from the environment
+        # (MEGAMOO_NETWORK_WEBSOCKET_ALLOWED_ORIGINS=https://a,https://b),
+        # so accept both shapes rather than silently treating a string as
+        # a list of one-character origins.
+        if isinstance(allowed_origins, str):
+            allowed_origins = [o.strip() for o in allowed_origins.split(',')]
+        self._allowed_origins = [o.rstrip('/')
+                                 for o in (allowed_origins or []) if o]
 
     # -----------------------------------------------------------------
     # Lifecycle
@@ -140,14 +161,86 @@ class WebServer:
         """
         Start listening for HTTP and WebSocket connections.
 
-        Creates an asyncio TCP server bound to the configured host and
-        port.  Each incoming connection is handled by
-        :meth:`_handle_request`.
+        Binds the first free port at or above the configured one (or pins
+        it exactly when ``scan_limit`` is 1).  Each incoming connection is
+        handled by :meth:`_handle_request`.  The port actually won is
+        stored on ``self._port`` so the caller can log and advertise it.
         """
-        self._tcp_server = await asyncio.start_server(
-            self._handle_request, self._host, self._port
+        from ..server import listen_walking_ports
+
+        first = self._port
+        self._tcp_server, self._port = await listen_walking_ports(
+            self._handle_request, self._host, first, self._scan_limit
         )
+        if self._port != first:
+            logger.warning(f"Web port {first} in use; "
+                           f"auto-selected {self._port}")
         logger.info(f"Web client listening on {self._host}:{self._port}")
+
+    @property
+    def port(self) -> int:
+        """The port the listener actually bound (set by :meth:`start`)."""
+        return self._port
+
+    # -----------------------------------------------------------------
+    # Rate limiting
+    # -----------------------------------------------------------------
+
+    def _allow_new_session(self, writer: asyncio.StreamWriter) -> bool:
+        """
+        Whether this IP may open another game session right now.
+
+        Scoped to WebSocket upgrades on purpose.  Applying it to *every*
+        HTTP request throttles the client's own page load -- index.html,
+        the stylesheet and the scripts are four requests before the socket
+        is even attempted, so a single visit exhausted the budget and the
+        upgrade was refused.  Static files are cheap and stateless; a
+        session costs a login slot and a task, and is what needs guarding.
+        """
+        peername = writer.get_extra_info('peername')
+        ip = peername[0] if peername else 'unknown'
+        now = time.monotonic()
+
+        timestamps = self._conn_timestamps.get(ip)
+        if timestamps is None:
+            timestamps = collections.deque()
+            self._conn_timestamps[ip] = timestamps
+        while timestamps and timestamps[0] <= now - self._conn_rate_window:
+            timestamps.popleft()
+
+        if len(timestamps) >= self._conn_rate_limit:
+            logger.warning(f"Session rate limit exceeded for {ip}")
+            return False
+
+        timestamps.append(now)
+        return True
+
+    # -----------------------------------------------------------------
+    # Origin checking
+    # -----------------------------------------------------------------
+
+    def _origin_allowed(self, headers: dict) -> bool:
+        """
+        Whether a WebSocket upgrade may proceed, based on ``Origin``.
+
+        The browser same-origin policy does **not** apply to WebSockets:
+        without this check, any page a logged-in player visits could open
+        a socket to the game and drive it as them.  ``Origin`` is set by
+        the browser and cannot be forged by page JavaScript, which is what
+        makes it usable here.
+
+        An empty allow-list permits everything -- the right default for
+        localhost development, and the reason a public deployment should
+        configure ``websocket_allowed_origins``.  Non-browser clients send
+        no ``Origin`` at all and are always allowed: they are not subject
+        to the attack this defends against.
+        """
+        if not self._allowed_origins:
+            return True
+        origin = headers.get('origin')
+        if origin is None:
+            return True
+        return origin.rstrip('/') in self._allowed_origins
 
     async def stop(self):
         """
@@ -189,23 +282,6 @@ class WebServer:
             reader: asyncio stream reader for the TCP connection.
             writer: asyncio stream writer for the TCP connection.
         """
-        # Per-IP rate limiting
-        peername = writer.get_extra_info('peername')
-        ip = peername[0] if peername else 'unknown'
-        now = time.monotonic()
-        timestamps = self._conn_timestamps.get(ip)
-        if timestamps is None:
-            timestamps = collections.deque()
-            self._conn_timestamps[ip] = timestamps
-        while timestamps and timestamps[0] <= now - self._conn_rate_window:
-            timestamps.popleft()
-        if len(timestamps) >= self._conn_rate_limit:
-            logger.warning(f"Rate limit exceeded for {ip}")
-            writer.close()
-            await writer.wait_closed()
-            return
-        timestamps.append(now)
-
         is_websocket = False
         try:
             # Read the HTTP request line (e.g. "GET /index.html HTTP/1.1")
@@ -236,11 +312,22 @@ class WebServer:
                     key, value = h.split(':', 1)
                     headers[key.strip().lower()] = value.strip()
 
-            # WebSocket upgrade on /ws
+            # WebSocket upgrade on /ws.  _handle_websocket reports whether
+            # it took ownership of the socket: a *rejected* upgrade (bad
+            # origin, failed handshake) has not, and still needs closing
+            # by the finally block below.
             if (path == '/ws'
                     and headers.get('upgrade', '').lower() == 'websocket'):
-                is_websocket = True
-                await self._handle_websocket(reader, writer, headers)
+                if not self._allow_new_session(writer):
+                    await self._send_response(writer, 429, 'Too Many Requests')
+                    return
+                is_websocket = await self._handle_websocket(
+                    reader, writer, headers)
+                return
+
+            # Build stamp, so a page can tell it has gone stale.
+            if method == 'GET' and path == '/build':
+                await self._serve_build_stamp(writer)
                 return
 
             # Static file serving for GET requests
@@ -283,8 +370,20 @@ class WebServer:
             writer:  asyncio stream writer for the TCP connection.
             headers: Parsed HTTP headers (lowercase keys) from the
                      upgrade request.
+
+        Returns:
+            bool: ``True`` if the socket was upgraded and this method now
+            owns its lifecycle; ``False`` if the upgrade was refused, in
+            which case the caller must close it.
         """
         from .websocket import websocket_handshake
+
+        if not self._origin_allowed(headers):
+            logger.warning(
+                f"Rejected WebSocket upgrade from disallowed origin "
+                f"{headers.get('origin')!r}")
+            await self._send_response(writer, 403, 'Forbidden')
+            return False
 
         try:
             response = websocket_handshake(headers)
@@ -293,7 +392,7 @@ class WebServer:
         except Exception as e:
             logger.error(f"WebSocket handshake failed: {e}")
             await self._send_response(writer, 400, 'Bad Request')
-            return
+            return False
 
         conn = WebSocketConnection(reader, writer, self._server)
         self._connections.add(conn)
@@ -301,6 +400,48 @@ class WebServer:
             await conn._run_after_handshake()
         finally:
             self._connections.discard(conn)
+        return True
+
+    # -----------------------------------------------------------------
+    # Build stamp
+    # -----------------------------------------------------------------
+
+    async def _serve_build_stamp(self, writer: asyncio.StreamWriter):
+        """
+        Report the newest modification time across the client's files.
+
+        The client auto-reconnects its WebSocket when the server restarts,
+        *without* reloading the page.  That is the right behaviour for a
+        dropped connection, but it means a player can keep running
+        JavaScript from before a deploy indefinitely -- and a stale client
+        misbehaving looks exactly like a server bug.  The page reads this
+        on load and on every reconnect, and says so when it changes.
+
+        Directory mtimes are ignored: editing a file updates its parent
+        directory too, which would be the same signal counted twice.
+        """
+        newest = 0.0
+        try:
+            for path in self._static_dir.rglob('*'):
+                if path.is_file():
+                    newest = max(newest, path.stat().st_mtime)
+        except OSError:
+            pass
+
+        body = f'{{"build":"{newest:.0f}"}}'.encode()
+        header = (
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Cache-Control: no-store\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+        )
+        try:
+            writer.write(header.encode() + body)
+            await writer.drain()
+        except Exception:
+            pass
 
     # -----------------------------------------------------------------
     # Static File Serving

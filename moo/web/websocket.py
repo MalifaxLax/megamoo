@@ -57,8 +57,12 @@ logger = logging.getLogger(__name__)
 # Constants
 # =============================================================================
 
-# RFC 6455 Section 4.2.2 -- magic GUID used in the handshake accept hash
-_WS_GUID = "258EAFA5-E914-47DA-95CA-5AB5D71115C3"
+# RFC 6455 Section 4.2.2 -- magic GUID used in the handshake accept hash.
+# This exact string is normative: the client computes the same hash and
+# drops the connection if the server's Sec-WebSocket-Accept disagrees, so a
+# single wrong character makes every browser refuse the upgrade (while
+# hand-rolled socket clients, which rarely verify it, connect happily).
+_WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 # WebSocket frame opcodes
 OP_TEXT = 0x1     # Text frame (UTF-8 encoded payload)

@@ -343,15 +343,22 @@ class MegaMOOServer:
             await self._api_server.start()
 
         # WebSocket server for browser-based clients
+        # WebSocket server for browser-based clients.  Serves the client's
+        # static files and upgrades /ws, so one port covers the whole
+        # browser experience.
         if self.config.network.websocket_enabled:
             from .web.server import WebServer
             static_dir = Path(__file__).parent.parent / 'web'
             self._web_server = WebServer(
                 self, self.config.network.host,
                 self.config.network.websocket_port,
-                str(static_dir)
+                str(static_dir),
+                allowed_origins=self.config.network.websocket_allowed_origins,
+                scan_limit=(self.config.network.port_scan_limit
+                            if self.config.network.websocket_auto_port else 1),
             )
             await self._web_server.start()
+            self.web_port = self._web_server.port
 
         # --- Phase 4: Ticker handler ---
         # Tickers fire periodic verb calls (heartbeats, weather cycles,
@@ -1044,7 +1051,9 @@ Name: """
 def run_server(database_path: str, port: Optional[int] = None,
                host: Optional[str] = None, config_path: Optional[str] = None,
                api_enabled: bool = False, api_port: Optional[int] = None,
-               api_token: Optional[str] = None):
+               api_token: Optional[str] = None,
+               web_enabled: bool = False, web_port: Optional[int] = None,
+               web_origins: Optional[str] = None):
     """
     Build and run a MegaMOO server from scratch.
 
@@ -1109,6 +1118,18 @@ def run_server(database_path: str, port: Optional[int] = None,
         config.api.auto_port = False
     if api_token is not None:
         config.api.auth_token = api_token
+
+    if web_enabled:
+        config.network.websocket_enabled = True
+    if web_port is not None:
+        # Same rule as --api-port and the main port: a named port is a
+        # request for *that* port, so pin it and let a conflict fail loudly.
+        config.network.websocket_port = web_port
+        config.network.websocket_auto_port = False
+    if web_origins is not None:
+        config.network.websocket_allowed_origins = [
+            o.strip() for o in web_origins.split(',') if o.strip()
+        ]
 
     # --- Database ---
     database = Database(database_path, mode='readwrite')
