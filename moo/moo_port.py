@@ -42,6 +42,14 @@ SYSREFS = {
     'player': 'pobj',
 }
 
+#: Verb-namespace variables that exist here under another name.  Every
+#: other MOO name -- this, caller, verb, argstr, args, dobj, dobjstr, iobj,
+#: iobjstr -- is spelled the same and needs no mapping.
+VARIABLES = {
+    'player': 'pobj',
+    'prepstr': 'prep',
+}
+
 #: Mapped sysrefs that are Python objects rather than MOO objects.  A
 #: ``:verb()`` call on one of these is a method call, not a verb call.
 _PY_RECEIVERS = {'su', 'ou'}
@@ -440,9 +448,7 @@ class Porter:
             items = self.arglist('}')
             return '[' + ', '.join(items) + ']'
         if k == 'name':
-            if t == 'player':
-                return 'pobj'
-            return t
+            return VARIABLES.get(t, t)
         raise MooSyntaxError(f'line {ln}: unexpected {t!r}')
 
     def postfix(self, val: str) -> str:
