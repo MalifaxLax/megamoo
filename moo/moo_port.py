@@ -461,6 +461,13 @@ class Porter:
                 args = self.arglist(')')
                 if name == 'tell':
                     val = f'tell({val}' + (', ' + ', '.join(args) if args else '') + ')'
+                elif name == 'notify':
+                    # $player:notify(text) is MOO's standard "send this to
+                    # that player" verb, wrapping the notify() builtin.
+                    # There is no notify *verb* here -- msg is the one --
+                    # so call_verb(x, 'notify') would fail at runtime with
+                    # "Verb 'notify' not found".
+                    val = f'{val}.msg(' + ', '.join(args) + ')'
                 elif val in _PY_RECEIVERS:
                     # su and ou are Python objects, not MOO objects, so
                     # $string_utils:trim(s) is su.trim(s) -- call_verb would
@@ -507,6 +514,16 @@ class Porter:
 
     def call(self, fn: str, args: List[str]) -> str:
         joined = ', '.join(args)
+        if fn == 'strsub' and len(args) >= 3:
+            return f'{args[0]}.replace({args[1]}, {args[2]})'
+        if fn == 'toliteral':
+            return f'repr({joined})'
+        if fn in ('verb_info', 'verb_args', 'verb_code', 'set_verb_info',
+                  'set_verb_args', 'set_verb_code'):
+            return self.mark_expr(
+                f'{fn}() has no equivalent; verbs here are VerbDef objects '
+                f'on obj.verbs, with .names/.owner/.perms/.code',
+                f'{fn}({joined})')
         if fn == 'raise':
             # `raise(E_PERM)` happens to be valid Python as a *statement* --
             # raise followed by a parenthesised expression -- but MOO also
