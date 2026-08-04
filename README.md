@@ -6,6 +6,23 @@ Where classic MOO servers make you program in a purpose-built MOO language, Mega
 
 > **This reimplements MOO's model, not its language.** You get objects carrying their own properties and verbs, single-parent inheritance, live in-world programming, and a wizard/programmer/owner permission model. You do not get a MOO-language interpreter — existing MOO code does not run unmodified and has to be ported to Python. That port is largely mechanical; see [Porting from LambdaMOO](#porting-from-lambdamoo).
 
+## Documentation
+
+**[Read the guide →](https://malifaxlax.github.io/megamoo/)**
+
+| | |
+|---|---|
+| [What MegaMOO Is](https://malifaxlax.github.io/megamoo/) | Start here |
+| [Getting Started](https://malifaxlax.github.io/megamoo/getting-started.html) | Your first room, object and verb |
+| [Building Worlds](https://malifaxlax.github.io/megamoo/rooms.html) | Rooms, exits, objects, shops |
+| [Writing Verbs](https://malifaxlax.github.io/megamoo/verbs.html) | The programming model |
+| [Command Reference](https://malifaxlax.github.io/megamoo/commands.html) | All 74 staff commands |
+| **[Coming from LambdaMOO](https://malifaxlax.github.io/megamoo/moo-compat.html)** | **Importing an old database, and porting its verbs** |
+| [The Web Client](https://malifaxlax.github.io/megamoo/web-client.html) | Playing in a browser |
+
+The engine's internals — object model, parser, verb types, the systems
+underneath — are in the developer manual under [`docs/manual/`](docs/manual/).
+
 ## Highlights
 
 - **Async-first network core** — `asyncio` event loop serving Telnet and WebSocket simultaneously, with classic MUD protocol negotiation (MXP clickable links, GMCP, MSDP, MSSP) and ANSI-aware word wrapping that measures *visible* width, not byte width.
@@ -129,7 +146,7 @@ kept verbatim under a docstring recording where it came from and how to port
 it, stored hidden and without the execute permission, so your old code sits on
 the right objects under the right names instead of in a tarball. `@grep
 'UNPORTED MOO SOURCE'` lists what is left. See
-[Coming from LambdaMOO](docs/guide/moo-compat.html) for the whole process.
+[Coming from LambdaMOO](https://malifaxlax.github.io/megamoo/moo-compat.html) for the whole process.
 
 ## Who may write verbs
 
