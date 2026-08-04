@@ -41,6 +41,7 @@
         <li><a href="#parsing">Verb types and parsing</a></li>
         <li><a href="#hidden">Hidden verbs</a></li>
         <li><a href="#adding">Adding a verb</a></li>
+        <li><a href="#waiting">Waiting, and talking to the outside</a></li>
         <li><a href="#disk">Editing verbs on disk</a></li>
         <li><a href="#ai">Writing verbs with an AI assistant</a></li>
     </ol>
@@ -434,6 +435,120 @@ Every verb carries a short permission string, and the default —
 Permissions are about the verb's code. Whether a <em>player</em> may use the
 command is decided by <code>auth</code>, above, and by
 <a href="#hidden">hiding</a>.
+</p>
+
+<h2 id="waiting">Waiting, and talking to the outside</h2>
+
+<p>
+One verb runs at a time. That is deliberate: verb code freely reads a
+property, changes it, and writes it back, and two verbs interleaving would
+silently lose one of the changes. Everything you write can assume it has the
+world to itself.
+</p>
+
+<p>
+The catch is that <em>anything</em> a verb waits for, the whole game waits for
+— every player, every ticker. So there are three ways to wait, and picking the
+wrong one freezes your world.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Use</th><th>When</th><th>What happens</th></tr></thead>
+<tbody>
+<tr><td><code>suspend(n)</code></td><td>You want to carry on after a wait</td><td>Steps aside for <code>n</code> seconds. Other verbs run. Yours resumes on the next line.</td></tr>
+<tr><td><code>request(...)</code></td><td>You are calling something outside the server</td><td>Returns at once. The answer arrives later by calling a verb.</td></tr>
+<tr><td><code>pause(n)</code></td><td>Almost never</td><td>Freezes the entire game for <code>n</code> seconds.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>suspend</h3>
+
+<p>
+<code>suspend(n)</code> hands your turn back. Other verbs run while you are
+parked, and execution picks up on the very next line with your variables
+exactly as you left them:
+</p>
+
+<pre><code>pobj.msg("You begin meditating...")
+suspend(5)
+pobj.msg("You feel refreshed.")
+</code></pre>
+
+<p>
+That makes patrols, slow rituals and staged events straightforward — a guard
+can walk its round without anyone else noticing:
+</p>
+
+<pre><code>for _step in ('north', 'east', 'south', 'west'):
+    call_verb(this, 'gmove', args=_step)
+    suspend(10)
+</code></pre>
+
+<div class="note">
+<span class="label">A suspend is a place where the world can change</span>
+<p>Nothing else runs <em>while</em> your verb is executing, but plenty can run
+   while it is parked. An object you looked at before the <code>suspend</code>
+   may have moved, changed hands, or been recycled by the time you wake. Re-read
+   what matters afterwards rather than trusting what you read before — the same
+   rule MOO has always had.</p>
+</div>
+
+<p>
+A single <code>suspend</code> is capped at 300 seconds. For anything longer,
+schedule a fresh task with <code>delay(n, code)</code> instead of holding a
+parked verb open for an hour.
+</p>
+
+<h3>request</h3>
+
+<p>
+<code>request()</code> is for reaching something outside the server — a web
+service, a local model, anything that answers over HTTP. It returns
+immediately, and the answer comes back by calling a verb of your choosing:
+</p>
+
+<pre><code># in a verb on the NPC
+request('http://127.0.0.1:11434/api/generate',
+        reply='npc_said', on=this, method='POST',
+        json={'model': 'llama3.2', 'prompt': argstr, 'stream': False},
+        tag=pobj.objnum)
+</code></pre>
+
+<p>
+The reply verb receives what happened as ordinary variables — <code>ok</code>,
+<code>status</code>, <code>body</code>, <code>error</code>, and whatever you
+passed as <code>tag</code>:
+</p>
+
+<pre><code># npc_said, on the same object, some time later
+if not ok:
+    this.msg_room("%S looks momentarily vacant.", sub=this)
+    return
+
+import json as _j
+this.msg_room(_j.loads(body).get('response', ''), sub=this)
+</code></pre>
+
+<p>
+<code>tag</code> comes back untouched, which is how you match an answer to the
+question that prompted it — the player who spoke, say, when several
+conversations are in flight at once.
+</p>
+
+<div class="note">
+<span class="label">Failures arrive as data, not exceptions</span>
+<p>By the time a request fails, your verb has already returned, so there is
+   nowhere for an exception to go. A timeout, a refused connection or an HTTP
+   500 all arrive at the reply verb with <code>ok</code> false and
+   <code>error</code> saying why. Check <code>ok</code> first.</p>
+</div>
+
+<p>
+The response body is never run as code. It arrives as a value, so a model that
+happens to emit something resembling Python — or an endpoint that does so on
+purpose — cannot get it executed.
 </p>
 
 <h2 id="disk">Editing verbs on disk</h2>
