@@ -78,6 +78,25 @@ def test_splat_argument():
     assert '*args' in py('this:foo(@args);').code
 
 
+def test_notify_becomes_msg_not_a_raw_call():
+    # msg is a verb and overridable per object -- a deafened character
+    # overrides it.  notify() walks straight past that, so a port must not
+    # leave it in place.
+    r = py('notify(player, "hi");')
+    assert 'pobj.msg("hi")' in r.code
+    assert 'notify' not in r.code
+
+
+def test_notify_on_any_object():
+    assert 'this.msg(x)' in py('notify(this, x);').code
+
+
+def test_notify_with_extra_arguments_is_marked():
+    r = port('notify(player, "hi", 1);')
+    assert 'pobj.msg("hi")' in r.code
+    assert r.marks >= 1
+
+
 def test_length_becomes_len():
     assert 'len(x)' in py('n = length(x);').code
 

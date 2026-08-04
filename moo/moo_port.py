@@ -507,6 +507,64 @@ class Porter:
 
     def call(self, fn: str, args: List[str]) -> str:
         joined = ', '.join(args)
+        if fn == 'raise':
+            # `raise(E_PERM)` happens to be valid Python as a *statement* --
+            # raise followed by a parenthesised expression -- but MOO also
+            # uses it as an operand (`expr || raise(E_PERM)`), where Python
+            # has no equivalent because raise is a statement.
+            if self.depth:
+                return self.mark_expr(
+                    'raise() used inside an expression; Python can only '
+                    'raise as a statement, so restructure this',
+                    f'raise({joined})')
+            return f'raise {joined}'
+        if fn == 'caller_perms':
+            return 'caller'
+        if fn == 'is_player':
+            return f'{joined}.is_player'
+        if fn == 'index' and len(args) >= 2:
+            # MOO's index() is 1-based, 0 when absent.  Python's find() is
+            # 0-based, -1 when absent, so +1 lines them up exactly.
+            return f'({args[0]}.find({args[1]}) + 1)'
+        if fn == 'time':
+            return 'time.time()'
+        if fn == 'listdelete' and len(args) == 2:
+            lst, i = args
+            return f'({lst}[:{_minus1(i)}] + {lst}[{i}:])'
+        if fn == 'setadd' and len(args) == 2:
+            lst, x = args
+            return f'({lst} if {x} in {lst} else {lst} + [{x}])'
+        if fn == 'setremove' and len(args) == 2:
+            lst, x = args
+            return f'[_e for _e in {lst} if _e != {x}]'
+        if fn == 'match':
+            # A false friend, and the dangerous kind: MOO's match() is a
+            # regex, MegaMOO's match() matches objects.  Passing it through
+            # would compile and call the wrong thing.
+            return self.mark_expr(
+                "match() means regex in MOO but object-matching here; use "
+                "re.search() or su, not match()", f'match({joined})')
+        if fn == 'set_task_perms':
+            return self.mark_expr(
+                'set_task_perms() has no equivalent; permissions here follow '
+                'the verb owner', f'set_task_perms({joined})')
+        if fn == 'notify':
+            # MOO's notify(who, text) is the raw output builtin.  The
+            # MegaMOO spelling is who.msg(text), and the difference is not
+            # cosmetic: msg is a verb and overridable per object, which is
+            # how a deafened or filtered character stops hearing things.
+            # notify() walks straight past that -- the same bug msg_room
+            # had until it was fixed.
+            if len(args) >= 2:
+                who, text = args[0], args[1]
+                if len(args) > 2:
+                    self.note('notify() had extra arguments beyond the text; '
+                              'msg() takes substitution kwargs instead')
+                    self.marks += 1
+                return f'{who}.msg({text})'
+            self.note('notify() with unexpected arguments; check by hand')
+            self.marks += 1
+            return f'notify({joined})'
         if fn == 'pass':
             # `pass` is a Python keyword.  MegaMOO spells MOO's pass() as
             # pass_(), which is why that alias exists at all.
