@@ -483,6 +483,7 @@ def search(
     isa: Union[int, MOOObject, None] = None,
     location: Union[int, MOOObject, None] = None,
     flag: Union[str, ObjectFlags, None] = None,
+    owner: Union[int, MOOObject, None] = None,
     property: Union[str, None] = None,
     value: Any = _SENTINEL,
     candidates: Union[Sequence[MOOObject], None] = None,
@@ -669,6 +670,10 @@ def search(
     if location is not None:
         loc_num = location.objnum if hasattr(location, 'objnum') else int(location)
 
+    owner_num: Optional[int] = None
+    if owner is not None:
+        owner_num = owner.objnum if hasattr(owner, 'objnum') else int(owner)
+
     flag_enum: Optional[ObjectFlags] = None
     if flag is not None:
         if isinstance(flag, ObjectFlags):
@@ -680,7 +685,8 @@ def search(
                 return []
 
     has_filters = (isa_num is not None or loc_num is not None
-                   or flag_enum is not None or property is not None)
+                   or flag_enum is not None or property is not None
+                   or owner_num is not None)
 
     if not has_filters:
         # Fast path: no filters -- just resolve objnums to MOOObject instances
@@ -708,6 +714,10 @@ def search(
 
         # location filter: object must be at the specified location
         if loc_num is not None and obj._location_id != loc_num:
+            continue
+
+        # owner filter: what @audit is for -- everything one player made
+        if owner_num is not None and obj.owner != owner_num:
             continue
 
         # flag filter: object must have the specified flag set
