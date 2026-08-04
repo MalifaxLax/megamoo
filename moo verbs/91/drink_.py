@@ -24,15 +24,15 @@ Returns True to indicate the action was handled.
 import random as _random
 
 # Decrement uses
-uses = getattr(this, 'uses', 1) or 1
+uses = (this.uses or 1)
 uses -= 1
 this.uses = uses
 
 # Apply effects
-effects_per_bite = getattr(this, 'effects_per_bite', True)
+effects_per_bite = this.effects_per_bite == True
 effects = this.effects or []
 if effects and (effects_per_bite or uses < 1):
-    chance = getattr(this, 'effect_chance', 100) or 100
+    chance = (this.effect_chance or 100)
     if _random.randint(1, 100) <= chance:
         $eu.trigger_all(pobj, effects)
 

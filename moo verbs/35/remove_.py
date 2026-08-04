@@ -166,8 +166,7 @@ for bodyloc in positions_to_remove:
                 rev_obj = db.get_object(slot[i])
                 if not rev_obj:
                     continue
-                vis = getattr(rev_obj, 'visible', True)
-                if vis is False:
+                if rev_obj.visible == False:
                     continue
                 # First visible item found
                 if rev_obj.objnum not in seen_rev:

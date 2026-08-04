@@ -44,8 +44,8 @@ char_mod = char_mods.get('mod_%d' % pobj.objnum, 1) or 1  # first-timer => 1.0
 # overridable per merchant.
 skill_bonus = pobj.skill_bonus or {}
 trading = skill_bonus.get('trading', 0) or 0
-rate = getattr(this, 'trade_rate', 0.01) or 0.0
-floor = getattr(this, 'trade_floor', 0.50) or 0.0
+rate = (this.trade_rate or 0.01) or 0.0
+floor = (this.trade_floor or 0.50) or 0.0
 trade_factor = max(floor, 1.0 - trading * rate)
 
 price = val * q * race_mod * guild_mod * char_mod * trade_factor

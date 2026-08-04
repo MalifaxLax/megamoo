@@ -16,8 +16,8 @@ if this.open:
     return True
 
 if this.locked:
-    ofail = getattr(this, 'ofail', "You have to unlock %d before you can open it.")
-    oofail = getattr(this, 'oofail', "%S struggles to open %d.")
+    ofail = (this.ofail or "You have to unlock %d before you can open it.")
+    oofail = (this.oofail or "%S struggles to open %d.")
     pobj.msg(ofail, dob=this)
     if not pobj.invis:
         pobj.location.msg_room(su.esub(oofail, sub=pobj, dob=this), exclude=[pobj])
@@ -29,8 +29,8 @@ if this.trap:
 
 this.open = True
 
-osucc = getattr(this, 'osucc', "You open %d.")
-oosucc = getattr(this, 'oosucc', "%S opens %d.")
+osucc = (this.osucc or "You open %d.")
+oosucc = (this.oosucc or "%S opens %d.")
 pobj.msg(osucc, dob=this)
 if not pobj.invis:
     pobj.location.msg_room(su.esub(oosucc, sub=pobj, dob=this), exclude=[pobj])

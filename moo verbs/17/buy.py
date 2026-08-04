@@ -126,7 +126,7 @@ for holder in stock:
             holder = None
     if holder is not None and hasattr(holder, 'objnum'):
         for o in (holder.contents or []):
-            if o is not None and hasattr(o, 'objnum') and getattr(o, 'existent', True):
+            if o is not None and hasattr(o, 'objnum') and o.existent == True:
                 item_list.append(o)
 
 # ── Vessel options: liquids poured to order ──────────────────────────

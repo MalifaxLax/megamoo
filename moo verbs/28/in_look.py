@@ -30,7 +30,7 @@ if visible and has_ltype:
     pobj.msg("In %d you see " + su.listtoenglish(names) + " soaking in %i.", dob=this, iob=ltype)
 elif has_ltype:
     # Show fill level from flist
-    uses = getattr(this, 'uses', 1) or 1
+    uses = (this.uses or 1)
     cuses = this.cuses or 0
     flist = this.flist or []
     if flist and uses > 0:

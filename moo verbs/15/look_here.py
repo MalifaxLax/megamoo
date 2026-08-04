@@ -127,7 +127,7 @@ for furn_num, sitter_nums in furn_sitters.items():
         try:
             furn = db.get_object(furn_num)
             fname = furn.name
-            prep = getattr(furn, 'sit_prep', 'at')
+            prep = (furn.sit_prep or 'at')
             sitter_str = su.listtoenglish(snames)
             if len(snames) == 1:
                 furn_lines.append(f"{sitter_str} is sitting {prep} {fname}.")

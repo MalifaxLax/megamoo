@@ -18,7 +18,7 @@ Properties checked:
     fall/ofall - Messages when falling to fail_dest.
 """
 if this.closed:
-    fail = getattr(this, 'failure', 'That is closed!')
+    fail = (this.failure or 'That is closed!')
     player.msg(fail)
     ofail = this.ofailure
     if ofail and not player.invis:
@@ -31,12 +31,12 @@ if locklist and not player.is_royal:
         call_verb(this, lockfunc)
         return
     else:
-        player.msg(getattr(this, 'lockfail', 'You cannot pass.'))
+        player.msg((this.lockfail or 'You cannot pass.'))
         return
 # Climb check
 difficulty = this.difficulty or 0
 if difficulty > 0:
-    skill_name = getattr(this, 'skill', 'climb')
+    skill_name = (this.skill or 'climb')
     skill_val = getattr(player, skill_name, 0) or 0
     import random
     roll = random.randint(1, 100)
@@ -52,7 +52,7 @@ if difficulty > 0:
         if fail_dest and type(fail_dest) == int:
             fail_dest = db.get_object(fail_dest)
         if fail_dest and fail_dest.is_room:
-            player.msg(getattr(this, 'fall', 'You lose your grip and fall!'))
+            player.msg((this.fall or 'You lose your grip and fall!'))
             if not player.invis:
                 omsg = this.ofall
                 if omsg:

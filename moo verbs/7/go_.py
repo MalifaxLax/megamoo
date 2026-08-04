@@ -135,7 +135,7 @@ def _run_chargen():
                 if cnum:
                     try:
                         c = db.get_object(cnum)
-                        display_name = c.noun or getattr(c, 'name', '<unnamed>').split()[0]
+                        display_name = c.noun or (c.name or '<unnamed>').split()[0]
                         pobj.msg(f"%<245>{i:>2}:%n {display_name}")
                     except Exception:
                         pobj.msg(f"%<245>{i:>2}:%n <invalid>")
@@ -151,7 +151,7 @@ def _run_chargen():
                 # Occupied slot
                 try:
                     ichar = db.get_object(slot_val)
-                    char_name = ichar.noun or getattr(ichar, 'name', '<unnamed>').split()[0]
+                    char_name = ichar.noun or (ichar.name or '<unnamed>').split()[0]
                 except Exception:
                     # Invalid object — just clear the slot
                     characters = [c for c in characters if c != slot_val]

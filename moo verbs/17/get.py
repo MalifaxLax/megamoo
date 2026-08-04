@@ -70,7 +70,7 @@ if item.is_char:
 
 # Check hands
 free = call_verb(pobj, 'hands_free')
-item_hands = getattr(item, 'hands', 1) or 1
+item_hands = (item.hands or 1)
 if not free:
     pobj.msg("Your hands are full.")
     return

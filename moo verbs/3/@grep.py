@@ -100,7 +100,7 @@ for objnum in objnums:
         continue
 
     for v in vlist:
-        names = list(getattr(v, 'names', []) or [])
+        names = list((v.names or []))
         if not names:
             continue
         label = names[0]

@@ -39,7 +39,7 @@ if sitters and pobj.location:
                 pstring = 'lying'
             else:
                 pstring = 'here'
-            prep = getattr(item, 'sit_prep', 'on')
+            prep = (item.sit_prep or 'on')
             pobj.msg(f"{char.cname} is {pstring} {prep} it.")
         except Exception:
             pass

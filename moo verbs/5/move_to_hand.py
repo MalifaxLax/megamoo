@@ -26,7 +26,7 @@ if (mh and hasattr(mh, 'objnum') and mh.objnum == dobj.objnum) or \
    (oh and hasattr(oh, 'objnum') and oh.objnum == dobj.objnum):
     return
 
-item_hands = getattr(dobj, 'hands', 1) or 1
+item_hands = (dobj.hands or 1)
 
 if item_hands == 2:
     this.mh = dobj

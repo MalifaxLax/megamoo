@@ -16,7 +16,7 @@ Returns True to indicate the action was handled.
 
 item = this
 sitters = item.sitters or []
-seats = getattr(item, 'seats', 1) or 1
+seats = (item.seats or 1)
 
 # Already sitting here?
 if pobj.objnum in sitters:
@@ -37,8 +37,8 @@ if cur_table:
         if pobj.objnum in old_sitters:
             old_sitters = [s for s in old_sitters if s != pobj.objnum]
             old.sitters = old_sitters
-        stand_msg = getattr(old, 'stand', 'You stand up from %d.')
-        ostand_msg = getattr(old, 'ostand', '%S stands up from %d.')
+        stand_msg = (old.stand or 'You stand up from %d.')
+        ostand_msg = (old.ostand or '%S stands up from %d.')
         pobj.msg(stand_msg, dob=old)
         if not pobj.invis:
             pobj.location.msg_room(ostand_msg, exclude=[pobj], sub=pobj, dob=old)
@@ -58,7 +58,7 @@ item.sitters = sitters
 pobj.table = item.objnum
 
 # Messages (build from sit_prep if no custom message set)
-prep = getattr(item, 'sit_prep', 'on')
+prep = (item.sit_prep or 'on')
 sit_msg = item.sit or f'You sit {prep} %d.'
 osit_msg = item.osit or f'%S sits {prep} %d.'
 pobj.msg(sit_msg, dob=item)

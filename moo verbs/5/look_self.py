@@ -24,7 +24,7 @@ char = this
 viewer = args if args else pobj
 
 # 1. Chargen description lines
-desclist = getattr(char, 'desclist', ['', '', '', '']) or ['', '', '', '']
+desclist = (char.desclist or ['', '', '', ''])
 for line in desclist:
     if line:
         viewer.msg(line)
@@ -42,14 +42,13 @@ accessories = []
 for worn_num in wearing:
     try:
         item = db.get_object(worn_num)
-        size = getattr(item, 'size', 1) or 1
+        size = (item.size or 1)
         if size <= 0:
             continue
         on_top = call_verb(item, 'items_on_top')
         if on_top:
             continue
-        vis = getattr(item, 'visible', True)
-        if vis is False:
+        if item.visible == False:
             continue
         if size > 1:
             clothing.append(item.name)

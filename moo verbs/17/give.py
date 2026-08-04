@@ -76,7 +76,7 @@ if recip_max and recip_load + item_weight > recip_max:
 
 # Check recipient has a free hand
 recip_free = call_verb(recipient, 'hands_free')
-item_hands = getattr(item, 'hands', 1) or 1
+item_hands = (item.hands or 1)
 if not recip_free:
     pobj.msg("%I doesn't have a free hand.", iob=recipient)
     return

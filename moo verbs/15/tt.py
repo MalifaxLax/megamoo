@@ -41,7 +41,7 @@ for objnum in sitters:
         except Exception:
             pass
 
-noun = getattr(furn, 'noun', 'table') or 'table'
+noun = (furn.noun or 'table')
 
 if args[0] == ':':
     # Emote: "At your table, Name smiles"

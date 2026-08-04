@@ -11,7 +11,7 @@ Note: This is the standard entry point for exit traversal. The go/n
 verbs call this after resolving the exit.
 """
 if this.closed:
-    fail = getattr(this, 'failure', 'That is closed!')
+    fail = (this.failure or 'That is closed!')
     player.msg(fail, sub=player, dob=this)
     ofail = this.ofailure
     if ofail and not player.invis:

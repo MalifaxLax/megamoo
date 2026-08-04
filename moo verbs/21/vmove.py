@@ -67,8 +67,8 @@ if walk and pos == 0:
     mode, omode = walk[0], walk[1]
 else:
     # Use room's mode/omode lists indexed by position
-    modes = getattr(room, 'mode', ['walk'])
-    omodes = getattr(room, 'omode', ['walks'])
+    modes = (room.mode or ['walk'])
+    omodes = (room.omode or ['walks'])
     mode = modes[pos] if pos < len(modes) else 'walk'
     omode = omodes[pos] if pos < len(omodes) else 'walks'
 

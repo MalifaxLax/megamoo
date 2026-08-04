@@ -98,7 +98,7 @@ else:
         try:
             parts.append(f"#{c.objnum}:{c.name}")
         except Exception:
-            parts.append(f"#{getattr(c, 'objnum', '?')}")
+            parts.append(f"#{(c.objnum or '?')}")
         if len(', '.join(parts)) > 5000:
             parts.append("and many more.")
             break

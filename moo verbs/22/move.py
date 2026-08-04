@@ -14,7 +14,7 @@ Properties checked:
     lockfail / olockfail - Messages shown when locked out.
 """
 if this.closed:
-    fail = getattr(this, 'failure', 'That is closed!')
+    fail = (this.failure or 'That is closed!')
     player.msg(fail)
     ofail = this.ofailure
     if ofail and not player.invis:
@@ -27,7 +27,7 @@ if locklist and not player.is_royal:
         call_verb(this, lockfunc)
         return
     else:
-        lockfail = getattr(this, 'lockfail', 'You cannot pass.')
+        lockfail = (this.lockfail or 'You cannot pass.')
         player.msg(lockfail)
         olockfail = this.olockfail
         if olockfail and not player.invis:

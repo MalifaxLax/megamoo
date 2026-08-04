@@ -21,7 +21,7 @@ from moo.globals import GAME_ENTRY_MESSAGE
 
 _g = db.get_object(0).globals
 _globals = db.get_object(_g) if type(_g) == int else _g
-_dr = getattr(_globals, 'ic_dropin_room', 200)
+_dr = (_globals.ic_dropin_room or 200)
 DROPIN_ROOM = _dr.objnum if hasattr(_dr, 'objnum') else int(_dr)
 
 # Get character list

@@ -62,7 +62,7 @@ if not m_num or not it_num:
 
 merchant = db.get_object(m_num)
 item = db.get_object(it_num)
-if not merchant or not item or not getattr(item, 'existent', True):
+if not merchant or not item or item.existent != True:
     pobj.msg("That deal's gone stale.  Try 'buy <item>' again.")
     pobj.pending_buy = {}
     return
@@ -156,7 +156,7 @@ if have < offered:
 # ── 4. Hands check ───────────────────────────────────────────────────
 # A bulk buy is handed over as one box, so it only ever needs one hand.
 free = call_verb(pobj, 'hands_free')
-need = 1 if qty > 1 else (getattr(item, 'hands', 1) or 1)
+need = 1 if qty > 1 else ((item.hands or 1))
 if not free or (need == 2 and free != 'both'):
     pobj.msg("Your hands are too full.")
     return
@@ -192,7 +192,7 @@ def _mint():
         # Pour: fill the fresh vessel with the ordered liquid, price it
         # at the per-unit charge, and regenerate the name from structure.
         g.ltype = item
-        g.cuses = getattr(vproto, 'uses', 1) or 1
+        g.cuses = (vproto.uses or 1)
         g.set_property('value', unit_cost)
         call_verb(g, '_ctitle')
     return g

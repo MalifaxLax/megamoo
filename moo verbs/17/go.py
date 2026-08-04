@@ -66,7 +66,7 @@ if not exit:
     return
 
 # Check existent flag
-if not getattr(exit, 'existent', True):
+if exit.existent != True:
     pobj.msg("Go where?")
     return
 

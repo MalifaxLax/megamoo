@@ -18,8 +18,8 @@ if cur_table:
         if pobj.objnum in sitters:
             sitters = [s for s in sitters if s != pobj.objnum]
             furn.sitters = sitters
-        stand_msg = getattr(furn, 'stand', 'You stand up from %d.')
-        ostand_msg = getattr(furn, 'ostand', '%S stands up from %d.')
+        stand_msg = (furn.stand or 'You stand up from %d.')
+        ostand_msg = (furn.ostand or '%S stands up from %d.')
         pobj.msg(stand_msg, dob=furn)
         if not pobj.invis:
             pobj.location.msg_room(ostand_msg, exclude=[pobj], sub=pobj, dob=furn)

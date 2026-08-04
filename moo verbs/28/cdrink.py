@@ -41,13 +41,13 @@ if ltype.edible:
     return True
 
 # Apply effects from liquid type
-effects_per_bite = getattr(ltype, 'effects_per_bite', True)
+effects_per_bite = ltype.effects_per_bite == True
 effects = ltype.effects or []
 cuses = this.cuses or 0
 will_empty = (cuses - 1) < 1
 
 if effects and (effects_per_bite or will_empty):
-    chance = getattr(ltype, 'effect_chance', 100) or 100
+    chance = (ltype.effect_chance or 100)
     if _random.randint(1, 100) <= chance:
         eu.trigger_all(pobj, effects)
 

@@ -111,7 +111,7 @@ for obj in clist:
         if obj.objnum not in furn_sitters:
             dlist.append(f"#{obj.objnum}:{obj.name}")
 
-    elif not getattr(obj, 'existent', True):
+    elif obj.existent != True:
         exlist.append(f"#{obj.objnum}:{obj.name}")
 
     else:
@@ -136,7 +136,7 @@ for furn_num, sitter_nums in furn_sitters.items():
     if snames:
         try:
             furn = db.get_object(furn_num)
-            prep = getattr(furn, 'sit_prep', 'at')
+            prep = (furn.sit_prep or 'at')
             sitter_str = su.listtoenglish(snames)
             if len(snames) == 1:
                 furn_lines.append(f"{sitter_str} is sitting {prep} #{furn.objnum}:{furn.noun or furn.name}.")
