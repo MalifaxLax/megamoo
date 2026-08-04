@@ -38,7 +38,12 @@ if not spec:
 candidates = list(pobj.location.contents) + list(pobj.contents)
 target = bmatch(spec, pobj, candidates, db)
 if target is None and spec.startswith('#') and spec[1:].isdigit():
-    target = db.get_object(int(spec[1:]))
+    # get_object raises for a number nobody holds, rather than
+    # returning None, so the report below never got reached.
+    try:
+        target = db.get_object(int(spec[1:]))
+    except Exception:
+        target = None
 if target is None:
     pobj.msg(f"'{spec}' not found.")
     return

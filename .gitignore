@@ -28,3 +28,6 @@ __pycache__/
 # Written at startup so tooling can find a running server's API port.
 # Runtime state (pid, port) — never part of the source tree.
 *.db.api.json
+
+# @dump output — local working files, not part of the source tree
+dumps/

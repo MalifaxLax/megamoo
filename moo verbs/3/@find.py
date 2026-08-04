@@ -53,7 +53,12 @@ for word, setter in (('  isa  ', 'isa'), (' isa ', 'isa'), (' in ', 'in')):
     candidates = list(pobj.location.contents) + list(pobj.contents)
     target = bmatch(tail, pobj, candidates, db)
     if target is None and tail.startswith('#') and tail[1:].isdigit():
-        target = db.get_object(int(tail[1:]))
+        # get_object raises for a number nobody holds, rather than
+        # returning None, so the report below never got reached.
+        try:
+            target = db.get_object(int(tail[1:]))
+        except Exception:
+            target = None
     if target is None:
         pobj.msg(f"'{tail}' not found.")
         return
