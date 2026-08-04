@@ -25,11 +25,43 @@ serving the old, good code rather than erroring out for players.
 """
 import os
 import logging
+import re
 from typing import Optional, List, Tuple
 
 from moo.verbs import VerbDef
 
 logger = logging.getLogger('megamoo.verb_loader')
+
+
+# ``if auth_level(pobj) < 3:`` -- the guard staff verbs open with.
+_AUTH_GUARD_RE = re.compile(
+    r'auth_level\(\s*(?:pobj|player)\s*\)\s*(<=?)\s*(\d+)')
+
+
+def auth_level_required(code: str) -> int:
+    """
+    The gm level *code* refuses to run below, read from its own guard.
+
+    A staff verb states its level twice: an ``auth_level(pobj) < N`` guard
+    that actually enforces it, and an ``auth`` value on the verb that
+    ``help`` filters the command list with.  A verb created from disk used
+    to get the guard and not the value, so ``help`` advertised it to
+    players who could not run it and it answered "Do what?" -- the bug
+    that started the MOO-compatibility work.  Deriving the value from the
+    guard keeps the two in step without anyone having to remember.
+
+    A verb may hold several guards: a low bar to run at all and a higher
+    one for a privileged switch.  The lowest is returned, since that is
+    the level at which the command becomes usable and therefore worth
+    listing.
+
+    Returns 0 when there is no guard, which is right for player commands.
+    """
+    levels = []
+    for op, num in _AUTH_GUARD_RE.findall(code or ''):
+        n = int(num)
+        levels.append(n if op == '<' else n + 1)
+    return min(levels) if levels else 0
 
 
 def resolve_verb_base_path(db) -> Optional[str]:
@@ -131,7 +163,13 @@ def reload_verb_code(obj, verb_name: str, code: str, *, create: bool = True) -> 
     if not create:
         return 'skipped'
 
-    new_verb = VerbDef(names=[verb_name], code=code, owner=obj.owner, perms='rx')
+    # Derive auth from the verb's own guard.  Without this a staff verb
+    # arrives with auth 0, help advertises it to players who cannot run it,
+    # and it answers "Do what?" when they try.  Existing verbs keep whatever
+    # auth they already have -- that is handled above, and may have been set
+    # deliberately with @verbauth.
+    new_verb = VerbDef(names=[verb_name], code=code, owner=obj.owner,
+                       perms='rx', auth=auth_level_required(code))
     new_verb.compile()  # validate before attaching; raises on syntax error
     obj.add_verb(new_verb)
     return 'created'
