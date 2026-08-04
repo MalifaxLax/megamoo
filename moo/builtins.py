@@ -1460,7 +1460,7 @@ def make_call_verb(pobj, db, _depth=0):
         callable: A ``call_verb(obj, verb_name, args='', ...)`` function.
     """
 
-    def call_verb(obj, verb_name, args='', this_override=None, **kwargs):
+    def call_verb(obj, verb_name, *argv, this_override=None, **kwargs):
         """
         Call a verb on an object and return its ``result``.
 
@@ -1479,8 +1479,26 @@ def make_call_verb(pobj, db, _depth=0):
                 inheritance).
             verb_name (str): Verb name string.  May include switches
                 separated by ``/`` (e.g. ``'look/brief'``).
-            args (str): Argument string passed to the verb's parser.
-                Defaults to ``''``.
+            *argv: The verb's arguments.
+
+                A single string is the historic form and behaves exactly
+                as it always has -- it becomes ``args`` and ``argstr`` in
+                the called verb, which is what the existing corpus reads::
+
+                    call_verb(exit, 'invoke')
+                    call_verb(room, 'match_exit', 'north')
+
+                Anything else is a real argument list, and reaches the
+                verb as ``argv``::
+
+                    call_verb(utils, 'from_list', [1, 2, 3], ', ')
+
+                The string form could not express that: arguments arrived
+                space-joined, so a list and a separator had nowhere to
+                go. That is why ``pass_`` could forward only a single
+                string, and why a utility object in the MOO idiom --
+                ``$string_utils:from_list(lst, ", ")`` -- had no spelling
+                here and had to be a Python module instead.
             this_override (MOOObject or None): If given, ``this`` in
                 the called verb is set to this object instead of *obj*.
                 Useful when the verb is defined on a parent but should
@@ -1524,6 +1542,32 @@ def make_call_verb(pobj, db, _depth=0):
         this_obj = this_override if this_override is not None else target
 
         # --- Build namespace via the unified builder ---
+        # Work out the historic `args` string.
+        #
+        # Callers reach it three ways, and all three predate this function
+        # taking positional arguments:
+        #
+        #   call_verb(o, 'v', 'north')        one positional string
+        #   call_verb(o, 'v', args='north')   keyword -- used across the
+        #                                     corpus, and it lands in
+        #                                     **kwargs now that the third
+        #                                     parameter is *argv
+        #   call_verb(o, 'v', args=some_obj)  keyword with a non-string,
+        #                                     which several verbs do
+        #
+        # Anything else is a real argument list, which the string form could
+        # never express: `$string_utils:from_list({1,2,3}, ", ")` has no
+        # spelling when arguments arrive as one space-joined string.
+        if 'args' in kwargs:
+            # Passed through untouched, string or not. Several verbs hand an
+            # object this way and read it back out of `argstr`, which works
+            # because a missing `.strip` returns the null sentinel and
+            # `argstr = args or ''` then keeps the object. Preserve that
+            # exactly rather than tidying it here.
+            args = kwargs.pop('args')
+        else:
+            args = argv[0] if len(argv) == 1 and isinstance(argv[0], str) else ''
+
         from .verb_namespace import build_verb_namespace
         ns = build_verb_namespace(
             pobj=pobj,
@@ -1538,6 +1582,11 @@ def make_call_verb(pobj, db, _depth=0):
             call_depth=_depth + 1,
             extra=kwargs if kwargs else None,
         )
+
+        # The positional arguments, as given. Set after the namespace is
+        # built so it is not folded into the `kwargs` dict that verbs
+        # introspect, and cannot be shadowed by `extra`.
+        ns['argv'] = list(argv)
 
         # --- Execute the verb code ---
         from .verbs import preprocess_verb_code

@@ -193,8 +193,13 @@ def make_pass(this, verb_name, call_verb, db):
             if parent is None:
                 return None
 
-        argstr = args[0] if len(args) == 1 and isinstance(args[0], str) else ''
-        return call_verb(parent, verb_name, argstr,
+        # Forward the arguments as given. This used to keep only a lone
+        # string and silently drop every other shape, because call_verb
+        # took an argument *string* and there was nowhere for a real
+        # argument list to go -- so `pass_(a, b)` quietly became
+        # `pass_()`. call_verb takes positional arguments now, so a pass
+        # carries what it was given.
+        return call_verb(parent, verb_name, *args,
                          this_override=this, **kwargs)
 
     return pass_
