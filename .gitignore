@@ -31,3 +31,6 @@ __pycache__/
 
 # @dump output — local working files, not part of the source tree
 dumps/
+
+# @import staging area — source databases, not part of the tree
+imports/
