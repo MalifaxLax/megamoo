@@ -611,6 +611,17 @@ def build_verb_namespace(
         from . import builtins as moo_builtins
         namespace['call_verb'] = moo_builtins.make_call_verb(pobj, db, call_depth)
 
+    # --- Layer 6b: MOO compatibility (tell, pass_, E_* error values) ---
+    # Must follow Layer 6: pass_ closes over whichever call_verb ended up in
+    # the namespace, so a passed call keeps the same depth accounting.
+    from .moo_compat import build_compat_namespace
+    namespace.update(build_compat_namespace(
+        this=this,
+        verb_name=verb_name,
+        call_verb=namespace.get('call_verb'),
+        db=db,
+    ))
+
     # --- Layer 7: Globals module (available in all verb namespaces) ---
     try:
         namespace['globals'] = __import__('moo.globals', fromlist=['globals'])
