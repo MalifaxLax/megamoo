@@ -1110,6 +1110,102 @@ def ticker_list(obj=None):
     return _server.ticker_handler.all(obj)
 
 
+def task_list(include_done: bool = False):
+    """
+    List the tasks the server currently knows about.
+
+    MOO's ``queued_tasks()``, and what ``@ps`` is built on.  ``fork()``
+    and the ticker system both create tasks; without this there is no way
+    to see one, and a runaway forked task has no in-game remedy.
+
+    Args:
+        include_done (bool): Also return recently finished tasks from the
+            history ring.  Off by default -- the usual question is "what
+            is running now".
+
+    Returns:
+        list[dict]: One dict per task, newest state first:
+            - ``id`` (int) -- task id, as ``@kill`` takes
+            - ``state`` (str) -- pending / running / suspended / done
+            - ``player`` (int) -- objnum that owns the task, 0 if none
+            - ``this`` (int) -- objnum the verb is defined on, 0 if none
+            - ``verb`` (str) -- verb name
+            - ``age`` (float) -- seconds since the task was created
+            - ``resumes_in`` (float) -- seconds until a suspended task
+              wakes, 0.0 otherwise
+            - ``parent`` (int) -- task id that forked this one, 0 if
+              top-level
+            - ``ticks`` (int) -- instruction ticks consumed
+
+    Raises:
+        RuntimeError: If no task queue is available.
+    """
+    if _task_queue is None:
+        raise RuntimeError("Task queue not initialized")
+
+    now = time.time()
+
+    def describe(task, state):
+        ctx = getattr(task, 'context', None)
+        def objnum_of(name):
+            val = getattr(ctx, name, None) if ctx is not None else None
+            if val is None:
+                return 0
+            return getattr(val, 'objnum', val) if not isinstance(val, int) else val
+        resumes = getattr(task, 'suspended_until', 0.0) or 0.0
+        return {
+            'id': getattr(task, 'task_id', 0),
+            'state': state,
+            'player': objnum_of('player'),
+            'this': objnum_of('this'),
+            'verb': str(getattr(ctx, 'verb', '') or '') if ctx is not None else '',
+            'age': round(now - (getattr(task, 'created_time', now) or now), 1),
+            'resumes_in': round(max(0.0, resumes - now), 1) if resumes else 0.0,
+            'parent': getattr(task, 'parent_task_id', 0) or 0,
+            'ticks': getattr(task, 'ticks_used', 0) or 0,
+        }
+
+    out = []
+    with _task_queue.lock:
+        for task in list(_task_queue.running_tasks.values()):
+            out.append(describe(task, 'running'))
+        for task in list(_task_queue.suspended_tasks.values()):
+            out.append(describe(task, 'suspended'))
+        if include_done:
+            for task in list(_task_queue.completed_tasks):
+                out.append(describe(task, 'done'))
+    return out
+
+
+def kill_task(task_id: int) -> bool:
+    """
+    Abort a task by id.
+
+    MOO's ``kill_task()``, and what ``@kill`` is built on.  Aborting a
+    running task stops it at its next tick; a suspended one is discarded
+    without resuming.
+
+    Args:
+        task_id (int): The task to abort, as reported by
+            :func:`task_list`.
+
+    Returns:
+        bool: ``True`` if a task with that id was found and aborted,
+        ``False`` if there was no such task.  A task that has already
+        finished counts as not found -- there is nothing left to stop.
+
+    Raises:
+        RuntimeError: If no task queue is available.
+    """
+    if _task_queue is None:
+        raise RuntimeError("Task queue not initialized")
+
+    task = _task_queue.get_task(int(task_id))
+    if task is None:
+        return False
+    _task_queue.abort_task(task)
+    return True
+
 # ============================================================================
 # PROPERTY FUNCTIONS
 # ============================================================================
