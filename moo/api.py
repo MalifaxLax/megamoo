@@ -105,6 +105,41 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger('megamoo.api')
 
 
+def _first_wizard(db):
+    """
+    Return the lowest-numbered wizard's object number, or ``None``.
+
+    Used as the default identity for API eval.  Searching beats a constant
+    because the wizard's number is a property of whichever database is
+    loaded -- #100 in the shipped one, something else in a world that grew
+    its own -- and the previous hard-coded default silently picked an exit.
+
+    Args:
+        db: The database to search.
+
+    Returns:
+        int | None: The object number, or ``None`` if there is no wizard.
+    """
+    from .objects import ObjectFlags
+
+    # #0 carries the wizard flag in every database but is the system
+    # object, not somebody who could have typed the command, so it is the
+    # last resort rather than the first hit.  Nothing finer works across
+    # databases: the PLAYER flag here means "connected right now", and
+    # is_char is set on sf.db's wizard but not on the starter's.
+    #
+    # db.objects() yields in ascending objnum order, so the first wizard
+    # that is not #0 is the lowest-numbered real one.
+    fallback = None
+    for obj in db.objects():
+        if obj is None or not obj.has_flag(ObjectFlags.WIZARD):
+            continue
+        if obj.objnum != 0:
+            return obj.objnum
+        fallback = obj.objnum
+    return fallback
+
+
 # =============================================================================
 # API CONNECTION HANDLER
 # =============================================================================
@@ -672,7 +707,7 @@ class ApiConnection:
             args (dict): Expected keys:
                 - ``code`` (str):               The code to execute.
                 - ``player_objnum`` (int, optional): Player context.
-                  Defaults to ``7`` (typically the initial Admin player).
+                  Defaults to the lowest-numbered wizard in the database.
 
         Returns:
             dict: ``{'value': repr_of_result, 'output': captured_stdout}``.
@@ -681,13 +716,30 @@ class ApiConnection:
             Any exception raised by the executed code.
         """
         code = args['code']
-        player_objnum = int(args.get('player_objnum', 7))  # default to Admin
 
         from .verbs import preprocess_verb_code
         from .verb_context import set_verb_context, clear_verb_context
         from . import builtins as moo_builtins
 
         db = self.api.database
+
+        given = args.get('player_objnum')
+        if given is None:
+            # This used to default to #7, described as "the initial Admin
+            # player".  In the shipped database #7 is a silver arch -- the
+            # chargen exit -- which is neither a player nor a wizard, so
+            # every unqualified eval ran with an exit's permissions and
+            # could not so much as create a property.  Find a real wizard
+            # instead: the number varies by database (#100 in mm.db), so
+            # there is nothing safe to hard-code.
+            player_objnum = _first_wizard(db)
+            if player_objnum is None:
+                raise ValueError(
+                    "no wizard in this database to run eval as; "
+                    "pass player_objnum explicitly")
+        else:
+            player_objnum = int(given)
+
         player = db.get_object(player_objnum)
 
         # Build the execution namespace to mirror verb context
