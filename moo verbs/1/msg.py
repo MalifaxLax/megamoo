@@ -15,16 +15,7 @@ Arguments:
 Note: Overridable on child objects to intercept or filter messages
 (e.g., for deaf/muted states).
 """
-# Collect the raw-string slots (sN kwargs) for %sN substitution.  `kwargs`
-# and notify's `svals` param both arrive with an engine restart; guard so
-# ordinary messaging keeps working before that lands.
-try:
-    _kw = kwargs
-except NameError:
-    _kw = {}
-_sv = {k: v for k, v in (_kw or {}).items()
+# Collect the raw-string slots (sN kwargs) for %N substitution.
+_sv = {k: v for k, v in (kwargs or {}).items()
        if len(k) >= 2 and k[0] == 's' and k[1:].isdigit()}
-if _sv:
-    notify(this, argstr, sub=sub, dob=dob, iob=iob, uob=uob, svals=_sv)
-else:
-    notify(this, argstr, sub=sub, dob=dob, iob=iob, uob=uob)
+notify(this, argstr, sub=sub, dob=dob, iob=iob, uob=uob, svals=_sv or None)

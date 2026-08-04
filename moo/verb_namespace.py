@@ -660,8 +660,8 @@ def build_verb_namespace(
         namespace.update(extra)
 
     # Expose the raw call-kwargs dict so a verb can introspect arbitrary
-    # keyword args it was given (the sandbox blocks globals()/vars()).  Used
-    # e.g. by msg/msg_room to forward %sN raw-string slots to esub.
+    # keyword args it was given, without having to dig through globals().
+    # Used e.g. by msg/msg_room to forward %sN raw-string slots to esub.
     namespace['kwargs'] = dict(extra) if extra else {}
 
     return namespace

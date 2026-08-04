@@ -202,7 +202,7 @@ class MegaMOOServer:
         connection_manager (ConnectionManager): Tracks every active
             ``PlayerConnection`` and provides broadcast helpers.
         verb_executor (VerbExecutor): Compiles and runs verb code in a
-            sandboxed namespace.
+            prepared namespace.
         state (ServerState): Current lifecycle flags (running, accepting
             connections, restart requested, etc.).
         loop (asyncio.AbstractEventLoop | None): The asyncio event loop.
@@ -841,7 +841,7 @@ class MegaMOOServer:
             get_task_queue().complete_task(task)
             return
 
-        # Hand off to the VerbExecutor for sandboxed execution.
+        # Hand off to the VerbExecutor to run it.
         try:
             result = self.verb_executor.execute(verb_def, task)
             get_task_queue().complete_task(task, result)
@@ -866,8 +866,8 @@ class MegaMOOServer:
         2. **Verb lookup** -- walk the inheritance chain on the object
            identified by the parser to find the matching ``VerbDef``.
         3. **Namespace construction** -- ``build_verb_namespace()``
-           creates the sandboxed ``dict`` that verb code executes in,
-           populated with ``player``, ``this``, ``args``, builtins, etc.
+           creates the ``dict`` that verb code executes in, populated
+           with ``player``, ``this``, ``args``, builtins, etc.
         4. **Execution** -- the verb code is preprocessed, compiled, and
            run in the single-threaded verb pool via ``run_in_executor``.
            A ``COMMAND_TIMEOUT`` guard prevents infinite loops.

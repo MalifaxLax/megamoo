@@ -2236,6 +2236,8 @@ def _build_eval_globals(context: dict) -> dict:
         - All public MOO builtins from this module
         - Common Python types (``len``, ``str``, ``dict``, etc.)
         - ``search()`` and ``find()`` bound to the database
+        - Permission-checking ``getattr`` / ``setattr``, matching
+          ``build_verb_namespace()``
         - Server config (if available)
         - Effects utility (``_effects``)
         - The caller-supplied *context* merged in last (can override
@@ -2276,6 +2278,19 @@ def _build_eval_globals(context: dict) -> dict:
     if db is not None:
         ns['search'] = lambda *a, _db=db, **kw: _search_fn(*a, db=_db, **kw)
         ns['find'] = lambda *a, _db=db, **kw: _find_fn(*a, db=_db, **kw)
+
+    # Permission-checking getattr/setattr, the same pair build_verb_namespace
+    # installs.  The plain Python versions used to go in here, which meant the
+    # two namespaces quietly disagreed about what getattr meant.  Nothing
+    # changes for callers that can actually reach this -- eval_python and
+    # exec_python both require the wizard flag, and can_write short-circuits
+    # True for wizards -- but the divergence is gone, so a reader can stop
+    # wondering which of the two rules applies where.
+    player = context.get('player')
+    if player is not None and db is not None:
+        from .verb_namespace import _make_safe_getattr, _make_safe_setattr
+        ns['getattr'] = _make_safe_getattr(player, db)
+        ns['setattr'] = _make_safe_setattr(player, db)
 
     # Server config
     if _config is not None:

@@ -20,10 +20,9 @@ of those overrides.  Anything msg learns to do, tell inherits for free.
 # when the caller passed them; the namespace variables of the same name are
 # populated from it.  Forwarding both would hand msg two values for one
 # keyword, so start from kwargs and only fill in what is missing.
-try:
-    _fwd = dict(kwargs or {})
-except NameError:
-    _fwd = {}
+# Underscore-prefixed keys are the namespace's own bookkeeping (_pyargs),
+# not caller keywords, so they are not ours to forward.
+_fwd = {k: v for k, v in (kwargs or {}).items() if not k.startswith('_')}
 
 for _name, _value in (('sub', sub), ('dob', dob), ('iob', iob), ('uob', uob)):
     if _name not in _fwd and _value is not None:

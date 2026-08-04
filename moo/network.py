@@ -254,6 +254,31 @@ MSSP = bytes([70])      # MUD Server Status Protocol
 MXP = bytes([91])       # MUD eXtension Protocol (Zuggsoft)
 
 
+def resolve_repeat(player_obj, command: str) -> Optional[str]:
+    """
+    Expand the "." repeat shortcut, and remember commands for next time.
+
+    Every transport needs this and none of them can reach a verb for it:
+    the parser would have to find a verb literally named ``.``, so the
+    shortcut has to be resolved before dispatch.  It lives here, once, so
+    telnet and the web client cannot drift apart on what "." means.
+
+    Args:
+        player_obj: The connected player, whose ``last_command`` is the
+            store being read and written.
+        command:    The raw line the player typed, already stripped.
+
+    Returns:
+        The command to execute.  ``None`` means the player typed "." with
+        nothing to repeat -- the caller reports that and re-prompts, since
+        only the caller knows how its own prompt works.
+    """
+    if command.strip() == '.':
+        return getattr(player_obj, 'last_command', None) or None
+    player_obj.last_command = command
+    return command
+
+
 # ---------------------------------------------------------------------------
 #   PlayerConnection — one per connected socket
 # ---------------------------------------------------------------------------
@@ -711,20 +736,14 @@ class PlayerConnection:
                     break
 
                 # Repeat last command via "." shortcut
-                if command.strip() == '.':
-                    last = getattr(self.player_obj, 'last_command', None)
-                    if last:
-                        command = last
-                    else:
-                        from .builtins import notify
-                        notify(self.player_obj, "No previous command.")
-                        await self.flush_messages()
-                        if not getattr(self, '_interactive_session', None):
-                            await self.send("> ", add_newline=False)
-                        continue
-                else:
-                    # Remember this command for "." recall
-                    self.player_obj.last_command = command
+                command = resolve_repeat(self.player_obj, command)
+                if command is None:
+                    from .builtins import notify
+                    notify(self.player_obj, "No previous command.")
+                    await self.flush_messages()
+                    if not getattr(self, '_interactive_session', None):
+                        await self.send("> ", add_newline=False)
+                    continue
 
                 # Execute command through the server's command dispatcher
                 logger.debug(f"Executing command: {command}")

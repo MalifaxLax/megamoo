@@ -218,6 +218,21 @@ class _NullAttr:
     a non-number returns ``NotImplemented`` and so still raises, because
     ``obj.name > 5`` is a real mistake rather than a missing value.
 
+    Ordering is where the forgiveness stops, and that edge has one trap
+    worth knowing.  ``max()`` and ``min()`` *return one of their
+    arguments* rather than computing a new value, so::
+
+        max(pobj.no_such_prop, 0)   # -> the sentinel, not 0
+
+    The comparison inside ``max`` is right -- the sentinel orders as zero
+    -- but the value handed back is still the sentinel, which then
+    travels on and raises somewhere else entirely.  Write
+    ``max(pobj.prop or 0, 0)`` when the result is used as a number.
+    Arithmetic dunders are deliberately *not* defined: a missing property
+    inside a sum is usually a misspelled property name, and that should
+    fail loudly at the point of the mistake rather than quietly read as
+    zero.
+
     A single module-level instance (``_null_attr``) is reused for all
     missing-property returns to avoid unnecessary allocations.
 

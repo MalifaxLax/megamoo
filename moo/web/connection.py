@@ -380,21 +380,17 @@ class WebSocketConnection:
                     await self.send("Goodbye!\n")
                     break
 
-                # '.' repeats the last command
-                if command.strip() == '.':
-                    last = getattr(self.player_obj, 'last_command', None)
-                    if last:
-                        command = last
-                    else:
-                        from ..builtins import notify
-                        notify(self.player_obj, "No previous command.")
-                        await self.flush_messages()
-                        if not getattr(self, '_interactive_session', None):
-                            await self._send_prompt("> ")
-                        continue
-                else:
-                    # Store this command as the last command for '.' recall
-                    self.player_obj.last_command = command
+                # '.' repeats the last command.  Shared with the telnet
+                # transport so the two cannot drift on what "." means.
+                from ..network import resolve_repeat
+                command = resolve_repeat(self.player_obj, command)
+                if command is None:
+                    from ..builtins import notify
+                    notify(self.player_obj, "No previous command.")
+                    await self.flush_messages()
+                    if not getattr(self, '_interactive_session', None):
+                        await self._send_prompt("> ")
+                    continue
 
                 # Execute the command through the game server
                 self._executing = True

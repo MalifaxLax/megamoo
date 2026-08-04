@@ -25,9 +25,9 @@ This module supplies them:
     injected into every verb namespace, so verb code can write both
     ``raise E_PERM`` and ``if result == E_PERM``.
 
-Nothing here is importable from verb code -- the verb sandbox deliberately
-withholds ``__import__``.  These names are injected into the namespace by
-:mod:`moo.verb_namespace`, the same way ``su`` and ``ou`` are.
+These names are injected into every verb namespace by
+:mod:`moo.verb_namespace`, the same way ``su`` and ``ou`` are, so verb code
+gets them without importing anything.
 
 See ``docs/guide/`` and the README's "Porting from LambdaMOO" section for
 the wider substitution table.

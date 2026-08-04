@@ -4,9 +4,12 @@ msg_room verb on #1 (RootObject).
 Broadcasts a message to all player-controlled characters in this
 object's contents, excluding specified objects.
 
-NOTE: most callers use the msg_room() *builtin* (a bare call), which is
-the primary room-broadcast path and supports the same substitution.
-This verb is the object-method form (call_verb(room, 'msg_room', ...)).
+NOTE: this verb is rarely the code that actually runs.  MOOObject defines
+a msg_room *method*, and a real Python method always wins over a verb of
+the same name, so `room.msg_room(...)` reaches the method and the bare
+msg_room() builtin reaches the builtin.  Both deliver through each
+recipient's msg verb, exactly as this does.  Reach this one deliberately
+with call_verb(room, 'msg_room', ...).
 
 Called as: location.msg_room("text", exclude=[pobj], sub=pobj, dob=X,
                               s1="raw", s2="raw")
@@ -18,11 +21,7 @@ Arguments:
     s1/s2/.../sN    - Raw strings spliced verbatim into %s1/%s2/...%sN.
 """
 # Forward the raw-string slots (sN kwargs) on to each recipient's msg().
-try:
-    _kw = kwargs
-except NameError:
-    _kw = {}
-_sv = {k: v for k, v in (_kw or {}).items()
+_sv = {k: v for k, v in (kwargs or {}).items()
        if len(k) >= 2 and k[0] == 's' and k[1:].isdigit()}
 _exclude = exclude or []
 _exclude_nums = set()
