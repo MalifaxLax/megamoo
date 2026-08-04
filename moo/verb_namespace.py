@@ -456,8 +456,13 @@ def _inject_moo_builtins(namespace: Dict[str, Any], pobj, db) -> None:
     namespace['find'] = lambda *a, _db=db, **kw: moo_builtins._find_fn(*a, db=_db, **kw)
 
     # String utilities (su.wrap, su.center, su.table, etc.)
+    #
+    # Bound under both names: `su` is the MegaMOO spelling, `string_utils`
+    # is what code ported from a MOO already says, so `$string_utils`
+    # resolves without an object behind it. Same instance either way.
     from .string_utils import su
     namespace['su'] = su
+    namespace['string_utils'] = su
 
     # Object utilities (ou.make_object, ou.make_room, etc.)
     from . import object_utils as ou

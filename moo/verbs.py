@@ -89,7 +89,19 @@ _SYSPROP_RE = re.compile(r'\$([A-Za-z_]\w*)')
 # $names that should resolve to Python namespace variables rather than
 # being rewritten to ``db.get_object(0).name``.  For example, ``$su``
 # is the string-utilities module imported directly into the verb namespace.
-_PYTHON_CONSTANTS = {'su'}
+#
+# ``$string_utils`` is an alias for the same object, so code ported from a
+# MOO keeps the name it was written with. The only edit a port needs is
+# the call syntax:
+#
+#     $string_utils:from_list(lst, ", ")    MOO
+#     $string_utils.from_list(lst, ", ")    here
+#
+# There is deliberately no #60 object behind it. call_verb() takes an
+# argument *string*, so a verb could not accept positional arguments the
+# way the MOO original does; a method on su is both faster and closer to
+# the source it replaces.
+_PYTHON_CONSTANTS = {'su', 'string_utils'}
 
 # Master regex: matches seven distinct token types in verb source code.
 # Groups 1-4 capture string literals (returned unchanged).
