@@ -19,11 +19,13 @@ Architecture Overview::
                                               in thread   execution
 
 The server runs on a single asyncio event loop. Verb code is executed in a
-dedicated ``ThreadPoolExecutor(max_workers=1)`` so that long-running verbs
-do not block the network I/O loop, while still guaranteeing single-threaded
-access to the database (no concurrent mutations). A ``contextvars`` snapshot
-is copied into the worker thread so that verb-context variables (current
-player, call depth, etc.) propagate correctly.
+thread pool so that long-running verbs do not block the network I/O loop.
+Exactly one verb runs at any instant -- that is guaranteed by the baton in
+``moo.verb_baton``, not by the pool size, so that ``suspend()`` can park a
+verb mid-execution and let others run without ever permitting two to
+execute at once. A ``contextvars`` snapshot is copied into the worker
+thread so that verb-context variables (current player, call depth, etc.)
+propagate correctly.
 
 Lifecycle:
     1. ``run_server()`` builds config, database, and server objects.

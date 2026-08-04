@@ -56,7 +56,7 @@ initializes a fresh schema instead.
 
 | Subsystem | Module | What it does |
 |---|---|---|
-| Server core | `moo/server.py` | Event loop, single-threaded verb execution via a one-worker executor, context propagation, graceful shutdown/restart |
+| Server core | `moo/server.py` | Event loop, serialised verb execution (one verb at a time, via the baton in `moo/verb_baton.py`), context propagation, graceful shutdown/restart |
 | Networking | `moo/network.py` | Telnet/WebSocket connections, protocol negotiation, color and wrapping |
 | Database | `moo/database.py` | SQLite persistence, object cache, checkpointing |
 | Object model | `moo/objects.py` | Inheritance, properties as native Python attributes, flags, tags |
@@ -128,6 +128,7 @@ What changes is the verb body. The usual substitutions:
 | `$string_utils:...` | `su....` — the LambdaMOO string utilities are provided, alongside Python's own `str` methods |
 | `$object_utils:...` | `ou....` |
 | `pass(@args)` | `pass_(*args)` |
+| `suspend(n)` | `suspend(n)` — same meaning: other verbs run, yours resumes on the next line |
 | `E_PERM` and friends | `E_PERM` — first-class values here too, so they can be returned, stored and compared as well as raised |
 | `player:my_huh(...)` | verb dispatch through the parser |
 | `length(x)`, `tostr(a, b)` | `len(x)`, `f"{a}{b}"` |
