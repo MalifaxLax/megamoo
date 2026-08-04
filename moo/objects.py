@@ -744,6 +744,9 @@ class MOOObject:
         Works like the builtin ``msg_room()`` but as a method, so verb
         code can write ``pobj.location.msg_room(...)`` naturally.
 
+        Each recipient is messaged through its own ``msg`` verb, so any
+        per-object override of ``msg`` applies to room broadcasts too.
+
         Args:
             message: Message text (supports %S/%d/%i emit substitution and
                 %0/%1/... raw-string slots).
@@ -751,8 +754,6 @@ class MOOObject:
             **kwargs: Optional sub, dob, iob, uob for emit substitution, plus
                 s0/s1/... raw-string slots (%N).
         """
-        from .builtins import notify
-
         exclude_nums = set()
         for obj in (exclude or []):
             exclude_nums.add(obj.objnum if hasattr(obj, 'objnum') else obj)
@@ -761,17 +762,23 @@ class MOOObject:
         dob = kwargs.get('dob')
         iob = kwargs.get('iob')
         uob = kwargs.get('uob')
-        # Raw-string slots (s0=, s1=, ...) -> esub %N, same as notify/msg.
-        svals = {k: v for k, v in kwargs.items()
-                 if len(k) >= 2 and k[0] == 's' and k[1:].isdigit()} or None
+        # Raw-string slots (s0=, s1=, ...) -> esub %N.  Passed straight
+        # through as sN kwargs, which is what the msg verb expects.
+        slots = {k: v for k, v in kwargs.items()
+                 if len(k) >= 2 and k[0] == 's' and k[1:].isdigit()}
 
         if hasattr(self, 'contents'):
             for obj in self.contents:
                 if obj.objnum not in exclude_nums:
                     try:
                         if obj.is_player:
-                            notify(obj, message, sub=sub, dob=dob, iob=iob,
-                                   uob=uob, svals=svals)
+                            # Deliver through msg, not notify.  msg is a verb
+                            # and overridable per object, which is how a
+                            # deafened or filtered character stops hearing
+                            # things; calling notify directly walked straight
+                            # past every one of those overrides.
+                            obj.msg(message, sub=sub, dob=dob, iob=iob,
+                                    uob=uob, **slots)
                     except Exception:
                         pass
 

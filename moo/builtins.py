@@ -1968,16 +1968,21 @@ def msg_room(location: Union[int, MOOObject], message: str,
     dob = kwargs.get('dob')
     iob = kwargs.get('iob')
     uob = kwargs.get('uob')
-    # Raw-string slots (s0=, s1=, ...) -> esub %N, same as notify/msg.
-    svals = {k: v for k, v in kwargs.items()
-             if len(k) >= 2 and k[0] == 's' and k[1:].isdigit()} or None
+    # Raw-string slots (s0=, s1=, ...) -> esub %N.  Passed straight through
+    # as sN kwargs, which is what the msg verb expects.
+    slots = {k: v for k, v in kwargs.items()
+             if len(k) >= 2 and k[0] == 's' and k[1:].isdigit()}
     if hasattr(loc_obj, 'contents'):
         for obj in loc_obj.contents:
             if obj.objnum not in exclude_nums:
                 try:
                     if obj.is_player:
-                        notify(obj, message, sub=sub, dob=dob, iob=iob,
-                               uob=uob, svals=svals)
+                        # Deliver through msg, not notify.  msg is a verb and
+                        # overridable per object, which is how a deafened or
+                        # filtered character stops hearing things; calling
+                        # notify walked straight past every such override.
+                        obj.msg(message, sub=sub, dob=dob, iob=iob,
+                                uob=uob, **slots)
                 except Exception:
                     pass
 
