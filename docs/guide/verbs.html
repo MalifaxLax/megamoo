@@ -119,6 +119,22 @@ engine refuses the command before your code runs:
 <div class="term"><code><span class="p">&gt;</span> @adverb #3.@mycmd with auth=3
 <span class="p">&gt;</span> @verbauth #3.@mycmd = 3     <span class="c"># or afterwards</span></code></div>
 
+<div class="warn">
+    <span class="label">gm3 is the security boundary</span>
+    <p>Verb code is ordinary Python with ordinary Python privileges: it can
+       <code>import</code> anything, open files, and reach the interpreter's
+       own builtins. That is the point of the language choice, and it is why
+       the whole standard library is genuinely available to you.</p>
+    <p>It also means that <strong>anyone you give <code>gm3</code> can run
+       any code they like as the account your server runs under</strong>.
+       Grant it to people you would trust with the machine, not merely with
+       the game.</p>
+    <p>Classic MOO let ordinary players program, because the MOO language
+       was itself the sandbox. MegaMOO has no equivalent boundary, so a
+       world where untrusted players write code is not something the auth
+       levels can give you today.</p>
+</div>
+
 <h2 id="exceptions">Exception verbs</h2>
 
 <p>

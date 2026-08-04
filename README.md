@@ -120,6 +120,33 @@ more replaceable half, and a lot of what old MOO utility packages exist to do
 library. A database importer to carry objects and properties across
 automatically is on the roadmap; today the port is manual.
 
+## Who may write verbs
+
+Verb code is ordinary Python, executed with ordinary Python privileges. A
+verb can `import` any module, open files, and reach `__builtins__`. That is
+deliberate — it is what "the in-world language is Python itself" means, and
+it is why the standard library is genuinely available rather than a curated
+subset.
+
+The consequence is that **the security boundary is who can create a verb,
+not what a verb can do once created.** `@program`, `@adverb` and `eval` are
+gated at gm3. Anyone holding gm3 can run arbitrary code as the server
+process and should be considered as trusted as the person running it.
+
+Two things follow:
+
+- The permission-checking `getattr`/`setattr` in the verb namespace are a
+  guard rail for well-behaved code, not an enforcement boundary. Verb code
+  that wants the unchecked versions can reach them.
+- **Think carefully before granting gm3 broadly.** Classic MOO let ordinary
+  players program, which worked because the MOO language was itself the
+  sandbox. MegaMOO has no equivalent boundary, so opening programming to
+  untrusted players would hand them the host account.
+
+If you want a world where players write code, that needs a real sandbox —
+a separate piece of work, and not something the current permission levels
+provide.
+
 ## Accessibility
 
 MegaMOO is developed by a quadriplegic (C1–C2) programmer using a head-pointer input device at about 30 words per minute, in collaboration with AI pair-programming tools. That vantage point shapes the engine:

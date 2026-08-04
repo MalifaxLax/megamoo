@@ -22,11 +22,14 @@ Namespace contents
 
 The namespace dict produced by :func:`build_verb_namespace` contains:
 
-1. **Safe Python builtins** -- a curated subset of Python's builtin
-   functions (``len``, ``str``, ``range``, ``sorted``, etc.) that are
-   safe for verb code to use.  Dangerous builtins like ``__import__``,
-   ``eval``, ``exec``, ``open``, and ``compile`` are intentionally
-   excluded.
+1. **Python builtins** -- a working set of Python's builtin functions
+   (``len``, ``str``, ``range``, ``sorted``, etc.), plus
+   permission-checking replacements for ``getattr`` and ``setattr``.
+   This is *not* a sandbox: ``__builtins__`` is left unpinned, so verb
+   code can ``import``, call ``open()``, and reach anything Python
+   offers.  See the note above ``SAFE_PYTHON_BUILTINS`` below -- the
+   security boundary is the gm3 gate on who may write a verb, not what
+   a verb may do.
 
 2. **Core context variables** -- ``pobj`` (player), ``this`` (object
    the verb is defined on), ``caller``, ``location``, ``db``, ``verb``,
@@ -54,18 +57,37 @@ from typing import Any, Dict, List, Optional
 
 
 # =============================================================================
-# Safe Python Builtins
+# Python Builtins exposed to verb code
 # =============================================================================
 #
-# This is the UNION of every Python builtin that was exposed by any of
-# the three former namespace builders (server.py, verbs.py, builtins.py).
-# Only functions that are safe for untrusted verb code are included.
+# The UNION of every Python builtin that was exposed by any of the three
+# former namespace builders (server.py, verbs.py, builtins.py).
 #
-# Notably EXCLUDED for security:
-#   __import__, eval, exec, compile, open, globals, locals, vars,
-#   delattr, breakpoint, exit, quit, input, memoryview, super,
-#   staticmethod, classmethod, property, object, type (type is
-#   included as a read-only introspection tool)
+# THIS IS NOT A SANDBOX. Read the following before adding to it.
+#
+# These names are merged into the verb's *globals*. Nothing pins
+# ``__builtins__``, so when ``exec(code, namespace)`` runs, Python inserts
+# the real builtins module itself, and any name this dict does not shadow
+# resolves to the genuine article. Verb code can therefore ``import os``,
+# call ``open()`` and reach ``__builtins__`` directly -- all of which it
+# does today, and which the "Python is the MOO language" design intends.
+#
+# What this dict actually does is *shadow* a handful of names with safer
+# equivalents -- notably ``getattr`` and ``setattr``, which are replaced in
+# build_verb_namespace() by permission-checking wrappers. That shadowing is
+# a convenience for well-behaved verb code, NOT an enforcement boundary:
+# ``__builtins__['getattr']`` reaches the unchecked version.
+#
+# The real security boundary is who may write a verb at all. @program,
+# @adverb and eval are gated at gm3, so anyone who can create verb code is
+# already trusted with the database. Keep that in mind before opening
+# programming to ordinary players, the way classic MOO does -- doing so
+# would make property permissions advisory rather than enforced.
+#
+# An earlier version of this comment claimed __import__, eval, open and
+# friends were "EXCLUDED for security". They are omitted from this dict,
+# but that does not exclude them from the namespace, and the claim misled
+# at least one reader into believing a sandbox existed.
 # =============================================================================
 
 SAFE_PYTHON_BUILTINS: Dict[str, Any] = {
