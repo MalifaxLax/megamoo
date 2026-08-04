@@ -207,6 +207,13 @@ COMMAND_HISTORY_SIZE = 100
 # this wall-clock limit is killed to prevent infinite loops.
 COMMAND_TIMEOUT = 30
 
+# How many verb threads exist.  Verbs are serialised by the baton in
+# verb_baton -- only one ever executes -- so this is not a concurrency
+# setting.  It bounds how many verbs may sit *suspended* at once, each
+# holding a parked thread so it can resume mid-execution.  Past this,
+# new commands wait for a free worker rather than being refused.
+VERB_POOL_SIZE = 32
+
 # ============================================================================
 # OBJECT SYSTEM SETTINGS
 # ============================================================================

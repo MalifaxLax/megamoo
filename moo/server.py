@@ -80,7 +80,8 @@ from .tasks import Task, TaskContext, create_task, get_task_queue
 from .objects import MOOObject, ObjectFlags
 from .api import ApiServer
 from . import builtins
-from .globals import COMMAND_TIMEOUT
+from .globals import COMMAND_TIMEOUT, VERB_POOL_SIZE
+from . import verb_baton
 
 logger = logging.getLogger('megamoo.server')
 
@@ -245,9 +246,15 @@ class MegaMOOServer:
         # meaningful once the listener is up, hence None until then.
         self.port: Optional[int] = None
         self._api_server: Optional[ApiServer] = None
-        # Single-threaded pool: verbs run off the event loop but are
-        # serialised so that database access is never concurrent.
-        self._verb_thread_pool = ThreadPoolExecutor(max_workers=1)
+        # Verbs are still serialised -- exactly one runs at a time -- but
+        # the serialising is done by the baton in verb_baton, not by having
+        # a single worker.  The distinction matters because suspend() parks
+        # a verb mid-execution: the thread keeps its stack so it can resume
+        # on the next line, and with one worker that park would deadlock
+        # the server.  Pool size therefore bounds how many verbs may be
+        # suspended at once; beyond it, new commands wait for a worker.
+        self._verb_thread_pool = ThreadPoolExecutor(
+            max_workers=VERB_POOL_SIZE, thread_name_prefix='moo-verb')
 
         # Per-IP connection rate limiting: track recent timestamps
         self._conn_timestamps: Dict[str, collections.deque] = {}
@@ -798,10 +805,11 @@ class MegaMOOServer:
                     # Snapshot contextvars so verb-context propagates
                     # into the worker thread.
                     ctx = contextvars.copy_context()
-                    await asyncio.wait_for(
-                        loop.run_in_executor(
-                            self._verb_thread_pool, ctx.run, exec, compiled, context),
-                        timeout=COMMAND_TIMEOUT)
+                    record = verb_baton.Execution()
+                    await self._await_verb(loop.run_in_executor(
+                        self._verb_thread_pool, ctx.run,
+                        verb_baton.run_guarded, compiled, context, record),
+                        record)
                 finally:
                     clear_verb_context(token)
                 get_task_queue().complete_task(task)
@@ -852,6 +860,30 @@ class MegaMOOServer:
     # --------------------------------------------------------
     # Command execution (the hot path for player input)
     # --------------------------------------------------------
+
+
+    async def _await_verb(self, future, record):
+        """
+        Wait for verb code, charging it only for the time it actually ran.
+
+        ``asyncio.wait_for`` cannot be used directly any more: a verb that
+        calls ``suspend(60)`` is not a runaway, and a fixed deadline would
+        kill it for sleeping.  The Execution record separates running time
+        from parked time, so a verb is only timed out for work it is
+        genuinely doing.
+
+        Note that the timeout abandons the *wait*, not the thread -- Python
+        cannot kill a running thread.  That was already true before, and is
+        why COMMAND_TIMEOUT has always been a report rather than a kill.
+        """
+        while True:
+            done, _ = await asyncio.wait({future}, timeout=1.0)
+            if done:
+                return future.result()
+            if record.running_seconds() > COMMAND_TIMEOUT:
+                raise asyncio.TimeoutError(
+                    f"verb ran for more than {COMMAND_TIMEOUT}s "
+                    f"(excluding {record.parked:.1f}s suspended)")
 
     async def execute_command(self, player: MOOObject, command: str):
         """
@@ -952,11 +984,11 @@ class MegaMOOServer:
                     # Snapshot contextvars so verb-context propagates into
                     # the worker thread.
                     ctx = contextvars.copy_context()
-                    await asyncio.wait_for(
-                        loop.run_in_executor(
-                            self._verb_thread_pool, ctx.run, exec, compiled,
-                            namespace),
-                        timeout=COMMAND_TIMEOUT)
+                    record = verb_baton.Execution()
+                    await self._await_verb(loop.run_in_executor(
+                        self._verb_thread_pool, ctx.run,
+                        verb_baton.run_guarded, compiled, namespace, record),
+                        record)
                 run_at_post_cmd(namespace, namespace.get('result'))
             except Exception as e:
                 run_at_post_cmd(namespace, error=e)

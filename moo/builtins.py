@@ -2747,3 +2747,37 @@ def request(url: str, *, reply: str, on=None, method: str = 'GET',
         lambda: async_io.http_fetch(url, method=method, data=payload,
                                     headers=headers, timeout=timeout),
         on=target, reply=reply, tag=tag, db=_database)
+
+
+def suspend(seconds: float = 0.0) -> None:
+    """
+    Step aside for *seconds*, then carry on from the next line.
+
+    Unlike ``pause()``, which sleeps the verb thread and freezes every
+    player, this hands the baton back: other verbs run while this one is
+    parked, and execution resumes here with locals and call stack intact.
+
+    Exactly one verb still executes at any instant.  What changes is that
+    "one at a time" no longer means "one until it finishes".
+
+    ``suspend()`` is a yield point, so the world may move across it.  An
+    object read before the call may have been moved, changed or recycled by
+    the time the verb wakes.  Re-read what matters rather than trusting
+    what was read before -- the same rule MOO has always had.
+
+    Args:
+        seconds: How long to step aside.  ``0`` yields to anything waiting
+            and returns immediately.  Capped at 300.
+
+    Raises:
+        RuntimeError: If called from somewhere that is not verb code, where
+            there is no baton to hand back.
+
+    Example -- a guard that finishes its round without stopping the world::
+
+        for _step in ('north', 'east', 'south', 'west'):
+            call_verb(this, 'gmove', args=_step)
+            suspend(10)
+    """
+    from .verb_baton import suspend as _suspend
+    _suspend(seconds)
