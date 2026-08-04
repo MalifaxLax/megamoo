@@ -15,9 +15,9 @@ if not args:
     pobj.msg("Get what?")
     return
 
-# RT check
-if pobj.rt > 0:
-    pobj.msg("You must wait.")
+# Can the character act? do_wait covers roundtime as well as the
+# immobilising conditions, and emits its own message.
+if pobj.do_wait():
     return
 
 # Container get: get <item> from [under|behind|off] <container>
