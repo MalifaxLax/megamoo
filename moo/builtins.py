@@ -2781,3 +2781,134 @@ def suspend(seconds: float = 0.0) -> None:
     """
     from .verb_baton import suspend as _suspend
     _suspend(seconds)
+
+
+def port_verb(pobj, spec: str, db):
+    """
+    Paste MOO source, get Python, review it before it is saved.
+
+    The editor half is deliberately the same as ``program_verb``: enter
+    lines, ``.`` alone to finish, ``@abort`` to cancel.  What differs is
+    what happens on save -- the lines are read as MOO and translated, and
+    the result is shown for approval rather than written straight out.
+
+    Nothing is saved without a yes.  A translation is a draft, and the
+    parts the translator would not guess at are marked in the code with
+    ``# PORT:`` so they cannot be missed.
+
+    Args:
+        pobj: The programmer.
+        spec: ``<object>.<verb>``, the same form @program takes.
+        db:   Database.
+    """
+    from .utils import interactive
+    from .moo_port import port, MooSyntaxError, MARK
+    from .verbs import VerbDef
+    from .match_utils import omatch
+
+    if '.' not in spec:
+        notify(pobj, "Usage: @port <object>.<verb-name>")
+        notify(pobj, "Example: @port #92.buy")
+        return
+
+    obj_part, verb_name = spec.rsplit('.', 1)
+    obj_part, verb_name = obj_part.strip(), verb_name.strip()
+    if not obj_part or not verb_name:
+        notify(pobj, "Usage: @port <object>.<verb-name>")
+        return
+
+    target = omatch(obj_part, pobj, db)
+    if target is None:
+        notify(pobj, f"I don't see '{obj_part}' here.")
+        return
+
+    @interactive
+    def _editor(pobj, **kw):
+        existing = None
+        for v in target.verbs:
+            if verb_name in v.names:
+                existing = v
+                break
+
+        notify(pobj, f"Porting MOO code into '{verb_name}' on "
+                     f"{target.name} (#{target.objnum}).")
+        if existing and (existing.code or '').strip():
+            notify(pobj, f"%<245>[{verb_name} already has "
+                         f"{len(existing.code.splitlines())} lines; you will "
+                         f"be asked before it is replaced.]%n")
+        notify(pobj, "Paste MOO source.  '.' alone to finish, '@abort' to cancel.")
+        notify(pobj, "-----")
+
+        lines = []
+        while True:
+            line = yield ""
+            if line is None:
+                notify(pobj, "Cancelled.")
+                return
+            if line.strip() == '@abort':
+                notify(pobj, "Cancelled.  Nothing was changed.")
+                return
+            if line.strip() == '.':
+                break
+            lines.append(line)
+
+        source = '\n'.join(lines)
+        if not source.strip():
+            notify(pobj, "Nothing to port.")
+            return
+
+        try:
+            result = port(source)
+        except MooSyntaxError as err:
+            notify(pobj, f"That does not parse as MOO: {err}")
+            notify(pobj, "Nothing was changed.")
+            return
+
+        notify(pobj, "")
+        notify(pobj, "%<245>-- translated --%n")
+        for ln in result.code.rstrip().splitlines():
+            # The code is shown raw, so % must be doubled or the colour
+            # processor eats it -- MOO code is full of them.
+            notify(pobj, '  ' + ln.replace('%', '%%'))
+        notify(pobj, "")
+
+        if result.notes:
+            notify(pobj, f"%<245>{len(result.notes)} thing(s) need you:%n")
+            for n in result.notes:
+                notify(pobj, f"  - {n}")
+            notify(pobj, "")
+
+        verdict = ('%<245>Nothing needed marking, but read it anyway: this '
+                   'checks the mechanics, never the meaning.%n'
+                   if result.clean else
+                   f'%<245>{result.marks} line(s) marked {MARK} -- the verb '
+                   f'will not work until those are done.%n')
+        notify(pobj, verdict)
+
+        answer = yield f"Save this to {verb_name} on #{target.objnum}? [y/N] "
+        if not answer or answer.strip().lower() not in ('y', 'yes'):
+            notify(pobj, "Not saved.")
+            return
+
+        try:
+            if existing:
+                existing.code = result.code
+                existing.compiled_code = None
+            else:
+                target.add_verb(VerbDef(
+                    names=[verb_name], code=result.code,
+                    owner=pobj.objnum, perms='rx',
+                    # Not executable-by-players until a human has been
+                    # through it; a half-ported verb should not be callable.
+                    hidden=bool(result.marks), auth=3))
+            db.save_object(target)
+        except Exception as err:
+            notify(pobj, f"Could not save: {err}")
+            return
+
+        notify(pobj, f"Saved to {verb_name} on #{target.objnum}.")
+        if result.marks:
+            notify(pobj, f"%<245>Hidden until ported: @grep '{MARK}' finds "
+                         f"what is left.%n")
+
+    _editor(pobj)
