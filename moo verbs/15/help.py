@@ -27,19 +27,53 @@ if not args:
     # List verbs with docstrings the player can see
     verb_topics = []
     seen = set()
+    # Engine machinery, not player commands: hook verbs invoked by
+    # name via call_verb. They cannot be marked hidden -- that also
+    # removes them from dispatch -- so help filters them here.
+    _INTERNAL_EXACT = {
+        'msg', 'msg_room', 'gmove', 'vmove', 'match_exit',
+        'look_here', 'look_self', 'rlook', 'make_postatus',
+        'get_condition', 'get_position', 'get_status',
+        'hands_free', 'clear_hand', 'move_to_hand', 'time_ok',
+        'postring', 'at_post_move', 'invoke', 'enter_func',
+        'exit_func', 'items_on_top', 'items_under', 'do_wait',
+        'do_intoxicate', 'liquid', 'list_active', 'trigger',
+        'trigger_all', 'mark', 'unmark', 'dot', 'tt', 'ceat',
+        'cdrink',
+    }
+    _INTERNAL_PREFIX = ('_', 'on_', 'in_', 'under_', 'behind_')
+    # One verb implements every compass command, so deduping onto
+    # names[0] would show only 'n'. List the long forms instead.
+    _DIRECTION_CANON = 'n'
+    _DIRECTION_SHOWN = ['north', 'south', 'east', 'west',
+                        'up', 'down', 'in', 'out']
     for obj in [pobj, pobj.location] + list(pobj.location.contents):
         if not obj:
             continue
         for vname, (vdef, _) in (obj._resolved_verbs or {}).items():
-            if vdef.hidden or vname in seen:
+            if vdef.hidden:
                 continue
             if vdef.auth and plevel < vdef.auth:
                 continue
+            # _resolved_verbs is keyed by every legal abbreviation,
+            # so dedupe on the canonical name; this also collapses
+            # aliases (@set/@val -> @set).
+            _names = getattr(vdef, 'names', None) or [vname]
+            canon = _names[0]
+            if (canon in _INTERNAL_EXACT
+                    or canon.startswith(_INTERNAL_PREFIX)
+                    or (canon.endswith('_') and len(canon) > 1)):
+                continue
+            if canon in seen:
+                continue
+            seen.add(canon)
             code = vdef.code or ''
             if code.lstrip().startswith('"""') or code.lstrip().startswith("'''"):
-                if vname not in topics:
-                    verb_topics.append(vname)
-            seen.add(vname)
+                if canon not in topics:
+                    if canon == _DIRECTION_CANON:
+                        verb_topics.extend(_DIRECTION_SHOWN)
+                    else:
+                        verb_topics.append(canon)
 
     pobj.msg("")
     pobj.msg("%<245>Help Topics%n")
@@ -158,3 +192,4 @@ for obj in [pobj, pobj.location] + list(pobj.location.contents):
         return
 
 pobj.msg("There's no help for that.")
+
