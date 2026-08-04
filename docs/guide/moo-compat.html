@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coming from LambdaMOO — MegaMOO Guide</title>
+<!-- seo:begin -->
+<meta name="description" content="Importing a LambdaMOO database into MegaMOO, the staff commands a MOO programmer will expect, and how to port MOO verb code to Python.">
+<link rel="canonical" href="https://malifaxlax.github.io/megamoo/moo-compat.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MegaMOO">
+<meta property="og:title" content="Coming from LambdaMOO — MegaMOO Guide">
+<meta property="og:description" content="Importing a LambdaMOO database into MegaMOO, the staff commands a MOO programmer will expect, and how to port MOO verb code to Python.">
+<meta property="og:url" content="https://malifaxlax.github.io/megamoo/moo-compat.html">
+<meta property="og:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Coming from LambdaMOO — MegaMOO Guide">
+<meta name="twitter:description" content="Importing a LambdaMOO database into MegaMOO, the staff commands a MOO programmer will expect, and how to port MOO verb code to Python.">
+<meta name="twitter:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
+<link rel="icon" href="https://malifaxlax.github.io/megamoo/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="https://malifaxlax.github.io/megamoo/apple-touch-icon.png">
+<!-- seo:end -->
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<p class="crumb"><a href="index.html">← MegaMOO Guide</a></p>
+
+<h1 class="wordmark" style="font-size:clamp(1.8rem,6vw,2.4rem)">Coming from LambdaMOO</h1>
+<p class="tagline">Bringing an old world across, and the commands you already know.</p>
+
+<p>
+MegaMOO reimplements the MOO <em>model</em> — numbered objects, single
+inheritance, properties and verbs living on the objects themselves, edited
+while the world runs. It does not implement the MOO <em>language</em>.
+Verbs here are Python.
+</p>
+
+<p>
+That is the whole of the incompatibility, and it is worth being blunt about
+it: a LambdaMOO core will not run on MegaMOO. What this chapter covers is
+what you <em>can</em> do — bring the world across, keep the code where you
+can read it, and port it verb by verb.
+</p>
+
+<div class="note">
+<span class="label">If you want a MOO that runs MOO code</span>
+<p>Use <a href="https://github.com/rdaum/moor">mooR</a>. It is a mature
+   reimplementation in Rust that reads LambdaMOO databases and executes MOO
+   verbs directly, so an existing core keeps working. MegaMOO is the right
+   choice when you would rather write in Python; mooR is the right choice
+   when you have a core you want to keep running.</p>
+</div>
+
+
+<h2>Importing a database</h2>
+
+<p>
+<code>@import</code> reads a classic LambdaMOO database file — LambdaCore,
+JHCore, or your own — and creates MegaMOO objects from what is in it. Put
+the <code>.db</code> in an <code>imports/</code> directory beside the
+server, then look before you leap:
+</p>
+
+<pre><code>@import/dry JHCore-DEV-2
+</code></pre>
+
+<p>
+The dry run reads the whole file and reports exactly what it would create
+without creating any of it. Do that first, every time. The real import does
+not merge and does not undo, so take a copy of your database before running
+it without <code>/dry</code>.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Command</th><th>Level</th><th>Does</th></tr></thead>
+<tbody>
+<tr><td><code>@import <span class="c">&lt;file&gt;</span></code></td><td><code>gm3</code></td><td>Import a LambdaMOO database from <code>imports/</code>.</td></tr>
+<tr><td><code>@import/dry <span class="c">&lt;file&gt;</span></code></td><td><code>gm3</code></td><td>Report what would be imported. Creates nothing.</td></tr>
+<tr><td><code>@import/players <span class="c">&lt;file&gt;</span></code></td><td><code>gm3</code></td><td>Include player objects, which are skipped by default.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+Format versions 1 through 4 are read, which covers LambdaMOO up to 1.8.
+</p>
+
+<h3>What happens to object numbers</h3>
+
+<p>
+They change, and they have to. A LambdaMOO <code>#10</code> cannot become a
+MegaMOO <code>#10</code> — that number is already the base object here, and
+a core landing on top of the shipped hierarchy would destroy both.
+</p>
+
+<p>
+Every imported object is created fresh, and every object reference stored
+inside a property is rewritten to match. Each object records where it came
+from in <code>moo_import_id</code>, so you can always find the thing that
+used to be <code>#57</code>:
+</p>
+
+<pre><code>@find 57 isa #1
+@ex #412
+</code></pre>
+
+<p>
+A reference pointing at something that was not imported — a skipped player,
+or a number the source database never had — is left visibly as a number and
+counted in the report. Pointing it at whatever now holds that number would
+be worse than leaving it obviously broken.
+</p>
+
+<h3>What happens to property names</h3>
+
+<p>
+Most survive untouched. Two kinds cannot:
+</p>
+
+<ul>
+<li><b>Names MegaMOO handles itself</b> — <code>flags</code>,
+    <code>owner</code>, <code>location</code>, <code>contents</code> and
+    friends. Assigning to those sets the real thing, not a property.</li>
+<li><b>Names beginning with an underscore</b>. Those are Python instance
+    attributes here, found before the property system is consulted, so they
+    would be invisible as properties.</li>
+</ul>
+
+<p>
+Both are prefixed rather than dropped: <code>_mail_task</code> becomes
+<code>moo_mail_task</code>, <code>flags</code> becomes
+<code>moo_flags</code>. Every rename is listed in the import report, so
+nothing changes name quietly.
+</p>
+
+<p>
+<code>aliases</code> is the one happy exception. MOO means the same thing by
+it that MegaMOO does, so it maps straight onto the native attribute.
+</p>
+
+<h3>What happens to verbs</h3>
+
+<p>
+This is the part worth understanding properly. Verb code comes across, but
+<b>nothing imported can run</b> — it is MOO source, and this engine executes
+Python.
+</p>
+
+<p>
+Rather than discard it, the importer keeps every verb's original source
+exactly as it was, stored as comments beneath a docstring that records where
+it came from and how to port it. The verb itself is stored
+<b>hidden</b>, <b>without the execute permission</b>, and at
+<code>gm3</code>, so no player can reach it by typing its name, and its body
+ends in <code>return None</code> so that even a contrived call does nothing.
+</p>
+
+<p>
+The effect is that your old code is sitting on the right objects, under the
+right names, waiting to be rewritten — instead of in a tarball you never
+open. To see what is left:
+</p>
+
+<pre><code>@grep UNPORTED MOO SOURCE
+</code></pre>
+
+<p>
+To port one, read the source in the verb, write the Python in its place, and
+give the verb <code>rx</code> permissions and an auth level. Delete the
+docstring when you do — it is what marks the verb as un-ported.
+</p>
+
+<div class="note">
+<span class="label">Players are skipped</span>
+<p>Player objects are left out unless you pass <code>/players</code>. A
+   player object carries a password hash and a connection history that mean
+   nothing here, and importing one creates an account nobody can log into.</p>
+</div>
+
+
+<h2>Porting verb code</h2>
+
+<p>
+Most lines fall to a small substitution table. The shape of the code — what
+is on <code>this</code>, what the verb is called with, how it talks to the
+player — does not change.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>MOO</th><th>MegaMOO</th></tr></thead>
+<tbody>
+<tr><td><code>player:tell("You have ", n)</code></td><td><code>pobj.msg(f"You have {n}")</code></td></tr>
+<tr><td><code>this:verbname(x)</code></td><td><code>call_verb(this, 'verbname', x)</code></td></tr>
+<tr><td><code>pass(@args)</code></td><td><code>pass_(*args)</code></td></tr>
+<tr><td><code>$string_utils:foo(x)</code></td><td><code>su.foo(x)</code></td></tr>
+<tr><td><code>$object_utils:foo(x)</code></td><td><code>ou.foo(x)</code></td></tr>
+<tr><td><code>player</code></td><td><code>pobj</code></td></tr>
+<tr><td><code>caller_perms()</code></td><td><code>caller</code></td></tr>
+<tr><td><code>length(x)</code></td><td><code>len(x)</code></td></tr>
+<tr><td><code>tostr(a, b)</code></td><td><code>f"{a}{b}"</code></td></tr>
+<tr><td><code>typeof(x) == LIST</code></td><td><code>isinstance(x, list)</code></td></tr>
+<tr><td><code>{1, 2, 3}</code></td><td><code>[1, 2, 3]</code></td></tr>
+<tr><td><code>x[1]</code> <span class="c">(1-based)</span></td><td><code>x[0]</code> <span class="c">(0-based)</span></td></tr>
+<tr><td><code>this.location</code></td><td><code>this.location</code> <span class="c">(unchanged)</span></td></tr>
+<tr><td><code>args</code>, <code>argstr</code>, <code>dobj</code></td><td><code>args</code>, <code>argstr</code>, <code>dobj</code> <span class="c">(unchanged)</span></td></tr>
+<tr><td><code>#123</code></td><td><code>#123</code> <span class="c">(unchanged)</span></td></tr>
+<tr><td><code>E_PERM</code></td><td><code>E_PERM</code> <span class="c">(a value here too)</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+A few things are worth knowing beyond the table:
+</p>
+
+<ul>
+<li><b>Returning.</b> A MOO verb returns by assigning <code>result</code>.
+    Both work here: assign <code>result</code>, or use a plain
+    <code>return</code>.</li>
+<li><b><code>tell</code> exists.</b> If ported code reads better as
+    <code>tell(pobj, "a", b)</code>, that is provided and does the same as
+    <code>pobj.msg</code>.</li>
+<li><b>Errors are values.</b> <code>E_PERM</code> and the rest can be
+    returned, stored in a property and compared with <code>==</code>, as
+    well as raised — the same as in MOO.</li>
+<li><b>Missing properties do not raise.</b> Reading a property that is not
+    set gives back something falsy that compares equal to
+    <code>None</code>, so <code>if this.rt &gt; 0</code> is safe on an
+    object that has no <code>rt</code>. Note that this means
+    <code>is None</code> is always false — use <code>== None</code> or plain
+    falsiness.</li>
+</ul>
+
+
+<h2>Commands you already know</h2>
+
+<p>
+These exist because a MOO programmer reaches for them without thinking. They
+behave as you would expect, with the differences noted.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Command</th><th>Level</th><th>Does</th></tr></thead>
+<tbody>
+<tr><td><code>@find <span class="c">&lt;text&gt;</span></code></td><td><code>gm2</code></td><td>Find objects anywhere by name. <code>in &lt;room&gt;</code> and <code>isa &lt;parent&gt;</code> narrow it; <code>/exact</code> and <code>/count</code> are available.</td></tr>
+<tr><td><code>@audit <span class="c">[player]</span></code></td><td><code>gm2</code></td><td>Everything a player owns, grouped by location. <code>/rooms</code>, <code>/nowhere</code> for orphans, <code>/count</code>.</td></tr>
+<tr><td><code>@kids <span class="c">&lt;object&gt;</span></code></td><td><code>gm2</code></td><td>What inherits from an object. <code>/all</code> draws the whole descendant tree.</td></tr>
+<tr><td><code>@quota <span class="c">[player]</span></code></td><td><code>gm2</code></td><td>How much of the database someone has built. See the note below.</td></tr>
+<tr><td><code>@grep <span class="c">&lt;text&gt;</span></code></td><td><code>gm3</code></td><td>Search verb code across the database.</td></tr>
+<tr><td><code>@copy <span class="c">&lt;object&gt;</span></code></td><td><code>gm3</code></td><td>Duplicate an object's own properties. Verbs and contents are deliberately not copied.</td></tr>
+<tr><td><code>@ps</code> / <code>@kill</code></td><td><code>gm3</code></td><td>List running tasks, and stop one.</td></tr>
+<tr><td><code>@dump <span class="c">&lt;object&gt;</span></code></td><td><code>gm3</code></td><td>Write an object out as text, into <code>dumps/</code>.</td></tr>
+<tr><td><code>@load <span class="c">&lt;file&gt;</span></code></td><td><code>gm3</code></td><td>Build a new object from a dump.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="note">
+<span class="label">@quota reports, it does not enforce</span>
+<p>MegaMOO has no quota system. <code>@quota</code> tells you what somebody
+   has actually built — objects, split into rooms, exits and everything else
+   — and shows a limit only if you have set a <code>quota</code> property
+   yourself, clearly marked as advisory. Object creation here is not gated
+   on it.</p>
+</div>
+
+
+<h2>Moving objects between databases</h2>
+
+<p>
+<code>@dump</code> and <code>@load</code> are the small version of the
+importer, and the everyday one: they move a single object between two
+MegaMOO databases — a development world and a live one, say.
+</p>
+
+<pre><code>@dump/verbs #92
+@load 92-BaseMerchant
+</code></pre>
+
+<p>
+What travels is what makes the object itself: parent, owner, flags, noun,
+aliases, properties, and with <code>/verbs</code> its verb code. What does
+not travel is where it happened to be — location, contents and children are
+relationships to other objects, and those numbers mean something else in the
+database you are loading into.
+</p>
+
+<p>
+<code>@load</code> always creates a <em>new</em> object. It never overwrites,
+it refuses a dump whose parent does not exist locally, and it lists any
+object references pointing at numbers this database does not have.
+<code>/dry</code> shows you all of that without building anything.
+</p>
+
+
+<div class="pagenav">
+    <a href="commands.html"><span class="dir">Previous</span>Command Reference</a>
+    <a class="to-next" href="web-client.html"><span class="dir">Next</span>The Web Client</a>
+</div>
+
+<div class="footer">
+    <span><a href="index.html">← MegaMOO Guide</a></span>
+    <span>Coming from LambdaMOO</span>
+</div>
+
+</div>
+</body>
+</html>

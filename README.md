@@ -108,17 +108,28 @@ What changes is the verb body. The usual substitutions:
 |---|---|
 | `player:tell("...")` | `pobj.msg("...")` |
 | `this.location` | `this.location` (unchanged) |
-| `$string_utils:...` | Python's `str` methods and the standard library |
-| `pass(@args)` | `call_verb(parent, verb, ...)` |
-| `E_PERM` and friends | ordinary Python exceptions |
+| `$string_utils:...` | `su....` — the LambdaMOO string utilities are provided, alongside Python's own `str` methods |
+| `$object_utils:...` | `ou....` |
+| `pass(@args)` | `pass_(*args)` |
+| `E_PERM` and friends | `E_PERM` — first-class values here too, so they can be returned, stored and compared as well as raised |
 | `player:my_huh(...)` | verb dispatch through the parser |
+| `length(x)`, `tostr(a, b)` | `len(x)`, `f"{a}{b}"` |
+| `{1, 2, 3}`, `x[1]` | `[1, 2, 3]`, `x[0]` — lists are 0-based |
 
 A world's *content* is the part worth preserving — the rooms, the objects, the
 descriptions, the shape of the hierarchy. Verb code is usually the smaller and
 more replaceable half, and a lot of what old MOO utility packages exist to do
 (string formatting, sorting, list manipulation) is already in Python's standard
-library. A database importer to carry objects and properties across
-automatically is on the roadmap; today the port is manual.
+library.
+
+`@import` reads a LambdaMOO database — format versions 1 through 4, so
+LambdaMOO up to 1.8 — and carries the objects, hierarchy and properties across,
+remapping object references as it goes. Verb code comes too, but inert: it is
+kept verbatim under a docstring recording where it came from and how to port
+it, stored hidden and without the execute permission, so your old code sits on
+the right objects under the right names instead of in a tarball. `@grep
+'UNPORTED MOO SOURCE'` lists what is left. See
+[Coming from LambdaMOO](docs/guide/moo-compat.html) for the whole process.
 
 ## Who may write verbs
 
@@ -221,8 +232,6 @@ Active development. The engine runs a private in-progress game world (character 
 
 - Web client polish on the WebSocket path
 - Documentation for the builtin library and verb-authoring conventions
-- A LambdaMOO database importer, to carry an existing world's objects and
-  properties across and leave the verb bodies to port
 
 ## Credits
 

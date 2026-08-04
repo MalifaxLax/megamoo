@@ -33,7 +33,7 @@
 <p class="tagline">Every staff command, grouped by what it is for.</p>
 
 <p>
-The 63 commands below are attached to <code>#3</code>, so every character
+The 74 commands below are attached to <code>#3</code>, so every character
 inherits them. What you may actually use depends on your
 <a href="verbs.html#auth">level</a> — the middle column. Without it, a command
 answers <code>Do what?</code>, exactly as if it did not exist.
@@ -73,6 +73,9 @@ works too.
 <tr><td><code>+decompile</code> <span class="c">(+dec)</span></td><td><code>gm3</code></td><td>Print a verb's code exactly as stored — the ground truth for what is running.</td></tr>
 <tr><td><code>@list</code></td><td><code>gm3</code></td><td>List objects in a range of numbers.</td></tr>
 <tr><td><code>+pron</code></td><td><code>gm2</code></td><td>Show the substitution tokens for messages (%S, %d and the rest).</td></tr>
+<tr><td><code>@find <span class="c">&lt;text&gt;</span></code></td><td><code>gm2</code></td><td>Find objects anywhere in the database by name. <code>in &lt;room&gt;</code> and <code>isa &lt;parent&gt;</code> narrow the search; <code>/exact</code> and <code>/count</code> change what comes back.</td></tr>
+<tr><td><code>@audit <span class="c">[player]</span></code></td><td><code>gm2</code></td><td>Everything a player owns, grouped by location. <code>/rooms</code>, <code>/nowhere</code> to find orphans, <code>/count</code> for totals.</td></tr>
+<tr><td><code>@kids <span class="c">&lt;object&gt;</span></code></td><td><code>gm2</code></td><td>What inherits from an object, each with a count of its own children. <code>/all</code> draws the whole descendant tree.</td></tr>
 </tbody>
 </table>
 </div>
@@ -105,6 +108,7 @@ works too.
 <tr><td><code>@move</code></td><td><code>gm2</code></td><td>Move an object somewhere else.</td></tr>
 <tr><td><code>@parent</code> <span class="c">(@par)</span></td><td><code>gm3</code></td><td>Change what an object is built from.</td></tr>
 <tr><td><code>@renumber</code></td><td><code>gm5</code></td><td>Give an object a different number.</td></tr>
+<tr><td><code>@copy <span class="c">&lt;object&gt;</span></code></td><td><code>gm3</code></td><td>Duplicate an object's own properties. Verbs and contents are deliberately not copied — behaviour belongs on the parent.</td></tr>
 </tbody>
 </table>
 </div>
@@ -169,6 +173,7 @@ works too.
 <tr><td><code>@verbauth</code> <span class="c">(@verba)</span></td><td><code>gm3</code></td><td>Set or read the level a command requires.</td></tr>
 <tr><td><code>@hideverb</code> <span class="c">(@hidev)</span></td><td><code>gm3</code></td><td>Hide a command so nobody can type it.</td></tr>
 <tr><td><code>@unhideverb</code> <span class="c">(@unhidev)</span></td><td><code>gm3</code></td><td>Reverse that.</td></tr>
+<tr><td><code>@grep <span class="c">&lt;text&gt;</span></code></td><td><code>gm3</code></td><td>Search verb code across the database.</td></tr>
 </tbody>
 </table>
 </div>
@@ -198,6 +203,7 @@ works too.
 <tr><td><code>unhold</code> <span class="c">(unh)</span></td><td><code>gm1</code></td><td>Stop holding it.</td></tr>
 <tr><td><code>@color</code></td><td><code>gm1</code></td><td>Show the colour palette.</td></tr>
 <tr><td><code>@wearpos</code> <span class="c">(@wearp)</span></td><td><code>gm2</code></td><td>Show the wearable positions.</td></tr>
+<tr><td><code>@quota <span class="c">[player]</span></code></td><td><code>gm2</code></td><td>How much of the database someone has built, split into rooms, exits and everything else. Reports only — MegaMOO does not enforce a quota.</td></tr>
 </tbody>
 </table>
 </div>
@@ -210,6 +216,11 @@ works too.
 <tr><td><code>eval</code></td><td><code>gm3</code></td><td>Run Python against the live world. Also <code>/</code>.</td></tr>
 <tr><td><code>@restart</code></td><td><code>gm5</code></td><td>Restart in place.</td></tr>
 <tr><td><code>@shutdown</code></td><td><code>gm5</code></td><td>Stop the server.</td></tr>
+<tr><td><code>@ps</code></td><td><code>gm3</code></td><td>List running and queued tasks.</td></tr>
+<tr><td><code>@kill <span class="c">&lt;task&gt;</span></code></td><td><code>gm3</code></td><td>Stop a running task.</td></tr>
+<tr><td><code>@dump <span class="c">&lt;object&gt;</span></code></td><td><code>gm3</code></td><td>Write an object out as text into <code>dumps/</code>. <code>/verbs</code> includes its code, <code>/screen</code> prints it.</td></tr>
+<tr><td><code>@load <span class="c">&lt;file&gt;</span></code></td><td><code>gm3</code></td><td>Build a new object from a dump. <code>/dry</code> reports without building, <code>/list</code> shows what is available.</td></tr>
+<tr><td><code>@import <span class="c">&lt;file&gt;</span></code></td><td><code>gm3</code></td><td>Import a LambdaMOO database. Always <code>/dry</code> first — see <a href="moo-compat.html">Coming from LambdaMOO</a>.</td></tr>
 </tbody>
 </table>
 </div>
@@ -224,7 +235,7 @@ works too.
 
 <div class="pagenav">
     <a href="shops.html"><span class="dir">Previous</span>Food, Drink &amp; Shops</a>
-    <a class="to-next" href="web-client.html"><span class="dir">Next</span>The Web Client</a>
+    <a class="to-next" href="moo-compat.html"><span class="dir">Next</span>Coming from LambdaMOO</a>
 </div>
 
 <div class="footer">
