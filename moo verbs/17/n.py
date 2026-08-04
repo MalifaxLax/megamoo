@@ -22,6 +22,15 @@ if not room or not room.is_room:
     pobj.msg("You can't go anywhere from here.")
     return
 
+# Can the character act? do_wait covers roundtime as well as the
+# immobilising conditions, and emits its own message.
+#
+# IC only. The #15 and #16 copies of this verb are deliberately left
+# ungated so that roundtime from a fight never strands anyone in an
+# out-of-character room.
+if pobj.do_wait():
+    return
+
 # Check if the player is in a position that prevents movement
 pos = pobj.position or 0
 if pos:
