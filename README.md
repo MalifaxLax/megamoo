@@ -1,8 +1,10 @@
 # MegaMOO
 
-A modern, from-scratch Python reimplementation of the [LambdaMOO](https://en.wikipedia.org/wiki/LambdaMOO) server — a persistent, multiplayer, fully programmable text world. Roughly 75,000 lines of Python built on `asyncio`, with **zero required third-party dependencies**: the core engine runs on the standard library alone.
+A modern, from-scratch text world engine in Python 3, built on the [LambdaMOO](https://en.wikipedia.org/wiki/LambdaMOO) model — a persistent, multiplayer, fully programmable text world. Roughly 75,000 lines of Python built on `asyncio`, with **zero required third-party dependencies**: the core engine runs on the standard library alone.
 
 Where classic MOO servers make you program in a purpose-built MOO language, MegaMOO's in-world programming language is **Python itself**. Every verb — from `look` to your own game systems — is a plain Python file with the full standard library available, executed live against a persistent object database.
+
+> **This reimplements MOO's model, not its language.** You get objects carrying their own properties and verbs, single-parent inheritance, live in-world programming, and a wizard/programmer/owner permission model. You do not get a MOO-language interpreter — existing MOO code does not run unmodified and has to be ported to Python. That port is largely mechanical; see [Porting from LambdaMOO](#porting-from-lambdamoo).
 
 ## Highlights
 
@@ -22,13 +24,16 @@ Where classic MOO servers make you program in a purpose-built MOO language, Mega
 Requires Python 3.10+. No `pip install` needed for the core server.
 
 ```
-python3 megamoo.py <database> [port]      # default port 7777
+python3 megamoo.py mm.db                  # default port 7777
 telnet localhost 7777
 ```
 
 Optional extras: `bcrypt` for stronger password hashing (salted SHA-256 fallback is built in), `websockets` for browser clients.
 
-> **Note:** the repository does not ship a starter world database; the server initializes its schema against a new database, but a packaged minimal core (rooms, character generation, base classes) is on the roadmap. See [Status](#status).
+`mm.db` ships with the repository: a starter world with the base object
+hierarchy, character generation, a full building suite of `@`-commands, and a
+starting room to build out from. Point the server at any other filename and it
+initializes a fresh schema instead.
 
 ## Architecture
 
@@ -88,6 +93,32 @@ else:
 ```
 
 No imports, no boilerplate: the verb namespace arrives pre-loaded with the acting player (`pobj`), parsed arguments (`args`, `dobj`, `iobj`), object matching (`pmatch`), cross-object calls (`call_verb`), and the rest of the builtin library. Objects are matched the way a player thinks — `jump gap`, `jump 2nd rope` — and the verb reads top to bottom like the action it performs.
+
+## Porting from LambdaMOO
+
+There is no MOO-language interpreter here, so existing MOO verbs have to be
+rewritten in Python. The good news is that the hard part of a MOO — the object
+model — carries over directly, because MegaMOO uses the same one: single-parent
+inheritance, properties and verbs living on objects, ownership and permission
+bits, `$name` system references.
+
+What changes is the verb body. The usual substitutions:
+
+| LambdaMOO | MegaMOO |
+|---|---|
+| `player:tell("...")` | `pobj.msg("...")` |
+| `this.location` | `this.location` (unchanged) |
+| `$string_utils:...` | Python's `str` methods and the standard library |
+| `pass(@args)` | `call_verb(parent, verb, ...)` |
+| `E_PERM` and friends | ordinary Python exceptions |
+| `player:my_huh(...)` | verb dispatch through the parser |
+
+A world's *content* is the part worth preserving — the rooms, the objects, the
+descriptions, the shape of the hierarchy. Verb code is usually the smaller and
+more replaceable half, and a lot of what old MOO utility packages exist to do
+(string formatting, sorting, list manipulation) is already in Python's standard
+library. A database importer to carry objects and properties across
+automatically is on the roadmap; today the port is manual.
 
 ## Accessibility
 
@@ -161,9 +192,10 @@ claude mcp add megamoo -e MEGAMOO_API_TOKEN=<token> -- python3 ~/sfdev/tools/meg
 
 Active development. The engine runs a private in-progress game world (character generation, building tools, and the accessibility layer are all exercised daily); it has not yet had a public multiplayer deployment. Near-term roadmap:
 
-- Packaged starter database (core classes, chargen, a small starting area)
 - Web client polish on the WebSocket path
 - Documentation for the builtin library and verb-authoring conventions
+- A LambdaMOO database importer, to carry an existing world's objects and
+  properties across and leave the verb bodies to port
 
 ## Credits
 

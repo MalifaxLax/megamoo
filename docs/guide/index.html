@@ -5,19 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MegaMOO — a MUD server and MOO engine in Python</title>
 <!-- seo:begin -->
-<meta name="description" content="MegaMOO is a text-based virtual world engine: a modern LambdaMOO in Python 3 with zero dependencies. Build and program a multiplayer MUD from inside it, while it runs.">
+<meta name="description" content="A text-based virtual world engine: the LambdaMOO model rebuilt in Python 3, zero dependencies. Verbs are Python, not MOO code. Build a world from inside it.">
 <link rel="canonical" href="https://malifaxlax.github.io/megamoo/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="MegaMOO">
 <meta property="og:title" content="MegaMOO — a MUD server and MOO engine in Python">
-<meta property="og:description" content="MegaMOO is a text-based virtual world engine: a modern LambdaMOO in Python 3 with zero dependencies. Build and program a multiplayer MUD from inside it, while it runs.">
+<meta property="og:description" content="A text-based virtual world engine: the LambdaMOO model rebuilt in Python 3, zero dependencies. Verbs are Python, not MOO code. Build a world from inside it.">
 <meta property="og:url" content="https://malifaxlax.github.io/megamoo/">
 <meta property="og:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="MegaMOO — a MUD server and MOO engine in Python">
-<meta name="twitter:description" content="MegaMOO is a text-based virtual world engine: a modern LambdaMOO in Python 3 with zero dependencies. Build and program a multiplayer MUD from inside it, while it runs.">
+<meta name="twitter:description" content="A text-based virtual world engine: the LambdaMOO model rebuilt in Python 3, zero dependencies. Verbs are Python, not MOO code. Build a world from inside it.">
 <meta name="twitter:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
 <link rel="icon" href="https://malifaxlax.github.io/megamoo/favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="https://malifaxlax.github.io/megamoo/apple-touch-icon.png">
@@ -29,7 +29,7 @@
   "applicationCategory": "GameApplication",
   "applicationSubCategory": "MUD server",
   "operatingSystem": "Linux, macOS, Windows",
-  "description": "A text-based virtual world engine: a modern LambdaMOO in Python 3 with zero dependencies. Build and program a multiplayer world from inside it, while it runs.",
+  "description": "A text-based virtual world engine: the LambdaMOO model rebuilt in Python 3, zero dependencies. Verbs are Python, not MOO code. Build a world from inside it.",
   "url": "https://malifaxlax.github.io/megamoo/",
   "codeRepository": "https://github.com/MalifaxLax/megamoo",
   "programmingLanguage": "Python",
@@ -64,8 +64,8 @@
 <h2>What MegaMOO is</h2>
 
 <p class="lede">
-MegaMOO is a text-based virtual world engine — a complete reimplementation of
-the LambdaMOO server in Python 3. It hosts a shared, programmable world that
+MegaMOO is a text-based virtual world engine — the LambdaMOO model rebuilt from
+scratch in Python 3. It hosts a shared, programmable world that
 players connect to over telnet or websocket, where they move between rooms,
 handle objects, and talk to each other. Builders and programmers extend that
 world <em>while it is running</em>, by writing code directly into the live
@@ -77,6 +77,16 @@ It combines the object-oriented model LambdaMOO proved in 1990 with modern
 Python: <code>asyncio</code> networking, SQLite persistence, and the full
 standard library available inside the world's own code.
 </p>
+
+<div class="note">
+    <span class="label">MOO's model, not MOO's language</span>
+    <p>MegaMOO keeps what makes a MOO a MOO — objects carrying their own
+       properties and verbs, single-parent inheritance, programming the world
+       from inside it while it runs — but verbs are written in Python rather
+       than the MOO language. Existing MOO code does not run unmodified and has
+       to be ported. Because the object model carries over unchanged, that work
+       is mostly mechanical substitution inside the verb bodies.</p>
+</div>
 
 <p>
 <strong>A browser client is included.</strong> Start a world with
