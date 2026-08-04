@@ -11,7 +11,7 @@ Examples:
 """
 
 # RT check
-if (getattr(pobj, 'rt', None) or 0) > 0:
+if pobj.rt > 0:
     pobj.msg("You must wait.")
     return
 
@@ -21,11 +21,11 @@ if not dobj:
     return
 
 # Match in hands, wearing, room
-mh = getattr(pobj, 'mh', None)
-oh = getattr(pobj, 'oh', None)
+mh = pobj.mh
+oh = pobj.oh
 slist = list(pobj.location.contents)
 slist += [x for x in [mh, oh] if x and hasattr(x, 'objnum')]
-wearing = getattr(pobj, 'wearing', None) or []
+wearing = pobj.wearing or []
 slist += [db.get_object(n) for n in wearing if n]
 
 tobj = pmatch(dobj, pobj, slist)
@@ -38,7 +38,7 @@ if not tobj:
 if tobj.objnum == pobj.objnum:
     pobj.msg("You tap your head all smart-like.")
     pobj.location.msg_room("%S taps %ps head all smart-like.", exclude=[pobj], sub=pobj)
-elif getattr(tobj, 'is_char', False):
+elif tobj.is_char:
     pobj.msg("You tap %d on the shoulder.", dob=tobj)
     tobj.msg("%S taps you on the shoulder.", sub=pobj)
     pobj.location.msg_room("%S taps %d on the shoulder.", exclude=[pobj, tobj], sub=pobj, dob=tobj)

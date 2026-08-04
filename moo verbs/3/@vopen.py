@@ -29,7 +29,7 @@ if not args:
     return
 
 room = pobj.location
-if not room or not getattr(room, 'is_room', False):
+if not room or not room.is_room:
     pobj.msg("You must be in a room to create a virtual exit.")
     return
 
@@ -55,12 +55,12 @@ except:
     pobj.msg("Invalid destination object.")
     return
 
-if not getattr(dest, 'is_room', False):
+if not dest.is_room:
     pobj.msg("Destination must be a room.")
     return
 
 # Deep copy dexits to avoid mutating inherited parent list
-inherited = getattr(room, 'dexits', None) or []
+inherited = room.dexits or []
 dexits = [list(e) if isinstance(e, list) else e for e in inherited]
 while len(dexits) < 12:
     dexits.append(None)
@@ -99,7 +99,7 @@ dexits[enum] = [dest.objnum, succ, osucc, '', odrop, 0]
 room.dexits = dexits
 
 # Deep copy obvexits too
-obvexits = list(getattr(room, 'obvexits', []) or [])
+obvexits = list(room.obvexits or [])
 if enum not in obvexits:
     obvexits.append(enum)
     # Sort by direction index so exits display in canonical order

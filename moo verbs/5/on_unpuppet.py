@@ -7,11 +7,11 @@ the character from the room's plist.
 """
 
 # Clean up furniture/table state
-table_num = getattr(this, 'table', None)
+table_num = this.table
 if table_num:
     try:
         furn = db.get_object(table_num)
-        sitters = getattr(furn, 'sitters', None)
+        sitters = furn.sitters
         if sitters and this.objnum in sitters:
             sitters.remove(this.objnum)
             furn.sitters = sitters
@@ -22,8 +22,8 @@ if table_num:
 
 # Remove from room plist
 _room = this.location
-if _room and getattr(this, 'is_char', False):
-    _plist = getattr(_room, 'plist', None) or []
+if _room and this.is_char:
+    _plist = _room.plist or []
     if this in _plist:
         _plist.remove(this)
         _room.set_property('plist', _plist, db)

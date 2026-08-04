@@ -25,14 +25,14 @@ _dr = getattr(_globals, 'ic_dropin_room', 200)
 DROPIN_ROOM = _dr.objnum if hasattr(_dr, 'objnum') else int(_dr)
 
 # Get character list
-chars = list(getattr(pobj, 'characters', None) or [])
+chars = list(pobj.characters or [])
 completed = []
 for c in chars:
     if isinstance(c, str) and c.startswith('#'):
         c = int(c[1:])
     if isinstance(c, int):
         c = db.get_object(c)
-    if c and not getattr(c, 'chargen_step', None):
+    if c and not c.chargen_step:
         completed.append(c)
 
 if not completed:
@@ -69,7 +69,7 @@ while True:
     ichar = completed[slot - 1]
 
     # Only set drop-in room if character has no valid last_location
-    last_loc = getattr(ichar, 'last_location', None)
+    last_loc = ichar.last_location
     if hasattr(last_loc, 'objnum'):
         last_loc = last_loc.objnum
     elif isinstance(last_loc, str) and last_loc.startswith('#'):
@@ -84,7 +84,7 @@ while True:
     yield 2
 
     # Announce departure
-    if not getattr(pobj, 'invis', False):
+    if not pobj.invis:
         pobj.location.msg_room(f"{pobj.name} steps into the gate and vanishes.", exclude=[pobj], sub=pobj, dob=dobj, iob=iobj)
 
     puppet(ichar)

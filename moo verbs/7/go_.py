@@ -93,7 +93,7 @@ def _validate_name(name, label):
         return "Must start with a letter."
     if not re.match(r"^[A-Za-z'-]+$", name):
         return "Only letters, apostrophes, and hyphens allowed."
-    badnames = list(getattr(this, 'bad_names', []) or [])
+    badnames = list(this.bad_names or [])
     if name.lower() in [b.lower() for b in badnames]:
         return "I don't think so."
     return None
@@ -121,10 +121,10 @@ def _run_chargen():
     # ── Step 1: Slot selection ────────────────────────────────────────
 
     if step is None:
-        max_chars = getattr(this, 'max_characters', None) or 5
+        max_chars = this.max_characters or 5
 
         while True:
-            characters = list(getattr(pobj, 'characters', None) or [])
+            characters = list(pobj.characters or [])
 
             # Pad to max_chars so empty slots are selectable
             slots = list(characters) + [None] * (max_chars - len(characters))
@@ -160,7 +160,7 @@ def _run_chargen():
                     pobj.msg("  Cleared invalid slot.")
                     continue
 
-                chargen_step_val = getattr(ichar, 'chargen_step', None)
+                chargen_step_val = ichar.chargen_step
 
                 if chargen_step_val is not None:
                     # In-progress character — resume or start over
@@ -187,9 +187,9 @@ def _run_chargen():
                         step = chargen_step_val
 
                         # Restore local variables from ichar properties
-                        first_name = getattr(ichar, 'name', None) or ichar.noun or 'unnamed'
-                        last_name = getattr(ichar, 'last_name', None)
-                        gender = getattr(ichar, 'gender', None)
+                        first_name = ichar.name or ichar.noun or 'unnamed'
+                        last_name = ichar.last_name
+                        gender = ichar.gender
 
                         break  # Exit slot selection loop, proceed to resumed step
 
@@ -218,7 +218,7 @@ def _run_chargen():
                     pobj.characters = characters
                     pobj._mark_modified()
                     # Remove name from taken list
-                    taken_names = list(getattr(this, 'character_names', []) or [])
+                    taken_names = list(this.character_names or [])
                     if char_name in taken_names:
                         taken_names.remove(char_name)
                         _set(this, 'character_names', taken_names)
@@ -238,7 +238,7 @@ def _run_chargen():
                 new_char.add_property('chargen_step', 'first_name')
 
                 # Copy auth and permissions from account
-                acct_auth = list(getattr(pobj, 'auth', []) or [])
+                acct_auth = list(pobj.auth or [])
                 if acct_auth:
                     new_char.add_property('auth', list(acct_auth))
                     if pobj.is_programmer:
@@ -247,7 +247,7 @@ def _run_chargen():
                         new_char.flags |= 4  # WIZARD
 
                 # Store in slot immediately
-                chars = list(getattr(pobj, 'characters', []) or [])
+                chars = list(pobj.characters or [])
                 chars.append(new_char.objnum)
                 pobj.characters = chars
                 pobj._mark_modified()
@@ -271,7 +271,7 @@ def _run_chargen():
                 pobj.msg(err)
                 _header("What is your first name?")
                 continue
-            taken_names = list(getattr(this, 'character_names', []) or [])
+            taken_names = list(this.character_names or [])
             if name.capitalize() in taken_names:
                 pobj.msg("That name is taken.")
                 continue
@@ -364,7 +364,7 @@ try:
 except _Quit:
     pass
 finally:
-    if pobj.location and getattr(pobj.location, 'objnum', None) == 6:
+    if pobj.location and pobj.location.objnum == 6:
         move(pobj, origin_room)
         msg_room(origin_room, f"{pobj.name} arrives, looking slightly bewildered.", exclude=[pobj], sub=pobj, dob=dobj, iob=iobj)
 

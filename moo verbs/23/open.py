@@ -9,28 +9,28 @@ announces to the other side with ropen.
 Called programmatically: call_verb(exit, 'open')
 """
 
-if not getattr(this, 'closed', 0):
-    player.msg((getattr(this, 'aopen', '') or '%d is already open.').replace('%d', this.noun or this.name))
+if not this.closed:
+    player.msg((this.aopen or '%d is already open.').replace('%d', this.noun or this.name))
     return
-if getattr(this, 'clock', 0):
-    player.msg((getattr(this, 'olopen', '') or '%d is locked.').replace('%d', this.noun or this.name))
-    if not getattr(player, 'invis', False):
-        omsg = getattr(this, 'oolopen', '')
+if this.clock:
+    player.msg((this.olopen or '%d is locked.').replace('%d', this.noun or this.name))
+    if not player.invis:
+        omsg = this.oolopen
         if omsg:
             msg_all(player.location, su.psub1(omsg.replace('%d', this.noun or this.name), player), exclude=[player])
     return
 this.set_property('closed', 0, db)
-player.msg(su.psub1((getattr(this, 'open', '') or 'You open %d.').replace('%d', this.noun or this.name), player))
-if not getattr(player, 'invis', False):
-    omsg = getattr(this, 'oopen', '')
+player.msg(su.psub1((this.open or 'You open %d.').replace('%d', this.noun or this.name), player))
+if not player.invis:
+    omsg = this.oopen
     if omsg:
         msg_all(player.location, su.psub1(omsg.replace('%d', this.noun or this.name), player), exclude=[player])
 # Open reverse exit too
-rev = getattr(this, 'reverse', None)
+rev = this.reverse
 if rev and type(rev) == int:
     rev = db.get_object(rev)
 if rev:
     rev.set_property('closed', 0, db)
-    rmsg = getattr(rev, 'ropen', '')
+    rmsg = rev.ropen
     if rmsg and rev.location:
         msg_all(rev.location, rmsg.replace('%d', rev.noun or rev.name))

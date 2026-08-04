@@ -17,8 +17,8 @@ list of stock objnums (the item, or the liquid type it holds).
 it = citem
 
 if cqtype != 'single':
-    excl = getattr(this, 'case_exclude', None) or []
-    lt = getattr(it, 'ltype', None)
+    excl = this.case_exclude or []
+    lt = it.ltype
     if it.objnum in excl or (lt and hasattr(lt, 'objnum') and lt.objnum in excl):
         return "That's not something I'll sell by the case."
 

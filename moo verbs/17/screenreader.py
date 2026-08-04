@@ -1,6 +1,6 @@
 """Toggle screen reader mode. Usage: screenreader"""
 
-settings = getattr(player, 'settings', {}) or {}
+settings = player.settings or {}
 current = settings.get('screenreader', False)
 settings['screenreader'] = not current
 player.settings = settings

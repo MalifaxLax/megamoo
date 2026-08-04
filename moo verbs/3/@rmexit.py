@@ -25,7 +25,7 @@ if not spec:
     return
 
 room = pobj.location
-if not room or not getattr(room, 'is_room', False):
+if not room or not room.is_room:
     pobj.msg("You must be in a room.")
     return
 
@@ -45,7 +45,7 @@ if type(exit) == int:
     enum = exit
     dname = DNAMES[enum] if enum < len(DNAMES) else str(enum)
 
-    dexits = getattr(room, 'dexits', None) or []
+    dexits = room.dexits or []
     if enum < len(dexits) and dexits[enum]:
         dest = dexits[enum][0] if dexits[enum] else None
     else:
@@ -60,7 +60,7 @@ if type(exit) == int:
     dexits[enum] = []
     room.dexits = dexits
 
-    obvexits = getattr(room, 'obvexits', []) or []
+    obvexits = room.obvexits or []
     if enum in obvexits:
         obvexits.remove(enum)
         room.obvexits = obvexits
@@ -87,12 +87,12 @@ else:
 
     trash = db.get_object(9)
 
-    exits = getattr(room, 'exits', []) or []
+    exits = room.exits or []
     if target.objnum in exits:
         exits.remove(target.objnum)
         room.exits = exits
 
-    obvexits = getattr(room, 'obvexits', []) or []
+    obvexits = room.obvexits or []
     if target.objnum in obvexits:
         obvexits.remove(target.objnum)
         room.obvexits = obvexits
@@ -102,7 +102,7 @@ else:
     pobj.msg(f"Removed exit %<245>#{target.objnum}:{target.name}%n from room.")
 
     # Check for return/reverse exit and remove it too
-    ret_num = getattr(target, 'rexit', None) or getattr(target, 'rxexit', None) or getattr(target, 'reverse', None)
+    ret_num = target.rexit or target.rxexit or target.reverse
     if ret_num:
         if hasattr(ret_num, 'objnum'):
             ret_num = ret_num.objnum
@@ -110,11 +110,11 @@ else:
             ret_exit = db.get_object(ret_num)
             ret_room = ret_exit.location
             if ret_room:
-                ret_exits = getattr(ret_room, 'exits', []) or []
+                ret_exits = ret_room.exits or []
                 if ret_exit.objnum in ret_exits:
                     ret_exits.remove(ret_exit.objnum)
                     ret_room.exits = ret_exits
-                ret_obv = getattr(ret_room, 'obvexits', []) or []
+                ret_obv = ret_room.obvexits or []
                 if ret_exit.objnum in ret_obv:
                     ret_obv.remove(ret_exit.objnum)
                     ret_room.obvexits = ret_obv

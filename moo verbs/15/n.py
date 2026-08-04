@@ -19,12 +19,12 @@ Verb names are set from the room's directions property.
 """
 
 room = pobj.location
-if not room or not getattr(room, 'is_room', False):
+if not room or not room.is_room:
     pobj.msg("You can't go anywhere from here.")
     return
 
 # Check if the player is in a position that prevents movement
-pos = getattr(pobj, 'position', 0) or 0
+pos = pobj.position or 0
 if pos:
     pobj.msg("You can't do that in your current position.")
     return

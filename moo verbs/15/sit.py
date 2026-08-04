@@ -9,7 +9,7 @@ Examples:
     sit bench       - Sit on a bench
 """
 
-pos = getattr(pobj, 'position', 0) or 0
+pos = pobj.position or 0
 if pos == 6:
     pobj.msg("You're already sitting.")
     return
@@ -24,7 +24,7 @@ if dobj:
     if not target:
         pobj.msg("Sit where?")
         return
-    if not getattr(target, 'is_sittable', False):
+    if not target.is_sittable:
         pobj.msg("You can't sit on that.")
         return
     try:
@@ -35,11 +35,11 @@ if dobj:
 
 # Floor sit — check room permission
 room = pobj.location
-if not getattr(room, 'is_sittable', False):
+if not room.is_sittable:
     pobj.msg("You can't sit here.")
     return
 
 pobj.position = 6
 pobj.msg("You sit down.")
-if not getattr(pobj, 'invis', False):
+if not pobj.invis:
     pobj.location.msg_room("%S sits down.", exclude=[pobj], sub=pobj)

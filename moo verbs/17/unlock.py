@@ -17,7 +17,7 @@ if not target:
 # Match key from held items if iobj provided
 _key_obj = None
 if iobj:
-    _held = [x for x in [getattr(pobj, 'mh', None), getattr(pobj, 'oh', None)] if x]
+    _held = [x for x in [pobj.mh, pobj.oh] if x]
     _key_obj = pmatch(iobj, pobj, _held)
     if not _key_obj:
         pobj.msg("You're not holding that.")

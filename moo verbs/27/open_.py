@@ -11,19 +11,19 @@ Called by the room-level open verb: call_verb(container, 'open_')
 Returns True to indicate the action was handled.
 """
 
-if getattr(this, 'open', False):
+if this.open:
     pobj.msg("%D is already open.", dob=this)
     return True
 
-if getattr(this, 'locked', 0):
+if this.locked:
     ofail = getattr(this, 'ofail', "You have to unlock %d before you can open it.")
     oofail = getattr(this, 'oofail', "%S struggles to open %d.")
     pobj.msg(ofail, dob=this)
-    if not getattr(pobj, 'invis', False):
+    if not pobj.invis:
         pobj.location.msg_room(su.esub(oofail, sub=pobj, dob=this), exclude=[pobj])
     return True
 
-if getattr(this, 'trap', 0):
+if this.trap:
     pobj.msg("%D is trapped!", dob=this)
     return True
 
@@ -32,6 +32,6 @@ this.open = True
 osucc = getattr(this, 'osucc', "You open %d.")
 oosucc = getattr(this, 'oosucc', "%S opens %d.")
 pobj.msg(osucc, dob=this)
-if not getattr(pobj, 'invis', False):
+if not pobj.invis:
     pobj.location.msg_room(su.esub(oosucc, sub=pobj, dob=this), exclude=[pobj])
 return True

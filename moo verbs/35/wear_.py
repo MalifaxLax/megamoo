@@ -57,7 +57,7 @@ def lorposition(pos):
 
 def check_flex(obj, bodyloc):
     """Check if obj has layer_flex at the given resolved body position."""
-    flex = getattr(obj, 'layer_flex', None)
+    flex = obj.layer_flex
     if not flex:
         return False
     if isinstance(flex, bool):
@@ -65,7 +65,7 @@ def check_flex(obj, bodyloc):
     if isinstance(flex, dict):
         if flex.get(bodyloc, False) or flex.get(str(bodyloc), False):
             return True
-        for ps in (getattr(obj, 'wear_pos', None) or []):
+        for ps in (obj.wear_pos or []):
             p = ps[0]
             if p > 100:
                 base = p % 100

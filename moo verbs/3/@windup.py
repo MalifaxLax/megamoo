@@ -75,7 +75,7 @@ monster.noun = template.noun
 monster.aliases = list(template.aliases) if template.aliases else []
 
 # Clone weapons from template
-template_weapons = getattr(template, 'weapons', []) or []
+template_weapons = template.weapons or []
 new_weapons = []
 for tw_num in template_weapons:
     tw = db.get_object(tw_num)
@@ -99,7 +99,7 @@ monster.home_room = room.objnum
 call_verb(monster, 'wind_up')
 
 # Show arrival emit
-emits = getattr(monster, 'emits', []) or []
+emits = monster.emits or []
 if emits:
     msg_room(room, emits[0])
 

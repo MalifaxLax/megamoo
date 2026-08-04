@@ -18,8 +18,8 @@ if not call_verb(pobj, 'time_ok'):
     return
 
 # Match item in hands + inventory + room contents
-mh = getattr(pobj, 'mh', None)
-oh = getattr(pobj, 'oh', None)
+mh = pobj.mh
+oh = pobj.oh
 slist = [x for x in [mh, oh] if x and hasattr(x, 'objnum')]
 slist += list(pobj.location.contents) + list(pobj.contents)
 item = pmatch(dobj, pobj, slist)

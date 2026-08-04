@@ -20,7 +20,7 @@ Returns:
 
 # Get the room's direction names and exit object list
 directions = this.directions
-exits = getattr(this, 'exits', []) or []
+exits = this.exits or []
 
 try:
     # Find the index of the typed direction in the directions list
@@ -64,7 +64,7 @@ if exits:
         return exit
 
 # Fall back to virtual directional exits (dexits) list
-dexits = getattr(this, 'dexits', [])
+dexits = this.dexits
 if dexits and enum < len(dexits) and dexits[enum]:
     return enum
 

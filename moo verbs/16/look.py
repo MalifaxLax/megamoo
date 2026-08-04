@@ -49,10 +49,10 @@ except KeyError:
 # Fallback
 if obj == loc:
     call_verb(loc, 'look_here', leader=False)
-elif getattr(obj, 'is_char', False):
+elif obj.is_char:
     pobj.msg(f"You see {obj.name}. A wandering traveller.")
-elif not (getattr(obj, 'invis', False) or getattr(obj, 'hidden', False)):
-    desc = getattr(obj, 'description', None)
+elif not (obj.invis or obj.hidden):
+    desc = obj.description
     if desc:
         pobj.msg(f"\n{obj.name}")
         pobj.msg(desc)

@@ -9,7 +9,7 @@ Arguments:
 Auth: none
 """
 
-marks = getattr(pobj, 'marks', None) or []
+marks = pobj.marks or []
 if not marks:
     pobj.msg("You have no marks.")
     return

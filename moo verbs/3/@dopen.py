@@ -31,7 +31,7 @@ if not args:
     return
 
 room = pobj.location
-if not room or not getattr(room, 'is_room', False):
+if not room or not room.is_room:
     pobj.msg("You must be in a room to create an exit.")
     return
 
@@ -53,7 +53,7 @@ except:
     pobj.msg("Invalid destination.")
     return
 
-if not getattr(dest, 'is_room', False):
+if not dest.is_room:
     pobj.msg(f"%<245>{dest_str}%n is not a valid destination.")
     return
 

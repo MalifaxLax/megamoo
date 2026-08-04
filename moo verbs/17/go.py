@@ -12,17 +12,17 @@ Ported from Evennia CmdGo.
 """
 
 room = pobj.location
-if not room or not getattr(room, 'is_room', False):
+if not room or not room.is_room:
     pobj.msg("You can't go anywhere from here.")
     return
 
 # RT check
-if (getattr(pobj, 'rt', None) or 0) > 0:
+if pobj.rt > 0:
     pobj.msg("You must wait.")
     return
 
 # Position check
-pos = getattr(pobj, 'position', 0) or 0
+pos = pobj.position or 0
 if pos:
     pobj.msg("You can't do that in your current position.")
     return
@@ -91,9 +91,9 @@ if sub_prep:
     return
 
 # Climbable/jumpable checks
-if getattr(exit, 'climbable', False):
+if exit.climbable:
     pobj.msg("You have to climb that!")
-elif getattr(exit, 'jumpable', False):
+elif exit.jumpable:
     pobj.msg("You have to jump that!")
 else:
     call_verb(exit, 'invoke')

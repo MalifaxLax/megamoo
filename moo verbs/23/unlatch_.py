@@ -3,19 +3,19 @@
 # Unlatches this exit. Checks already not latched.
 # Sets latched=False on this and reverse exit.
 
-if not getattr(this, 'latched', False):
-    player.msg(getattr(this, 'culatchf', '') or '%D is not latched.', dob=this)
+if not this.latched:
+    player.msg(this.culatchf or '%D is not latched.', dob=this)
     return
 
 this.set_property('latched', False, db)
-player.msg(getattr(this, 'ulatch', '') or 'You unlatch %d.', dob=this)
-if not getattr(player, 'invis', False):
-    omsg = getattr(this, 'oulatch', '')
+player.msg(this.ulatch or 'You unlatch %d.', dob=this)
+if not player.invis:
+    omsg = this.oulatch
     if omsg:
         pobj.location.msg_room(omsg, exclude=[pobj], sub=pobj, dob=this)
 
 # Unlatch reverse exit too
-_rev = getattr(this, 'reverse', None)
+_rev = this.reverse
 if _rev and type(_rev) == int:
     _rev = db.get_object(_rev)
 if _rev:

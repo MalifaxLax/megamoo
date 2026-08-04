@@ -54,7 +54,7 @@ if cfg:
     _w(this, prop, current)
 
     # Per-tick regen rate -> regen_<prop>; modifier from regen_mods[idx]
-    rmods = getattr(this, 'regen_mods', None) or []
+    rmods = this.regen_mods or []
     mod = (rmods[mod_idx] if mod_idx < len(rmods) else 0) or 0
     if prop == 'hits':
         rate = max(1, current // 10) + mod

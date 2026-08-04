@@ -27,7 +27,7 @@ if not args:
     return
 
 room = pobj.location
-if not room or not getattr(room, 'is_room', False):
+if not room or not room.is_room:
     pobj.msg("You must be in a room to create an exit.")
     return
 
@@ -46,7 +46,7 @@ if dest_str and dest_str.startswith('#') and dest_str[1:].isdigit():
     except:
         pobj.msg("Invalid destination. Exit not linked.")
         dest = None
-    if dest and not getattr(dest, 'is_room', False):
+    if dest and not dest.is_room:
         pobj.msg("Destination is not a room. Exit not linked.")
         dest = None
 elif dest_str:

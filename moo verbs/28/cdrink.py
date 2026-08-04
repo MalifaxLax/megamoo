@@ -31,19 +31,19 @@ if not this.open:
     pobj.msg("%D is closed.", dob=this)
     return True
 
-ltype = getattr(this, 'ltype', None)
+ltype = this.ltype
 if not ltype or not hasattr(ltype, 'objnum'):
     pobj.msg("%D is empty.", dob=this)
     return True
 
-if getattr(ltype, 'edible', False):
+if ltype.edible:
     pobj.msg("You'll have to eat %d.", dob=ltype)
     return True
 
 # Apply effects from liquid type
 effects_per_bite = getattr(ltype, 'effects_per_bite', True)
-effects = getattr(ltype, 'effects', None) or []
-cuses = getattr(this, 'cuses', 0) or 0
+effects = ltype.effects or []
+cuses = this.cuses or 0
 will_empty = (cuses - 1) < 1
 
 if effects and (effects_per_bite or will_empty):
@@ -52,8 +52,8 @@ if effects and (effects_per_bite or will_empty):
         eu.trigger_all(pobj, effects)
 
 # Drinking messages
-prepared = getattr(ltype, 'prepared', False)
-emits = getattr(ltype, 'ceemits', None) or []
+prepared = ltype.prepared
+emits = ltype.ceemits or []
 if emits and len(emits) >= 4:
     ind = 0 if prepared else 2
     pmsgs = emits[ind] or []
@@ -69,7 +69,7 @@ else:
     pobj.location.msg_room("%S takes a drink of %d from %i.", exclude=[pobj], sub=pobj, dob=ltype, iob=this)
 
 # Apply round time
-rt_dice = getattr(ltype, 'rt_dice', None) or [1, 7, 0]
+rt_dice = ltype.rt_dice or [1, 7, 0]
 rt = dice(rt_dice[0], rt_dice[1], rt_dice[2] if len(rt_dice) > 2 else 0)
 call_verb(pobj, '_rt', amount=rt)
 
@@ -80,8 +80,8 @@ this.cuses = cuses
 if cuses == 1:
     pobj.msg("It's almost all gone!")
 elif cuses < 1:
-    finish = getattr(ltype, 'finish', None) or "You drink the last drop of %d from %i."
-    ofinish = getattr(ltype, 'ofinish', None) or "%S drinks the last drop of %d from %i."
+    finish = ltype.finish or "You drink the last drop of %d from %i."
+    ofinish = ltype.ofinish or "%S drinks the last drop of %d from %i."
     pobj.msg(finish, sub=pobj, dob=ltype, iob=this)
     pobj.location.msg_room(ofinish, exclude=[pobj], sub=pobj, dob=ltype, iob=this)
     this.ltype = None

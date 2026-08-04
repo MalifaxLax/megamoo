@@ -15,7 +15,7 @@ Returns True to indicate the action was handled.
 """
 
 item = this
-sitters = getattr(item, 'sitters', None) or []
+sitters = item.sitters or []
 seats = getattr(item, 'seats', 1) or 1
 
 # Already sitting here?
@@ -29,18 +29,18 @@ if len(sitters) >= seats:
     return True
 
 # If sitting elsewhere, stand from current furniture first
-cur_table = getattr(pobj, 'table', None)
+cur_table = pobj.table
 if cur_table:
     try:
         old = db.get_object(cur_table)
-        old_sitters = getattr(old, 'sitters', None) or []
+        old_sitters = old.sitters or []
         if pobj.objnum in old_sitters:
             old_sitters = [s for s in old_sitters if s != pobj.objnum]
             old.sitters = old_sitters
         stand_msg = getattr(old, 'stand', 'You stand up from %d.')
         ostand_msg = getattr(old, 'ostand', '%S stands up from %d.')
         pobj.msg(stand_msg, dob=old)
-        if not getattr(pobj, 'invis', False):
+        if not pobj.invis:
             pobj.location.msg_room(ostand_msg, exclude=[pobj], sub=pobj, dob=old)
     except Exception:
         pass
@@ -59,10 +59,10 @@ pobj.table = item.objnum
 
 # Messages (build from sit_prep if no custom message set)
 prep = getattr(item, 'sit_prep', 'on')
-sit_msg = getattr(item, 'sit', None) or f'You sit {prep} %d.'
-osit_msg = getattr(item, 'osit', None) or f'%S sits {prep} %d.'
+sit_msg = item.sit or f'You sit {prep} %d.'
+osit_msg = item.osit or f'%S sits {prep} %d.'
 pobj.msg(sit_msg, dob=item)
-if not getattr(pobj, 'invis', False):
+if not pobj.invis:
     pobj.location.msg_room(osit_msg, exclude=[pobj], sub=pobj, dob=item)
 
 return True

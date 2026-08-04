@@ -17,15 +17,15 @@ Properties checked:
     fail/ofail - Messages on climb failure.
     fall/ofall - Messages when falling to fail_dest.
 """
-if getattr(this, 'closed', 0):
+if this.closed:
     fail = getattr(this, 'failure', 'That is closed!')
     player.msg(fail)
-    ofail = getattr(this, 'ofailure', '')
-    if ofail and not getattr(player, 'invis', False):
+    ofail = this.ofailure
+    if ofail and not player.invis:
         player.location.msg_room(ofail, exclude=[player], sub=player)
     return
-locklist = getattr(this, 'locklist', [])
-if locklist and not getattr(player, 'is_royal', False):
+locklist = this.locklist
+if locklist and not player.is_royal:
     lockfunc = locklist[1] if len(locklist) > 1 else None
     if lockfunc:
         call_verb(this, lockfunc)
@@ -34,7 +34,7 @@ if locklist and not getattr(player, 'is_royal', False):
         player.msg(getattr(this, 'lockfail', 'You cannot pass.'))
         return
 # Climb check
-difficulty = getattr(this, 'difficulty', 0) or 0
+difficulty = this.difficulty or 0
 if difficulty > 0:
     skill_name = getattr(this, 'skill', 'climb')
     skill_val = getattr(player, skill_name, 0) or 0
@@ -42,19 +42,19 @@ if difficulty > 0:
     roll = random.randint(1, 100)
     if roll > skill_val + (100 - difficulty):
         # Failed the climb
-        player.msg(getattr(this, 'fail', '') or 'You try to climb %D but fail.', dob=this)
-        if not getattr(player, 'invis', False):
-            omsg = getattr(this, 'ofail', '')
+        player.msg(this.fail or 'You try to climb %D but fail.', dob=this)
+        if not player.invis:
+            omsg = this.ofail
             if omsg:
                 player.location.msg_room(omsg, exclude=[player], sub=player, dob=this)
         # Fall to fail_dest if set
-        fail_dest = getattr(this, 'fail_dest', None)
+        fail_dest = this.fail_dest
         if fail_dest and type(fail_dest) == int:
             fail_dest = db.get_object(fail_dest)
-        if fail_dest and getattr(fail_dest, 'is_room', False):
+        if fail_dest and fail_dest.is_room:
             player.msg(getattr(this, 'fall', 'You lose your grip and fall!'))
-            if not getattr(player, 'invis', False):
-                omsg = getattr(this, 'ofall', '')
+            if not player.invis:
+                omsg = this.ofall
                 if omsg:
                     player.location.msg_room(omsg, exclude=[player], sub=player)
             move(player, fail_dest)

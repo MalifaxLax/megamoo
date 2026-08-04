@@ -31,7 +31,7 @@ if not type(enum) == int:
     return
 
 # Fetch the room's virtual exit data
-dexits = getattr(room, 'dexits', [])
+dexits = room.dexits
 if not dexits or enum >= len(dexits) or not dexits[enum]:
     player.msg("That exit doesn't seem to lead anywhere.")
     return
@@ -60,8 +60,8 @@ odrop = edata[4] if len(edata) > 4 else ''
 
 # Determine movement mode based on player position and room settings
 # position 0 = standing (default), higher values = sitting, lying, etc.
-pos = getattr(player, 'position', 0) or 0
-walk = getattr(player, 'walk', None)
+pos = player.position or 0
+walk = player.walk
 if walk and pos == 0:
     # Player has a custom walk style override
     mode, omode = walk[0], walk[1]
@@ -79,8 +79,8 @@ drop = drop.replace('%MODE', mode) if drop else ''
 odrop = odrop.replace('%OMODE', omode) if odrop else ''
 
 # Check visibility flags for message suppression
-invis = getattr(player, 'invis', False)
-hidden = getattr(player, 'hidden', False)
+invis = player.invis
+hidden = player.hidden
 old_loc = player.location
 
 # Send departure messages

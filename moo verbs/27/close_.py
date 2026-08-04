@@ -9,7 +9,7 @@ Called by the room-level close verb: call_verb(container, 'close_')
 Returns True to indicate the action was handled.
 """
 
-if not getattr(this, 'open', False):
+if not this.open:
     pobj.msg("%D is already closed.", dob=this)
     return True
 
@@ -18,6 +18,6 @@ this.open = False
 csucc = getattr(this, 'csucc', "You close %d.")
 ocsucc = getattr(this, 'ocsucc', "%S closes %d.")
 pobj.msg(csucc, dob=this)
-if not getattr(pobj, 'invis', False):
+if not pobj.invis:
     pobj.location.msg_room(su.esub(ocsucc, sub=pobj, dob=this), exclude=[pobj])
 return True

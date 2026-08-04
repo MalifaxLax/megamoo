@@ -51,7 +51,7 @@ import re
 if call_verb(pobj, 'do_wait'):
     return
 
-merchant = getattr(pobj.location, 'merchant', None)
+merchant = pobj.location.merchant
 if not merchant or not hasattr(merchant, 'objnum'):
     pobj.msg("There is no one to buy from here.")
     return
@@ -61,8 +61,8 @@ if not merchant or not hasattr(merchant, 'objnum'):
 # The merchant object is a back-end price book, never an in-room NPC --
 # the npc's 'name' is what the player hears, not merchant.name.  With a
 # single shop we just take the configured npc (active_npc, else first).
-npcs = getattr(merchant, 'npcs', None) or {}
-npc_key = getattr(merchant, 'active_npc', None)
+npcs = merchant.npcs or {}
+npc_key = merchant.active_npc
 if npc_key and npc_key in npcs:
     npc = npcs[npc_key]
 elif npcs:
@@ -79,7 +79,7 @@ def _say(text, suffix='', **subkw):
     slots that esub splices into %0/%1/... in `text`.  `suffix` is
     unspoken narration appended to the same line, after the closing
     quote mark."""
-    sp = (npc and npc.get('name')) or getattr(merchant, 'speaker', None) \
+    sp = (npc and npc.get('name')) or merchant.speaker \
         or merchant.name
     line = sp[:1].upper() + sp[1:] + ' says, "' + text + '"'
     if suffix:
@@ -92,12 +92,12 @@ def _core(it):
     of the vessels); otherwise the item's adjectives + noun from
     name_mod_list [article, adj1, adj2, adj3, trailer], dropping the
     article and trailer."""
-    lt = getattr(it, 'ltype', None)
+    lt = it.ltype
     if lt is not None and hasattr(lt, 'objnum'):
         return lt.name
-    nml = getattr(it, 'name_mod_list', None) or []
+    nml = it.name_mod_list or []
     adjs = [a.strip() for a in nml[1:4] if a and a.strip()]
-    noun = (getattr(it, 'noun', None) or it.name).strip()
+    noun = (it.noun or it.name).strip()
     return ' '.join(adjs + [noun]) if adjs else noun
 
 # ── Peel off the case / half-case quantity words ─────────────────────
@@ -115,7 +115,7 @@ else:
 # merchant.items is an optional list of stock holders.  Its elements may be
 # live objects, bare objnums, or "#N" strings depending on how it was set
 # (verb assignment vs @set / MCP), so resolve each to an object first.
-stock = getattr(merchant, 'items', None) or [merchant]
+stock = merchant.items or [merchant]
 item_list = []
 for holder in stock:
     if isinstance(holder, int) or (isinstance(holder, str)
@@ -125,7 +125,7 @@ for holder in stock:
         except Exception:
             holder = None
     if holder is not None and hasattr(holder, 'objnum'):
-        for o in (getattr(holder, 'contents', None) or []):
+        for o in (holder.contents or []):
             if o is not None and hasattr(o, 'objnum') and getattr(o, 'existent', True):
                 item_list.append(o)
 
@@ -135,7 +135,7 @@ for holder in stock:
 # multiple of the liquid's price.  `parent` is stored as a raw objnum,
 # so the ancestry walk resolves each link before comparing.
 def _is_liquid(o):
-    p = getattr(o, 'parent', None)
+    p = o.parent
     for _ in range(20):
         if p is None or p == 0:
             return False
@@ -148,11 +148,11 @@ def _is_liquid(o):
                 return False
         if p.objnum == 91:
             return True
-        p = getattr(p, 'parent', None)
+        p = p.parent
     return False
 
 vconfigs = []
-for v in (getattr(merchant, 'vessels', None) or []):
+for v in (merchant.vessels or []):
     pn = v.get('proto') if isinstance(v, dict) else None
     if pn is None:
         continue
@@ -175,7 +175,7 @@ vessel = None  # (proto, mult) when the goods are a liquid poured to order
 if item is None and re.search(r'\s+of\s+', req, re.I):
     cpart, lpart = re.split(r'\s+of\s+', req, maxsplit=1, flags=re.I)
     for cand in item_list:
-        lt = getattr(cand, 'ltype', None)
+        lt = cand.ltype
         if lt is None or not hasattr(lt, 'objnum'):
             continue
         if pmatch(cpart, pobj, [cand]) and pmatch(lpart, pobj, [lt]):
@@ -188,7 +188,7 @@ if item is None and re.search(r'\s+of\s+', req, re.I):
 # "buy whiskey" still finds a stocked glass of fire whiskey.
 if item is None:
     for cand in item_list:
-        lt = getattr(cand, 'ltype', None)
+        lt = cand.ltype
         if lt is not None and hasattr(lt, 'objnum') \
                 and pmatch(req, pobj, [lt]):
             item = cand
@@ -232,7 +232,7 @@ if qty_type == 'single':
     if vessel:
         desc = vessel[0].name + ' of ' + item.name
     else:
-        lt = getattr(item, 'ltype', None)
+        lt = item.ltype
         desc = (item.name + ' of ' + lt.name) \
             if (lt is not None and hasattr(lt, 'objnum')) else item.name
 elif qty_type == 'case':
@@ -245,8 +245,8 @@ else:
 # are stored singular ('plat') so that offer's startswith() coin match
 # works on what the player types ('plats'); we append the 's' for display
 # here, plural unless the price is exactly 1 ("57 plats", "1 plat").
-ctypes = getattr(merchant, 'ctypes', None) or []
-coin_idx = getattr(merchant, 'coin_type', 0) or 0
+ctypes = merchant.ctypes or []
+coin_idx = merchant.coin_type or 0
 coin = ctypes[coin_idx] if coin_idx < len(ctypes) \
     else (ctypes[0] if ctypes else 'coin')
 currency = coin + ('s' if asking != 1 else '')
@@ -256,7 +256,7 @@ currency = coin + ('s' if asking != 1 else '')
 # and currency as raw strings (%1 = asking, %2 = currency).  `offer`
 # renders sell/o_sell itself, so nothing pre-rendered needs stashing here.
 cost_emit = (npc and npc.get('cost_emit')) \
-    or getattr(merchant, 'buy_quote', None) \
+    or merchant.buy_quote \
     or 'Lessee eer, %d costs %1 %2. Ye want one?'
 
 pobj.pending_buy = {
@@ -303,6 +303,6 @@ _say(emit, suffix=help_line, dob=item, s1=str(asking), s2=currency)
 # Haggling for a quote takes a beat; the do_wait gate at the top of this
 # verb then blocks further buys until it counts down.  Defaults to 0, so
 # a merchant with no rt set imposes no cooldown.
-rt = getattr(merchant, 'rt', 0) or 0
+rt = merchant.rt or 0
 if rt > 0:
     call_verb(pobj, '_rt', amount=rt)

@@ -9,7 +9,7 @@ Examples:
     lie bed         - Lie down on a bed
 """
 
-pos = getattr(pobj, 'position', 0) or 0
+pos = pobj.position or 0
 if pos >= 7 and pos <= 9:
     pobj.msg("You're already lying down.")
     return
@@ -24,7 +24,7 @@ if dobj:
     if not target:
         pobj.msg("Lie down where?")
         return
-    if not getattr(target, 'is_layable', False):
+    if not target.is_layable:
         pobj.msg("You can't lie down on that.")
         return
     try:
@@ -35,16 +35,16 @@ if dobj:
 
 # Floor lay — check room permission
 room = pobj.location
-if not getattr(room, 'is_layable', False):
+if not room.is_layable:
     pobj.msg("You can't lie down here.")
     return
 
 # If on furniture, leave it first
-cur_table = getattr(pobj, 'table', None)
+cur_table = pobj.table
 if cur_table:
     try:
         furn = db.get_object(cur_table)
-        sitters = getattr(furn, 'sitters', None) or []
+        sitters = furn.sitters or []
         if pobj.objnum in sitters:
             sitters = [s for s in sitters if s != pobj.objnum]
             furn.sitters = sitters
@@ -54,5 +54,5 @@ if cur_table:
 
 pobj.position = 8
 pobj.msg("You lie down.")
-if not getattr(pobj, 'invis', False):
+if not pobj.invis:
     pobj.location.msg_room("%S lies down.", exclude=[pobj], sub=pobj)

@@ -24,13 +24,13 @@ Keyword arguments (passed via call_verb):
 """
 
 # Validate destination is a valid room
-if not dest or not getattr(dest, 'is_room', False):
+if not dest or not dest.is_room:
     player.msg("You've just found a bad exit. Please report it to the staff.", sub=player, dob=this)
     return
 
 # Determine movement mode based on player position
-pos = getattr(player, 'position', 0) or 0
-walk = getattr(player, 'walk', None)
+pos = player.position or 0
+walk = player.walk
 if walk and pos == 0:
     # Player has a custom walk style override
     mode, omode = walk[0], walk[1]
@@ -48,8 +48,8 @@ drop = su.psub1(drop.replace('%MODE', mode), player)
 odrop = su.psub1(odrop.replace('%OMODE', omode), player)
 
 # Check visibility flags
-invis = getattr(player, 'invis', False)
-hidden = getattr(player, 'hidden', False)
+invis = player.invis
+hidden = player.hidden
 
 old_loc = player.location
 

@@ -13,11 +13,11 @@ Returns:
 """
 
 position = this.position
-_status = getattr(this, 'status', None)
+_status = this.status
 status = {k: v for k, v in _status.items()
           if (v > 0 and k != 'life') or (k == 'life' and v == 0)} if _status else {}
 
-_pstrings = getattr(this, 'position_strings', None)
+_pstrings = this.position_strings
 pstring = _pstrings[position] if _pstrings and position < len(_pstrings) else ''
 if pstring:
     pstring = su.esub(pstring, sub=this)

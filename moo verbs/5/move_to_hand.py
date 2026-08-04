@@ -20,8 +20,8 @@ if not dobj:
 
 # Already held? Then there's nothing to do -- prevents a duplicate
 # call from filling the off hand with the same object.
-mh = getattr(this, 'mh', None)
-oh = getattr(this, 'oh', None)
+mh = this.mh
+oh = this.oh
 if (mh and hasattr(mh, 'objnum') and mh.objnum == dobj.objnum) or \
    (oh and hasattr(oh, 'objnum') and oh.objnum == dobj.objnum):
     return

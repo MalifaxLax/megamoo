@@ -60,7 +60,7 @@ def size_at(obj, pos):
 
 def check_flex(obj, bodyloc):
     """Check if obj has layer_flex at the given resolved body position."""
-    flex = getattr(obj, 'layer_flex', None)
+    flex = obj.layer_flex
     if not flex:
         return False
     if isinstance(flex, bool):
@@ -68,7 +68,7 @@ def check_flex(obj, bodyloc):
     if isinstance(flex, dict):
         if flex.get(bodyloc, False) or flex.get(str(bodyloc), False):
             return True
-        for ps in (getattr(obj, 'wear_pos', None) or []):
+        for ps in (obj.wear_pos or []):
             p = ps[0]
             if p > 100:
                 base = p % 100
@@ -171,13 +171,13 @@ for bodyloc in positions_to_remove:
                     continue
                 # First visible item found
                 if rev_obj.objnum not in seen_rev:
-                    rev_size = getattr(rev_obj, 'size', 0) or 0
+                    rev_size = rev_obj.size or 0
                     if rev_size > 1:
                         revlist.append(rev_obj.name)
                     elif rev_size == 1:
-                        revlist.append(rev_obj.name + (getattr(rev_obj, 'pos_str', '') or ''))
+                        revlist.append(rev_obj.name + (rev_obj.pos_str or ''))
                     elif rev_size == 0:
-                        revlist.append(rev_obj.name + (getattr(rev_obj, 'pos_str', '') or ''))
+                        revlist.append(rev_obj.name + (rev_obj.pos_str or ''))
                     seen_rev.add(rev_obj.objnum)
                 break
             except Exception:

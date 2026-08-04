@@ -10,13 +10,13 @@ Called programmatically: call_verb(exit, 'close_')
 
 Returns True to indicate the close action was handled.
 """
-if getattr(this, 'closed', 0):
-    player.msg(getattr(this, 'aclose', '') or '%D is already closed.', dob=this)
+if this.closed:
+    player.msg(this.aclose or '%D is already closed.', dob=this)
     return True
 this.set_property('closed', 1, db)
-player.msg(getattr(this, 'close', '') or 'You close %D.', dob=this)
-if not getattr(player, 'invis', False):
-    omsg = getattr(this, 'oclose', '')
+player.msg(this.close or 'You close %D.', dob=this)
+if not player.invis:
+    omsg = this.oclose
     if omsg:
         pobj.location.msg_room(omsg, exclude=[pobj], sub=pobj, dob=this)
 # Close reverse exit too

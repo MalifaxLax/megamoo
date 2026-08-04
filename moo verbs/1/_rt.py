@@ -18,6 +18,6 @@ try:
     seconds = amount
 except NameError:
     seconds = int(args) if args else 0
-mod = getattr(this, 'rt_regen_mod', 0) or 0
-this.rt = (getattr(this, 'rt', 0) or 0) + seconds + mod
+mod = this.rt_regen_mod or 0
+this.rt = (this.rt or 0) + seconds + mod
 ticker_add(1, '_td_rt', this, f'_td_rt_{this.objnum}')

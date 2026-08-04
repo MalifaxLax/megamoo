@@ -7,7 +7,7 @@ Re-executes the player's previous command.
 Verb name: .
 """
 
-cmd = getattr(pobj, 'last_command', None)
+cmd = pobj.last_command
 if cmd:
     force(pobj, cmd)
 else:

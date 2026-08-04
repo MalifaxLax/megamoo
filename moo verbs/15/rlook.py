@@ -19,13 +19,13 @@ Display includes:
 """
 
 room = this
-desc = getattr(room, 'description', '')
-dnames = getattr(room, 'dnames', [])
-obvexits = getattr(room, 'obvexits', [])
-dexits = getattr(room, 'dexits', [])
+desc = room.description
+dnames = room.dnames
+obvexits = room.obvexits
+dexits = room.dexits
 
 # Room header: #objnum:Name
-_sr = (getattr(player, 'settings', None) or {}).get('screenreader', False)
+_sr = (player.settings or {}).get('screenreader', False)
 if _sr:
     player.msg(f"\nRoom: #{room.objnum}:{room.name}")
 else:
@@ -41,15 +41,15 @@ clist = [obj for obj in room.contents if obj.objnum != player.objnum]
 # Build furniture sitter mapping from character table props and furniture sitters
 furn_sitters = {}
 for obj in clist:
-    if getattr(obj, 'is_char', False):
-        tbl = getattr(obj, 'table', None)
+    if obj.is_char:
+        tbl = obj.table
         if tbl and isinstance(tbl, int):
             if tbl not in furn_sitters:
                 furn_sitters[tbl] = []
             if obj.objnum not in furn_sitters[tbl]:
                 furn_sitters[tbl].append(obj.objnum)
 for obj in clist:
-    sitters = getattr(obj, 'sitters', None)
+    sitters = obj.sitters
     if sitters and isinstance(sitters, list):
         room_nums = {c.objnum for c in clist}
         room_nums.add(player.objnum)
@@ -60,7 +60,7 @@ for obj in clist:
                 if s not in furn_sitters[obj.objnum]:
                     furn_sitters[obj.objnum].append(s)
 # Looker's table
-looker_tbl = getattr(player, 'table', None)
+looker_tbl = player.table
 if looker_tbl and isinstance(looker_tbl, int):
     if looker_tbl not in furn_sitters:
         furn_sitters[looker_tbl] = []
@@ -82,7 +82,7 @@ furn_lines = []
 estr = ""
 
 for obj in clist:
-    if getattr(obj, 'is_char', False):
+    if obj.is_char:
         if obj.objnum in chars_on_furn:
             continue  # Will show under furniture
         postatus = ""
@@ -91,23 +91,23 @@ for obj in clist:
         except KeyError:
             pass
         entry = f"#{obj.objnum}:{obj.noun or obj.name} {postatus}".rstrip()
-        if getattr(obj, 'hidden', False):
+        if obj.hidden:
             entry += "(hidden)"
-        elif getattr(obj, 'invis', False):
+        elif obj.invis:
             entry += "(invisible)"
         plist.append(entry)
 
-    elif getattr(obj, 'is_exit', False):
-        dest = getattr(obj, 'destination', None)
+    elif obj.is_exit:
+        dest = obj.destination
         d = f"#{dest.objnum}" if dest and hasattr(dest, 'objnum') else (f"#{dest}" if dest else "")
-        if getattr(obj, 'is_obvious', False):
+        if obj.is_obvious:
             elist.append(obj)
             nstr = f"{estr}, " if estr else ""
             estr = f"{nstr}#{obj.objnum}:{obj.name} -> {d}"
         else:
             delist.append(f"#{obj.objnum}:{obj.name} -> {d}")
 
-    elif getattr(obj, 'dark', False):
+    elif obj.dark:
         if obj.objnum not in furn_sitters:
             dlist.append(f"#{obj.objnum}:{obj.name}")
 
@@ -116,9 +116,9 @@ for obj in clist:
 
     else:
         entry = f"#{obj.objnum}:{obj.name}"
-        if getattr(obj, 'hidden', False):
+        if obj.hidden:
             entry += "(hidden)"
-        if getattr(obj, 'invis', False):
+        if obj.invis:
             entry += "(invisible)"
         olist.append(entry)
 
@@ -165,7 +165,7 @@ for o in sorted_exits:
         d = f"#{dest.objnum}" if dest and hasattr(dest, 'objnum') else (f"#{dest}" if dest else "")
         estr = f"{nstr}`{dnames[o]}`\x1b[38;5;245m(v) -> {d}"
     else:
-        dest = getattr(o, 'destination', None)
+        dest = o.destination
         d = f"#{dest.objnum}" if dest and hasattr(dest, 'objnum') else (f"#{dest}" if dest else "")
         estr = f"{nstr}#{o.objnum}:`{o.name}`\x1b[38;5;245m -> {d}"
 

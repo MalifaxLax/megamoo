@@ -34,7 +34,7 @@ parts = iobj.strip().split(None, 1)
 action = parts[0].lower()
 
 if action == 'list':
-    auth = getattr(target, 'auth', None) or []
+    auth = target.auth or []
     if auth:
         pobj.msg(f"Auth for %<245>#{target.objnum}:{target.name}%n: {', '.join(auth)}")
     else:
@@ -51,7 +51,7 @@ if level not in valid_levels:
     pobj.msg(f"Invalid level '{level}'. Valid: {', '.join(valid_levels)}")
     return
 
-auth = list(getattr(target, 'auth', None) or [])
+auth = list(target.auth or [])
 
 if action == 'add':
     if level in auth:

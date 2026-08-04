@@ -4,7 +4,7 @@ Leave the game world and return to the lobby.
 Usage: exit  |  x
 """
 
-ochar_num = getattr(pobj, 'account', None)
+ochar_num = pobj.account
 if not ochar_num:
     pobj.msg("You have no account to return to.")
     result = True
@@ -18,7 +18,7 @@ ochar = db.get_object(ochar_num)
 yield 1
 
 # Announce departure from IC room
-if not getattr(pobj, 'invis', False):
+if not pobj.invis:
     pobj.location.msg_room(f"{pobj.noun} fades from existence.", exclude=[pobj])
 
 puppet(ochar)

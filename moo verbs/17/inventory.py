@@ -5,17 +5,17 @@ Usage: inventory  |  i
 """
 
 # RT check
-if (getattr(pobj, 'rt', None) or 0) > 0:
+if pobj.rt > 0:
     pobj.msg("You must wait.")
     return
 
 # Wearing — resolve objnums to objects
-raw_wearing = getattr(pobj, 'wearing', []) or []
+raw_wearing = pobj.wearing or []
 wearing = [db.get_object(n) for n in raw_wearing if n]
 wearing = [obj for obj in wearing if obj]
 
 visible_worn = [obj for obj in wearing
-                if (obj.size or 0) > 0 and not getattr(obj, 'invis', False)]
+                if (obj.size or 0) > 0 and not obj.invis]
 
 if visible_worn:
     names = [obj.name for obj in visible_worn]
@@ -30,17 +30,17 @@ else:
         pobj.msg("You are naked, except for " + su.listtoenglish(tatnames) + ".")
 
 # Hands
-mh = getattr(pobj, 'mh', None)
+mh = pobj.mh
 if isinstance(mh, int):
     mh = db.get_object(mh)
 elif isinstance(mh, str):
     mh = None
-oh = getattr(pobj, 'oh', None)
+oh = pobj.oh
 if isinstance(oh, int):
     oh = db.get_object(oh)
 elif isinstance(oh, str):
     oh = None
-hand = getattr(pobj, 'hand', None) or ['right', 'left']
+hand = pobj.hand or ['right', 'left']
 
 if not mh and not oh:
     pobj.msg("Your hands are empty.")
@@ -58,7 +58,7 @@ else:
     pobj.msg(f"You have {oh.name} in your {hand[1]} hand.")
 
 # Staff contents — show everything not worn or held
-if getattr(pobj, 'auth', None):
+if pobj.auth:
     worn_nums = set(raw_wearing)
     held_nums = set()
     if mh and hasattr(mh, 'objnum'):

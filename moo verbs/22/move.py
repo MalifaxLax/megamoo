@@ -13,15 +13,15 @@ Properties checked:
     locklist - [lock_obj, lock_func] for access restriction.
     lockfail / olockfail - Messages shown when locked out.
 """
-if getattr(this, 'closed', 0):
+if this.closed:
     fail = getattr(this, 'failure', 'That is closed!')
     player.msg(fail)
-    ofail = getattr(this, 'ofailure', '')
-    if ofail and not getattr(player, 'invis', False):
+    ofail = this.ofailure
+    if ofail and not player.invis:
         msg_all(player.location, su.psub1(ofail, player), exclude=[player])
     return
-locklist = getattr(this, 'locklist', [])
-if locklist and not getattr(player, 'is_royal', False):
+locklist = this.locklist
+if locklist and not player.is_royal:
     lockfunc = locklist[1] if len(locklist) > 1 else None
     if lockfunc:
         call_verb(this, lockfunc)
@@ -29,8 +29,8 @@ if locklist and not getattr(player, 'is_royal', False):
     else:
         lockfail = getattr(this, 'lockfail', 'You cannot pass.')
         player.msg(lockfail)
-        olockfail = getattr(this, 'olockfail', '')
-        if olockfail and not getattr(player, 'invis', False):
+        olockfail = this.olockfail
+        if olockfail and not player.invis:
             msg_all(player.location, su.psub1(olockfail.replace('%d', this.noun or this.name), player), exclude=[player])
         return
 call_verb(this, 'gmove')

@@ -2,8 +2,8 @@
 # Returns True if the character cannot act (status/condition/RT check).
 # Usage: call_verb(pobj, 'do_wait')
 
-_status = getattr(this, 'status', None) or {}
-_condition = getattr(this, 'condition', None) or {}
+_status = this.status or {}
+_condition = this.condition or {}
 
 if _status.get('unconscious', 0):
     this.msg('You are unconscious...')
@@ -30,7 +30,7 @@ elif _condition.get('bound', 0):
     this.msg('You are tied up...')
     result = True
 elif _status.get('life', 0) and not _status.get('stunned', 0):
-    _rt = getattr(this, 'rt', 0) or 0
+    _rt = this.rt or 0
     if _rt > 0:
         this.msg(f'[Wait: {_rt} seconds]')
         result = True

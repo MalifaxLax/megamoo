@@ -6,8 +6,8 @@
 _objnum = int(args) if args else None
 if _objnum:
     _obj = db.get_object(_objnum)
-    if getattr(_obj, 'is_char', False):
-        _plist = getattr(this, 'plist', None) or []
+    if _obj.is_char:
+        _plist = this.plist or []
         if _obj in _plist:
             _plist.remove(_obj)
             this.set_property('plist', _plist, db)

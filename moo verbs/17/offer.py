@@ -54,7 +54,7 @@ glass of fire whiskey") belongs to the buy quote, not the handover.
 Plurals: any coin word printed alongside a cost gets an 's' when cost > 1.
 """
 
-pb = getattr(pobj, 'pending_buy', None) or {}
+pb = pobj.pending_buy or {}
 m_num, it_num = pb.get('merchant'), pb.get('item')
 if not m_num or not it_num:
     pobj.msg("You haven't haggled for anything yet.  Try 'buy <item>' first.")
@@ -68,12 +68,12 @@ if not merchant or not item or not getattr(item, 'existent', True):
     return
 
 # The merchant must still be the one serving this room.
-room_m = getattr(pobj.location, 'merchant', None)
-if not room_m or getattr(room_m, 'objnum', None) != merchant.objnum:
+room_m = pobj.location.merchant
+if not room_m or room_m.objnum != merchant.objnum:
     pobj.msg("There's no one here to take that offer.")
     return
 
-npcs = getattr(merchant, 'npcs', None) or {}
+npcs = merchant.npcs or {}
 npc = npcs.get(pb.get('npc')) or next(iter(npcs.values()), None)
 
 def _say(text, **subkw):
@@ -81,7 +81,7 @@ def _say(text, **subkw):
     slots that esub splices into %0/%1/... in `text`."""
     if not text:
         return
-    sp = (npc and npc.get('name')) or getattr(merchant, 'speaker', None) \
+    sp = (npc and npc.get('name')) or merchant.speaker \
         or merchant.name
     pobj.msg(sp[:1].upper() + sp[1:] + ' says, "' + text + '"', **subkw)
 
@@ -112,9 +112,9 @@ if parts:
     in_coin = ' '.join(parts[1:]).strip().lower()
 
 # ── 1. Coin check (explicit offers only; bare pays the house coin) ───
-ctypes = getattr(merchant, 'ctypes', None) or []
-coin_idx = getattr(merchant, 'coin_type', 0) or 0
-exchange = getattr(merchant, 'exchange', None) or []
+ctypes = merchant.ctypes or []
+coin_idx = merchant.coin_type or 0
+exchange = merchant.exchange or []
 accepted = ctypes[coin_idx] if coin_idx < len(ctypes) \
     else (ctypes[0] if ctypes else 'coin')
 
@@ -147,7 +147,7 @@ if offered < cost:
     return
 
 # ── 3. Funds check (must hold at least what was offered) ─────────────
-cash = list(getattr(pobj, 'cash', None) or [])
+cash = list(pobj.cash or [])
 have = cash[coin_idx] if coin_idx < len(cash) else 0
 if have < offered:
     _say(_field('cash_fail') or "Ye don't have that kind o' coin.")
@@ -220,17 +220,17 @@ else:
         _u = _mint()
         move(_u, goods)
         _in.append(_u.objnum)
-        _wsum += getattr(_u, 'weight', 0) or 0
-        _vsum += getattr(_u, 'volume', 0) or 0
+        _wsum += _u.weight or 0
+        _vsum += _u.volume or 0
     goods.in_contents = _in
     goods.current_weight_in = _wsum
     goods.current_vol = _vsum
     goods.set_property('max_items_in',
-                       max(qty, getattr(goods, 'max_items_in', 0) or 0))
+                       max(qty, goods.max_items_in or 0))
     goods.set_property('max_weight_in',
-                       max(_wsum, getattr(goods, 'max_weight_in', 0) or 0))
+                       max(_wsum, goods.max_weight_in or 0))
     goods.set_property('max_vol',
-                       max(_vsum, getattr(goods, 'max_vol', 0) or 0))
+                       max(_vsum, goods.max_vol or 0))
     goods.set_property('value', cost)
     # The box's own weight carries its cargo, so load tracking below
     # charges the buyer for the whole case (+1 for the box itself).
@@ -238,7 +238,7 @@ else:
 
 move(goods, pobj)
 call_verb(pobj, 'move_to_hand', dobj=goods)
-pobj.load = (getattr(pobj, 'load', 0) or 0) + (getattr(goods, 'weight', 0) or 0)
+pobj.load = (pobj.load or 0) + (goods.weight or 0)
 
 while len(cash) <= coin_idx:
     cash.append(0)
@@ -253,7 +253,7 @@ sell = _field('sell')
 o_sell = _field('o_sell')
 if sell:
     pobj.msg(sell, dob=goods)
-if o_sell and not getattr(pobj, 'invis', False):
+if o_sell and not pobj.invis:
     pobj.location.msg_room(o_sell, exclude=[pobj], dob=pobj, iob=goods)
 
 pobj.pending_buy = {}

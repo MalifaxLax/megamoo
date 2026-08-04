@@ -12,7 +12,7 @@ Returns:
     True  - Character is free to act.
 """
 
-rt = getattr(this, 'rt', None) or 0
+rt = this.rt or 0
 if rt > 0:
     this.msg(f'Wait: {rt} seconds.')
     return False

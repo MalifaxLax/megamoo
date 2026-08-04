@@ -21,7 +21,7 @@ if not args:
     pobj.msg("Usage: hold <object>")
     return
 
-candidates = [o for o in pobj.contents if o != getattr(pobj, 'mh', None) and o != getattr(pobj, 'oh', None)]
+candidates = [o for o in pobj.contents if o != pobj.mh and o != pobj.oh]
 item = bmatch(args, pobj, candidates)
 if not item:
     pobj.msg("You don't have that.")
@@ -33,8 +33,8 @@ if item.location.objnum != pobj.objnum:
     return
 
 # Check if already holding it
-mh = getattr(pobj, 'mh', None)
-oh = getattr(pobj, 'oh', None)
+mh = pobj.mh
+oh = pobj.oh
 if (mh and hasattr(mh, 'objnum') and mh.objnum == item.objnum) or \
    (oh and hasattr(oh, 'objnum') and oh.objnum == item.objnum):
     pobj.msg("You're already holding that.")

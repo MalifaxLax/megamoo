@@ -13,10 +13,10 @@ Context variables:
 """
 
 loc = this.location
-if not loc or not getattr(loc, 'is_room', False):
+if not loc or not loc.is_room:
     return
 
-settings = getattr(this, 'settings', {}) or {}
+settings = this.settings or {}
 if settings.get('brief', False):
     return
 

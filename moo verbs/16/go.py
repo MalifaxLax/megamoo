@@ -21,12 +21,12 @@ Verb names are set from the room's directions property.
 """
 
 room = pobj.location
-if not room or not getattr(room, 'is_room', False):
+if not room or not room.is_room:
     pobj.msg("You can't go anywhere from here.", sub=pobj, dob=dobj, iob=iobj)
     return
 
 # Check if the player is in a position that prevents movement
-pos = getattr(pobj, 'position', 0) or 0
+pos = pobj.position or 0
 if pos:
     pobj.msg("You can't do that in your current position.", sub=pobj, dob=dobj, iob=iobj)
     return
@@ -87,9 +87,9 @@ try:
 except Exception:
     pass
 # Climbable/jumpable exits require specific commands
-if getattr(exit, 'climbable', False):
+if exit.climbable:
     pobj.msg("You have to climb that!", sub=pobj, dob=dobj, iob=iobj)
-elif getattr(exit, 'jumpable', False):
+elif exit.jumpable:
     pobj.msg("You have to jump that!", sub=pobj, dob=dobj, iob=iobj)
 else:
     # Normal exit — call its invoke verb (checks closed, then gmove)

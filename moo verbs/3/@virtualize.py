@@ -26,7 +26,7 @@ if not spec:
     return
 
 room = pobj.location
-if not room or not getattr(room, 'is_room', False):
+if not room or not room.is_room:
     pobj.msg("You must be in a room.")
     return
 
@@ -49,7 +49,7 @@ while obj is not None and obj.objnum not in seen:
     if obj.objnum == 21:
         is_direxit = True
         break
-    parent = getattr(obj, 'parent', None)
+    parent = obj.parent
     if hasattr(parent, 'objnum'):
         obj = parent
     elif isinstance(parent, int) and parent >= 0:
@@ -62,7 +62,7 @@ if not is_direxit:
     return
 
 # Find the direction index by matching the exit's noun against DNAMES
-noun = getattr(target, 'noun', '') or ''
+noun = target.noun or ''
 try:
     enum = DNAMES.index(noun.lower())
 except ValueError:
@@ -70,18 +70,18 @@ except ValueError:
     return
 
 # Gather exit properties
-dest = getattr(target, 'destination', None)
+dest = target.destination
 if not dest:
     pobj.msg(f"%<245>#{target.objnum}:{target.name}%n has no destination set.")
     return
 
 dest_num = dest if type(dest) == int else dest.objnum if hasattr(dest, 'objnum') else dest
-succ = getattr(target, 'success', '') or ''
-osucc = getattr(target, 'osuccess', '') or ''
-odrop = getattr(target, 'odrop', '') or ''
+succ = target.success or ''
+osucc = target.osuccess or ''
+odrop = target.odrop or ''
 
 # Get or initialize the room's dexits list (12 direction slots)
-dexits = getattr(room, 'dexits', None) or []
+dexits = room.dexits or []
 while len(dexits) < 12:
     dexits.append(None)
 
@@ -90,7 +90,7 @@ dexits[enum] = [dest_num, succ, osucc, '', odrop, 0]
 room.dexits = dexits
 
 # Add direction index to obvexits if not already present, sorted by direction order
-obvexits = getattr(room, 'obvexits', []) or []
+obvexits = room.obvexits or []
 if enum not in obvexits:
     obvexits.append(enum)
     obvexits = sorted([e for e in obvexits if type(e) == int],
@@ -98,7 +98,7 @@ if enum not in obvexits:
     room.obvexits = obvexits
 
 # Remove the exit object from the room's exits list
-exits = getattr(room, 'exits', []) or []
+exits = room.exits or []
 if target.objnum in exits:
     exits.remove(target.objnum)
     room.exits = exits

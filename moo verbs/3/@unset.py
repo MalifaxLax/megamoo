@@ -17,7 +17,7 @@ if auth_level(pobj) < 3:
     pobj.msg("Do what?")
     return
 
-rec = getattr(pobj, '_set_undo', None)
+rec = pobj._set_undo
 if not rec:
     pobj.msg("Nothing to undo.")
     return

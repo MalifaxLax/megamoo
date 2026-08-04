@@ -58,7 +58,7 @@ if not args:
             # _resolved_verbs is keyed by every legal abbreviation,
             # so dedupe on the canonical name; this also collapses
             # aliases (@set/@val -> @set).
-            _names = getattr(vdef, 'names', None) or [vname]
+            _names = vdef.names or [vname]
             canon = _names[0]
             if (canon in _INTERNAL_EXACT
                     or canon.startswith(_INTERNAL_PREFIX)
@@ -136,7 +136,7 @@ if topic.startswith('#'):
         return
     else:
         # help #obj — show object.help_text
-        help_text = getattr(obj, 'help_text', None)
+        help_text = obj.help_text
         if not help_text:
             pobj.msg("There's no help for that.")
             return

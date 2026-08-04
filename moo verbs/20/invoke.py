@@ -10,11 +10,11 @@ Called programmatically: call_verb(exit, 'invoke')
 Note: This is the standard entry point for exit traversal. The go/n
 verbs call this after resolving the exit.
 """
-if getattr(this, 'closed', 0):
+if this.closed:
     fail = getattr(this, 'failure', 'That is closed!')
     player.msg(fail, sub=player, dob=this)
-    ofail = getattr(this, 'ofailure', '')
-    if ofail and not getattr(player, 'invis', False):
+    ofail = this.ofailure
+    if ofail and not player.invis:
         player.location.msg_room(ofail, exclude=[player], sub=player, dob=this)
     return
 call_verb(this, 'gmove')

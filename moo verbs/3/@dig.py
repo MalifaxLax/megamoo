@@ -48,7 +48,7 @@ if not parent_num:
 
 # Fetch the parent room object and verify it's actually a room
 parent = db.get_object(parent_num)
-if not getattr(parent, 'is_room', False):
+if not parent.is_room:
     pobj.msg(f"#{parent_num} is not a room type.")
     return
 

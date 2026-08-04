@@ -16,8 +16,8 @@ both slots are cleared independently.
 
 if not dobj:
     return
-mh = getattr(this, 'mh', None)
-oh = getattr(this, 'oh', None)
+mh = this.mh
+oh = this.oh
 if mh and hasattr(mh, 'objnum') and mh.objnum == dobj.objnum:
     this.mh = None
 if oh and hasattr(oh, 'objnum') and oh.objnum == dobj.objnum:

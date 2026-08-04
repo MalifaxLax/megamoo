@@ -10,7 +10,7 @@ Examples:
 You must be sitting at a table or furniture to use this command.
 """
 
-cur_table = getattr(pobj, 'table', None)
+cur_table = pobj.table
 if not cur_table:
     pobj.msg("You aren't sitting at a table.")
     return
@@ -22,7 +22,7 @@ except Exception:
     pobj.table = None
     return
 
-sitters = getattr(furn, 'sitters', None) or []
+sitters = furn.sitters or []
 if pobj.objnum not in sitters:
     pobj.msg("You aren't sitting at a table.")
     pobj.table = None

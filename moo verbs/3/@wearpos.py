@@ -63,7 +63,7 @@ if 'flex' in switches:
     if not target:
         pobj.msg("I don't see '%s' here." % obj_str)
         return
-    wear_pos = getattr(target, 'wear_pos', None) or []
+    wear_pos = target.wear_pos or []
     if not wear_pos:
         pobj.msg("%s has no wear positions." % target.name)
         return
@@ -91,7 +91,7 @@ if 'flex' in switches:
     if bad:
         pobj.msg("Position(s) not on this item: %s" % ', '.join(str(b) for b in bad))
         return
-    layer_flex = getattr(target, 'layer_flex', None) or {}
+    layer_flex = target.layer_flex or {}
     if not isinstance(layer_flex, dict):
         layer_flex = {}
     # Normalize string keys from JSON to ints
@@ -183,7 +183,7 @@ if 'layer' in switches:
     if not target:
         pobj.msg("I don't see '%s' here." % obj_str)
         return
-    wear_pos = getattr(target, 'wear_pos', None) or []
+    wear_pos = target.wear_pos or []
     if not wear_pos:
         pobj.msg("%s has no wear positions." % target.name)
         return
@@ -231,7 +231,7 @@ if 'rem' in switches:
     if not target:
         pobj.msg("I don't see '%s' here." % dobj)
         return
-    wear_pos = getattr(target, 'wear_pos', None) or []
+    wear_pos = target.wear_pos or []
     if not wear_pos:
         pobj.msg("%s has no wear positions." % target.name)
         return
@@ -314,11 +314,11 @@ else:
     if not target:
         pobj.msg("I don't see '%s' here." % dobj)
         return
-    wear_pos = getattr(target, 'wear_pos', None) or []
+    wear_pos = target.wear_pos or []
     if not wear_pos:
         pobj.msg("%s has no wear positions." % target.name)
         return
-    layer_flex = getattr(target, 'layer_flex', None) or {}
+    layer_flex = target.layer_flex or {}
     if isinstance(layer_flex, dict):
         layer_flex = {int(k): v for k, v in layer_flex.items()}
     pobj.msg(f'Wear positions on %<245>#{target.objnum}:{target.name}%n:')

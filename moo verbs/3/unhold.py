@@ -21,14 +21,14 @@ if not args:
     pobj.msg("Usage: unhold <object>")
     return
 
-candidates = [o for o in [getattr(pobj, 'mh', None), getattr(pobj, 'oh', None)] if o]
+candidates = [o for o in [pobj.mh, pobj.oh] if o]
 item = bmatch(args, pobj, candidates)
 if not item:
     return
 
 # Check if player is holding the item
-mh = getattr(pobj, 'mh', None)
-oh = getattr(pobj, 'oh', None)
+mh = pobj.mh
+oh = pobj.oh
 in_mh = mh and hasattr(mh, 'objnum') and mh.objnum == item.objnum
 in_oh = oh and hasattr(oh, 'objnum') and oh.objnum == item.objnum
 

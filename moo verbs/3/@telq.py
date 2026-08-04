@@ -29,7 +29,7 @@ dest = None
 
 # Check for 'home'
 if arg.lower() == 'home':
-    home = getattr(pobj, 'home', None)
+    home = pobj.home
     if not home:
         pobj.msg("You have no home set.")
         return
@@ -40,7 +40,7 @@ if arg.lower() == 'home':
 
 # Check for 'mark'
 elif arg.lower() == 'mark':
-    mark = getattr(pobj, 'mark', None)
+    mark = pobj.mark
     if not mark:
         pobj.msg("You have no mark set.")
         return
@@ -74,10 +74,10 @@ if not dest:
     return
 
 # Check IC/OOC boundary
-src_ic = getattr(pobj.location, 'is_icroom', False)
-src_oc = getattr(pobj.location, 'is_ocroom', False)
-dst_ic = getattr(dest, 'is_icroom', False)
-dst_oc = getattr(dest, 'is_ocroom', False)
+src_ic = pobj.location.is_icroom
+src_oc = pobj.location.is_ocroom
+dst_ic = dest.is_icroom
+dst_oc = dest.is_ocroom
 
 if (src_ic and dst_oc) or (src_oc and dst_ic):
     kind = "an OOC" if dst_oc else "an IC"
@@ -88,14 +88,14 @@ if (src_ic and dst_oc) or (src_oc and dst_ic):
 silent = (verb == '@telq')
 
 if not silent:
-    tel_msg = getattr(pobj, 'tel', None)
+    tel_msg = pobj.tel
     if tel_msg:
         pobj.location.msg_room(tel_msg)
 
 move(pobj, dest)
 
 if not silent:
-    otel_msg = getattr(pobj, 'otel', None)
+    otel_msg = pobj.otel
     if otel_msg:
         pobj.msg(otel_msg)
         dest.msg_room(otel_msg, exclude=[pobj])

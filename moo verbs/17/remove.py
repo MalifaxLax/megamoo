@@ -17,7 +17,7 @@ if not args:
     return
 
 # RT check
-if (getattr(pobj, 'rt', None) or 0) > 0:
+if pobj.rt > 0:
     pobj.msg("You must wait.")
     return
 

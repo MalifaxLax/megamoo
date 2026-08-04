@@ -16,7 +16,7 @@ if not args:
     return
 
 # RT check
-if (getattr(pobj, 'rt', None) or 0) > 0:
+if pobj.rt > 0:
     pobj.msg("You must wait.")
     return
 
@@ -59,12 +59,12 @@ if not item:
     return
 
 # Can't get exits
-if getattr(item, 'is_exit', False):
+if item.is_exit:
     pobj.msg("Get what?")
     return
 
 # Can't get characters
-if getattr(item, 'is_char', False):
+if item.is_char:
     pobj.msg("%D probably wouldn't appreciate that.", dob=item)
     return
 
@@ -79,9 +79,9 @@ if item_hands == 2 and free != 'both':
     return
 
 # Check carry capacity
-item_weight = getattr(item, 'weight', 0) or 0
-cur_load = getattr(pobj, 'load', 0) or 0
-max_load = getattr(pobj, 'max_load', 0) or 0
+item_weight = item.weight or 0
+cur_load = pobj.load or 0
+max_load = pobj.max_load or 0
 if max_load and cur_load + item_weight > max_load:
     pobj.msg("You can't pick up anything else right now.")
     return
@@ -104,5 +104,5 @@ pobj.load = cur_load + item_weight
 
 # Messages
 pobj.msg("You pick up %d.", dob=item)
-if not getattr(pobj, 'invis', False):
+if not pobj.invis:
     pobj.location.msg_room("%S picks up %d.", exclude=[pobj], sub=pobj, dob=item)

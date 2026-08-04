@@ -16,14 +16,14 @@ if not args:
     return
 
 # RT check
-if (getattr(pobj, 'rt', None) or 0) > 0:
+if pobj.rt > 0:
     pobj.msg("You must wait.")
     return
 
 # Build list of held items (what's in hands)
 holding = []
-mh = getattr(pobj, 'mh', None)
-oh = getattr(pobj, 'oh', None)
+mh = pobj.mh
+oh = pobj.oh
 if mh and hasattr(mh, 'objnum'):
     holding.append(mh)
 if oh and hasattr(oh, 'objnum'):

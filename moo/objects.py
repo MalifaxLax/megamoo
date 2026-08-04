@@ -203,10 +203,20 @@ class _NullAttr:
     Sentinel object returned when a MOO property or verb lookup fails.
 
     ``_NullAttr`` is designed to be maximally forgiving: it is falsy,
-    stringifies to the empty string, compares equal to ``None``, and
-    can be called without raising (returns ``None``).  This lets verb
-    code test for missing properties with a simple ``if obj.foo:``
-    guard instead of catching ``AttributeError``.
+    stringifies to the empty string, compares equal to ``None``, orders
+    as zero, and can be called without raising (returns ``None``).  This
+    lets verb code read a property that may not exist without guarding
+    it::
+
+        if pobj.rt > 0:            # rt need not be defined anywhere
+            pobj.msg("You must wait.")
+
+    Ordering treats a missing property as ``0``, which is what game code
+    almost always means by it: no roundtime, no damage, no stack.  It is
+    the same premise as being falsy, extended to ``<`` and ``>`` so that
+    numeric properties do not each need an ``or 0``.  Comparison against
+    a non-number returns ``NotImplemented`` and so still raises, because
+    ``obj.name > 5`` is a real mistake rather than a missing value.
 
     A single module-level instance (``_null_attr``) is reused for all
     missing-property returns to avoid unnecessary allocations.
@@ -222,6 +232,26 @@ class _NullAttr:
     def __str__(self): return ''
     def __eq__(self, other): return other is None or isinstance(other, _NullAttr)
     def __hash__(self): return hash(None)
+
+    # Ordering: a missing numeric property behaves as 0.  bool is excluded
+    # deliberately -- it is an int subclass, but `obj.flag > True` is not a
+    # numeric comparison anyone means to make.
+    def _as_zero(self, other):
+        if isinstance(other, bool) or not isinstance(other, (int, float)):
+            return NotImplemented
+        return 0
+    def __lt__(self, other):
+        z = self._as_zero(other)
+        return NotImplemented if z is NotImplemented else z < other
+    def __le__(self, other):
+        z = self._as_zero(other)
+        return NotImplemented if z is NotImplemented else z <= other
+    def __gt__(self, other):
+        z = self._as_zero(other)
+        return NotImplemented if z is NotImplemented else z > other
+    def __ge__(self, other):
+        z = self._as_zero(other)
+        return NotImplemented if z is NotImplemented else z >= other
 
 # Module-level singleton -- every missing-property lookup returns this
 # same object rather than creating a new one each time.

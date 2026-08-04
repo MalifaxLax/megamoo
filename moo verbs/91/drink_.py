@@ -30,7 +30,7 @@ this.uses = uses
 
 # Apply effects
 effects_per_bite = getattr(this, 'effects_per_bite', True)
-effects = getattr(this, 'effects', None) or []
+effects = this.effects or []
 if effects and (effects_per_bite or uses < 1):
     chance = getattr(this, 'effect_chance', 100) or 100
     if _random.randint(1, 100) <= chance:
@@ -38,8 +38,8 @@ if effects and (effects_per_bite or uses < 1):
 
 # Drinking messages (while uses remain)
 if uses > 0:
-    prepared = getattr(this, 'prepared', False)
-    emits = getattr(this, 'eemits', None) or []
+    prepared = this.prepared
+    emits = this.eemits or []
     if emits and len(emits) >= 4:
         ind = 0 if prepared else 2
         pmsgs = emits[ind] or []
@@ -55,15 +55,15 @@ if uses > 0:
         pobj.location.msg_room("%S drinks %d.", exclude=[pobj], sub=pobj, dob=this)
 
 # Apply round time (before potential recycle)
-rt_dice = getattr(this, 'rt_dice', None) or [1, 7, 0]
+rt_dice = this.rt_dice or [1, 7, 0]
 rt = dice(rt_dice[0], rt_dice[1], rt_dice[2] if len(rt_dice) > 2 else 0)
 call_verb(pobj, '_rt', amount=rt)
 
 if uses == 1:
     pobj.msg("It's almost all gone!")
 elif uses < 1:
-    finish = getattr(this, 'finish', None) or "You drink the last drop of %d."
-    ofinish = getattr(this, 'ofinish', None) or "%S drinks the last drop of %d."
+    finish = this.finish or "You drink the last drop of %d."
+    ofinish = this.ofinish or "%S drinks the last drop of %d."
     pobj.msg(finish, sub=pobj, dob=this)
     pobj.location.msg_room(ofinish, exclude=[pobj], sub=pobj, dob=this)
     call_verb(pobj, 'clear_hand', dobj=this)

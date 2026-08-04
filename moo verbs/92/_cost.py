@@ -22,10 +22,10 @@ it = citem
 q = cqty or 1
 
 # Base value: the item itself, or the liquid it holds.
-val = getattr(it, 'value', None)
+val = it.value
 if val is None:
-    lt = getattr(it, 'ltype', None)
-    val = getattr(lt, 'value', 0) if (lt and hasattr(lt, 'objnum')) else 0
+    lt = it.ltype
+    val = lt.value if (lt and hasattr(lt, 'objnum')) else 0
 val = val or 0
 
 def _mod(table, key):
@@ -33,16 +33,16 @@ def _mod(table, key):
         return 1.0
     return table.get(key, 1.0) or 1.0
 
-race_mod = _mod(getattr(this, 'race_mods', None), getattr(pobj, 'race', None))
-guild_mod = _mod(getattr(this, 'guild_mods', None),
-                 getattr(pobj, 'guild', None) or getattr(pobj, 'charclass', None))
+race_mod = _mod(this.race_mods, pobj.race)
+guild_mod = _mod(this.guild_mods,
+                 pobj.guild or pobj.charclass)
 
-char_mods = getattr(this, 'char_mods', None) or {}
+char_mods = this.char_mods or {}
 char_mod = char_mods.get('mod_%d' % pobj.objnum, 1) or 1  # first-timer => 1.0
 
 # Trading skill discounts the price, down to a floor.  Both knobs are
 # overridable per merchant.
-skill_bonus = getattr(pobj, 'skill_bonus', None) or {}
+skill_bonus = pobj.skill_bonus or {}
 trading = skill_bonus.get('trading', 0) or 0
 rate = getattr(this, 'trade_rate', 0.01) or 0.0
 floor = getattr(this, 'trade_floor', 0.50) or 0.0

@@ -15,13 +15,13 @@ types 'look' or 'l' with no arguments. Displays:
 """
 
 room = this
-desc = getattr(room, 'description', '')
-dnames = getattr(room, 'dnames', [])
-obvexits = getattr(room, 'obvexits', [])
+desc = room.description
+dnames = room.dnames
+obvexits = room.obvexits
 
 # Room name in dark gray (leader=True adds a leading blank line by default)
 _leader = "\n" if locals().get('leader', True) else ""
-_sr = (getattr(player, 'settings', None) or {}).get('screenreader', False)
+_sr = (player.settings or {}).get('screenreader', False)
 if _sr:
     player.msg(f"{_leader}Room: {room.name}")
 else:
@@ -36,9 +36,9 @@ all_contents = [obj for obj in room.contents if obj.objnum != player.objnum]
 
 # Visible contents (not invis, hidden, or dark)
 visible = [obj for obj in all_contents
-           if not getattr(obj, 'invis', False)
-           and not getattr(obj, 'hidden', False)
-           and not getattr(obj, 'dark', False)]
+           if not obj.invis
+           and not obj.hidden
+           and not obj.dark]
 
 # Build furniture sitter mapping from character table properties
 # AND from furniture sitters lists (furniture may be dark)
@@ -47,8 +47,8 @@ furn_sitters = {}
 
 # Check character table properties
 for obj in all_contents:
-    if getattr(obj, 'is_char', False):
-        tbl = getattr(obj, 'table', None)
+    if obj.is_char:
+        tbl = obj.table
         if tbl and isinstance(tbl, int):
             if tbl not in furn_sitters:
                 furn_sitters[tbl] = []
@@ -57,7 +57,7 @@ for obj in all_contents:
 
 # Also check furniture sitters lists (catches all cases)
 for obj in all_contents:
-    sitters = getattr(obj, 'sitters', None)
+    sitters = obj.sitters
     if sitters and isinstance(sitters, list):
         room_nums = {c.objnum for c in all_contents}
         room_nums.add(player.objnum)
@@ -69,7 +69,7 @@ for obj in all_contents:
                     furn_sitters[obj.objnum].append(s)
 
 # Also check the looker's table
-looker_tbl = getattr(player, 'table', None)
+looker_tbl = player.table
 if looker_tbl and isinstance(looker_tbl, int):
     if looker_tbl not in furn_sitters:
         furn_sitters[looker_tbl] = []
@@ -88,17 +88,17 @@ furn_lines = []
 
 # Collect obvious exits from ALL contents (exits are typically dark)
 for obj in all_contents:
-    if getattr(obj, 'is_exit', False) and getattr(obj, 'is_obvious', False):
+    if obj.is_exit and obj.is_obvious:
         elist.append(obj.name)
 
 for obj in visible:
-    if getattr(obj, 'is_char', False):
+    if obj.is_char:
         if obj.objnum in chars_on_furn:
             continue  # Will show under furniture
-        pos = getattr(obj, 'position', 0) or 0
+        pos = obj.position or 0
         cname = obj.noun or obj.name
         if pos:
-            pstrings = getattr(obj, 'position_strings', None) or []
+            pstrings = obj.position_strings or []
             pstring = pstrings[pos] if pos < len(pstrings) else ''
             if pstring:
                 pstring = su.esub(pstring, sub=obj)
@@ -107,7 +107,7 @@ for obj in visible:
                 plist.append(cname)
         else:
             plist.append(cname)
-    elif not getattr(obj, 'is_exit', False):
+    elif not obj.is_exit:
         olist.append(obj.name)
 
 # Build furniture lines (furniture may be dark, look it up by objnum)
@@ -118,7 +118,7 @@ for furn_num, sitter_nums in furn_sitters.items():
             continue  # Don't list looker in furniture sitters
         try:
             schar = db.get_object(snum)
-            if getattr(schar, 'invis', False):
+            if schar.invis:
                 continue
             snames.append(schar.noun or schar.name)
         except Exception:

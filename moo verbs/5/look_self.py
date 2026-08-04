@@ -30,12 +30,12 @@ for line in desclist:
         viewer.msg(line)
 
 # 2. Character description
-desc = getattr(char, 'description', '')
+desc = char.description
 if desc:
     viewer.msg(desc)
 
 # 3. Visible worn items
-wearing = getattr(char, 'wearing', []) or []
+wearing = char.wearing or []
 clothing = []
 accessories = []
 
@@ -64,8 +64,8 @@ if accessories:
     viewer.msg(f"{char.cname} has {su.listtoenglish(accessories)}.")
 
 # 4. Held items
-mh = getattr(char, 'mh', None)
-oh = getattr(char, 'oh', None)
+mh = char.mh
+oh = char.oh
 mh_valid = mh and hasattr(mh, 'objnum')
 oh_valid = oh and hasattr(oh, 'objnum')
 

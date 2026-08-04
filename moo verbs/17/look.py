@@ -44,7 +44,7 @@ if prep:
 # Build search list: room contents + hands + wearing (resolved)
 slist = list(loc.contents)
 slist += [x for x in [pobj.mh, pobj.oh] if x]
-wearing = getattr(pobj, 'wearing', []) or []
+wearing = pobj.wearing or []
 for wnum in wearing:
     try:
         wobj = db.get_object(wnum)
@@ -69,15 +69,15 @@ if not obj:
 
     if result is not None:
         if type(result) == int:
-            dexits = getattr(loc, 'dexits', [])
+            dexits = loc.dexits
             if result < len(dexits) and dexits[result]:
                 dest_num = dexits[result][0]
                 try:
                     dest = db.get_object(dest_num)
-                    directions = getattr(loc, 'directions', [])
+                    directions = loc.directions
                     dname = directions[result + 12] if result + 12 < len(directions) else str(result)
                     pobj.msg(f"You look to the {dname}.")
-                    ddesc = getattr(dest, 'description', '')
+                    ddesc = dest.description
                     if ddesc:
                         pobj.msg(ddesc)
                     else:
@@ -88,7 +88,7 @@ if not obj:
                 pobj.msg("You can't see anything that way.")
         else:
             pobj.msg(f"You look toward {result.name}.")
-            rdesc = getattr(result, 'description', '')
+            rdesc = result.description
             if rdesc:
                 pobj.msg(rdesc)
             else:
@@ -101,7 +101,7 @@ if not obj:
 
 # Preposition look: look in/on/under/behind <object>
 if _prep:
-    if getattr(obj, 'is_char', False):
+    if obj.is_char:
         pobj.msg("Perv.")
         return
     if obj == loc:
@@ -128,15 +128,15 @@ except KeyError:
 # Fallback
 if obj == loc:
     call_verb(loc, 'look_here', leader=False)
-elif getattr(obj, 'is_char', False):
+elif obj.is_char:
     try:
         call_verb(obj, 'look_self')
         return
     except KeyError:
         pass
     pobj.msg("You see nothing special.")
-elif not (getattr(obj, 'invis', False) or getattr(obj, 'hidden', False)):
-    desc = getattr(obj, 'description', None)
+elif not (obj.invis or obj.hidden):
+    desc = obj.description
     pobj.msg(f"\n{obj.name}")
     pobj.msg(desc if desc else "You see nothing special.")
 else:

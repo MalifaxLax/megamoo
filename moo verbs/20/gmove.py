@@ -24,7 +24,7 @@ Expected properties on this (exit):
 """
 
 # Resolve destination (may be int, '#N' string, or MOOObject)
-dest = getattr(this, 'destination', None)
+dest = this.destination
 if not dest:
     player.msg("You've just found a bad exit. Please bugrep it.", sub=player, dob=this)
     return
@@ -39,8 +39,8 @@ if not dest or not dest.has_property('is_room', database=db):
     return
 
 # Determine movement mode based on player position (standing, crawling, etc.)
-pos = getattr(player, 'position', 0) or 0
-walk = getattr(player, 'walk', None)
+pos = player.position or 0
+walk = player.walk
 if walk and pos == 0:
     # Player has a custom walk style override
     mode, omode = walk[0], walk[1]
@@ -52,10 +52,10 @@ else:
     omode = omodes[pos] if pos < len(omodes) else 'walks'
 
 # Get message templates and substitute placeholders
-succ = getattr(this, 'success', '') or ''
-osucc = getattr(this, 'osuccess', '') or ''
-drop = getattr(this, 'drop', '') or ''
-odrop = getattr(this, 'odrop', '') or ''
+succ = this.success or ''
+osucc = this.osuccess or ''
+drop = this.drop or ''
+odrop = this.odrop or ''
 
 # Replace %MODE/%OMODE with movement verbs, %d with exit name
 succ = succ.replace('%MODE', mode).replace('%d', this.name or this.noun)
@@ -64,8 +64,8 @@ drop = drop.replace('%MODE', mode)
 odrop = odrop.replace('%OMODE', omode)
 
 # Check visibility flags
-invis = getattr(player, 'invis', False)
-hidden = getattr(player, 'hidden', False)
+invis = player.invis
+hidden = player.hidden
 
 old_loc = player.location
 

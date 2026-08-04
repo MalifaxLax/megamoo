@@ -46,9 +46,9 @@ else:
 loc = obj.location
 if loc and hasattr(loc, 'objnum'):
     pobj.msg(f"Location:     #{loc.objnum},  {loc.name}")
-    cloc = getattr(loc, 'location', None)
+    cloc = loc.location
     while cloc and hasattr(cloc, 'objnum'):
-        ploc = getattr(cloc, 'location', None)
+        ploc = cloc.location
         if ploc and hasattr(ploc, 'objnum'):
             pobj.msg(f"              #{cloc.objnum} Location: {ploc.name}")
         else:

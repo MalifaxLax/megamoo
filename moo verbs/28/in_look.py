@@ -16,7 +16,7 @@ if not this.open:
     pobj.msg("%D is closed.", dob=this)
     return True
 
-ltype = getattr(this, 'ltype', None)
+ltype = this.ltype
 has_ltype = ltype and hasattr(ltype, 'objnum')
 
 # Resolve in_contents objnums to objects
@@ -31,8 +31,8 @@ if visible and has_ltype:
 elif has_ltype:
     # Show fill level from flist
     uses = getattr(this, 'uses', 1) or 1
-    cuses = getattr(this, 'cuses', 0) or 0
-    flist = getattr(this, 'flist', None) or []
+    cuses = this.cuses or 0
+    flist = this.flist or []
     if flist and uses > 0:
         idx = round(cuses / uses * (len(flist) - 1))
         idx = max(0, min(idx, len(flist) - 1))

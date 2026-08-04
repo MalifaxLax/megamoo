@@ -28,7 +28,7 @@ else:
     if not target:
         pobj.msg(f"Object '{dobj}' not found.")
     else:
-        nml = getattr(target, 'name_mod_list', None)
+        nml = target.name_mod_list
         if nml:
             nml = list(nml)  # local copy (don't mutate inherited)
         else:

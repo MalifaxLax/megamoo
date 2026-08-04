@@ -51,7 +51,7 @@ if answer.strip() != 'YES':
     return
 
 # Gather characters
-chars = getattr(account, 'characters', None) or []
+chars = account.characters or []
 storage = db.get_object(8)
 
 for c in list(chars):

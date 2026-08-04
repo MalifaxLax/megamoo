@@ -11,7 +11,7 @@ Requires the room to have 'mark_ok' set and respects pobj.max_marks.
 """
 
 if 'list' in switches:
-    marks = getattr(pobj, 'marks', None) or []
+    marks = pobj.marks or []
     if not marks:
         pobj.msg("You have no marks.")
         return
@@ -24,12 +24,12 @@ if 'list' in switches:
     return
 
 loc = pobj.location
-if not getattr(loc, 'mark_ok', False):
+if not loc.mark_ok:
     pobj.msg("You can't mark this place.")
     return
 
-marks = list(getattr(pobj, 'marks', None) or [])
-max_marks = getattr(pobj, 'max_marks', 0) or 0
+marks = list(pobj.marks or [])
+max_marks = pobj.max_marks or 0
 if max_marks and len(marks) >= max_marks:
     pobj.msg(f"You can only have {max_marks} marks.")
     return

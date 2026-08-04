@@ -3,8 +3,8 @@
 # Adds this character to the room's plist.
 
 _room = this.location
-if _room and getattr(this, 'is_char', False):
-    _plist = getattr(_room, 'plist', None) or []
+if _room and this.is_char:
+    _plist = _room.plist or []
     if this not in _plist:
         _plist.append(this)
         _room.set_property('plist', _plist, db)

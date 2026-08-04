@@ -15,25 +15,25 @@ if not args:
     return
 
 # RT check
-if (getattr(pobj, 'rt', None) or 0) > 0:
+if pobj.rt > 0:
     pobj.msg("You must wait.")
     return
 
-pos = getattr(pobj, 'position', 0) or 0
+pos = pobj.position or 0
 if pos:
     pobj.msg("You can't do that in your current position.")
     return
 
 # Match exit in room contents
 exit = pmatch(dobj, pobj, list(pobj.location.contents))
-if not exit or not getattr(exit, 'is_exit', False):
+if not exit or not exit.is_exit:
     pobj.msg("Jump what?")
     return
 
 # Check if it's a jumpable exit
-if getattr(exit, 'jumpable', False):
+if exit.jumpable:
     call_verb(exit, 'invoke')
-elif getattr(exit, 'climbable', False):
+elif exit.climbable:
     pobj.msg("You have to climb that!")
 else:
     pobj.msg("You can't jump that!")

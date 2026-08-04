@@ -13,14 +13,14 @@ Returns True to indicate the action was handled.
 """
 
 item = this
-desc = getattr(item, 'description', None)
+desc = item.description
 
 pobj.msg(f"\n{item.name}")
 if desc:
     pobj.msg(desc)
 
 # Show occupants
-sitters = getattr(item, 'sitters', None) or []
+sitters = item.sitters or []
 if sitters and pobj.location:
     here = [obj.objnum for obj in pobj.location.contents]
     sitters = [s for s in sitters if s in here]
@@ -29,8 +29,8 @@ if sitters and pobj.location:
     for objnum in sitters:
         try:
             char = db.get_object(objnum)
-            pos = getattr(char, 'position', 0) or 0
-            pstrings = getattr(char, 'position_strings', None) or []
+            pos = char.position or 0
+            pstrings = char.position_strings or []
             if pos < len(pstrings):
                 pstring = pstrings[pos]
             elif pos == 6:

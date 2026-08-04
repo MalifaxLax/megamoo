@@ -27,16 +27,16 @@ if not args:
     return
 
 room = pobj.location
-if not room or not getattr(room, 'is_room', False):
+if not room or not room.is_room:
     pobj.msg("You must be in a room to create an exit.")
     return
 
 # Get direction data from the room's inherited properties
-dnames = getattr(room, 'dnames', [])
-fdnames = getattr(room, 'fdnames', [])
-rfdnames = getattr(room, 'rfdnames', [])
-daliases = getattr(room, 'daliases', [])
-directions = getattr(room, 'directions', [])
+dnames = room.dnames
+fdnames = room.fdnames
+rfdnames = room.rfdnames
+daliases = room.daliases
+directions = room.directions
 
 # Validate the direction name against the room's directions list
 direction = dobj.strip().lower() if dobj else args.strip().split()[0].lower()
@@ -52,7 +52,7 @@ if dnum > 11:
 name = dnames[dnum] if dnum < len(dnames) else direction
 
 # Check if an exit already exists in this direction
-exits = getattr(room, 'exits', []) or []
+exits = room.exits or []
 for ex in exits:
     if hasattr(ex, 'noun') and ex.noun == name:
         pobj.msg(f"An exit named '{name}' already exists here.")
@@ -64,7 +64,7 @@ dest_str = iobj.strip() if iobj else ''
 if dest_str and dest_str.startswith('#') and dest_str[1:].isdigit():
     try:
         dest = db.get_object(int(dest_str[1:]))
-        if not getattr(dest, 'is_room', False):
+        if not dest.is_room:
             pobj.msg("Destination is not a room. Exit not linked.")
             dest = None
     except:
@@ -86,7 +86,7 @@ if dnum < len(daliases):
     new_exit.add_property('daliases', daliases[dnum], perms='rc')
 
 # Add to obvexits list
-obvexits = getattr(room, 'obvexits', []) or []
+obvexits = room.obvexits or []
 obvexits.append(new_exit.objnum)
 room.obvexits = obvexits
 room._mark_modified()
