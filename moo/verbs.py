@@ -288,7 +288,25 @@ def preprocess_verb_code(code: str) -> str:
     # Empty lines are left blank to preserve line-number alignment.
     lines = processed.split('\n')
     indented = '\n'.join('    ' + line if line.strip() else '' for line in lines)
-    return f'def _verb_():\n{indented}\nresult = _verb_()'
+
+    # Honour both ways a verb can answer its caller:
+    #
+    #   return X        -- returns immediately, as Python does
+    #   result = X      -- the documented MOO-style idiom
+    #
+    # The second needs help. Verb code runs inside a function, so a bare
+    # ``result = X`` binds a local that is discarded when the function
+    # returns None. Verbs written that way -- do_wait among them -- were
+    # silently answering None to every caller, which turned guards like
+    # ``if call_verb(pobj, 'do_wait'):`` into no-ops that still printed
+    # their message, so they looked as though they worked.
+    #
+    # The trailing lookup runs only when control falls off the end, so an
+    # explicit ``return`` still wins. It is appended rather than paired
+    # with a prologue assignment so verb line numbers stay aligned with
+    # tracebacks.
+    tail = "    return locals().get('result')"
+    return f'def _verb_():\n{indented}\n{tail}\nresult = _verb_()'
 
 
 # ===========================================================================
