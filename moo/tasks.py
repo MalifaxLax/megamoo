@@ -376,12 +376,26 @@ class Task:
         automatically detect when the suspension expires and re-dispatch
         the task.
 
-        This is used by the ``suspend(seconds)`` builtin available in
-        verb code, e.g.::
+        .. warning::
 
-            notify(player, "You begin meditating...")
-            suspend(5)
-            notify(player, "You feel refreshed.")
+            This is the *scheduling* half of suspension only, and there is
+            no ``suspend()`` builtin -- verb code cannot reach this.  An
+            earlier version of this docstring claimed otherwise and showed
+            a verb resuming on the line after ``suspend(5)``, which has
+            never worked and misled at least one reader.
+
+            A ``Task`` carries no continuation: no saved stack, no resume
+            point.  Re-dispatching one therefore restarts its code from the
+            top rather than continuing where it left off, so MOO-style
+            ``suspend`` cannot be built on this alone.  Implementing it
+            means parking the verb's real execution state somewhere -- a
+            thread holding a baton, or a coroutine -- and that is a
+            substantial change, not a missing wrapper.
+
+            What verb code has today: ``pause(n)`` blocks the whole server
+            for n seconds (capped at 30), and ``delay(n, code)`` /
+            ``fork(n, code)`` schedule a *fresh* task from a code string
+            without blocking.  Neither resumes the calling verb.
 
         Args:
             seconds: Number of seconds to suspend. May be fractional
