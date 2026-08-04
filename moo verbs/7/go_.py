@@ -349,6 +349,18 @@ def _run_chargen():
         # IC room named by $globals.ic_dropin_room on first entry.
         _set(ichar, 'last_location', 0)
 
+        # Start alive and able to act.
+        #
+        # do_wait only consults roundtime for a character whose status
+        # carries a truthy 'life', so without this a new character is
+        # never gated by rt at all. status is a dict: it has to be
+        # reassigned, not mutated in place, or the write never reaches
+        # the database (see _tick_down.py).
+        _status = dict(ichar.status or {})
+        _status['life'] = 1
+        _set(ichar, 'status', _status)
+        _set(ichar, 'rt', 0)
+
         # Mark chargen complete
         _set(ichar, 'chargen_step', None)
 
