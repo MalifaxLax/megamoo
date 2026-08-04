@@ -56,6 +56,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from .objects import MOOObject, ObjectFlags
+from .globals import SERVER_VERSION
 from .globals import PASSWORD_PROMPT_RE  # noqa: F401  (re-exported for callers)
 
 if TYPE_CHECKING:
@@ -330,12 +331,15 @@ class LoginHandler:
         # be carrying attributes from a previous session.
         screen = load_display_screen(self.config)
         await send('\x1b[0m' + screen, raw=True)
-        _globals = self.database.get_object(0).globals
-        if type(_globals) == int:
-            _globals = self.database.get_object(_globals)
-        _version = getattr(_globals, 'version', '') if _globals else ''
-        if _version:
-            await send(f"%<245>({_version})%n")
+        # Sent apart from the banner, and not raw: the splash goes out raw
+        # so its ASCII art survives untouched, which also means colour codes
+        # in it would print literally.  This line needs the dim grey.
+        #
+        # It used to read a version property off the in-world Globals
+        # object, which held 'beta 0.7.0' -- an engine version copied into
+        # the database once and left to rot, so a 0.9 server introduced
+        # itself as 0.7.  SERVER_VERSION cannot drift.
+        await send(f"%<245>({SERVER_VERSION})%n")
         await send("")
 
         for _ in range(max_attempts):
