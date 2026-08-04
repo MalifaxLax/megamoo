@@ -181,8 +181,11 @@ def make_pass(this, verb_name, call_verb, db):
         parent to pass to (mirroring MOO, where passing from a verb with no
         parent definition is a no-op rather than an error).
         """
-        parent = getattr(this, 'parent', None)
-        if parent is None:
+        # Falsiness rather than `is None`: an unset property reads as the
+        # _null_attr sentinel, which is falsy but is *not* None, and a root
+        # object records its parent as 0.  Both mean "nothing to pass to".
+        parent = this.parent
+        if not parent:
             return None
 
         # A parent recorded as a bare object number still needs resolving.

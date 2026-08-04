@@ -213,7 +213,7 @@ def make_exit(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
     # Place in room
     if room:
         new_exit.move_to(room, db)
-        exits = getattr(room, 'exits', None) or []
+        exits = room.exits or []
         exits.append(new_exit.objnum)
         room.exits = exits
         room._mark_modified()

@@ -85,7 +85,7 @@ def _exits_of(room, dnames):
     Reads ``dexits`` -- entry *i* is ``[dest, ...messages]`` or empty --
     and skips anything that is not a usable destination number.
     """
-    dexits = getattr(room, 'dexits', None) or []
+    dexits = room.dexits or []
     for index, entry in enumerate(dexits):
         if index >= len(dnames) or not entry:
             continue
@@ -95,7 +95,7 @@ def _exits_of(room, dnames):
 
 
 def _is_room(obj):
-    return bool(getattr(obj, 'is_room', False))
+    return bool(obj.is_room)
 
 
 def _free_cell(taken, x, y, z):

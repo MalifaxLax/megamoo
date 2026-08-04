@@ -305,7 +305,7 @@ class SearchIndex:
                     word_idx[word].add(n)
 
             # Index all aliases
-            for alias in getattr(obj, 'aliases', []):
+            for alias in (obj.aliases or []):
                 alias_low = alias.lower().strip()
                 if alias_low:
                     alias_idx[alias_low].add(n)

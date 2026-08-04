@@ -274,7 +274,10 @@ def resolve_repeat(player_obj, command: str) -> Optional[str]:
         only the caller knows how its own prompt works.
     """
     if command.strip() == '.':
-        return getattr(player_obj, 'last_command', None) or None
+        # `or None` is load-bearing: an unset property reads as the falsy
+        # _null_attr sentinel, and the caller tests `is None`, which the
+        # sentinel fails.  Collapse it to a real None.
+        return player_obj.last_command or None
     player_obj.last_command = command
     return command
 

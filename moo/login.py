@@ -487,7 +487,7 @@ class LoginHandler:
         pool = self.database.get_object(self.PLAYER_POOL)
         player = None
         for obj in pool.contents:
-            if getattr(obj, 'name', None) == 'PlayerPlace':
+            if obj.name == 'PlayerPlace':
                 player = obj
                 break
 

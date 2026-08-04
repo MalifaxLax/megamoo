@@ -686,7 +686,7 @@ def pmatch(inp: str, pobj: MOOObject,
             return None
         # Filter candidates to only those located inside the player
         my_items = [obj for obj in candidates
-                    if getattr(getattr(obj, 'location', None), 'objnum', None) == pobj.objnum]
+                    if getattr(obj.location, 'objnum', None) == pobj.objnum]
         return match(text, my_items) if my_items else None
 
     # --- Keywords only: "me" and "here" (no #N or $name) ---

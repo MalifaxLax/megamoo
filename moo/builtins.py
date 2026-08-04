@@ -895,7 +895,7 @@ def _send_room_gmcp(obj, dest_num):
         obj (MOOObject): The object that just moved.
         dest_num (int): The destination room's object number.
     """
-    if not getattr(obj, 'is_char', False) and not getattr(obj, 'is_player', False):
+    if not obj.is_char and not obj.is_player:
         return
     try:
         from .network import get_connection_for_player
@@ -908,8 +908,8 @@ def _send_room_gmcp(obj, dest_num):
             return
         room = _database.get_object(dest_num)
         # Build exit list from directional exits (dnames/obvexits)
-        dnames = getattr(room, 'dnames', []) or []
-        obvexits = getattr(room, 'obvexits', []) or []
+        dnames = (room.dnames or [])
+        obvexits = (room.obvexits or [])
         exits = []
         for idx in obvexits:
             if isinstance(idx, int) and idx < len(dnames):
@@ -921,8 +921,8 @@ def _send_room_gmcp(obj, dest_num):
                     c = _database.get_object(c)
                 except Exception:
                     continue
-            if getattr(c, 'is_exit', False) and getattr(c, 'is_obvious', False):
-                exits.append(getattr(c, 'name', ''))
+            if c.is_exit and c.is_obvious:
+                exits.append((c.name or ''))
         # ``num`` is the room's identity, which is what lets a client map
         # the world exactly rather than guessing from room names (which
         # repeat).  ``coords`` is its cell in the canonical layout derived
@@ -939,11 +939,11 @@ def _send_room_gmcp(obj, dest_num):
         from .roommap import coords_for
         conn.send_gmcp_sync('Room.Info', {
             'num': dest_num,
-            'name': getattr(room, 'name', ''),
-            'desc': getattr(room, 'description', ''),
+            'name': (room.name or ''),
+            'desc': (room.description or ''),
             'exits': exits,
             'coords': coords_for(_database, dest_num),
-            'ic': bool(getattr(room, 'is_icroom', False)),
+            'ic': bool(room.is_icroom),
         })
     except Exception:
         pass
@@ -1889,7 +1889,7 @@ def notify(player, message, sub=None, dob=None, iob=None, uob=None, svals=None):
     # Fall back to the player's account connection if the character
     # itself has no direct connection.
     if conn is None:
-        account = getattr(player_obj, 'account', None)
+        account = player_obj.account
         if account is not None and hasattr(account, 'objnum'):
             conn = get_connection_for_player(account.objnum)
     if conn:
