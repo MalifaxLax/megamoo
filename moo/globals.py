@@ -416,7 +416,7 @@ LOGIN_ROOM = 14
 DEFAULT_SERVER_NAME = 'MegaMOO Server'
 
 # Server version (imported from __init__.py)
-SERVER_VERSION = 'beta 0.7.1'
+SERVER_VERSION = 'beta 0.7.2'
 
 DATABASE_VERSION = 'alpha 0.0.5'
 
