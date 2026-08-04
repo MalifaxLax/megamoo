@@ -17,7 +17,12 @@ if auth_level(pobj) < 3:
     pobj.msg("Do what?")
     return
 
-rec = pobj._set_undo
+# getattr, not `pobj._set_undo`: an underscore name is a Python instance
+# attribute rather than a MOO property, so a missing one raises instead of
+# returning the falsy sentinel.  Before the session's first @set there is
+# nothing here at all, and reading it directly blew up rather than saying
+# "Nothing to undo."
+rec = getattr(pobj, '_set_undo', None)
 if not rec:
     pobj.msg("Nothing to undo.")
     return
