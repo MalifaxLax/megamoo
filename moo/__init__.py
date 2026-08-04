@@ -7,7 +7,6 @@ Copyright (c) 2026
 License: MIT
 """
 
-__version__ = '1.0.0'
 __author__ = 'MegaMOO Contributors'
 __license__ = 'MIT'
 

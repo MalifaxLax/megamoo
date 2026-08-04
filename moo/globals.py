@@ -252,9 +252,6 @@ MAX_PROPERTIES_PER_OBJECT = 1000
 #
 # Configuration for the disk-backed object database (``moo.database``).
 
-# Database version -- stored in ``index.json`` and checked at load time.
-DATABASE_VERSION = "1.0"
-
 # Checkpoint interval (seconds) -- how often the server creates a full
 # compressed snapshot of the database.
 DEFAULT_CHECKPOINT_INTERVAL = 300  # 5 min
@@ -423,9 +420,7 @@ LOGIN_ROOM = 14
 DEFAULT_SERVER_NAME = 'MegaMOO Server'
 
 # Server version (imported from __init__.py)
-SERVER_VERSION = 'beta 0.8.0'
-
-DATABASE_VERSION = 'alpha 0.0.5'
+SERVER_VERSION = '0.9.0-beta'
 
 # Server description
 SERVER_DESCRIPTION = 'A Python implementation of LambdaMOO'

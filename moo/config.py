@@ -53,6 +53,7 @@ Copyright (c) 2026
 License: MIT
 """
 
+from .globals import SERVER_VERSION
 import json
 import os
 from pathlib import Path
@@ -366,7 +367,7 @@ class ServerConfig:
     dev: DevConfig = field(default_factory=DevConfig)
 
     server_name: str = 'MegaMOO Server'
-    version: str = '1.0.0'
+    version: str = SERVER_VERSION
     motd: str = 'Welcome to MegaMOO!'
     login_welcome: str = ''
     display_screen: str = ''  # Path to text file shown before login prompt

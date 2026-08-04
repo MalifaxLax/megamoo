@@ -162,9 +162,15 @@ DEFAULT_SCREEN = r"""
  \___ \   __ \    _` |   _` |   _ \ \ \  \   /  |     _` |  |  |
        |  | | |  (   |  (   |  (   | \ \  \ /   __|  (   |  |  |
  _____/  _| |_| \__,_| \__,_| \___/   \_/\_/   _|   \__,_| _| _|
-(alpha v. 0.0.5)
-
 """
+# No version in the art: the number that used to be here was a database
+# version for a world this does not ship, and it had gone stale anyway.
+#
+# Note also that this fallback banner reads "Welcome to Shadowfall", the
+# development world it came from.  It is only reached when neither
+# config.display_screen nor display_screen.txt is present, and the shipped
+# display_screen.txt does say MegaMOO -- but it is the wrong name to fall
+# back to.
 
 
 def load_display_screen(config: 'ServerConfig') -> str:
