@@ -56,12 +56,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from .objects import MOOObject, ObjectFlags
+from .globals import PASSWORD_PROMPT_RE  # noqa: F401  (re-exported for callers)
 
 if TYPE_CHECKING:
     from .database import Database
     from .config import ServerConfig
 
 logger = logging.getLogger('megamoo.login')
+
 
 # ---------------------------------------------------------------------------
 #   Optional bcrypt dependency

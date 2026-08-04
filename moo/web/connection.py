@@ -63,13 +63,9 @@ from .color import moo_colors_to_html, ansi_to_html
 _CLICKABLE_RE = re.compile(r'`([^`\n]+)`')
 
 # Password prompts, so the browser can mask the next line of input.
-#
-# Telnet hides passwords with IAC WILL ECHO; there is no such channel over
-# a WebSocket, so the server flags the prompt instead and the client masks
-# its input box.  Recognising the prompt here rather than in JavaScript
-# keeps it next to login.py's wording, and means an explicit echo-control
-# API could replace it later without touching the client.
-_PASSWORD_PROMPT_RE = re.compile(r'password[^a-z]*:\s*$', re.IGNORECASE)
+# Shared with the telnet transport, which answers the same prompts with
+# IAC WILL ECHO; the canonical pattern lives in globals.py.
+from ..globals import PASSWORD_PROMPT_RE as _PASSWORD_PROMPT_RE
 
 if TYPE_CHECKING:
     from ..server import MegaMOOServer

@@ -843,3 +843,17 @@ def get_all_preposition_strings() -> list:
         True
     """
     return ALL_PREPOSITIONS.copy()
+
+
+# ---------------------------------------------------------------------------
+#   Password prompts
+# ---------------------------------------------------------------------------
+
+#: Matches the login prompts that ask for a password, so a transport can
+#: stop the next line of input from being displayed.
+#:
+#: It lives here rather than in login.py because both transports need it
+#: and neither owns it: telnet answers with IAC WILL ECHO, the web client
+#: with an echo message to the browser.  Change the wording of a prompt in
+#: login.py and this is the thing to re-check.
+PASSWORD_PROMPT_RE = re.compile(r'password[^a-z]*:\s*$', re.IGNORECASE)

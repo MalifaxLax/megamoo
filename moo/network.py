@@ -143,6 +143,7 @@ def _word_wrap(text: str, width: int) -> str:
 
 from .objects import MOOObject, ObjectFlags
 from .color import ColorProcessor
+from .globals import PASSWORD_PROMPT_RE
 
 if TYPE_CHECKING:
     from .server import MegaMOOServer
@@ -906,8 +907,19 @@ class PlayerConnection:
         # \r\r\n (double carriage return) on output.
         message = message.replace('\r\n', '\n').replace('\n', '\r\n')
 
+        # Stop the terminal showing what is typed next, if this is a
+        # password prompt.  RFC 857: a server offering WILL ECHO means "I
+        # will echo for you", so the client stops echoing locally -- and
+        # because we do not actually echo it back, the password never
+        # reaches the screen.  read_line() sends WONT ECHO once the line
+        # is in, so this covers exactly one line of input.
+        suppress_echo = not raw and PASSWORD_PROMPT_RE.search(message)
+
         # Write to socket
         try:
+            if suppress_echo:
+                self.writer.write(IAC + WILL + ECHO)
+                self._echo_suppressed = True
             self.writer.write(message.encode('utf-8'))
             await self.writer.drain()
         except (BrokenPipeError, ConnectionResetError, OSError):
@@ -1104,6 +1116,19 @@ class PlayerConnection:
                     else:
                         cleaned.append(line[i])
                         i += 1
+
+                # A password line has been read, so give echo back.  The
+                # terminal did not show the player's Enter either, so emit
+                # the newline ourselves or the next output runs on from
+                # the prompt.
+                if getattr(self, '_echo_suppressed', False):
+                    self._echo_suppressed = False
+                    try:
+                        self.writer.write(IAC + WONT + ECHO)
+                        self.writer.write(b'\r\n')
+                        await self.writer.drain()
+                    except (BrokenPipeError, ConnectionResetError, OSError):
+                        self._disconnected = True
 
                 # Decode filtered bytes to string and strip line endings
                 text = cleaned.decode('utf-8', errors='ignore').rstrip('\r\n')
