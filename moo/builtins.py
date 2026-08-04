@@ -2676,3 +2676,74 @@ if re.match(r'^[A-Z][a-z]+$', name):
 import json
 data = json.dumps({'player': player.name, 'score': 100})
 """
+
+
+# =============================================================================
+# ASYNC I/O -- slow work without stopping the world
+# =============================================================================
+
+def request(url: str, *, reply: str, on=None, method: str = 'GET',
+            json=None, data=None, headers: Optional[dict] = None,
+            timeout: float = 30.0, tag=None) -> None:
+    """
+    Fetch a URL without blocking, and deliver the answer to a verb.
+
+    Verbs run one at a time, so anything that waits inside one stops the
+    whole game.  This returns immediately; the request happens on a
+    separate pool and the answer arrives later by calling *reply* on *on*.
+
+    The reply verb receives these as ordinary variables:
+
+        ok      True when the status was 2xx
+        status  HTTP status, or 0 if the request never completed
+        body    Response text
+        error   Empty on success, otherwise what went wrong
+        tag     Whatever was passed as ``tag``, untouched
+
+    The body is never compiled -- it arrives as a value, so a response
+    that happens to look like code cannot be executed.
+
+    Args:
+        url:     What to fetch.
+        reply:   Verb name to call with the answer.  Required: a request
+                 whose answer goes nowhere is a bug, not a use case.
+        on:      Object carrying that verb.  Defaults to ``this``.
+        method:  GET, POST, ...
+        json:    Sent as a JSON body, with the content type set.
+        data:    Raw body, if ``json`` is not what you want.
+        headers: Extra request headers.
+        timeout: Seconds before the attempt is abandoned.
+        tag:     Passed back untouched, to match a reply to its request.
+
+    Example -- an NPC answering through a local model::
+
+        # in a verb on the NPC
+        request('http://127.0.0.1:11434/api/generate',
+                reply='npc_said', on=this, method='POST',
+                json={'model': 'llama3.2', 'prompt': argstr, 'stream': False},
+                tag=pobj.objnum)
+
+        # in npc_said, some time later
+        if not ok:
+            this.msg_room("%S looks momentarily vacant.", sub=this)
+            return
+        import json as _j
+        this.msg_room(_j.loads(body).get('response', ''), sub=this)
+    """
+    from . import async_io
+
+    if not reply:
+        raise ValueError("request() needs reply= : where should the answer go?")
+    if on is None:
+        # Not defaulted: the verb context carries the *player*, not `this`,
+        # so guessing here would deliver replies to the wrong object.  Verb
+        # code writes on=this, which is one word and unambiguous.
+        raise ValueError("request() needs on= : which object handles the reply?")
+
+    target = on
+
+    payload = json if json is not None else data
+    async_io.submit(
+        lambda: async_io.http_fetch(url, method=method, data=payload,
+                                    headers=headers, timeout=timeout),
+        on=target, reply=reply, tag=tag, db=_database)
