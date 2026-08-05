@@ -476,13 +476,29 @@ def _inject_moo_builtins(namespace: Dict[str, Any], pobj, db) -> None:
     # The other LambdaMOO utility objects, ported far enough to carry the
     # calls a real core makes.  Same trick: the MOO spelling is an alias,
     # so ported code needs no rewriting beyond dropping the $.
-    from .moo_libs import lu, cu, cdu
+    from .moo_libs import (lu, cu, cdu, pu, moo_match, moo_rmatch,
+                           moo_substitute, FAILED_MATCH, AMBIGUOUS_MATCH)
     namespace['lu'] = lu
     namespace['list_utils'] = lu
     namespace['cu'] = cu
     namespace['command_utils'] = cu
     namespace['cdu'] = cdu
     namespace['code_utils'] = cdu
+    namespace['pu'] = pu
+    namespace['perm_utils'] = pu
+
+    # MOO's regex builtins, under names that cannot collide.  `match` is
+    # already taken here by object matching, and a ported verb calling the
+    # wrong one of those would compile and then quietly misbehave, so MOO's
+    # regex keeps the moo_ prefix rather than fighting for the short name.
+    namespace['moo_match'] = moo_match
+    namespace['moo_rmatch'] = moo_rmatch
+    namespace['moo_substitute'] = moo_substitute
+
+    # MOO's several ways of saying "no object".  $nothing and $no_one are
+    # None here; the two matcher outcomes are sentinels -- see moo_libs.
+    namespace['FAILED_MATCH'] = FAILED_MATCH
+    namespace['AMBIGUOUS_MATCH'] = AMBIGUOUS_MATCH
 
     # Effects utility (screen effects, delays, etc.)
     from .effects import eu as _effects_mgr

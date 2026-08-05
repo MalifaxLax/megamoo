@@ -42,7 +42,21 @@ SYSREFS = {
     'list_utils': 'lu',
     'command_utils': 'cu',
     'code_utils': 'cdu',
+    'perm_utils': 'pu',
     'player': 'pobj',
+}
+
+#: System references that name a *value*, not an object.  MOO spells "no
+#: object" several ways: $nothing and $no_one are #-1 and mean None here.
+#: The other two are what MOO's matcher returns to tell "no such thing"
+#: apart from "which one did you mean"; this engine returns None for both,
+#: so they map to sentinels nothing ever produces rather than to None --
+#: see moo_libs for why conflating them would be worse than leaving them.
+SYSCONSTANTS = {
+    'nothing': 'None',
+    'no_one': 'None',
+    'failed_match': 'FAILED_MATCH',
+    'ambiguous_match': 'AMBIGUOUS_MATCH',
 }
 
 #: Verb-namespace variables that exist here under another name.  Every
@@ -55,7 +69,7 @@ VARIABLES = {
 
 #: Mapped sysrefs that are Python objects rather than MOO objects.  A
 #: ``:verb()`` call on one of these is a method call, not a verb call.
-_PY_RECEIVERS = {'su', 'ou', 'lu', 'cu', 'cdu'}
+_PY_RECEIVERS = {'su', 'ou', 'lu', 'cu', 'cdu', 'pu'}
 
 #: MOO builtins that map straight onto Python.
 BUILTINS = {
@@ -152,6 +166,10 @@ class Porter:
         self.i = 0
         self.notes: List[str] = []
         self.marks = 0
+        #: Modules the translation needs that a verb namespace
+        #: does not already provide.  Emitted as imports rather
+        #: than asked for in a note.
+        self.needs_import = set()
         self.depth = 0
         self.receiver: List[str] = []
 
@@ -667,6 +685,8 @@ class Porter:
             name = t[1:]
             if name in SYSREFS:
                 return SYSREFS[name]
+            if name in SYSCONSTANTS:
+                return SYSCONSTANTS[name]
             return self.mark_expr(
                 f'${name}: no equivalent object; point this at the right one',
                 f'${name}')
@@ -790,9 +810,12 @@ class Porter:
             return f'({args[0]} + [{args[1]}])'
         if fn == 'listinsert' and len(args) >= 2:
             return f'([{args[1]}] + {args[0]})'
-        if fn == 'substitute':
-            return f'cdu.substitute({joined})'
-        if fn in ('ctime', 'seconds_left', 'server_log', 'boot_player'):
+        if fn == 'ctime':
+            # MOO's ctime() is C's: epoch seconds to a readable string,
+            # and with no argument, now.  Both are time.ctime exactly.
+            self.needs_import.add('time')
+            return f'time.ctime({joined})'
+        if fn in ('seconds_left', 'server_log', 'boot_player'):
             return self.mark_expr(
                 f'{fn}() has no equivalent here', f'{fn}({joined})')
         if fn == 'strsub' and len(args) >= 3:
@@ -818,10 +841,11 @@ class Porter:
             return f'({args[0]}.find({args[1]}) + 1)'
         if fn == 'time':
             # MOO's time() is epoch seconds.  `time` is not in the verb
-            # namespace, so emitting time.time() would name something that
-            # is not there -- import time first.
-            self.note('time(): add `import time` at the top of the verb')
-            self.marks += 1
+            # namespace, so the import has to come with it -- the emitter
+            # adds one at the top when this fires.  Asking a human to add
+            # a line the translator knows it needs was never a judgement
+            # call, and it was the fifth commonest mark in the corpus.
+            self.needs_import.add('time')
             return 'time.time()'
         if fn == 'listdelete' and len(args) == 2:
             lst, i = args
@@ -832,13 +856,16 @@ class Porter:
         if fn == 'setremove' and len(args) == 2:
             lst, x = args
             return f'[_e for _e in {lst} if _e != {x}]'
-        if fn == 'match':
+        if fn in ('match', 'rmatch'):
             # A false friend, and the dangerous kind: MOO's match() is a
-            # regex, MegaMOO's match() matches objects.  Passing it through
-            # would compile and call the wrong thing.
-            return self.mark_expr(
-                "match() means regex in MOO but object-matching here; use "
-                "re.search() or su, not match()", f'match({joined})')
+            # regex and this engine's match() matches objects, so passing
+            # it through would compile and call the wrong function.
+            # Renaming is not enough either -- MOO escapes with % and
+            # treats ( as a literal, so the pattern itself needs
+            # translating.  moo_match does both.
+            return f'moo_{fn}({joined})'
+        if fn == 'substitute':
+            return f'moo_substitute({joined})'
         if fn == 'notify':
             # MOO's notify(who, text) is the raw output builtin.  The
             # MegaMOO spelling is who.msg(text), and the difference is not
@@ -923,10 +950,6 @@ _VERB_CONTEXT = {
     'arglist', 'kwargs', 'sub', 'dob', 'iob', 'uob', 'exclude', 'result',
     'su', 'string_utils', 'ou', 'object_utils', 'call_verb', 'search',
     'find', 'pass_', 'tell', 'player',
-    # The ported LambdaMOO utility objects, bound by the namespace builder
-    # rather than being module-level builtins, so they must be listed here
-    # or every ported $list_utils call looks undefined.
-    'lu', 'list_utils', 'cu', 'command_utils', 'cdu', 'code_utils',
 }
 
 
@@ -945,6 +968,18 @@ def _known_names() -> set:
         # explicitly or every ported `! E_PERM' looks undefined.
         from .moo_compat import MOO_ERRORS
         names |= set(MOO_ERRORS)
+    except Exception:
+        pass
+    try:
+        # The ported utility objects and MOO's regex builtins are bound by
+        # the namespace builder, not defined as module-level builtins, so
+        # they have to be added or every ported $list_utils call looks
+        # undefined.  Taken from the library itself rather than restated:
+        # a hand-kept list would not fail loudly when it drifted, it would
+        # just report working calls as broken.
+        from . import moo_libs as _libs
+        names |= set(_libs.__all__)
+        names |= {'list_utils', 'command_utils', 'code_utils', 'perm_utils'}
     except Exception:
         pass
     return names | _VERB_CONTEXT | set(dir(_py))
@@ -1076,6 +1111,9 @@ def port(source: str) -> PortResult:
                     p.note(f'{was.get(kind, 0)} {kind} in the source but '
                            f'{now.get(kind, 0)} in the translation -- '
                            f'something was dropped, check this by hand')
+
+    if p.needs_import:
+        lines = [f'import {m}' for m in sorted(p.needs_import)] + [''] + lines
 
     for name in undefined_names('\n'.join(lines)):
         p.marks += 1

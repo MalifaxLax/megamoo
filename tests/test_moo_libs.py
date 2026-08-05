@@ -294,3 +294,117 @@ def test_set_task_perms_is_accepted_and_does_nothing():
     # code that is otherwise correct.
     from moo.builtins import set_task_perms
     assert set_task_perms(None) is None
+
+
+# --------------------------------------------------------------------------
+# $perm_utils, the match sentinels, and MOO's regexes
+# --------------------------------------------------------------------------
+
+def test_apply_edits_permission_strings():
+    from moo.moo_libs import pu
+    assert pu.apply('rw', '+x') == 'rwx'
+    assert pu.apply('rwx', '-w') == 'rx'
+    assert pu.apply('rw', '+x-r') == 'wx'
+
+
+def test_apply_without_a_sign_replaces():
+    from moo.moo_libs import pu
+    assert pu.apply('rw', 'rx') == 'rx'
+
+
+def test_apply_is_idempotent():
+    from moo.moo_libs import pu
+    assert pu.apply('rw', '+r') == 'rw'
+
+
+def test_moo_parens_are_literal():
+    # The whole reason MOO patterns cannot go straight to `re`: this must
+    # match the bracket characters, not capture foo.
+    from moo.moo_libs import moo_regex_to_python, moo_match
+    assert moo_regex_to_python('(foo)') == r'\(foo\)'
+    assert moo_match('a (foo) b', '(foo)')[:2] == [3, 7]
+    assert moo_match('a foo b', '(foo)') == []
+
+
+def test_percent_paren_is_a_group():
+    from moo.moo_libs import moo_regex_to_python
+    assert moo_regex_to_python('%(foo%)') == '(foo)'
+
+
+def test_match_offsets_are_one_based_and_inclusive():
+    from moo.moo_libs import moo_match
+    assert moo_match('abcdef', 'cd')[:2] == [3, 4]
+
+
+def test_match_folds_case_by_default():
+    # Opposite of Python's default, and quietly wrong if not handled.
+    from moo.moo_libs import moo_match
+    assert moo_match('HELLO', 'hello') != []
+    assert moo_match('HELLO', 'hello', 1) == []
+
+
+def test_match_reports_nine_slots():
+    from moo.moo_libs import moo_match
+    reps = moo_match('hello', '%(h%)%(e%)')[2]
+    assert len(reps) == 9
+    assert reps[0] == [1, 1] and reps[2] == [0, -1]
+
+
+def test_rmatch_takes_the_last_one():
+    from moo.moo_libs import moo_match, moo_rmatch
+    assert moo_match('a1 a2 a3', 'a[0-9]')[0] == 1
+    assert moo_rmatch('a1 a2 a3', 'a[0-9]')[0] == 7
+
+
+def test_substitute_fills_from_a_match():
+    from moo.moo_libs import moo_match, moo_substitute
+    m = moo_match('hello world', '%(w%w+%)')
+    assert moo_substitute('got %1!', m) == 'got world!'
+    assert moo_substitute('[%0]', m) == '[world]'
+
+
+def test_substitute_of_a_failed_match_changes_nothing():
+    from moo.moo_libs import moo_substitute
+    assert moo_substitute('got %1', []) == 'got %1'
+
+
+def test_a_bad_pattern_does_not_raise():
+    from moo.moo_libs import moo_match
+    assert moo_match('abc', '%(unclosed') == []
+
+
+def test_the_two_match_failures_stay_distinct():
+    # Conflating them would make the "which one did you mean?" branch fire
+    # on a plain miss.  Both are falsy, and neither equals the other.
+    from moo.moo_libs import FAILED_MATCH, AMBIGUOUS_MATCH
+    assert FAILED_MATCH != AMBIGUOUS_MATCH
+    assert not FAILED_MATCH and not AMBIGUOUS_MATCH
+    assert FAILED_MATCH == FAILED_MATCH
+
+
+def test_none_never_equals_a_match_sentinel():
+    # None is what this engine's matcher really returns, and ported code
+    # tests it against these.  The test must be answerable, not a crash.
+    from moo.moo_libs import FAILED_MATCH
+    assert (None == FAILED_MATCH) is False
+
+
+def test_port_translates_match_rather_than_marking_it():
+    from moo.moo_port import port
+    r = port('r = match(argstr, "^%(foo%)$");')
+    assert 'moo_match' in r.code and 'match(' in r.code
+    assert r.marks == 0
+
+
+def test_port_supplies_the_import_time_needs():
+    from moo.moo_port import port
+    r = port('x = time(); y = ctime(x);')
+    assert r.code.startswith('import time')
+    assert r.marks == 0
+
+
+def test_port_maps_the_nothing_constants():
+    from moo.moo_port import port
+    r = port('if (dobj == $nothing || dobj == $failed_match) return; endif')
+    assert 'None' in r.code and 'FAILED_MATCH' in r.code
+    assert r.marks == 0

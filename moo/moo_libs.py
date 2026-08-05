@@ -27,9 +27,14 @@ even though it reads oddly from Python.
 Each function's docstring quotes the JHCore original it was written from.
 """
 
+import re
 from typing import Any, List, Optional
 
-__all__ = ['lu', 'cu', 'cdu', 'ListUtils', 'CommandUtils', 'CodeUtils']
+__all__ = ['lu', 'cu', 'cdu', 'pu',
+           'ListUtils', 'CommandUtils', 'CodeUtils', 'PermUtils',
+           'FAILED_MATCH', 'AMBIGUOUS_MATCH',
+           'moo_match', 'moo_rmatch', 'moo_substitute',
+           'moo_regex_to_python']
 
 _MISSING = object()
 
@@ -585,3 +590,328 @@ class CodeUtils:
 lu = ListUtils()
 cu = CommandUtils()
 cdu = CodeUtils()
+
+
+# ---------------------------------------------------------------------------
+# $perm_utils
+#
+# The most concentrated object in the whole core: four methods, and
+# `controls` is 262 of the 272 calls to them across JHCore.  Permission
+# checks sit at the top of verbs, so leaving these unported did not just
+# mark one line -- it marked the verb.
+# ---------------------------------------------------------------------------
+
+class PermUtils:
+    """
+    Port of JHCore's ``$perm_utils``.
+
+    Note what ``controls`` does *not* do here.  In MOO it is advisory: it
+    reports whether someone would be allowed to do a thing, and the verb
+    then chooses to obey it.  That is exactly how it behaves in this
+    engine too.  It is not a gate -- the engine's own ``can_write``
+    already decides what actually happens -- so a ported verb that checks
+    it gets MOO's answer without this becoming a second, competing
+    permission system.
+    """
+
+    @staticmethod
+    def controls(who, what) -> bool:
+        """
+        JHCore: ``return $perm_utils:controls(who, what)`` -- true if
+        *who* owns *what* or is a wizard.
+
+        Wizardliness is checked first because a wizard controls objects
+        it does not own, which is the whole point of the check.
+        """
+        if who is None or what is None:
+            return False
+        if getattr_safe(who, 'wizard'):
+            return True
+        owner = getattr_safe(what, 'owner')
+        return bool(owner) and _same_object(owner, who)
+
+    @staticmethod
+    def controls_prop(who, what, propname: str) -> bool:
+        """
+        JHCore: controls the object, or owns the property itself.
+
+        A property can be owned by someone other than the object's owner,
+        which is why this is not just ``controls``.
+        """
+        if PermUtils.controls(who, what):
+            return True
+        try:
+            from .builtins import property_info
+            info = property_info(what, propname)
+            if isinstance(info, list) and info:
+                return _same_object(info[0], who)
+        except Exception:
+            pass
+        return False
+
+    @staticmethod
+    def apply(perms: str, changes: str) -> str:
+        """
+        JHCore: apply a ``+r``/``-w``/``rw`` style change to a permission
+        string.  ``apply("rw", "+x")`` is ``"rwx"``; a change with no
+        leading sign replaces rather than edits.
+        """
+        perms = str(perms or '')
+        changes = str(changes or '')
+        if not changes:
+            return perms
+        if changes[0] not in '+-':
+            return changes
+        out = list(perms)
+        sign = '+'
+        for ch in changes:
+            if ch in '+-':
+                sign = ch
+            elif sign == '+':
+                if ch not in out:
+                    out.append(ch)
+            elif ch in out:
+                out.remove(ch)
+        return ''.join(out)
+
+    @staticmethod
+    def invoked_by_function() -> bool:
+        """
+        JHCore: true when the running verb was called by other code rather
+        than typed as a command.
+
+        An empty call stack means nothing called us, so we came from the
+        command line.
+        """
+        try:
+            from .builtins import callers
+            return bool(callers())
+        except Exception:
+            return False
+
+
+def getattr_safe(obj, name, default=False):
+    """
+    Read a property without tripping over the ``_NullAttr`` sentinel.
+
+    A missing property here comes back as a falsy stand-in rather than
+    raising, and ``getattr``'s *default* is therefore unreachable.  So
+    this reads normally and coerces the sentinel to *default*, which is
+    what every caller in this module actually wants.
+    """
+    try:
+        val = getattr(obj, name)
+    except Exception:
+        return default
+    return default if val is None or repr(val) == 'None' else val
+
+
+def _same_object(a, b) -> bool:
+    """Compare two things that may be objects, object numbers, or both."""
+    if a is b:
+        return True
+    an = getattr(a, 'objnum', a)
+    bn = getattr(b, 'objnum', b)
+    try:
+        return int(an) == int(bn)
+    except (TypeError, ValueError):
+        return False
+
+
+# ---------------------------------------------------------------------------
+# The match sentinels
+#
+# MOO spells "no object" four ways and they do not all mean the same
+# thing.  $nothing and $no_one are both #-1 and genuinely mean None here.
+# $failed_match (#-3) and $ambiguous_match (#-2) are what MOO's matcher
+# returns to tell those two failures apart.
+#
+# This engine's pmatch/bmatch return None for both, so there is no value
+# these could map onto that would be right.  Mapping them to None anyway
+# would be worse than useless: `if x == $ambiguous_match` would then fire
+# on an ordinary miss and ask "which one?" about a thing that simply is
+# not there.  So they are distinct sentinels that nothing ever returns.
+# The comparison is well-defined, it is just always false, and the
+# ambiguity branch of ported code is dead rather than wrong.
+# ---------------------------------------------------------------------------
+
+class _MatchSentinel:
+    """A match outcome this engine never produces.  See above."""
+
+    __slots__ = ('_name',)
+
+    def __init__(self, name):
+        self._name = name
+
+    def __repr__(self):
+        return self._name
+
+    def __bool__(self):
+        return False
+
+    def __eq__(self, other):
+        return self is other
+
+    def __hash__(self):
+        return id(self)
+
+
+FAILED_MATCH = _MatchSentinel('$failed_match')
+AMBIGUOUS_MATCH = _MatchSentinel('$ambiguous_match')
+
+
+# ---------------------------------------------------------------------------
+# MOO's regular expressions
+#
+# match() is the most dangerous name in the corpus.  In MOO it is a regex
+# builtin; in this engine `match` matches objects by name.  A translation
+# that passed it through would compile and call the wrong function, and
+# the wrongness would only show at runtime.
+#
+# MOO's syntax is not Python's.  It escapes with `%` rather than `\`, and
+# parentheses are literal unless written `%(`.  Handing a MOO pattern
+# straight to `re` therefore silently changes what it means -- `(foo)`
+# would become a group instead of matching the brackets.
+# ---------------------------------------------------------------------------
+
+_MOO_ESCAPES = {
+    '(': '(', ')': ')', '|': '|',          # grouping and alternation
+    'b': r'\b', 'B': r'\B',                # word boundaries
+    'w': r'\w', 'W': r'\W',                # word characters
+    '<': r'\b(?=\w)', '>': r'\b(?<=\w)',   # start and end of word
+    '%': '%',
+}
+
+
+def moo_regex_to_python(pattern: str) -> str:
+    """
+    Translate a MOO pattern into a Python one.
+
+    Args:
+        pattern: A MOO regular expression.
+
+    Returns:
+        The equivalent Python pattern.
+    """
+    out = []
+    i, n = 0, len(pattern)
+    in_class = False
+    while i < n:
+        ch = pattern[i]
+        if in_class:
+            # Inside [...] nothing is special to MOO, but a backslash is
+            # special to Python, so it has to be escaped on the way out.
+            out.append('\\\\' if ch == '\\' else ch)
+            if ch == ']' and out[-2:-1] != ['[']:
+                in_class = False
+            i += 1
+            continue
+        if ch == '%' and i + 1 < n:
+            nxt = pattern[i + 1]
+            if nxt in _MOO_ESCAPES:
+                out.append(_MOO_ESCAPES[nxt])
+            elif nxt.isdigit() and nxt != '0':
+                out.append('\\' + nxt)          # backreference
+            else:
+                out.append(re.escape(nxt))      # %x means a literal x
+            i += 2
+            continue
+        if ch == '[':
+            in_class = True
+            out.append(ch)
+        elif ch in '()|{}':
+            out.append('\\' + ch)               # literal in MOO
+        elif ch == '\\':
+            out.append('\\\\')
+        else:
+            out.append(ch)
+        i += 1
+    return ''.join(out)
+
+
+def moo_match(subject: str, pattern: str, case_matters: bool = False):
+    """
+    MOO's ``match()``: the leftmost match, in MOO's own return shape.
+
+    Args:
+        subject: The string to search.
+        pattern: A MOO regular expression.
+        case_matters: Whether case is significant.  MOO folds case by
+            default, which is the opposite of Python's default.
+
+    Returns:
+        ``[start, end, replacements, subject]`` with **1-based inclusive**
+        offsets, or ``[]`` when there is no match -- the same shape ported
+        code already unpacks and tests for emptiness.
+    """
+    return _match(subject, pattern, case_matters, last=False)
+
+
+def moo_rmatch(subject: str, pattern: str, case_matters: bool = False):
+    """MOO's ``rmatch()``: as :func:`moo_match`, but the rightmost match."""
+    return _match(subject, pattern, case_matters, last=True)
+
+
+def _match(subject, pattern, case_matters, last):
+    subject = '' if subject is None else str(subject)
+    flags = 0 if case_matters else re.IGNORECASE
+    try:
+        rx = re.compile(moo_regex_to_python(str(pattern)), flags)
+    except re.error:
+        return []
+    found = None
+    for m in rx.finditer(subject):
+        found = m
+        if not last:
+            break
+    if found is None:
+        return []
+    # MOO reports nine replacement slots whether or not the pattern has
+    # nine groups, and an unset slot is {0, -1} rather than absent.
+    reps = []
+    for g in range(1, 10):
+        s, e = found.span(g) if g <= rx.groups else (-1, -1)
+        reps.append([0, -1] if s < 0 else [s + 1, e])
+    return [found.start() + 1, found.end(), reps, subject]
+
+
+def moo_substitute(template: str, subs) -> str:
+    """
+    MOO's ``substitute()``: fill ``%1``..``%9`` from a match result.
+
+    Args:
+        template: Text containing ``%0``-``%9`` placeholders, where ``%0``
+            is the whole match.
+        subs: A result from :func:`moo_match`.
+
+    Returns:
+        The filled-in text, or *template* unchanged if *subs* is empty.
+    """
+    if not subs or len(subs) < 4:
+        return template
+    start, end, reps, subject = subs[0], subs[1], subs[2], subs[3]
+    out = []
+    i, n = 0, len(template)
+    while i < n:
+        ch = template[i]
+        if ch == '%' and i + 1 < n:
+            nxt = template[i + 1]
+            if nxt == '0':
+                out.append(subject[start - 1:end])
+                i += 2
+                continue
+            if nxt.isdigit():
+                s, e = reps[int(nxt) - 1]
+                out.append('' if s < 1 else subject[s - 1:e])
+                i += 2
+                continue
+            if nxt == '%':
+                out.append('%')
+                i += 2
+                continue
+        out.append(ch)
+        i += 1
+    return ''.join(out)
+
+
+pu = PermUtils()
