@@ -149,3 +149,77 @@ def test_yes_or_no_refuses_rather_than_pretending():
     # world, so this must not quietly return a guess.
     with pytest.raises(NotImplementedError):
         cu.yes_or_no('really?')
+
+
+# --------------------------------------------------------------------------
+# $code_utils -- the parsing half
+#
+# Written from LambdaCore's definitions.  The half that resists is not the
+# 54-method count but the fact that most of the rest is written in terms of
+# server builtins (verb_info, callers, set_task_perms) that this engine does
+# not have; mooR supplies those and then runs $code_utils unchanged.
+# --------------------------------------------------------------------------
+
+def test_get_prep_finds_the_longest_phrase():
+    # LambdaCore: get_prep("in","front","of",...) => {"in front of",...}
+    assert cdu.get_prep('in', 'front', 'of', 'box') == ['in front of', 'box']
+
+
+def test_get_prep_matches_a_single_word():
+    assert cdu.get_prep('inside', 'box')[0] == 'in/inside/into'
+
+
+def test_get_prep_returns_empty_when_not_a_preposition():
+    # LambdaCore: get_prep("frabulous",...) => {"", "frabulous",...}
+    assert cdu.get_prep('frabulous', 'x') == ['', 'frabulous', 'x']
+
+
+def test_parse_argspec_full_form():
+    # LambdaCore: {{"this","in front of","any"},{"foo"}}
+    assert cdu.parse_argspec('this', 'in', 'front', 'of', 'any', 'foo') == \
+        [['this', 'in front of', 'any'], ['foo']]
+
+
+def test_parse_argspec_bare_specifier():
+    assert cdu.parse_argspec('any') == [['any', 'none', 'none'], []]
+
+
+def test_parse_argspec_reports_a_bad_specifier():
+    # The original returns a string rather than a list on failure.
+    assert isinstance(cdu.parse_argspec('wibble'), str)
+
+
+def test_substitute_respects_word_boundaries():
+    # "avoiding substitution inside words"
+    assert cdu.substitute('cat cathode', [['cat', 'dog']]) == 'dog cathode'
+
+
+def test_substitute_of_punctuation_is_not_delimited():
+    assert cdu.substitute('a%b', [['%', '-']]) == 'a-b'
+
+
+def test_find_verb_named_is_one_based_and_zero_when_absent():
+    class _V:
+        def __init__(self, names, perms='rx'):
+            self.names, self.perms = names, perms
+            self.code = ''
+
+    class _O:
+        verbs = [_V(['look']), _V(['get'])]
+
+    assert cdu.find_verb_named(_O(), 'get') == 2
+    assert cdu.find_verb_named(_O(), 'nope') == 0
+
+
+def test_verb_documentation_reads_the_docstring():
+    class _V:
+        names = ['look']
+        perms = 'rx'
+        code = '"""Look at a thing.\n\nUsage: look <thing>\n"""\nreturn 1\n'
+
+    class _O:
+        verbs = [_V()]
+
+    doc = cdu.verb_documentation(_O(), 'look')
+    assert doc[0] == 'Look at a thing.'
+    assert cdu.verb_usage(_O(), 'look') == 'look <thing>'

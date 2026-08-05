@@ -369,6 +369,204 @@ class CodeUtils:
         'for/about', 'is', 'as', 'off/off of',
     ]
 
+    # -- verb introspection ---------------------------------------------
+
+    @staticmethod
+    def find_verb_named(obj, name: str, start: int = 1) -> int:
+        """
+        Position of the first verb on *obj* called *name*, 1-based.
+
+        LambdaCore: "returns the *number* of the first verb on object
+        matching the given name ... 0 is returned if no verb is found.
+        This routine does not find inherited verbs."  That last clause is
+        the point: only the object's own verbs are searched.
+        """
+        try:
+            own = list(obj.verbs or [])
+        except Exception:
+            return 0
+        for i, v in enumerate(own[start - 1:], start=start):
+            if name in (v.names or []):
+                return i
+        return 0
+
+    @staticmethod
+    def verb_perms(obj, vname: str) -> str:
+        """The permission string of a verb, or empty when there is none."""
+        try:
+            for v in obj.verbs or []:
+                if vname in (v.names or []):
+                    return v.perms or ''
+        except Exception:
+            pass
+        return ''
+
+    @staticmethod
+    def verb_code(obj, vname: str) -> List[str]:
+        """A verb's source as a list of lines, which is how MOO returns it."""
+        try:
+            for v in obj.verbs or []:
+                if vname in (v.names or []):
+                    return (v.code or '').splitlines()
+        except Exception:
+            pass
+        return []
+
+    @staticmethod
+    def verb_documentation(obj, vname: str) -> List[str]:
+        """
+        The documentation at the top of a verb.
+
+        LambdaCore reads the leading bare strings, which are MOO's
+        comments.  Verbs here are Python, so the docstring is the same
+        thing in the same place; leading ``#`` comments count too, for
+        verbs written without one.
+
+        LambdaCore defaults to "the calling verb" via callers(), which has
+        no equivalent here, so the object and verb name are required.
+        """
+        lines = CodeUtils.verb_code(obj, vname)
+        if not lines:
+            return []
+        text = '\n'.join(lines).lstrip()
+        for quote in ('"' * 3, "'" * 3):
+            if text.startswith(quote):
+                body = text[3:]
+                end = body.find(quote)
+                if end >= 0:
+                    return body[:end].strip().splitlines()
+        out = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith('#'):
+                out.append(stripped.lstrip('#').strip())
+            elif stripped:
+                break
+        return out
+
+    @staticmethod
+    def verb_usage(obj, vname: str) -> str:
+        """
+        The usage line from a verb's documentation, if it has one.
+
+        LambdaCore looks at the top of the code; the convention here is a
+        ``Usage:`` line inside the docstring.
+        """
+        for line in CodeUtils.verb_documentation(obj, vname):
+            if line.lower().startswith('usage'):
+                return line.split(':', 1)[-1].strip()
+        return ''
+
+    # -- prepositions and argument specs ---------------------------------
+
+    @staticmethod
+    def get_prep(*args):
+        """
+        Pull a prepositional phrase off the front of *args*.
+
+        LambdaCore: ``get_prep("in","front","of",...)`` gives
+        ``{"in front of",...}``, and ``get_prep("frabulous",...)`` gives
+        ``{"", "frabulous",...}`` -- an empty first element when the words
+        are not a preposition.  Longest spelling wins, so "in front of"
+        beats "in".
+        """
+        words = [str(a) for a in args]
+        for group in CodeUtils.PREPS:
+            for spelling in sorted(group.split('/'), key=len, reverse=True):
+                parts = spelling.split()
+                if len(parts) <= len(words) and words[:len(parts)] == parts:
+                    return [group] + words[len(parts):]
+        return [''] + words
+
+    @staticmethod
+    def parse_argspec(*args):
+        """
+        Read a verb argument specification off the front of *args*.
+
+        LambdaCore: ``parse_argspec("this","in","front","of","any","foo")``
+        gives ``{{"this","in front of","any"},{"foo"}}``.  Returns a string
+        instead when it cannot parse, which is how the original reports an
+        error.
+        """
+        words = [str(a) for a in args]
+        if not words:
+            return 'no arguments given'
+        valid = ('this', 'any', 'none')
+        dobj = words[0]
+        if dobj not in valid:
+            return f'"{dobj}" is not a valid argument specifier'
+        rest = words[1:]
+        if not rest:
+            return [[dobj, 'none', 'none'], []]
+        got = CodeUtils.get_prep(*rest)
+        prep, rest = got[0], got[1:]
+        if not prep:
+            return [[dobj, 'none', 'none'], rest]
+        if not rest:
+            return [[dobj, prep, 'none'], []]
+        iobj = rest[0]
+        if iobj not in valid:
+            return f'"{iobj}" is not a valid argument specifier'
+        return [[dobj, prep, iobj], rest[1:]]
+
+    # -- text -------------------------------------------------------------
+
+    @staticmethod
+    def substitute(text: str, subs) -> str:
+        """
+        Replace targets with substitutions, respecting word boundaries.
+
+        LambdaCore: "Substitutes targets for subs in a delimited string
+        fashion, avoiding substitution inside words."  A target beginning
+        and ending with an alphanumeric matches whole words only; one that
+        does not -- punctuation, say -- matches anywhere.
+        """
+        import re as _re
+        out = str(text)
+        for pair in subs or []:
+            if not pair or len(pair) < 2:
+                continue
+            target, replacement = str(pair[0]), str(pair[1])
+            if not target:
+                continue
+            delimited = target[0].isalnum() and target[-1].isalnum()
+            pattern = _re.escape(target)
+            if delimited:
+                pattern = r'\b' + pattern + r'\b'
+            out = _re.sub(pattern, replacement.replace('\\', '\\\\'), out)
+        return out
+
+    # -- tasks and players ------------------------------------------------
+
+    @staticmethod
+    def connected_players() -> List:
+        """Everyone with a live connection."""
+        try:
+            from .network import _player_connections
+            from .builtins import _database
+        except Exception:
+            return []
+        out = []
+        for num in list(_player_connections):
+            try:
+                obj = _database.get_object(num)
+            except Exception:
+                continue
+            if obj is not None:
+                out.append(obj)
+        return out
+
+    @staticmethod
+    def task_valid(task_id) -> bool:
+        """Whether a task is still queued or running."""
+        try:
+            from .tasks import get_task_queue
+            q = get_task_queue()
+        except Exception:
+            return False
+        return bool(q and (task_id in q.running_tasks
+                           or task_id in q.suspended_tasks))
+
     @staticmethod
     def short_prep(prep: str) -> str:
         """The first spelling of a preposition group: ``at/to`` -> ``at``."""
