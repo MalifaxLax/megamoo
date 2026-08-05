@@ -2912,3 +2912,46 @@ def port_verb(pobj, spec: str, db):
                          f"what is left.%n")
 
     _editor(pobj)
+
+
+_NO_FALLBACK = object()
+
+
+def catch(attempt, codes=None, fallback=_NO_FALLBACK):
+    """
+    MOO's ```expr ! codes => fallback'``, as a callable.
+
+    LambdaMOO's backtick is an *expression* that catches errors, and mooR
+    models it the same way -- ``Expr::TryCatch { trye, codes, except }``,
+    compiled to a catch label in its VM.  Python has no expression-level
+    try, but a deferred call gives exactly the same semantics: the
+    attempt is not evaluated until it is inside the try, and the whole
+    thing is still an expression, so it nests anywhere MOO's does.
+
+        `x.name ! E_PROPNF => "nameless"'
+
+    becomes::
+
+        catch(lambda: x.name, ('E_PROPNF',), lambda: "nameless")
+
+    Args:
+        attempt:  Zero-argument callable producing the value.
+        codes:    Error names to catch, or ``None``/``('ANY',)`` for all.
+                  Anything not listed propagates, as in MOO.
+        fallback: Zero-argument callable for the value on error.  Omitted
+                  means the error value itself is the result, which is
+                  what MOO does without ``=>``.
+
+    Returns:
+        The attempt's value, or the fallback, or the error value.
+    """
+    try:
+        return attempt()
+    except MOOError as err:
+        name = getattr(err, 'code', None) or str(err)
+        if codes and 'ANY' not in codes and name not in codes:
+            raise
+        if fallback is _NO_FALLBACK:
+            # No `=>` clause: in MOO the expression evaluates to the error.
+            return err
+        return fallback() if callable(fallback) else fallback

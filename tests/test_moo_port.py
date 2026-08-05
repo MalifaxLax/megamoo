@@ -157,15 +157,39 @@ def test_bare_string_becomes_a_comment():
 # What it refuses, and how loudly
 # --------------------------------------------------------------------------
 
-def test_backtick_is_marked_not_guessed():
-    r = port("""x = `this.foo ! E_PROPNF => 0';""")
-    assert r.marks == 1
-    assert MARK in r.code
-    # not approximated into a try block...
-    body = [l for l in r.code.splitlines() if not l.strip().startswith('#')]
-    assert not any('try' in l for l in body)
-    # ...and the original is preserved in the notes the header reproduces
-    assert 'E_PROPNF' in r.code
+def test_backtick_becomes_a_catch():
+    # mooR models this as a TryCatch *expression*.  Python has no
+    # expression-level try, but deferring both halves into callables gives
+    # the same semantics and stays an expression, so it still nests.
+    r = py("""x = `this.foo ! E_PROPNF => 0';""")
+    assert "catch(lambda: this.foo, ('E_PROPNF',), lambda: 0)" in r.code
+
+
+def test_catching_e_propnf_is_flagged_as_behaving_differently():
+    # MOO raises when a property is missing; here it returns the falsy
+    # sentinel, so the fallback never fires.  Silent unless said.
+    r = port("""x = `this.foo ! E_PROPNF => 5';""")
+    assert r.marks >= 1
+    assert 'sentinel' in ' '.join(r.notes)
+
+
+def test_backtick_without_a_fallback_yields_the_error():
+    # No `=>` clause: in MOO the expression evaluates to the error value,
+    # which is what catch() returns when given no fallback.
+    r = py("""x = `this.foo ! E_PROPNF';""")
+    assert "catch(lambda: this.foo, ('E_PROPNF',))" in r.code
+
+
+def test_backtick_with_several_codes():
+    r = py("""x = `y ! E_PERM, E_VERBNF => 0';""")
+    assert "('E_PERM', 'E_VERBNF')" in r.code
+
+
+def test_backtick_nests_because_it_is_an_expression():
+    # real names, so the namespace check does not flag the fixture itself
+    r = py("""x = length(`args ! ANY => 0');""")
+    assert 'len(catch(lambda: args' in r.code
+    assert r.clean
 
 
 def test_fork_is_marked_not_guessed():
@@ -174,9 +198,21 @@ def test_fork_is_marked_not_guessed():
     assert 'delay()' in ' '.join(r.notes)
 
 
-def test_try_is_marked():
-    r = port('try\n  x = 1;\nexcept (ANY)\n  x = 2;\nendtry')
-    assert r.marks >= 1
+def test_try_becomes_a_python_try():
+    # A statement in both languages, so it maps directly.  MOO's codes are
+    # values rather than classes, so the check moves inside the handler.
+    r = py('try\n  x = 1;\nexcept e (E_PROPNF)\n  x = 2;\nendtry')
+    assert 'try:' in r.code
+    assert 'except MOOError as e:' in r.code
+    assert "if e.code not in ('E_PROPNF',):" in r.code
+    assert r.clean
+
+
+def test_try_with_any_catches_everything():
+    r = py('try\n  x = 1;\nexcept (ANY)\n  x = 2;\nendtry')
+    assert 'except MOOError' in r.code
+    # ANY means no code filter at all
+    assert 'not in' not in r.code
 
 
 def test_unknown_sysref_is_marked_rather_than_invented():

@@ -207,7 +207,12 @@ class Porter:
         while True:
             k, t, ln = self.peek()
             if k == 'eof' or (k == 'name' and t in stop):
-                return out or ['    ' * indent + 'pass']
+                # A body that translated to nothing but comments is not an
+                # indented block as far as Python is concerned, so it needs
+                # a statement to stand on.
+                if not out or all(l.strip().startswith('#') for l in out):
+                    out.append('    ' * indent + 'pass')
+                return out
             out.extend(self.statement(indent))
 
     def statement(self, indent: int) -> List[str]:
@@ -232,7 +237,7 @@ class Porter:
             if t == 'while':
                 return self.while_stmt(indent)
             if t == 'try':
-                return self._refuse(indent, 'try')
+                return self.try_stmt(indent)
             if t == 'return':
                 self.next()
                 if self.at(';'):
@@ -411,9 +416,9 @@ class Porter:
         #   for i in [1..n]        numeric range, inclusive at both ends
         if self.at('['):
             self.next()
-            lo = self.expr()
+            lo = self._paren(self.expr)
             self.expect('..')
-            hi = self.expr()
+            hi = self._paren(self.expr)
             self.expect(']')
             head = f'{pad}for {var} in range({lo}, ({hi}) + 1):'
         else:
@@ -427,9 +432,65 @@ class Porter:
             self.eat_semi()
         return out
 
+    def try_stmt(self, indent) -> List[str]:
+        """
+        `try ... except (codes) ... endtry` -- a statement in both languages.
+
+        This one does map directly; it was previously refused out of
+        caution.  MOO names the codes in parentheses and may bind the error
+        to a variable; Python spells that `except MOOError as e`, with the
+        code check inside since MOO's codes are values rather than classes.
+        """
+        pad = '    ' * indent
+        self.expect('try')
+        out = [f'{pad}try:'] + self.block(indent + 1, ('except', 'finally',
+                                                       'endtry'))
+        while self.at_name('except'):
+            self.next()
+            var = None
+            if self.peek()[0] == 'name' and self.peek()[1] != 'ANY':
+                var = self.next()[1]
+            codes = []
+            if self.at('('):
+                self.next()
+                while not self.at(')'):
+                    k, t, _ = self.peek()
+                    if k == 'name':
+                        codes.append(self.next()[1])
+                    else:
+                        self.next()
+                    if self.at(','):
+                        self.next()
+                if self.at(')'):
+                    self.next()
+            name = var or '_err'
+            out.append(f'{pad}except MOOError as {name}:')
+            body = self.block(indent + 1, ('except', 'finally', 'endtry'))
+            if codes and 'ANY' not in codes:
+                names = ', '.join(f"'{c}'" for c in codes)
+                out.append(f'{pad}    if {name}.code not in ({names},):')
+                out.append(f'{pad}        raise')
+            out += body
+        if self.at_name('finally'):
+            self.next()
+            out.append(f'{pad}finally:')
+            out += self.block(indent + 1, ('endtry',))
+        if self.at_name('endtry'):
+            self.next()
+            self.eat_semi()
+        return out
+
     def while_stmt(self, indent) -> List[str]:
         pad = '    ' * indent
         self.expect('while')
+        # MOO 1.8 allows a loop label: `while searching (queue)`.  It only
+        # matters to break/continue targeting it, which Python cannot do
+        # anyway, so it is consumed and noted rather than kept.
+        if self.peek()[0] == 'name' and self.peek(1)[1] == '(':
+            label = self.next()[1]
+            self.note(f'loop label {label!r} dropped; Python cannot break '
+                      f'to a label, so check any break/continue inside')
+            self.marks += 1
         self.expect('(')
         cond = self._paren(self.expr)
         self.expect(')')
@@ -453,9 +514,9 @@ class Porter:
         # MOO's conditional, at any depth:  cond ? a | b
         if self.at('?'):
             self.next()
-            a = self.expr()
+            a = self._paren(self.expr)
             self.expect('|')
-            b = self.expr()
+            b = self._paren(self.expr)
             left = f'({a} if {left} else {b})'
 
         # MOO assignment is an expression, so `if (x = foo())` is legal and
@@ -523,16 +584,56 @@ class Porter:
         return self.postfix(self.primary())
 
     def backtick(self) -> str:
-        """`expr ! E_FOO => fallback' -- caught, not translated."""
-        raw = []
-        self.next()
-        while not self.at("'") and self.peek()[0] != 'eof':
-            raw.append(self.next()[1])
-        if self.at("'"):
+        """
+        ```expr ! codes => fallback'`` -- MOO's expression-level catch.
+
+        mooR models this as a TryCatch *expression* and compiles it to a
+        catch label in its VM.  Python has no expression-level try, but
+        deferring both halves into callables gives the same semantics and
+        keeps it an expression, so it still nests anywhere MOO's does.
+        """
+        self.expect('`')
+        attempt = self._paren(self.expr)
+
+        codes = []
+        if self.at('!'):
             self.next()
-        return self.mark_expr(
-            'backtick error-catch: rewrite as try/except round the expression',
-            '`' + ' '.join(raw) + "'")
+            while True:
+                k, t, ln = self.peek()
+                if k != 'name':
+                    break
+                codes.append(self.next()[1])
+                if self.at(','):
+                    self.next()
+                    continue
+                break
+
+        fallback = None
+        if self.at('=>'):
+            self.next()
+            fallback = self._paren(self.expr)
+
+        self.expect("'")
+
+        code_tuple = ('(' + ', '.join(f"'{c}'" for c in codes) +
+                      (',)' if len(codes) == 1 else ')')) if codes else "('ANY',)"
+        if 'E_PROPNF' in codes:
+            # Worth saying, because it is silent: MOO raises E_PROPNF when
+            # a property is missing, so the fallback fires.  Here a missing
+            # property returns the falsy _null_attr sentinel and nothing is
+            # raised, so the fallback does *not* fire and the sentinel is
+            # the value.  Usually equivalent, since both are falsy -- but
+            # not when the fallback is a real default.
+            self.note('caught E_PROPNF: reading a missing property here '
+                      'returns the falsy sentinel rather than raising, so '
+                      'the fallback will not fire -- use `or default`')
+            self.marks += 1
+
+        if fallback is None:
+            # Without `=>` the value is the error itself, which is what
+            # catch() returns when given no fallback.
+            return f'catch(lambda: {attempt}, {code_tuple})'
+        return f'catch(lambda: {attempt}, {code_tuple}, lambda: {fallback})'
 
     def primary(self) -> str:
         k, t, ln = self.next()
@@ -817,11 +918,20 @@ _VERB_CONTEXT = {
 def _known_names() -> set:
     """Every name a verb body may reference without defining it."""
     import builtins as _py
+    names = set()
     try:
         from . import builtins as _moo
-        names = set(_moo._get_builtin_ns_template())
+        names |= set(_moo._get_builtin_ns_template())
     except Exception:          # importable standalone, e.g. under test
-        names = set()
+        pass
+    try:
+        # The E_* error values are injected by the compat layer rather
+        # than being module-level builtins, so they have to be added
+        # explicitly or every ported `! E_PERM' looks undefined.
+        from .moo_compat import MOO_ERRORS
+        names |= set(MOO_ERRORS)
+    except Exception:
+        pass
     return names | _VERB_CONTEXT | set(dir(_py))
 
 
