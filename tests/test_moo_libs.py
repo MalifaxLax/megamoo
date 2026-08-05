@@ -787,3 +787,24 @@ def test_a_splatted_list_builtin_works():
     from moo.moo_builtins import listset
     args = [[1, 2, 3], 9, 2]
     assert listset(*args) == [1, 9, 3]
+
+
+def test_moo_in_folds_case_like_moos_equality():
+    # "foo" in {"Foo"} is 1 in MOO and was 0 here.  Alias lists are what
+    # this gets used on, so it failed on any capitalisation the author had
+    # not anticipated.
+    from moo.moo_builtins import moo_in
+    assert moo_in('foo', ['Foo']) == 1
+    assert ('foo' in ['Foo']) is False        # what Python would have done
+
+
+def test_moo_in_returns_a_position_not_a_boolean():
+    from moo.moo_builtins import moo_in
+    assert moo_in('c', ['a', 'b', 'c']) == 3
+    assert moo_in('z', ['a']) == 0
+
+
+def test_moo_in_on_two_strings_is_a_substring_search():
+    from moo.moo_builtins import moo_in
+    assert moo_in('ell', 'Hello') == 2
+    assert moo_in('xyz', 'Hello') == 0

@@ -924,3 +924,23 @@ def test_a_property_named_like_a_python_keyword():
 
 def test_an_ordinary_property_keeps_the_readable_spelling():
     assert 'this.name' in py('x = this.name;').code
+
+
+def test_in_uses_moos_equality():
+    # MOO's `in` yields a 1-based index, which was handled -- and compares
+    # with MOO's equality, which folds case, which was not.
+    assert 'moo_in(dobjstr, this.aliases)' in py('x = (dobjstr in this.aliases);').code
+
+
+def test_a_missing_utility_method_is_marked():
+    # The hole the undefined-name check cannot see: $string_utils:foo
+    # becomes su.foo, an *attribute* access, and `su` is perfectly well
+    # defined -- so a method that does not exist looks exactly like one
+    # that does.  Roughly one clean verb in six across the stock cores.
+    r = port('x = $string_utils:pronoun_sub(argstr);')
+    assert r.marks >= 1
+    assert 'not implemented' in ' '.join(r.notes)
+
+
+def test_a_utility_method_that_exists_is_not_marked():
+    assert port('x = $string_utils:trim(argstr);').marks == 0

@@ -38,7 +38,7 @@ __all__ = [
     # Expression forms Python lacks
     'moo_raise', 'moo_setprop', 'moo_setitem', 'moo_listset',
     # Operators whose meaning differs from Python's
-    'moo_eq', 'moo_ne', 'moo_lt', 'moo_le', 'moo_gt', 'moo_ge',
+    'moo_eq', 'moo_ne', 'moo_lt', 'moo_le', 'moo_gt', 'moo_ge', 'moo_in',
     'moo_div', 'moo_mod',
     # Values and strings
     'random', 'strcmp', 'sqrt',
@@ -1792,3 +1792,38 @@ def setremove(lst: List, value) -> List:
             del out[i]
             break
     return out
+
+
+def moo_in(value, lst) -> int:
+    """
+    MOO's ``in``: **where** *value* is in *lst*, not whether it is there.
+
+    Two differences from Python's, and the second is the quiet one.
+
+    It returns a 1-based position, or ``0`` when absent -- truthy exactly
+    when membership holds, so code reading it as a boolean is right and
+    code using the position gets the position.  That much was already
+    translated.
+
+    The comparison is MOO's, so **strings match without regard to case**.
+    ``"foo" in {"Foo"}`` is 1 in MOO and was 0 here.  This is the same
+    difference :func:`moo_eq` exists for, in the one operator that was
+    still using Python's rule -- and alias lists are exactly what it gets
+    used on, so `dobjstr in this.aliases` failed on any capitalisation the
+    author had not thought of.
+
+    Args:
+        value: What to look for.
+        lst: A list, or a string to search for a substring.
+
+    Returns:
+        int: 1-based index, or ``0``.
+    """
+    if isinstance(lst, str):
+        # MOO's `in` on two strings is a substring search, also folded.
+        found = lst.lower().find(str(value).lower())
+        return found + 1
+    for i, item in enumerate(lst or [], 1):
+        if moo_eq(item, value):
+            return i
+    return 0

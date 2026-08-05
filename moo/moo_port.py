@@ -1123,8 +1123,13 @@ class Porter:
                 # MOO's `in` yields a 1-based index, or 0 when absent --
                 # not a boolean.  Translating it to Python's `in` would be
                 # right for a truth test and wrong everywhere else.
-                left = (f'(({right}).index({left}) + 1 '
-                        f'if ({left}) in ({right}) else 0)')
+                # Not Python's `in`.  MOO's yields a 1-based index rather
+                # than a boolean, which was already handled -- and
+                # compares with MOO's equality, which folds case, which
+                # was not.  `dobjstr in this.aliases` is the commonest
+                # use there is, and it was failing on any capitalisation
+                # the author had not anticipated.
+                left = f'moo_in({left}, {right})'
                 continue
             if k == 'op' and t in ops:
                 op = self.next()[1]
@@ -1695,6 +1700,50 @@ def _known_names() -> set:
     return names | _VERB_CONTEXT | set(dir(_py))
 
 
+#: The utility objects @port remaps `$name` onto, and what they were.
+_SHIM_NAMES = {'su': 'string_utils', 'ou': 'object_utils', 'lu': 'list_utils',
+               'cu': 'command_utils', 'cdu': 'code_utils', 'pu': 'perm_utils'}
+
+_SHIM_CALL = re.compile(r'\b(su|ou|lu|cu|cdu|pu)\.(\w+)')
+
+
+def _missing_shim_methods(code: str):
+    """
+    Calls to utility methods the ports of those objects do not have.
+
+    This is the hole the undefined-name check cannot see.  ``$string_utils
+    :pronoun_sub`` becomes ``su.pronoun_sub`` -- an *attribute* access, and
+    the name `su` is perfectly well defined -- so a method that does not
+    exist looks exactly like one that does, and the verb translates clean
+    and then fails the first time it runs.
+
+    Across the two stock cores that was roughly one clean verb in six.  It
+    is the difference between "this translated" and "this will work", and
+    conflating the two made the first number flatter than it deserved.
+
+    Args:
+        code: Translated Python, ``# PORT:`` lines and all.
+
+    Returns:
+        Sorted ``(receiver, method)`` pairs that will not resolve.
+    """
+    body = '\n'.join(l for l in code.splitlines()
+                      if not l.strip().startswith(MARK))
+    shims = {}
+    try:
+        from .string_utils import su
+        from . import object_utils as ou
+        from .moo_libs import lu, cu, cdu, pu
+        shims = {'su': su, 'ou': ou, 'lu': lu, 'cu': cu, 'cdu': cdu, 'pu': pu}
+    except Exception:          # importable standalone, e.g. under test
+        return []
+    out = set()
+    for recv, meth in _SHIM_CALL.findall(body):
+        if recv in shims and not hasattr(shims[recv], meth):
+            out.add((recv, meth))
+    return sorted(out)
+
+
 def _will_not_parse(code: str) -> Optional[str]:
     """
     Why the translated code is not valid Python, if it is not.
@@ -1874,6 +1923,12 @@ def port(source: str, resolve=None) -> PortResult:
         p.marks += 1
         p.note(f"'{name}' is not defined anywhere a verb can see; it is "
                f"probably a MOO builtin with no equivalent here")
+
+    for recv, meth in _missing_shim_methods('\n'.join(lines)):
+        p.marks += 1
+        p.note(f'{recv}.{meth}() is not implemented; ${_SHIM_NAMES[recv]} '
+               f'has this method in a real MOO and the port of it here '
+               f'does not, so this line will fail when it runs')
 
     # Does the output actually parse?
     #
