@@ -36,7 +36,10 @@ __all__ = [
     'TYPE_INT', 'TYPE_NUM', 'TYPE_OBJ', 'TYPE_STR', 'TYPE_ERR',
     'TYPE_LIST', 'TYPE_FLOAT',
     # Expression forms Python lacks
-    'moo_raise', 'moo_setprop', 'moo_setitem',
+    'moo_raise', 'moo_setprop', 'moo_setitem', 'moo_listset',
+    # Operators whose meaning differs from Python's
+    'moo_eq', 'moo_ne', 'moo_lt', 'moo_le', 'moo_gt', 'moo_ge',
+    'moo_div', 'moo_mod',
     # Values and strings
     'random', 'strcmp', 'sqrt',
     # Players and connections
@@ -1054,3 +1057,173 @@ def output_delimiters(who) -> List:
         list: ``[prefix, suffix]``.
     """
     return ['', '']
+
+
+# ---------------------------------------------------------------------------
+# Operators that look the same in both languages and are not
+#
+# These are the quietest bugs a port can have.  Nothing raises, nothing
+# looks wrong, and the verb behaves correctly on most inputs -- so a
+# translation carrying one of these reads as finished and is not.
+#
+# Each is checked against mooR's implementation rather than against
+# memory: string comparison in crates/var/src/string.rs (PartialEq goes
+# through cmp_case_insensitive), division and modulus in
+# crates/var/src/scalar.rs (checked_div and checked_rem, which are C's).
+# ---------------------------------------------------------------------------
+
+def _fold(x):
+    """Lower-case a string, leave anything else alone."""
+    return x.lower() if isinstance(x, str) else x
+
+
+def moo_eq(a, b) -> bool:
+    """
+    MOO's ``==``: **string comparison ignores case.**
+
+    ``"Foo" == "foo"`` is true in MOO and false in Python.  This is the
+    single widest silent difference between the two languages -- it
+    touches roughly one clean-translating verb in eight -- because
+    nothing about `x == "north"` looks wrong, and it behaves correctly
+    right up until someone types "North".
+
+    Lists compare element-wise under the same rule, since MOO's list
+    equality is its scalar equality applied down the list.
+
+    Args:
+        a: Either value.
+        b: The other.
+
+    Returns:
+        bool: Whether MOO would call them equal.
+    """
+    if isinstance(a, str) and isinstance(b, str):
+        return a.lower() == b.lower()
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return len(a) == len(b) and all(moo_eq(x, y) for x, y in zip(a, b))
+    return a == b
+
+
+def moo_ne(a, b) -> bool:
+    """MOO's ``!=``.  See :func:`moo_eq` for why this is not Python's."""
+    return not moo_eq(a, b)
+
+
+def moo_lt(a, b) -> bool:
+    """MOO's ``<``.  Strings order case-insensitively."""
+    return _fold(a) < _fold(b)
+
+
+def moo_le(a, b) -> bool:
+    """MOO's ``<=``.  Strings order case-insensitively."""
+    return _fold(a) <= _fold(b)
+
+
+def moo_gt(a, b) -> bool:
+    """MOO's ``>``.  Strings order case-insensitively."""
+    return _fold(a) > _fold(b)
+
+
+def moo_ge(a, b) -> bool:
+    """MOO's ``>=``.  Strings order case-insensitively."""
+    return _fold(a) >= _fold(b)
+
+
+def moo_div(a, b):
+    """
+    MOO's ``/``: integer division stays **integer** and truncates toward
+    zero.
+
+    Two differences from Python in one operator, and neither raises.
+
+    Python's ``/`` on two integers produces a float, so ``7 / 2`` is
+    ``3.5`` where MOO gives ``3``.  Using ``//`` instead fixes the type
+    but not the rounding: Python floors, C truncates, so ``-7 / 2`` is
+    ``-3`` in MOO and ``-4`` under ``//``.  The sign only shows up on
+    negative operands, which is exactly when a game rule stops being
+    tested.
+
+    Args:
+        a: Dividend.
+        b: Divisor.
+
+    Returns:
+        An int when both operands are ints, else a float.
+
+    Raises:
+        MOOError: On division by zero, as MOO's E_INVARG.
+    """
+    if isinstance(a, bool):
+        a = int(a)
+    if isinstance(b, bool):
+        b = int(b)
+    if isinstance(a, int) and isinstance(b, int):
+        if b == 0:
+            raise MOOError('Integer division by zero')
+        q = abs(a) // abs(b)
+        return -q if (a < 0) != (b < 0) else q
+    return a / b
+
+
+def moo_mod(a, b):
+    """
+    MOO's ``%``: the remainder takes the sign of the **dividend**.
+
+    Python's takes the sign of the divisor, so ``-7 % 2`` is ``-1`` in
+    MOO and ``1`` in Python.  Both are defensible; they are not the same,
+    and code that reaches for ``%`` on a possibly-negative number is
+    usually doing something the difference breaks.
+
+    Args:
+        a: Dividend.
+        b: Divisor.
+
+    Returns:
+        The remainder, with MOO's sign convention.
+
+    Raises:
+        MOOError: On division by zero.
+    """
+    if isinstance(a, bool):
+        a = int(a)
+    if isinstance(b, bool):
+        b = int(b)
+    if isinstance(a, int) and isinstance(b, int):
+        if b == 0:
+            raise MOOError('Integer division by zero')
+        return a - b * moo_div(a, b)
+    import math
+    return math.fmod(a, b)
+
+
+def moo_listset(seq, index, value):
+    """
+    Indexed assignment with MOO's **value** semantics: a new container.
+
+    MOO lists are values, not references.  After ``l2 = l1; l2[1] = 5;``
+    the list ``l1`` is unchanged, because the assignment built a new list
+    and rebound ``l2`` to it.  Python's lists are references, so the
+    obvious translation mutates in place and changes ``l1`` too -- a bug
+    that only appears when something else still holds the original, which
+    is to say rarely, and far from the line that caused it.
+
+    This returns a copy for lists so the caller can rebind.  Dicts and
+    objects keep reference semantics, because MOO's do as well.
+
+    Args:
+        seq: The container.
+        index: An already-translated index, or a key.
+        value: What to store.
+
+    Returns:
+        The updated container -- a new list, or the same dict.
+    """
+    if isinstance(seq, list):
+        out = list(seq)
+        out[index] = value
+        return out
+    if isinstance(seq, str):
+        i = index if index >= 0 else len(seq) + index
+        return seq[:i] + str(value) + seq[i + 1:]
+    seq[index] = value
+    return seq

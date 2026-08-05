@@ -515,3 +515,75 @@ def test_force_input_does_nothing():
     # their permissions, without their knowledge.
     from moo.moo_builtins import force_input
     assert force_input(None, 'quit') is None
+
+
+# --------------------------------------------------------------------------
+# Operators that look identical in both languages and are not.
+#
+# These are the quietest bugs a port can have: nothing raises, nothing
+# reads as wrong, and the verb behaves correctly on most inputs.
+# --------------------------------------------------------------------------
+
+def test_string_equality_ignores_case():
+    # mooR: crates/var/src/string.rs, PartialEq goes through
+    # cmp_case_insensitive.  "Foo" == "foo" is true in MOO.
+    from moo.moo_builtins import moo_eq
+    assert moo_eq('Foo', 'foo')
+    assert not ('Foo' == 'foo')       # what Python would have done
+
+
+def test_case_folding_recurses_into_lists():
+    from moo.moo_builtins import moo_eq
+    assert moo_eq([['A'], 'B'], [['a'], 'b'])
+
+
+def test_non_strings_compare_normally():
+    from moo.moo_builtins import moo_eq, moo_ne
+    assert moo_eq(1, 1) and not moo_eq(1, 2)
+    assert moo_ne('a', 'b')
+
+
+def test_integer_division_stays_integer():
+    # Python's / would give 3.5 here.
+    from moo.moo_builtins import moo_div
+    assert moo_div(7, 2) == 3
+    assert isinstance(moo_div(7, 2), int)
+
+
+def test_integer_division_truncates_toward_zero():
+    # Python's // floors, so it gives -4.  MOO, like C, gives -3.
+    from moo.moo_builtins import moo_div
+    assert moo_div(-7, 2) == -3
+    assert moo_div(7, -2) == -3
+    assert -7 // 2 == -4              # what Python would have done
+
+
+def test_float_division_is_still_float():
+    from moo.moo_builtins import moo_div
+    assert moo_div(7.0, 2) == 3.5
+
+
+def test_modulo_takes_the_sign_of_the_dividend():
+    # Python takes the sign of the divisor, giving 1.
+    from moo.moo_builtins import moo_mod
+    assert moo_mod(-7, 2) == -1
+    assert moo_mod(7, -2) == 1
+    assert -7 % 2 == 1                # what Python would have done
+
+
+def test_division_by_zero_raises_rather_than_returning():
+    import pytest
+    from moo.moo_builtins import moo_div, moo_mod
+    from moo.properties import MOOError
+    with pytest.raises(MOOError):
+        moo_div(1, 0)
+    with pytest.raises(MOOError):
+        moo_mod(1, 0)
+
+
+def test_listset_leaves_the_original_alone():
+    # MOO lists are values.  After `l2 = l1; l2[1] = 5;` l1 is unchanged.
+    from moo.moo_builtins import moo_listset
+    l1 = [1, 2, 3]
+    l2 = moo_listset(l1, 0, 9)
+    assert l1 == [1, 2, 3] and l2 == [9, 2, 3]

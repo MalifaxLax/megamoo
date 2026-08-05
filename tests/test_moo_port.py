@@ -663,3 +663,36 @@ def test_scatter_inside_an_expression_is_marked_not_fatal():
     r = port('while ({?a, @rest} = todo)\n  x = 1;\nendwhile')
     assert r.marks >= 1
     assert 'scatter assignment inside an expression' in ' '.join(r.notes)
+
+
+# --------------------------------------------------------------------------
+# Operators whose Python spelling means something else
+# --------------------------------------------------------------------------
+
+def test_string_comparison_goes_through_the_helper():
+    # MOO folds case, Python does not, and `x == "north"` looks fine
+    # right up until someone types "North".
+    assert 'moo_eq(argstr, "north")' in py('x = (argstr == "north");').code
+
+
+def test_a_numeric_operand_keeps_the_readable_spelling():
+    # The two languages only disagree when *both* sides are strings, so
+    # one known number is enough to make Python's operator safe.
+    assert 'x = (args == 0)' in py('x = (args == 0);').code
+    assert 'moo_' not in py('x = (args < 3);').code
+
+
+def test_an_unknowable_comparison_is_wrapped():
+    assert 'moo_eq(args, dobj)' in py('x = (args == dobj);').code
+
+
+def test_division_always_goes_through_the_helper():
+    # Unlike comparison, this difference is about integers, not strings,
+    # so `7 / 2` -- where both operands are plainly numbers -- is exactly
+    # the case that goes wrong.
+    assert 'moo_div(7, 2)' in py('x = 7 / 2;').code
+    assert 'moo_div(args, dobj)' in py('x = args / dobj;').code
+
+
+def test_modulo_always_goes_through_the_helper():
+    assert 'moo_mod(args, 4)' in py('x = args % 4;').code

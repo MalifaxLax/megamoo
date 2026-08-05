@@ -112,6 +112,65 @@ REFUSED = {
 }
 
 
+#: Comparisons whose Python spelling means something else, because MOO
+#: compares strings without regard to case.  Only these are skippable
+#: when neither operand can be a string.
+MOO_CMP = {'==': 'moo_eq', '!=': 'moo_ne', '<': 'moo_lt', '<=': 'moo_le',
+           '>': 'moo_gt', '>=': 'moo_ge'}
+
+#: Arithmetic whose Python spelling means something else.  These are
+#: *never* skippable: the difference is about integers, not strings, so
+#: `7 / 2` -- where both operands are plainly numbers -- is exactly the
+#: case that goes wrong.  MOO gives 3, Python's / gives 3.5, and Python's
+#: // gives 3 but rounds the wrong way on negatives.
+MOO_ARITH = {'/': 'moo_div', '%': 'moo_mod'}
+
+_NUMERIC_CALLS = ('len(', 'abs(', 'min(', 'max(', 'int(', 'float(',
+                  'len (', 'time.time(', 'random(', 'typeof(')
+
+
+def _provably_not_string(text: str) -> bool:
+    """
+    Whether *text* cannot possibly evaluate to a string.
+
+    Used to keep the readable spelling where it is safe to.  MOO compares
+    strings without regard to case, so ``==`` has to go through moo_eq
+    whenever a string might be involved -- but ``i == 0`` and
+    ``len(x) > 3`` never involve one, and rewriting those would make
+    every translation harder to read for no gain.
+
+    One side is enough.  The two languages only disagree when *both*
+    operands are strings, so a comparison with a number on either side can
+    keep Python's operator -- which is why `i == 0` stays readable while
+    `a == b`, where neither side is knowable, does not.
+
+    Deliberately conservative: it says no unless it is certain, because a
+    wrong yes here reinstates exactly the silent bug the helper exists to
+    remove.
+
+    Args:
+        text: Translated Python for one operand.
+
+    Returns:
+        True only when the value is certainly numeric or an object.
+    """
+    t = text.strip().strip('()').strip()
+    if not t:
+        return False
+    if re.fullmatch(r'-?\d+(\.\d+)?([eE][-+]?\d+)?', t):
+        return True
+    if t in ('None', 'True', 'False'):
+        return True
+    if t.startswith('#') and t[1:].lstrip('-').isdigit():
+        return True
+    if t.startswith(_NUMERIC_CALLS) and t.endswith(')'):
+        return True
+    # An arithmetic expression over things that are themselves numeric.
+    if re.fullmatch(r'[-+*/%\s\d().]+', t):
+        return True
+    return False
+
+
 def _has_bare_colon(text: str) -> bool:
     """Whether *text* is a slice rather than a single index."""
     depth = 0
@@ -899,6 +958,17 @@ class Porter:
                     inner = fn_side[len('typeof('):-1]
                     test = f'isinstance({inner}, {pair})'
                     left = test if op == '==' else f'not {test}'
+                    continue
+                if op in MOO_ARITH:
+                    left = f'{MOO_ARITH[op]}({left}, {right})'
+                    continue
+                if op in MOO_CMP and not (_provably_not_string(left) or
+                                          _provably_not_string(right)):
+                    # MOO compares strings without regard to case, and
+                    # nothing about `x == "north"` looks wrong until
+                    # someone types "North".  Skipped only where neither
+                    # side can be a string, to keep `i == 0` readable.
+                    left = f'{MOO_CMP[op]}({left}, {right})'
                     continue
                 left = f'{left} {word or self.OPS.get(op, op)} {right}'
                 continue
