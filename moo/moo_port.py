@@ -1727,6 +1727,8 @@ def _known_names() -> set:
         names |= {'list_utils', 'command_utils', 'code_utils', 'perm_utils'}
         from . import moo_builtins as _mb
         names |= set(_mb.__all__)
+        from . import moo_files as _mf
+        names |= set(_mf.__all__)
         # read() is engine machinery rather than a compatibility shim --
         # it takes the baton off the verb thread -- so it is bound by the
         # namespace builder and has to be named here.
@@ -1798,8 +1800,8 @@ def _will_not_parse(code: str) -> Optional[str]:
     if not body.strip():
         return None
     try:
-        from .verbs import preprocess_verb_code
-        body = preprocess_verb_code(body)
+        from .verbs import preprocess_objrefs
+        body = preprocess_objrefs(body)
     except Exception:
         pass
     wrapped = 'def _v():\n' + '\n'.join('    ' + l for l in body.splitlines())
@@ -1878,6 +1880,20 @@ def structure_of_python(code: str) -> dict:
     counts = {'if': 0, 'for': 0, 'while': 0, 'return': 0}
     if not body.strip():
         return counts
+    # Resolve objrefs first.  `#300` is a comment to Python, so a body
+    # containing one either loses the rest of its line or fails to parse
+    # outright -- and this function returns {} on a SyntaxError, so the
+    # loops inside simply went uncounted.  That is what made a correct
+    # translation of Inferno's forked verbs report as having dropped
+    # three for-loops it had translated perfectly well.
+    try:
+        # preprocess_objrefs, not preprocess_verb_code: the latter also
+        # wraps the body in `def _verb_(): ...`, which adds a return of
+        # its own and makes the counts describe the wrapper.
+        from .verbs import preprocess_objrefs
+        body = preprocess_objrefs(body)
+    except Exception:
+        pass
     try:
         tree = ast.parse('def _v():\n' +
                          '\n'.join('    ' + l for l in body.splitlines()))
