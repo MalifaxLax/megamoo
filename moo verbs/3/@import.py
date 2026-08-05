@@ -6,7 +6,7 @@ Usage: @import <file>
        @import/inert <file>
 
 Arguments:
-    file - A .db file in the imports/ directory.
+    file - A .db file in the imports/ directory, or an absolute path.
 
 Switches:
     /dry     - Report what would be imported without creating anything.
@@ -44,8 +44,8 @@ anything is created, which is the number to decide on.
 execute permission, its MOO source verbatim under a docstring explaining
 how to port it by hand.  Nothing is lost by not using it -- the translated
 form carries the same original -- so it is for when you mean to do the
-work yourself.  @grep for
-'UNPORTED MOO SOURCE' to find what is left to do.
+work yourself.  Those verbs are stored hidden, so @grep will not find
+them -- @kids or @audit on what was imported is the way to see them.
 
 Players.  Left out unless you ask.  A player object carries a password
 hash and a connection history that mean nothing here, and importing one
@@ -65,7 +65,14 @@ import os
 from moo.lambdamoo import parse, LambdaMOOError
 from moo.lambdamoo_import import import_lambda_db
 
+# Made rather than merely named.  The verb told people to put a file in
+# imports/ and then listed a directory that had never been created, so the
+# first thing it said was a dead end.
 folder = os.path.join(os.getcwd(), 'imports')
+try:
+    os.makedirs(folder, exist_ok=True)
+except OSError:
+    pass
 
 spec = (args or '').strip()
 if not spec:
@@ -86,10 +93,16 @@ if not spec:
 if not spec.endswith('.db'):
     spec += '.db'
 
-path = os.path.normpath(os.path.join(folder, spec))
-if not path.startswith(folder + os.sep):
-    pobj.msg("That is not in the imports directory.")
-    return
+# An absolute path is accepted as well.  This is an auth-3 verb and the
+# file is being read, not written, so insisting the database be copied
+# into one directory first was ceremony -- and a 196 MB copy at that.
+if os.path.isabs(spec):
+    path = os.path.normpath(spec)
+else:
+    path = os.path.normpath(os.path.join(folder, spec))
+    if not path.startswith(folder + os.sep):
+        pobj.msg("That is not in the imports directory.")
+        return
 
 if not os.path.exists(path):
     pobj.msg(f"No such file: {spec}")
@@ -188,4 +201,24 @@ if report['failures']:
         pobj.msg(f"    {item}")
 
 pobj.msg("")
-pobj.msg("%<245>-- @grep 'UNPORTED MOO SOURCE' to see what needs porting.%n")
+# What to do next depends on what actually happened, so say that rather
+# than printing one line of advice regardless.  The old text pointed at
+# @grep 'UNPORTED MOO SOURCE', which found nothing: inert verbs are stored
+# hidden and @grep skips those.
+if translate:
+    if report['ported_with_marks']:
+        pobj.msg(f"%<245>-- {report['ported_with_marks']} verb(s) carry "
+                 f"marks.  They run; the marked lines need a human:%n")
+        for entry in report['marked_verbs'][:10]:
+            pobj.msg(f"     {entry}")
+        if len(report['marked_verbs']) > 10:
+            pobj.msg(f"     %<245>...and {len(report['marked_verbs']) - 10} "
+                     f"more%n")
+    else:
+        pobj.msg("%<245>-- every verb translated without needing a human.%n")
+    if report['unported']:
+        pobj.msg(f"%<245>-- {report['unported']} verb(s) could not be read "
+                 f"as MOO and are stored inert and hidden.%n")
+else:
+    pobj.msg("%<245>-- verbs were kept inert.  Run without /inert to "
+             "translate them.%n")

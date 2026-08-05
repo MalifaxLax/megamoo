@@ -280,9 +280,14 @@ Original
     called as   <{verb.dobj}> {verb.prep_name} <{verb.iobj}>
 
 The MOO source is kept as comments at the foot of this verb.  Anything the
-translator could not render faithfully is marked with a {MARK_TEXT} line;
-a verb with none of those is one it believes it handled completely, which
-is a claim about the mechanical parts only and never about the logic.
+translator could not render faithfully carries a marker comment; a verb
+with none of those is one it believes it handled completely, which is a
+claim about the mechanical parts only and never about the logic.
+
+The marker is deliberately not spelled out here.  Writing it would put the
+literal string in every ported verb's header, so a search for verbs that
+actually carry one would match all of them -- which is exactly what
+happened, and made the search useless on an import of 1695 verbs.
 """'''
     footer = ('\n\n# --- original MOO source, for reference ---\n' + original)
     return f'{header}\n\n{result.code.rstrip()}\n{footer}\n', result.marks
