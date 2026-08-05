@@ -240,9 +240,26 @@ def test_code_for_a_missing_verb_warns_rather_than_raising():
 # Property names come from the inheritance chain
 # --------------------------------------------------------------------------
 
-def test_property_names_include_inherited(db):
+def test_property_names_put_the_objects_own_first(db):
+    """
+    LambdaMOO writes an object's own property definitions first, then its
+    parent's, then on up the chain.
+
+    This test asserted the opposite until it was checked against a real
+    database, and it is worth saying how that survived: the count still
+    matched, every value still had a name, and every name was simply the
+    wrong one -- shifted by however many properties the ancestors define.
+    LambdaCore's #0 inherits four from #1, so `$string_utils` read the
+    value four slots along and resolved to "generic thing" instead of
+    "string utilities".  Nothing looked broken.
+
+    The ground truth, from LambdaCore itself: $string_utils -> #20
+    "string utilities", $code_utils -> #59 "code utilities",
+    $failed_match -> #-3.  All three are right under own-first and wrong
+    under parent-first, which is what settled it.
+    """
     child = db.objects[1]
-    assert property_names_for(child, db) == ['title', 'count', 'extra']
+    assert property_names_for(child, db) == ['extra', 'title', 'count']
 
 
 def test_property_names_line_up_with_values(db):

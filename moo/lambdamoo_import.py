@@ -43,6 +43,7 @@ Verbs
 See :func:`build_inert_verb`.  Nothing imported can execute.
 """
 
+import re
 import time
 from typing import Dict, List, Optional
 
@@ -52,7 +53,7 @@ from .lambdamoo import (
 )
 
 __all__ = ['import_lambda_db', 'build_inert_verb', 'build_ported_verb',
-           'property_names_for']
+           'property_names_for', 'closure_for']
 
 
 #: Marks an imported verb.  Anything scanning for un-ported code looks for
@@ -108,10 +109,18 @@ def property_names_for(obj: LambdaObject, ldb: LambdaDB) -> List[str]:
     """
     Recover the property names matching an object's positional values.
 
-    LambdaMOO writes values in inheritance order -- root ancestor's
-    definitions first, then down the chain, then the object's own.  The
-    names live only on the object that defined them, so the chain has to be
-    walked to line names up with values.
+    LambdaMOO writes an object's **own** definitions first, then its
+    parent's, then on up the chain.  The names live only on the object
+    that defined them, so the chain has to be walked to line names up with
+    values.
+
+    The order was the other way round here until it was checked against a
+    known answer, and being wrong about it is silent: the count still
+    matches, every value still has a name, and every name is simply the
+    wrong one -- offset by however many properties the ancestors define.
+    LambdaCore's #0 inherits four from #1, so `$string_utils` was reading
+    the value four slots along and resolving to "generic thing".  A test
+    that only asked whether names resolved passed throughout.
 
     The ``seen`` guard is not paranoia: a damaged database can contain a
     parent cycle, and without it this loops forever.
@@ -131,8 +140,8 @@ def property_names_for(obj: LambdaObject, ldb: LambdaDB) -> List[str]:
         node = ldb.objects.get(node.parent) if node.parent >= 0 else None
 
     names: List[str] = []
-    for ancestor in reversed(chain):
-        names.extend(ancestor.propdefs)
+    for obj_in_chain in chain:          # own first, then up the chain
+        names.extend(obj_in_chain.propdefs)
     return names
 
 
@@ -279,6 +288,88 @@ is a claim about the mechanical parts only and never about the logic.
     return f'{header}\n\n{result.code.rstrip()}\n{footer}\n', result.marks
 
 
+def closure_for(ldb: LambdaDB, roots, max_objects: int = 500):
+    """
+    The objects a set of objects actually needs, following references.
+
+    Porting one verb out of a large database is the case this exists for.
+    Inferno is 61110 objects and nobody wants all of them, but a verb that
+    calls ``$su:_pSub2()`` needs whatever ``$su`` is, and whatever *that*
+    calls in turn.  Bringing across the transitive set is the difference
+    between a verb that runs and one that is 90% marks.
+
+    What counts as a reference: any ``#N`` or ``$name`` appearing in the
+    object's **verb code**, plus its parent chain.
+
+    Property *values* are deliberately not followed, and that is the whole
+    difference between a usable closure and an unusable one.  A utility
+    object holds references to rooms, players and items as data, so
+    following them drags in the world -- starting from ``$su`` alone and
+    following values reaches 400 objects without finishing, and 2000 while
+    still growing.  Following only code reaches what the verbs actually
+    call, which is what a port needs to run.
+
+    Args:
+        ldb: The parsed source database.
+        roots: Object numbers to start from, or ``$names`` on #0.
+        max_objects: Stop after this many, so a runaway closure over a
+            whole world fails visibly rather than importing 61110 objects
+            because something referenced #1.
+
+    Returns:
+        ``(objnums, truncated)`` -- the set to import, and whether the cap
+        was hit.
+    """
+    zero = ldb.objects.get(0)
+    sysnames = {}
+    if zero is not None:
+        names = property_names_for(zero, ldb)
+        for i, nm in enumerate(names):
+            if i < len(zero.propvals):
+                sysnames[nm.lower()] = zero.propvals[i][0]
+
+    def as_objnum(value):
+        num = getattr(value, 'objid', None)
+        if num is None and isinstance(value, int):
+            num = value
+        if num is None:
+            m = re.fullmatch(r'#(-?\d+)', str(value).strip())
+            num = int(m.group(1)) if m else None
+        return num if (num is not None and num >= 0
+                       and num in ldb.objects) else None
+
+    pending, found, truncated = [], set(), False
+    for r in roots:
+        n = as_objnum(r) if not isinstance(r, str) or r.lstrip('#-').isdigit() \
+            else as_objnum(sysnames.get(r.lstrip('$').lower()))
+        if n is not None:
+            pending.append(n)
+
+    ref_re = re.compile(r'#(\d+)|\$([A-Za-z_]\w*)')
+    while pending:
+        num = pending.pop()
+        if num in found:
+            continue
+        if len(found) >= max_objects:
+            truncated = True
+            break
+        found.add(num)
+        obj = ldb.objects.get(num)
+        if obj is None:
+            continue
+        if obj.parent is not None and obj.parent >= 0:
+            pending.append(obj.parent)
+        text = '\n'.join(v.code or '' for v in obj.verbs)
+        for m in ref_re.finditer(text):
+            if m.group(1) is not None:
+                nxt = as_objnum(int(m.group(1)))
+            else:
+                nxt = as_objnum(sysnames.get(m.group(2).lower()))
+            if nxt is not None and nxt not in found:
+                pending.append(nxt)
+    return found, truncated
+
+
 def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                      root_parent: int = 1, dry_run: bool = False,
                      skip_players: bool = True, translate: bool = True,
@@ -330,6 +421,9 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
         # still carry marks, and how many could not be read as MOO at all.
         'ported': 0, 'ported_with_marks': 0, 'unported': 0,
         'marked_verbs': [],
+        # $names copied onto this database's #0, and the ones that were
+        # already taken and so left alone.
+        'refs_registered': 0, 'ref_conflicts': [],
         'objmap': {}, 'unresolved_refs': [], 'failures': [], 'renamed': {},
     }
 
@@ -409,6 +503,18 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
 
         if src.name:
             obj.noun = src.name.split()[0] if src.name.split() else src.name
+
+        # Build the object with auto-save off, then write it once.
+        #
+        # add_property() calls _mark_modified(), which saves the whole
+        # object -- so importing an object with N properties wrote it N
+        # times, each write carrying every property added so far.  That is
+        # 1+2+...+N rows for one object: LambdaCore's #0 has 243
+        # properties and was saved 243 times, and the import as a whole
+        # did 14131 whole-object writes.  It is why LambdaCore took 309
+        # seconds where JHCore, with a quarter the property values, took
+        # seven.
+        obj._auto_save = False
 
         names = property_names_for(src, ldb)
         for i, (value, _powner, pperms) in enumerate(src.propvals):
@@ -529,9 +635,44 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                     f"#{src.objid}:{clean[0]}: {err}")
 
         try:
+            obj._auto_save = True
             db.save_object(obj)
         except Exception as err:
             report['failures'].append(f"#{src.objid}: save ({err})")
+
+    # ---- register the source's $refs on this database's #0 ------------
+    #
+    # The source's own system object is imported like any other, so it
+    # arrives as a numbered object carrying all its $names -- correctly
+    # remapped, and completely useless where it sits.  `$string_utils`
+    # resolves against #0, not against whatever #0 became, so without this
+    # step every ported verb that says $string_utils:foo() is looking at
+    # nothing.  An import whose $refs do not resolve is half an import.
+    #
+    # An existing property always wins.  The destination's $chair is its
+    # own; an import must not redefine what a world already means by a
+    # name, and reporting the clash is more useful than silently choosing.
+    zero_src = next((o for o in sources if o.objid == 0), None)
+    if zero_src is not None and objmap.get(0) is not None:
+        try:
+            here = db.get_object(0)
+            there = db.get_object(objmap[0])
+            for pname in sorted(getattr(there, 'properties', None) or {}):
+                if pname == ORIGIN_PROP:
+                    continue
+                if pname in (getattr(here, 'properties', None) or {}):
+                    report['ref_conflicts'].append(pname)
+                    continue
+                try:
+                    here.add_property(pname,
+                                      there.properties[pname].value,
+                                      owner=owner, perms='rc')
+                    report['refs_registered'] += 1
+                except Exception as err:
+                    report['failures'].append(f"$#{pname}: {err}")
+            db.save_object(here)
+        except Exception as err:
+            report['failures'].append(f"registering $refs on #0: {err}")
 
     report['unresolved_refs'] = sorted(set(report['unresolved_refs']))
     return report
