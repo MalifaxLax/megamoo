@@ -1727,8 +1727,13 @@ def _known_names() -> set:
         names |= {'list_utils', 'command_utils', 'code_utils', 'perm_utils'}
         from . import moo_builtins as _mb
         names |= set(_mb.__all__)
-        from . import moo_files as _mf
-        names |= set(_mf.__all__)
+        try:
+            # Optional: only present in a tree that ports from a server
+            # with file builtins.
+            from . import moo_files as _mf
+            names |= set(_mf.__all__)
+        except ImportError:
+            pass
         # read() is engine machinery rather than a compatibility shim --
         # it takes the baton off the verb thread -- so it is bound by the
         # namespace builder and has to be named here.

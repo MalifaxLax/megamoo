@@ -512,13 +512,17 @@ def _inject_moo_builtins(namespace: Dict[str, Any], pobj, db) -> None:
     # obviously `random`, take the MOO spelling of a name this engine
     # already uses differently, and the two vocabularies should not have
     # to fight over it.
-    # Inferno-style file builtins, confined to one directory.  Bound
-    # unconditionally: they are present but refuse to work until a files
-    # root is set, so a ported verb gets a clear error rather than a
-    # NameError, and a server that never configured one is not exposed.
-    from . import moo_files as _mf
-    for _n in _mf.__all__:
-        namespace[_n] = getattr(_mf, _n)
+    # File builtins, for databases ported from a server that had them.
+    # Optional: the module is not part of the base distribution, and a
+    # tree without it simply does not bind these names.  Where it is
+    # present the functions refuse to work until a files root is set, so a
+    # server that never configured one is not exposed either way.
+    try:
+        from . import moo_files as _mf
+        for _n in _mf.__all__:
+            namespace[_n] = getattr(_mf, _n)
+    except ImportError:
+        pass
 
     from . import moo_builtins as _mb
     for _n in _mb.__all__:
