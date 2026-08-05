@@ -15,10 +15,17 @@ in the output rather than quietly emitted.
 What it will not do
 -------------------
 
-``fork``, ``read()``, the backtick error-catch form (`` `x ! E_PERM' ``)
-and ``try``/``except`` are left as marked comments rather than approximated.
-They have no faithful one-line equivalent, and a plausible-looking wrong
-translation is worse than an obvious hole.
+``read()`` is left as a marked comment rather than approximated: it blocks
+for player input, and there is no faithful one-line equivalent.  A
+plausible-looking wrong translation is worse than an obvious hole.
+
+Where a construct has no Python *syntax* but does have honest semantics, it
+goes through a helper instead of being refused.  ``raise()`` inside an
+expression becomes ``moo_raise()``, assignment inside an expression becomes
+``moo_setprop``/``moo_setitem``, and ``fork`` becomes a deferred code string
+handed to the scheduler.  A function call is an expression, so the idiom
+survives; refusing these only moved the work to a human who would have
+written the same thing.
 
 Everything it emits that a human should check carries a ``# PORT:`` line, so
 the residue is greppable.  A verb with no ``# PORT:`` markers is one the
@@ -27,6 +34,7 @@ mechanical parts only, never about whether the logic is right.
 """
 
 import ast
+import keyword
 import re
 from typing import List, Optional, Tuple
 
@@ -94,10 +102,48 @@ TYPE_TESTS = {
 
 #: Constructs deliberately not translated.
 REFUSED = {
-    'fork': 'fork has no equivalent; use delay()/fork() with a code string, '
-            'or restructure around suspend()',
     'read': 'read() blocks for player input; use an interactive session',
 }
+
+
+def _has_bare_colon(text: str) -> bool:
+    """Whether *text* is a slice rather than a single index."""
+    depth = 0
+    for ch in text:
+        if ch in '([{':
+            depth += 1
+        elif ch in ')]}':
+            depth -= 1
+        elif ch == ':' and depth == 0:
+            return True
+    return False
+
+
+def _safe_name(name: str) -> str:
+    """
+    Rename a MOO variable that Python will not let us spell.
+
+    ``from``, ``class``, ``as``, ``is``, ``in``, ``lambda``, ``global``
+    and ``None`` are all perfectly ordinary variable names in MOO, and
+    JHCore uses several of them -- ``from`` alone appears in thirteen
+    verbs, mostly the mail system.  Left alone they produce a syntax
+    error, which is at least loud, but the verb does not run at all.
+
+    A trailing underscore is the fix, and it has to happen here, at the
+    single point where a name is translated, so that reads and writes are
+    renamed identically.  Renaming in one place and not the other would
+    turn a syntax error into a verb that runs and quietly uses the wrong
+    variable.
+
+    Args:
+        name: The translated name.
+
+    Returns:
+        The name, with ``_`` appended if Python has claimed it.
+    """
+    if keyword.iskeyword(name) or name in ('None', 'True', 'False'):
+        return name + '_'
+    return name
 
 
 class MooSyntaxError(Exception):
@@ -265,6 +311,8 @@ class Porter:
                 return self.while_stmt(indent)
             if t == 'try':
                 return self.try_stmt(indent)
+            if t == 'fork':
+                return self.fork_stmt(indent)
             if t == 'return':
                 self.next()
                 if self.at(';'):
@@ -383,7 +431,7 @@ class Porter:
         pad = '    ' * indent
         depth = 0
         raw = []
-        end = {'fork': 'endfork', 'try': 'endtry'}.get(word)
+        end = {'try': 'endtry'}.get(word)
         while True:
             k, t, ln = self.peek()
             if k == 'eof':
@@ -507,6 +555,62 @@ class Porter:
             self.eat_semi()
         return out
 
+    def fork_stmt(self, indent) -> List[str]:
+        """
+        ``fork (n) ... endfork`` -- run a block later, in its own task.
+
+        The engine's fork() takes the deferred work as a *code string*
+        rather than a callable, because a scheduled task is resumed on a
+        fresh thread out of a queue and there is no live frame to
+        re-enter.  So the body is translated like any other block, bound
+        to a name above the call, and handed over with a snapshot of the
+        namespace.
+
+        The snapshot is the part with a real consequence, and it matches
+        MOO: a forked task sees the values its parent held at the moment
+        of the fork, not whatever they became afterwards.  A verb that
+        forks inside a loop and expects the loop variable to have moved
+        on is disappointed here exactly as it would be there.
+
+        The body is bound to a variable rather than written inline
+        because it is a multi-line string in the middle of a call
+        argument, and putting it there would wreck the indentation of
+        everything around it.
+        """
+        pad = '    ' * indent
+        self.expect('fork')
+        # `fork name (n)` binds the new task id.  Unlike while's loop
+        # label this is worth keeping -- it is a real value, and
+        # kill_task() is called with it later.
+        target = None
+        if self.peek()[0] == 'name' and self.peek(1)[1] == '(':
+            target = self.next()[1]
+        self.expect('(')
+        secs = self._paren(self.expr)
+        self.expect(')')
+        body = self.block(0, ('endfork',))
+        self.expect('endfork')
+
+        self._forks = getattr(self, '_forks', 0) + 1
+        name = f'_forked_{self._forks}'
+        text = '\n'.join(body)
+        lhs = f'{target} = ' if target else ''
+
+        # Triple quotes keep the deferred code readable in the output, but
+        # only when the body cannot end them early.  repr() is always
+        # correct, so it is the fallback rather than the default.
+        if "'''" in text or text.endswith("'") or '\\' in text:
+            return [f'{pad}{name} = {text!r}',
+                    f'{pad}{lhs}fork({secs}, {name}, dict(globals()))']
+        # Both the body and the closing quote sit at column 0 even inside
+        # an indented block.  Indentation inside a string literal is part
+        # of the string, and the deferred code is compiled on its own, so
+        # a padded body would arrive pre-indented and fail to parse.
+        return ([f"{pad}{name} = '''"] +
+                text.splitlines() +
+                ["'''",
+                 f'{pad}{lhs}fork({secs}, {name}, dict(globals()))'])
+
     def while_stmt(self, indent) -> List[str]:
         pad = '    ' * indent
         self.expect('while')
@@ -560,15 +664,68 @@ class Porter:
             if left.isidentifier():
                 left = f'({left} := {rhs})'
             else:
-                # Python's walrus binds plain names only, so assigning to a
-                # property or an element *inside* an expression has no inline
-                # form.  Mark it rather than emit something that will not
-                # compile: the fix is to lift it to its own statement above.
-                left = self.mark_expr(
-                    'assignment inside an expression to something Python '
-                    'cannot bind inline; lift it to its own statement',
-                    f'{left} = {rhs}')
+                # Python's walrus binds plain names only, so a property or
+                # element target has no inline form.  A call is still an
+                # expression, though, so the write goes through a helper
+                # instead of being marked and left for a human.
+                #
+                # The two helpers do not return the same thing, and that
+                # is MOO's doing rather than a wrinkle here: `o.p = v`
+                # evaluates to v, but `l[i] = v` evaluates to the whole
+                # list, because MOO lists are values and the assignment
+                # produces the new one.
+                target = self._split_target(left)
+                if target is None:
+                    left = self.mark_expr(
+                        'assignment inside an expression to something with '
+                        'no inline form; lift it to its own statement',
+                        f'{left} = {rhs}')
+                elif target[0] == 'prop':
+                    left = f'moo_setprop({target[1]}, {target[2]!r}, {rhs})'
+                else:
+                    left = f'moo_setitem({target[1]}, {target[2]}, {rhs})'
         return left
+
+    @staticmethod
+    def _split_target(text: str):
+        """
+        Take apart an already-translated assignment target.
+
+        Args:
+            text: Translated Python for the left side, e.g. ``this.name``
+                or ``lst[i - 1]``.
+
+        Returns:
+            ``('prop', obj, name)``, ``('item', seq, index)``, or None if
+            it is not a shape that can be written through a helper.
+
+        The bracket scan counts depth rather than searching for the first
+        ``[``, because the container is itself an expression and may carry
+        brackets of its own -- ``x[1][2]`` must split at the last pair.
+        """
+        if text.endswith(']'):
+            depth = 0
+            for i in range(len(text) - 1, -1, -1):
+                if text[i] == ']':
+                    depth += 1
+                elif text[i] == '[':
+                    depth -= 1
+                    if depth == 0:
+                        seq, index = text[:i], text[i + 1:-1]
+                        if not seq or not index:
+                            return None
+                        # A range target -- MOO's x[i..j] = v -- arrives as
+                        # a Python slice, and `a:b` is not an expression,
+                        # so it cannot be passed to a helper.  Refuse it
+                        # rather than emit something that will not compile.
+                        if _has_bare_colon(index):
+                            return None
+                        return ('item', seq, index)
+            return None
+        head, dot, name = text.rpartition('.')
+        if dot and name.isidentifier() and head:
+            return ('prop', head, name)
+        return None
 
     def binary(self, level: int) -> str:
         if level >= len(self.BIN):
@@ -600,9 +757,9 @@ class Porter:
                 # whole comparison into an isinstance(), rather than emit
                 # a _typeof() and a bare LIST that exist nowhere.
                 pair = TYPE_TESTS.get(right) or TYPE_TESTS.get(left)
-                fn_side = left if left.startswith('_typeof(') else right
-                if pair and fn_side.startswith('_typeof(') and op in ('==', '!='):
-                    inner = fn_side[len('_typeof('):-1]
+                fn_side = left if left.startswith('typeof(') else right
+                if pair and fn_side.startswith('typeof(') and op in ('==', '!='):
+                    inner = fn_side[len('typeof('):-1]
                     test = f'isinstance({inner}, {pair})'
                     left = test if op == '==' else f'not {test}'
                     continue
@@ -655,17 +812,12 @@ class Porter:
 
         code_tuple = ('(' + ', '.join(f"'{c}'" for c in codes) +
                       (',)' if len(codes) == 1 else ')')) if codes else "('ANY',)"
-        if 'E_PROPNF' in codes:
-            # Worth saying, because it is silent: MOO raises E_PROPNF when
-            # a property is missing, so the fallback fires.  Here a missing
-            # property returns the falsy _null_attr sentinel and nothing is
-            # raised, so the fallback does *not* fire and the sentinel is
-            # the value.  Usually equivalent, since both are falsy -- but
-            # not when the fallback is a real default.
-            self.note('caught E_PROPNF: reading a missing property here '
-                      'returns the falsy sentinel rather than raising, so '
-                      'the fallback will not fire -- use `or default`')
-            self.marks += 1
+        # E_PROPNF used to be marked here: a missing property returns the
+        # falsy sentinel rather than raising, so the fallback would not
+        # have fired and the sentinel would have been the value.  catch()
+        # now recognises the sentinel and applies the fallback, which is
+        # the right place for the fix -- one function rather than a note on
+        # every backtick in the corpus.
 
         if fallback is None:
             # Without `=>` the value is the error itself, which is what
@@ -702,7 +854,13 @@ class Porter:
                 raise MooSyntaxError(f'line {ln}: $ outside an index')
             return f'len({self.receiver[-1]})'
         if k == 'name':
-            return VARIABLES.get(t, t)
+            # Only *variables* get the keyword rename.  A name followed by
+            # `(` is a call, and the call handler dispatches on MOO's own
+            # spelling -- renaming `raise` to `raise_` here would hide it
+            # from the branch that knows what raise() means.
+            if self.at('('):
+                return VARIABLES.get(t, t)
+            return _safe_name(VARIABLES.get(t, t))
         raise MooSyntaxError(f'line {ln}: unexpected {t!r}')
 
     def postfix(self, val: str) -> str:
@@ -815,24 +973,25 @@ class Porter:
             # and with no argument, now.  Both are time.ctime exactly.
             self.needs_import.add('time')
             return f'time.ctime({joined})'
-        if fn in ('seconds_left', 'server_log', 'boot_player'):
-            return self.mark_expr(
-                f'{fn}() has no equivalent here', f'{fn}({joined})')
+
         if fn == 'strsub' and len(args) >= 3:
             return f'{args[0]}.replace({args[1]}, {args[2]})'
         if fn == 'toliteral':
             return f'repr({joined})'
         if fn == 'raise':
-            # Python can only raise as a statement.  statement() handles the
-            # case where raise() *is* the whole statement; anywhere else --
-            # `expr || raise(E_PERM)` is the common MOO idiom -- there is no
-            # equivalent, so it is marked rather than emitted inline.
-            return self.mark_expr(
-                'raise() inside an expression; Python raises only as a '
-                'statement, so restructure this',
-                f'raise({joined})')
+            # Python raises only as a statement, but MOO's raise() is an
+            # expression and the common idiom puts it inside one:
+            # `caller_perms().wizard || raise(E_PERM)`.  A call *is* an
+            # expression, so moo_raise keeps the idiom rather than asking
+            # for the verb to be restructured by hand.
+            return f'moo_raise({joined})'
         if fn == 'caller_perms':
-            return 'caller'
+            # Not `caller`.  MOO's caller_perms() is the *owner of the
+            # calling verb*, and `caller` is the calling object -- often
+            # different, and the difference is what the check turns on,
+            # since `caller_perms().wizard` guards real permissions.  This
+            # mapped to `caller` only while the real builtin was missing.
+            return 'caller_perms()'
         if fn == 'is_player':
             return f'{joined}.is_player'
         if fn == 'index' and len(args) >= 2:
@@ -847,6 +1006,14 @@ class Porter:
             # call, and it was the fifth commonest mark in the corpus.
             self.needs_import.add('time')
             return 'time.time()'
+        if fn == 'rindex' and len(args) >= 2:
+            # As index(), but the last occurrence.  1-based, 0 when absent.
+            return f'({args[0]}.rfind({args[1]}) + 1)'
+        if fn == 'listset' and len(args) >= 3:
+            # MOO's listset(list, value, index) returns a *new* list, so
+            # the copy is the point -- writing through would mutate a list
+            # the caller still holds.
+            return f'moo_setitem(list({args[0]}), {args[2]}, {args[1]})'
         if fn == 'listdelete' and len(args) == 2:
             lst, i = args
             return f'({lst}[:{_minus1(i)}] + {lst}[{i}:])'
@@ -892,7 +1059,7 @@ class Porter:
         if fn == 'typeof':
             # Handled as a whole comparison in binary() when it is compared
             # against a type constant, which is how MOO always writes it.
-            return f'_typeof({joined})'
+            return f'typeof({joined})'
         if fn == 'valid':
             return f'({joined} != None)'
         if fn == 'toobj':
@@ -913,6 +1080,14 @@ def _assign(target: str, value: str) -> str:
     m = re.fullmatch(r'getattr\((.*), (.*)\)', target, re.S)
     if m:
         return f'setattr({m.group(1)}, {m.group(2)}, {value})'
+    if target in ('None', 'True', 'False'):
+        # A sysref that maps to a constant rather than an object, being
+        # written to: `$nothing = ""` in core setup code.  There is no
+        # object here to store it on, and guessing at one would be worse
+        # than saying so, so the line becomes a mark carrying the
+        # original.  Rare -- two verbs in JHCore -- but it produced code
+        # that did not compile at all.
+        return f'{MARK} cannot assign to {target}  --  was: {target} = {value}'
     return f'{target} = {value}'
 
 
@@ -980,6 +1155,8 @@ def _known_names() -> set:
         from . import moo_libs as _libs
         names |= set(_libs.__all__)
         names |= {'list_utils', 'command_utils', 'code_utils', 'perm_utils'}
+        from . import moo_builtins as _mb
+        names |= set(_mb.__all__)
     except Exception:
         pass
     return names | _VERB_CONTEXT | set(dir(_py))
@@ -1119,6 +1296,19 @@ def port(source: str) -> PortResult:
         p.marks += 1
         p.note(f"'{name}' is not defined anywhere a verb can see; it is "
                f"probably a MOO builtin with no equivalent here")
+
+    # A MARK can be emitted from a module-level helper that has no way to
+    # reach the counter, and `clean` is built on the counter.  Reconciling
+    # against the body means a mark cannot reach the output uncounted --
+    # reporting a verb clean while it still carries a # PORT: line is the
+    # one lie this whole tool exists to avoid.
+    emitted = sum(1 for l in lines if l.lstrip().startswith(MARK))
+    for l in lines:
+        stripped = l.lstrip()
+        if stripped.startswith(MARK):
+            p.note(stripped[len(MARK):].strip())
+    if emitted > p.marks:
+        p.marks = emitted
 
     header = []
     if p.notes:

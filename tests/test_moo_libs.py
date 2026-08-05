@@ -408,3 +408,76 @@ def test_port_maps_the_nothing_constants():
     r = port('if (dobj == $nothing || dobj == $failed_match) return; endif')
     assert 'None' in r.code and 'FAILED_MATCH' in r.code
     assert r.marks == 0
+
+
+def test_setitem_does_not_shift_an_already_shifted_index():
+    # @port shifts subscripts as it translates, so MOO's x[1] arrives as
+    # x[0].  Shifting again would write to x[-1] -- no error, just the
+    # wrong end of the list.
+    from moo.moo_builtins import moo_setitem
+    lst = [1, 2, 3]
+    assert moo_setitem(lst, 0, 9) == [9, 2, 3]
+
+
+def test_setitem_returns_the_container_not_the_value():
+    # MOO's indexed assignment evaluates to the whole list.
+    from moo.moo_builtins import moo_setitem
+    assert moo_setitem([1, 2], 0, 9) == [9, 2]
+
+
+def test_setprop_returns_the_value_unlike_setitem():
+    from moo.moo_builtins import moo_setprop
+
+    class O:
+        pass
+    o = O()
+    assert moo_setprop(o, 'x', 7) == 7 and o.x == 7
+
+
+def test_moo_random_includes_both_ends():
+    from moo.moo_builtins import random
+    seen = {random(3) for _ in range(300)}
+    assert seen == {1, 2, 3}
+
+
+def test_typeof_returns_moos_constants():
+    from moo.moo_builtins import typeof, LIST, STR, INT, FLOAT
+    assert typeof([1]) == LIST and typeof('a') == STR
+    assert typeof(1) == INT and typeof(1.0) == FLOAT
+
+
+def test_both_type_constant_spellings_agree():
+    # JHCore writes LIST, LambdaCore writes TYPE_LIST, and a core that
+    # compared one against the other must still get the right answer.
+    from moo.moo_builtins import LIST, TYPE_LIST, STR, TYPE_STR
+    assert LIST == TYPE_LIST and STR == TYPE_STR
+
+
+def test_strcmp_is_case_sensitive():
+    from moo.moo_builtins import strcmp
+    assert strcmp('A', 'a') != 0
+    assert strcmp('a', 'a') == 0
+
+
+def test_moo_raise_raises():
+    import pytest
+    from moo.moo_builtins import moo_raise
+    from moo.properties import MOOError
+    with pytest.raises(MOOError):
+        moo_raise('E_PERM')
+
+
+def test_catch_uses_the_fallback_for_a_missing_property():
+    # A missing property returns the falsy sentinel rather than raising,
+    # so `x.foo ! E_PROPNF => 0' would otherwise sail past the except.
+    from moo.builtins import catch
+    from moo.objects import _null_attr
+    assert catch(lambda: _null_attr, ('E_PROPNF',), lambda: 'd') == 'd'
+
+
+def test_catch_keeps_a_property_that_really_holds_a_falsy_value():
+    # The test is against the sentinel, not against falsiness: a property
+    # holding 0 must keep its own value.
+    from moo.builtins import catch
+    assert catch(lambda: 0, ('E_PROPNF',), lambda: 'd') == 0
+    assert catch(lambda: '', ('E_PROPNF',), lambda: 'd') == ''

@@ -398,6 +398,11 @@ class PlayerConnection:
         self.host = peername[0] if peername else 'unknown'
         self.port = peername[1] if peername else 0
         self.connected_at = datetime.now()
+        #: When this connection last sent a line.  MOO's idle_seconds()
+        #: reports against it, and it starts at connect time so a player
+        #: who has said nothing yet reads as idle since they arrived
+        #: rather than as never active at all.
+        self.last_activity = self.connected_at
 
         logger.info(f"New connection from {self.host}:{self.port}")
 
@@ -1099,6 +1104,7 @@ class PlayerConnection:
         while True:
             try:
                 line = await self.reader.readline()
+                self.last_activity = datetime.now()
                 if not line:
                     # EOF — client disconnected
                     self._disconnected = True

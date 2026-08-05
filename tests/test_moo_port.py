@@ -174,12 +174,15 @@ def test_backtick_becomes_a_catch():
     assert "catch(lambda: this.foo, ('E_PROPNF',), lambda: 0)" in r.code
 
 
-def test_catching_e_propnf_is_flagged_as_behaving_differently():
+def test_catching_e_propnf_needs_no_warning():
     # MOO raises when a property is missing; here it returns the falsy
-    # sentinel, so the fallback never fires.  Silent unless said.
+    # sentinel and nothing is raised.  That used to be marked on every
+    # backtick in the corpus; catch() recognises the sentinel instead, so
+    # the translation is now simply correct.  See test_moo_libs for the
+    # behaviour itself, including that a property really holding 0 keeps
+    # its own value rather than taking the fallback.
     r = port("""x = `this.foo ! E_PROPNF => 5';""")
-    assert r.marks >= 1
-    assert 'sentinel' in ' '.join(r.notes)
+    assert r.marks == 0
 
 
 def test_backtick_without_a_fallback_yields_the_error():
@@ -201,10 +204,74 @@ def test_backtick_nests_because_it_is_an_expression():
     assert r.clean
 
 
-def test_fork_is_marked_not_guessed():
+def test_fork_becomes_a_scheduled_code_string():
+    # The engine's fork() takes the deferred work as source, because a
+    # scheduled task resumes on a fresh thread with no frame to re-enter.
     r = port('fork (5)\n  player:tell("later");\nendfork')
-    assert r.marks == 1
-    assert 'delay()' in ' '.join(r.notes)
+    assert r.marks == 0
+    assert 'fork(5, _forked_1, dict(globals()))' in r.code
+    assert 'tell(pobj, "later")' in r.code
+
+
+def test_fork_keeps_the_task_id_when_one_is_named():
+    # `fork tid (n)` binds the new task's id, and kill_task() is called
+    # with it later, so dropping the name would break the pair.
+    r = port('fork tid (0)\n  x = 1;\nendfork')
+    assert 'tid = fork(0,' in r.code
+
+
+def test_forked_body_is_not_indented_by_its_surroundings():
+    # The body is compiled on its own, so indentation carried in from an
+    # enclosing block would make it fail to parse.
+    r = port('if (1)\n  fork (2)\n    x = 1;\n  endfork\nendif')
+    assert '\nx = 1\n' in r.code
+
+
+def test_raise_survives_inside_an_expression():
+    # `perms || raise(E_PERM)` is the standard permission guard, and it is
+    # an expression in MOO.  A call is an expression in Python too.
+    r = port('caller_perms().wizard || raise(E_PERM);')
+    assert 'moo_raise(E_PERM)' in r.code
+    assert r.marks == 0
+
+
+def test_caller_perms_is_not_caller():
+    # The owner of the calling verb, not the calling object.  The two
+    # differ, and `caller_perms().wizard` guards real permissions.
+    r = port('x = caller_perms();')
+    assert 'caller_perms()' in r.code
+
+
+def test_assignment_to_a_property_inside_an_expression():
+    r = port('if (this.name = "bob")\n  x = 1;\nendif')
+    assert "moo_setprop(this, 'name', \"bob\")" in r.code
+    assert r.marks == 0
+
+
+def test_assignment_to_an_element_inside_an_expression():
+    # The index is shifted here, in the translation -- which is why
+    # moo_setitem must not shift it a second time.
+    r = port('if (args[1] = 3)\n  x = 1;\nendif')
+    assert 'moo_setitem(args, 0, 3)' in r.code
+
+
+def test_indexed_assignment_splits_at_the_last_bracket():
+    # The container is itself an expression and may carry brackets of its
+    # own, so a scan for the first `[` would split in the wrong place.
+    r = port('if (args[1][2] = 3)\n  x = 1;\nendif')
+    assert 'moo_setitem(args[0], 1, 3)' in r.code
+
+
+def test_listset_copies_rather_than_writing_through():
+    # MOO's listset returns a new list; mutating would hit one the caller
+    # still holds.
+    r = port('x = listset(args, 9, 2);')
+    assert 'moo_setitem(list(args), 2, 9)' in r.code
+
+
+def test_rindex_is_one_based_like_index():
+    r = port('x = rindex(argstr, ".");')
+    assert '(argstr.rfind(".") + 1)' in r.code
 
 
 def test_try_becomes_a_python_try():
@@ -416,9 +483,49 @@ def test_raise_as_a_statement():
     assert 'raise E_PERM' in py('raise(E_PERM);').code
 
 
-def test_raise_inside_an_expression_is_marked():
-    # Python raises only as a statement; `expr || raise(E_PERM)` cannot be
-    # written inline, so it must not be emitted as though it could.
+def test_a_moo_variable_named_from_is_renamed():
+    # `from`, `class` and `as` are ordinary variable names in MOO -- from
+    # alone appears in thirteen JHCore verbs, mostly the mail system.
+    r = port('from = args[1];\nx = from;')
+    assert 'from_ = args[0]' in r.code and 'x = from_' in r.code
+
+
+def test_the_rename_is_applied_to_reads_and_writes_alike():
+    # Renaming one and not the other would turn a syntax error into a
+    # verb that runs and uses the wrong variable.
+    r = port('class = 1;\nclass = class + 1;')
+    assert 'class ' not in r.code
+    assert 'class_ = class_ + 1' in r.code
+
+
+def test_a_called_name_is_not_renamed():
+    # raise() is a MOO builtin whose name Python has claimed.  Renaming it
+    # as though it were a variable would hide it from the branch that
+    # knows what it means.
     r = port('x || raise(E_PERM);')
+    assert 'moo_raise(E_PERM)' in r.code
+
+
+def test_range_assignment_inside_an_expression_is_refused():
+    # MOO's x[i..j] = v arrives as a Python slice, and `a:b` is not an
+    # expression, so it cannot be handed to moo_setitem.
+    r = port('(args[2][1..1] != "w") && (args[2][1..1] = " ");')
+    assert 'moo_setitem' not in r.code
     assert r.marks >= 1
-    assert not any('or raise' in l for l in r.code.splitlines())
+
+
+def test_assigning_to_a_constant_sysref_is_refused():
+    # `$nothing = ""` maps to `None = ""`, which does not compile at all.
+    # The original survives in the mark; what must not survive is a live
+    # assignment statement, so this checks the result parses.
+    r = py('$nothing = "";')
+    assert r.marks >= 1
+    assert not any(l.startswith('None = ') for l in r.code.splitlines())
+
+
+def test_a_mark_from_a_helper_is_still_counted():
+    # `clean` is built on the counter, and some marks are emitted by
+    # module-level helpers that cannot reach it.  A verb reported clean
+    # while carrying a # PORT: line is the one lie this tool must not tell.
+    r = port('$nothing = "";')
+    assert not r.clean

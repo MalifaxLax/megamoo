@@ -500,6 +500,15 @@ def _inject_moo_builtins(namespace: Dict[str, Any], pobj, db) -> None:
     namespace['FAILED_MATCH'] = FAILED_MATCH
     namespace['AMBIGUOUS_MATCH'] = AMBIGUOUS_MATCH
 
+    # LambdaMOO builtins that exist only for ported code.  Kept in their
+    # own module rather than added to moo.builtins: several of them, most
+    # obviously `random`, take the MOO spelling of a name this engine
+    # already uses differently, and the two vocabularies should not have
+    # to fight over it.
+    from . import moo_builtins as _mb
+    for _n in _mb.__all__:
+        namespace[_n] = getattr(_mb, _n)
+
     # Effects utility (screen effects, delays, etc.)
     from .effects import eu as _effects_mgr
     namespace['_effects'] = _effects_mgr

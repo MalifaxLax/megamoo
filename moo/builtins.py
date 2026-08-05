@@ -75,7 +75,7 @@ import threading
 import time
 import logging
 
-from .objects import MOOObject, ObjectFlags
+from .objects import MOOObject, ObjectFlags, _null_attr
 from .properties import MOOObjectRef, MOOError
 from .permissions import PermissionChecker
 from .utils import interactive  # noqa: F401 — re-exported for verb code
@@ -2953,7 +2953,7 @@ def catch(attempt, codes=None, fallback=_NO_FALLBACK):
         The attempt's value, or the fallback, or the error value.
     """
     try:
-        return attempt()
+        value = attempt()
     except MOOError as err:
         name = getattr(err, 'code', None) or str(err)
         if codes and 'ANY' not in codes and name not in codes:
@@ -2962,6 +2962,18 @@ def catch(attempt, codes=None, fallback=_NO_FALLBACK):
             # No `=>` clause: in MOO the expression evaluates to the error.
             return err
         return fallback() if callable(fallback) else fallback
+
+    # A missing property does not raise here -- it returns the falsy
+    # _null_attr sentinel -- so `x.foo ! E_PROPNF => 0' would sail past
+    # the except and hand back the sentinel instead of the default.  The
+    # test is against the sentinel itself and not for falsiness, because a
+    # property that genuinely holds 0 or "" must keep its own value rather
+    # than be replaced by the fallback.
+    if value is _null_attr and codes and ('ANY' in codes or
+                                          'E_PROPNF' in codes):
+        if fallback is not _NO_FALLBACK:
+            return fallback() if callable(fallback) else fallback
+    return value
 
 
 # =============================================================================
