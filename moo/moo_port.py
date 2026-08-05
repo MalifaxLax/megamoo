@@ -26,10 +26,11 @@ translator believes it handled completely -- which is a claim about the
 mechanical parts only, never about whether the logic is right.
 """
 
+import ast
 import re
 from typing import List, Optional, Tuple
 
-__all__ = ['port', 'PortResult', 'MooSyntaxError']
+__all__ = ['port', 'PortResult', 'MooSyntaxError', 'undefined_names']
 
 MARK = '# PORT:'
 
@@ -60,6 +61,12 @@ BUILTINS = {
     'random': 'random', 'floor': 'int', 'sqrt': 'sqrt',
     'tostr': None, 'toint': 'int', 'tofloat': 'float', 'toobj': None,
     'typeof': None, 'valid': None,
+}
+
+#: MOO's type constants, which only ever appear in `typeof(x) == LIST`.
+TYPE_TESTS = {
+    'LIST': 'list', 'STR': 'str', 'NUM': 'int', 'INT': 'int',
+    'FLOAT': 'float', 'OBJ': 'MOOObject', 'ERR': 'MOOError',
 }
 
 #: Constructs deliberately not translated.
@@ -398,6 +405,17 @@ class Porter:
             if k == 'op' and t in ops:
                 op = self.next()[1]
                 right = self.binary(level + 1)
+                # `typeof(x) == LIST` is how MOO asks about a type, and it
+                # is the only place its type constants appear.  Turn the
+                # whole comparison into an isinstance(), rather than emit
+                # a _typeof() and a bare LIST that exist nowhere.
+                pair = TYPE_TESTS.get(right) or TYPE_TESTS.get(left)
+                fn_side = left if left.startswith('_typeof(') else right
+                if pair and fn_side.startswith('_typeof(') and op in ('==', '!='):
+                    inner = fn_side[len('_typeof('):-1]
+                    test = f'isinstance({inner}, {pair})'
+                    left = test if op == '==' else f'not {test}'
+                    continue
                 left = f'{left} {word or op} {right}'
                 continue
             return left
@@ -520,6 +538,20 @@ class Porter:
 
     def call(self, fn: str, args: List[str]) -> str:
         joined = ', '.join(args)
+        if fn == 'tonum':
+            return f'int({joined})'
+        if fn == 'parent':
+            return f'{joined}.parent'
+        if fn == 'children':
+            return f'{joined}.children'
+        if fn == 'listappend' and len(args) >= 2:
+            return f'({args[0]} + [{args[1]}])'
+        if fn == 'listinsert' and len(args) >= 2:
+            return f'([{args[1]}] + {args[0]})'
+        if fn in ('callers', 'task_id', 'ctime', 'substitute', 'seconds_left',
+                  'queued_tasks', 'kill_task', 'server_log', 'boot_player'):
+            return self.mark_expr(
+                f'{fn}() has no equivalent here', f'{fn}({joined})')
         if fn == 'strsub' and len(args) >= 3:
             return f'{args[0]}.replace({args[1]}, {args[2]})'
         if fn == 'toliteral':
@@ -550,6 +582,11 @@ class Porter:
             # 0-based, -1 when absent, so +1 lines them up exactly.
             return f'({args[0]}.find({args[1]}) + 1)'
         if fn == 'time':
+            # MOO's time() is epoch seconds.  `time` is not in the verb
+            # namespace, so emitting time.time() would name something that
+            # is not there -- import time first.
+            self.note('time(): add `import time` at the top of the verb')
+            self.marks += 1
             return 'time.time()'
         if fn == 'listdelete' and len(args) == 2:
             lst, i = args
@@ -595,8 +632,9 @@ class Porter:
         if fn == 'tostr':
             return ' + '.join(f'str({a})' for a in args) or "''"
         if fn == 'typeof':
-            self.mark('typeof(): compare with isinstance() instead')
-            return f'type({joined})'
+            # Handled as a whole comparison in binary() when it is compared
+            # against a type constant, which is how MOO always writes it.
+            return f'_typeof({joined})'
         if fn == 'valid':
             return f'({joined} != None)'
         if fn == 'toobj':
@@ -627,6 +665,75 @@ def _wrap(text: str, width: int) -> List[str]:
     return out or ['']
 
 
+
+# ---------------------------------------------------------------------------
+# Checking our own output
+# ---------------------------------------------------------------------------
+
+#: Names a verb can see that are not builtins: the context the engine
+#: injects, plus the messaging kwargs.
+_VERB_CONTEXT = {
+    'pobj', 'this', 'caller', 'location', 'db', 'verb', 'args', 'argstr',
+    'dobj', 'dobjstr', 'iobj', 'iobjstr', 'prep', 'switches', 'lhs', 'rhs',
+    'arglist', 'kwargs', 'sub', 'dob', 'iob', 'uob', 'exclude', 'result',
+    'su', 'string_utils', 'ou', 'call_verb', 'search', 'find', 'pass_',
+    'tell', 'player',
+}
+
+
+def _known_names() -> set:
+    """Every name a verb body may reference without defining it."""
+    import builtins as _py
+    try:
+        from . import builtins as _moo
+        names = set(_moo._get_builtin_ns_template())
+    except Exception:          # importable standalone, e.g. under test
+        names = set()
+    return names | _VERB_CONTEXT | set(dir(_py))
+
+
+def undefined_names(code: str) -> List[str]:
+    """
+    Names the translated code uses but nothing defines.
+
+    This is the check that matters most, and the one that was missing.
+    Verifying the output *parses* catches nothing useful: every bug found
+    by hand so far -- notify, prepstr, verb_info, strsub -- produced
+    perfectly valid Python that referred to something not there, and blew
+    up the first time the verb ran.
+
+    Args:
+        code: Translated Python.
+
+    Returns:
+        Sorted names that are referenced but neither assigned nor known.
+        Empty if the code does not parse, since then there is nothing
+        meaningful to say.
+    """
+    body = '\n'.join(l for l in code.splitlines()
+                      if not l.strip().startswith('#'))
+    if not body.strip():
+        return []
+    try:
+        tree = ast.parse('def _v():\n' +
+                         '\n'.join('    ' + l for l in body.splitlines()))
+    except SyntaxError:
+        return []
+
+    assigned, used = set(), set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            (assigned if isinstance(node.ctx, ast.Store) else used).add(node.id)
+        elif isinstance(node, ast.arg):
+            assigned.add(node.arg)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            for a in node.names:
+                assigned.add((a.asname or a.name).split('.')[0])
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            assigned.add(node.name)
+    return sorted(used - assigned - _known_names())
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -650,6 +757,17 @@ def port(source: str) -> PortResult:
     p = Porter(source)
     body = p.block(0, ())
     lines = [ln for ln in body if ln.strip()]
+
+    # Check our own output before handing it over.  Verifying that it
+    # *parses* proves almost nothing -- every bug found in this translator
+    # so far produced valid Python that named something not there and blew
+    # up the first time the verb ran.  So the last step is to look up every
+    # free name in the real verb namespace and mark the ones that are not
+    # in it.
+    for name in undefined_names('\n'.join(lines)):
+        p.marks += 1
+        p.note(f"'{name}' is not defined anywhere a verb can see; it is "
+               f"probably a MOO builtin with no equivalent here")
 
     header = []
     if p.notes:

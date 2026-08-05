@@ -237,3 +237,69 @@ return 0;''')
     assert 'args[0]' in r.code
     assert "call_verb(item, 'moveto', iobj)" in r.code
     assert r.clean is True
+
+
+# --------------------------------------------------------------------------
+# Checking our own output
+#
+# This is the check that catches the class of bug the parse test cannot:
+# valid Python that names something not there.  notify, prepstr, verb_info
+# and strsub were all found by hand, one at a time, because nothing looked.
+# --------------------------------------------------------------------------
+
+def test_undefined_name_is_caught():
+    from moo.moo_port import undefined_names
+    assert 'wibble' in undefined_names('x = wibble(1)')
+
+
+def test_verb_context_names_are_not_flagged():
+    from moo.moo_port import undefined_names
+    code = 'pobj.msg(argstr)\nx = this.name\ny = args[0]\nz = dobj'
+    assert undefined_names(code) == []
+
+
+def test_assigned_locals_are_not_flagged():
+    from moo.moo_port import undefined_names
+    assert undefined_names('total = 0\ntotal = total + 1') == []
+
+
+def test_loop_variables_are_not_flagged():
+    from moo.moo_port import undefined_names
+    assert undefined_names('for item in this.contents:\n    x = item.name') == []
+
+
+def test_imports_are_not_flagged():
+    from moo.moo_port import undefined_names
+    assert undefined_names('import json\nx = json.dumps({})') == []
+
+
+def test_port_marks_a_name_it_cannot_provide():
+    r = port('x = some_moo_builtin(1);')
+    assert r.marks >= 1
+    assert 'some_moo_builtin' in ' '.join(r.notes)
+    assert not r.clean
+
+
+def test_a_clean_port_never_names_the_undefined():
+    from moo.moo_port import undefined_names
+    r = port('player:tell("hi");\nx = length(args);')
+    assert r.clean
+    assert undefined_names(r.code) == []
+
+
+# --------------------------------------------------------------------------
+# Type tests
+# --------------------------------------------------------------------------
+
+def test_typeof_comparison_becomes_isinstance():
+    assert 'isinstance(x, list)' in py('if (typeof(x) == LIST)\n y=1;\nendif').code
+
+
+def test_typeof_inequality_becomes_not_isinstance():
+    assert 'not isinstance(x, str)' in py('if (typeof(x) != STR)\n y=1;\nendif').code
+
+
+def test_type_constants_do_not_leak_as_bare_names():
+    from moo.moo_port import undefined_names
+    r = port('if (typeof(x) == LIST)\n y=1;\nendif')
+    assert 'LIST' not in undefined_names(r.code)
