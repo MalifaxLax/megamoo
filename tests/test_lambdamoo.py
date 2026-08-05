@@ -343,3 +343,71 @@ def test_inert_verb_survives_source_containing_triple_quotes():
                           code='s = """oops""";\n\'\'\'also\'\'\'')
     body = build_inert_verb(nasty, 7, '2026-01-01')
     ast.parse(body)             # comments cannot be escaped out of
+
+
+# --------------------------------------------------------------------------
+# Auth derived from a verb's own text
+# --------------------------------------------------------------------------
+
+def test_auth_comes_from_the_guard():
+    from moo.verb_loader import auth_level_required
+    assert auth_level_required('if auth_level(pobj) < 3:\n    return') == 3
+
+
+def test_a_documented_level_is_used_when_there_is_no_guard():
+    """
+    A verb that documents a level but forgets the guard used to be
+    published at auth 0 -- runnable by anyone the moment the file landed
+    on disk.  @checkpoint shipped that way for several minutes today.
+
+    Falling back to the documented level is the lesser of the two
+    failures.  It gates the command parser, though not call_verb, which is
+    why the loader warns rather than treating it as equivalent.
+    """
+    from moo.verb_loader import auth_level_required
+    assert auth_level_required('"""Auth: gm4+ (auth_level 4)"""') == 4
+
+
+def test_the_guard_beats_the_docstring():
+    # The guard is what actually enforces, so it wins even when the
+    # documentation disagrees.
+    from moo.verb_loader import auth_level_required
+    code = '"""Auth: gm4+ (auth_level 4)"""\nif auth_level(pobj) < 2:\n    return'
+    assert auth_level_required(code) == 2
+
+
+def test_no_guard_and_no_docstring_is_zero():
+    # Right for player commands and for hooks.
+    from moo.verb_loader import auth_level_required
+    assert auth_level_required('x = 1') == 0
+
+
+# --------------------------------------------------------------------------
+# Selective import
+# --------------------------------------------------------------------------
+
+def test_closure_follows_code_not_property_values(db):
+    """
+    A utility object holds references to rooms and players as *data*, so
+    following property values drags in the world: from Inferno's $su alone
+    that reached 400 objects without converging, and 2000 while still
+    growing.  Following only code reached 322, carrying most of its verbs.
+    """
+    from moo.lambdamoo_import import closure_for
+    found, truncated = closure_for(db, [1])
+    assert 1 in found          # the root itself
+    assert 0 in found          # its parent, reached by the chain
+    assert truncated is False
+
+
+def test_closure_of_nothing_is_empty(db):
+    from moo.lambdamoo_import import closure_for
+    found, _ = closure_for(db, ['$no_such_ref'])
+    assert found == set()
+
+
+def test_closure_stops_at_its_cap(db):
+    from moo.lambdamoo_import import closure_for
+    found, truncated = closure_for(db, [1], max_objects=1)
+    assert truncated is True
+    assert len(found) <= 1

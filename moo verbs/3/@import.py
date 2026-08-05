@@ -4,6 +4,7 @@ Imports a LambdaMOO database.
 Usage: @import <file>
        @import/dry <file>
        @import/inert <file>
+       @import/only <file> $ref [$ref ...]
 
 Arguments:
     file - A .db file in the imports/ directory, or an absolute path.
@@ -13,6 +14,8 @@ Switches:
                Do this first.
     /inert   - Keep verbs as unexecutable MOO source instead of
                translating them.  See Verbs below.
+    /only    - Import just what the named $refs need, rather than the
+               whole database.  See Selective import below.
     /players - Include player objects.  Off by default; see below.
 
 Auth: gm3+ (auth_level 3)
@@ -47,6 +50,21 @@ form carries the same original -- so it is for when you mean to do the
 work yourself.  Those verbs are stored hidden, so @grep will not find
 them -- @kids or @audit on what was imported is the way to see them.
 
+Selective import.  A world is mostly world -- rooms, players, things --
+and porting a verb out of one does not want any of that.  /only takes one
+or more $refs and imports the objects they actually need: the ones their
+verb code calls, and their parent chains.
+
+    @import/only inferno.db $su $utils
+
+Property *values* are deliberately not followed.  A utility object holds
+references to rooms and players as data, so following them drags in the
+world -- from Inferno's $su alone that reaches 400 objects without
+converging.  Following only code reaches 322, carrying 2038 of its 3244
+verbs, which is what a port needs and sixty thousand objects fewer.
+
+Run /dry with it first; the closure is reported before anything is made.
+
 Players.  Left out unless you ask.  A player object carries a password
 hash and a connection history that mean nothing here, and importing one
 makes an account nobody can log into.
@@ -75,6 +93,16 @@ except OSError:
     pass
 
 spec = (args or '').strip()
+
+# With /only the line is `<file> $ref [$ref ...]`, so the filename is the
+# first word and the rest names the starting points.  Split only in that
+# case: a path may contain spaces, and splitting always would break it.
+rest = ''
+if 'only' in switches and spec:
+    parts = spec.split(None, 1)
+    spec = parts[0]
+    rest = parts[1] if len(parts) > 1 else ''
+
 if not spec:
     pobj.msg('Usage: @import <file>')
     pobj.msg(f'Put the .db in {folder} first.')
@@ -145,6 +173,25 @@ try:
 except Exception:
     pass
 
+# /only: the rest of the line after the filename names the starting
+# points.  Everything they need comes too; everything else stays behind.
+only = None
+if 'only' in switches:
+    roots = [w for w in rest.split() if w]
+    if not roots:
+        pobj.msg('Usage: @import/only <file> $ref [$ref ...]')
+        pobj.msg('  e.g. @import/only inferno.db $su $utils')
+        return
+    from moo.lambdamoo_import import closure_for
+    only, truncated = closure_for(ldb, roots)
+    if not only:
+        pobj.msg(f"None of {' '.join(roots)} resolve in that database.")
+        return
+    pobj.msg(f"%<245>{' '.join(roots)} needs {len(only)} object(s).%n")
+    if truncated:
+        pobj.msg('%<245>  -- the closure hit its cap and may be '
+                 'incomplete.%n')
+
 report = import_lambda_db(ldb, db,
                           owner=pobj.objnum,
                           root_parent=1,
@@ -152,6 +199,7 @@ report = import_lambda_db(ldb, db,
                           translate=translate,
                           resolve=(lambda n: n.lower() in _core_refs)
                                   if _core_refs else None,
+                          only=only,
                           skip_players='players' not in switches)
 
 pobj.msg("")

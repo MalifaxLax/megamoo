@@ -2,7 +2,7 @@
 Disk -> database verb loading helpers.
 ====================================
 
-A verb's source of truth is the database (``mm.db``); the files under
+A verb's source of truth is the database (``sf.db``); the files under
 ``<moo_verb_path>/<objnum>/<verbname>.py`` are developer-facing copies that
 make it convenient to edit verb code in a real editor.  These helpers read a
 disk file and push it into the live in-memory object, recompiling and marking
@@ -32,10 +32,13 @@ from moo.verbs import VerbDef
 
 logger = logging.getLogger('megamoo.verb_loader')
 
-
 # ``if auth_level(pobj) < 3:`` -- the guard staff verbs open with.
 _AUTH_GUARD_RE = re.compile(
     r'auth_level\(\s*(?:pobj|player)\s*\)\s*(<=?)\s*(\d+)')
+
+#: ``Auth: gm4+ (auth_level 4)`` -- the line every staff verb's docstring
+#: carries.  Only consulted when there is no guard to read instead.
+_AUTH_DOC_RE = re.compile(r'auth_level\s+(\d+)\s*\)')
 
 
 def auth_level_required(code: str) -> int:
@@ -55,13 +58,33 @@ def auth_level_required(code: str) -> int:
     the level at which the command becomes usable and therefore worth
     listing.
 
-    Returns 0 when there is no guard, which is right for player commands.
+    A verb that *documents* a level but has no guard falls back to the
+    documented one, and says so.  That case is a mistake -- the guard is
+    what stops a privileged verb being reached through call_verb, and the
+    value only filters the command list -- but publishing it at 0 because
+    the author forgot is the worse of the two failures: it makes a wizard
+    command runnable by anyone the moment the file lands on disk.  This is
+    not hypothetical; @checkpoint shipped that way for several minutes.
+
+    Returns 0 when there is neither, which is right for player commands
+    and for hooks.
     """
     levels = []
     for op, num in _AUTH_GUARD_RE.findall(code or ''):
         n = int(num)
         levels.append(n if op == '<' else n + 1)
-    return min(levels) if levels else 0
+    if levels:
+        return min(levels)
+
+    documented = _AUTH_DOC_RE.search(code or '')
+    if documented:
+        level = int(documented.group(1))
+        logger.warning(
+            'verb documents auth_level %d but has no auth_level() guard; '
+            'gating dispatch at %d, but the verb is still reachable through '
+            'call_verb -- add the guard', level, level)
+        return level
+    return 0
 
 
 def resolve_verb_base_path(db) -> Optional[str]:

@@ -64,6 +64,13 @@ def _size(n):
     return f'{n:.1f}GB'
 
 
+# The guard, not just the docstring.  The verb's auth value gates the
+# command parser; this stops it being reached through call_verb, which
+# the value does not cover.
+if auth_level(pobj) < 4:
+    pobj.msg('You are not authorized to do that.')
+    return
+
 directory = str(getattr(db, 'checkpoint_dir', '') or '')
 if not directory:
     pobj.msg('This database has no checkpoint directory.')

@@ -378,7 +378,7 @@ def closure_for(ldb: LambdaDB, roots, max_objects: int = 500):
 def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                      root_parent: int = 1, dry_run: bool = False,
                      skip_players: bool = True, translate: bool = True,
-                     resolve=None) -> Dict:
+                     resolve=None, only=None) -> Dict:
     """
     Create MegaMOO objects for everything in a parsed LambdaMOO database.
 
@@ -402,6 +402,10 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                       Turning it off (@import/inert) keeps every verb as
                       unexecutable MOO source, which is what you want if
                       you mean to port by hand.
+        only:         Object numbers to import, or None for everything.
+                      Porting one verb out of a 61110-object world does
+                      not want the world; closure_for() computes the set a
+                      given starting point actually needs.
         resolve:      ``name -> bool`` for whether ``$name`` resolves.  It
                       should answer against the database being *built*,
                       not the one being imported into: a core brings its
@@ -416,6 +420,15 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
 
     sources = [o for o in ldb.live_objects
                if not (skip_players and o.is_player)]
+    if only is not None:
+        # A selective import.  The caller has already worked out which
+        # objects it wants -- closure_for() is the usual way -- and
+        # everything outside that set is simply not a source, so the
+        # objref remapping below leaves references to it as numbers and
+        # reports them, exactly as it does for anything else it cannot
+        # resolve.
+        wanted = set(only)
+        sources = [o for o in sources if o.objid in wanted]
 
     report = {
         'dry_run': dry_run,
