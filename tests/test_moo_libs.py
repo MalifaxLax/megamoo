@@ -483,6 +483,76 @@ def test_catch_keeps_a_property_that_really_holds_a_falsy_value():
     assert catch(lambda: '', ('E_PROPNF',), lambda: 'd') == ''
 
 
+def _undefined_variable():
+    # LambdaCore #69:E_VARNF, verbatim: the error generator raises each
+    # error on purpose, and a bare unbound name is how it makes this one.
+    return a                                            # noqa: F821
+
+
+def test_catch_reads_a_python_nameerror_as_e_varnf():
+    from moo.builtins import catch
+    assert catch(_undefined_variable, ('E_VARNF',), lambda: 'ok') == 'ok'
+
+
+def test_catch_reads_the_other_native_failures_as_their_moo_codes():
+    from moo.builtins import catch
+    assert catch(lambda: [][0], ('E_RANGE',), lambda: 'ok') == 'ok'
+    assert catch(lambda: 1 // 0, ('E_DIV',), lambda: 'ok') == 'ok'
+    assert catch(lambda: 1 + 'x', ('E_TYPE',), lambda: 'ok') == 'ok'
+
+
+def test_a_native_failure_with_no_clause_yields_the_error_value():
+    # MOO's backtick without `=>` evaluates to the error itself, and
+    # MOOError compares by code, which is what ported code goes on to test.
+    from moo.builtins import catch
+    from moo.properties import MOOError
+    assert catch(_undefined_variable) == MOOError('E_VARNF')
+
+
+def test_a_native_failure_the_clause_does_not_name_still_propagates():
+    from moo.builtins import catch
+    with pytest.raises(NameError):
+        catch(_undefined_variable, ('E_RANGE',), lambda: 'ok')
+
+
+def test_an_engine_failure_is_not_disguised_as_a_moo_error():
+    # Propagating is the point: a bug in the engine is not an error the
+    # verb was expecting, and giving it a MOO code would hide it inside
+    # somebody's `! ANY'.
+    from moo.builtins import catch
+    def boom():
+        raise SystemError('engine bug')
+    with pytest.raises(SystemError):
+        catch(boom, ('ANY',), lambda: 'ok')
+
+
+def test_moo_splice_inserts_deletes_and_replaces():
+    # MOO uses range assignment for all three, naming an empty range to
+    # insert -- LambdaCore's @display does `perms[1..0] = " "`.
+    from moo.moo_builtins import moo_splice
+    assert moo_splice(['a', 'b', 'c'], 0, 1, []) == ['b', 'c']
+    assert moo_splice([1, 2, 3], 1, 2, [9, 9]) == [1, 9, 9, 3]
+    assert moo_splice('rw', 0, 0, ' ') == ' rw'
+    assert moo_splice('ab', 2, 2, 'c') == 'abc'
+
+
+def test_moo_splice_leaves_the_original_alone():
+    # MOO lists are values: the assignment builds a new one and rebinds.
+    from moo.moo_builtins import moo_splice
+    original = ['a', 'b']
+    moo_splice(original, 0, 1, ['x'])
+    assert original == ['a', 'b']
+
+
+def test_moo_splice_refuses_a_mismatched_type():
+    from moo.moo_builtins import moo_splice
+    from moo.properties import MOOError
+    with pytest.raises(MOOError):
+        moo_splice([1], 0, 1, 'x')
+    with pytest.raises(MOOError):
+        moo_splice('ab', 0, 1, ['x'])
+
+
 def test_atan_two_argument_form_keeps_the_quadrant():
     # atan(y, x) is C's atan2; atan(y / x) loses which quadrant it was in.
     import math

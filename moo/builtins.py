@@ -2936,6 +2936,55 @@ def port_verb(pobj, spec: str, db):
 
 _NO_FALLBACK = object()
 
+#: Python exceptions that *are* MOO errors, under another name.
+#:
+#: A verb translated from MOO fails the way Python fails, not the way MOO
+#: does: reading an unbound variable raises NameError rather than E_VARNF,
+#: an index past the end raises IndexError rather than E_RANGE.  The MOO
+#: code that ported cleanly still says `` `x[i] ! E_RANGE => 0' ``, and
+#: without this it does not catch, because the exception it is looking at
+#: is not a MOOError at all.
+#:
+#: LambdaCore keeps a whole object of these -- #69, one verb per error
+#: code, each raising its own on purpose: ``this.a`` for E_PROPNF,
+#: ``this:a()`` for E_VERBNF, ``{}[1]`` for E_RANGE, and a bare ``a`` for
+#: E_VARNF.  Those ported faithfully and still did not work, which is a
+#: neat demonstration that translating the *source* is not by itself
+#: translating the *language*.
+#:
+#: ZeroDivisionError comes before ArithmeticError because it is a subclass
+#: of it; the scan takes the first match.
+_NATIVE_ERRORS = (
+    (ZeroDivisionError, 'E_DIV'),
+    (NameError, 'E_VARNF'),         # includes UnboundLocalError
+    (IndexError, 'E_RANGE'),
+    (KeyError, 'E_RANGE'),
+    (AttributeError, 'E_PROPNF'),   # PropertyNotFound is caught earlier
+    (TypeError, 'E_TYPE'),
+    (ValueError, 'E_INVARG'),
+    (RecursionError, 'E_MAXREC'),
+)
+
+
+def native_error_code(err):
+    """
+    The MOO error code a Python exception stands for, or None.
+
+    Args:
+        err: The exception.
+
+    Returns:
+        A code such as ``'E_RANGE'``, or None if the exception has no MOO
+        equivalent and should propagate as itself.  Propagating is the
+        right default: a bug in the engine is not an E_TYPE the verb was
+        expecting, and dressing it as one would hide it inside somebody's
+        catch-all.
+    """
+    for kind, code in _NATIVE_ERRORS:
+        if isinstance(err, kind):
+            return code
+    return None
+
 
 def catch(attempt, codes=None, fallback=_NO_FALLBACK):
     """
@@ -2974,6 +3023,23 @@ def catch(attempt, codes=None, fallback=_NO_FALLBACK):
         if fallback is _NO_FALLBACK:
             # No `=>` clause: in MOO the expression evaluates to the error.
             return err
+        return fallback() if callable(fallback) else fallback
+    except Exception as err:
+        # Python's own failures, under their MOO names -- see
+        # _NATIVE_ERRORS.  MOOError is handled above and never reaches
+        # here, so PropertyNotFound keeps its own code rather than being
+        # re-derived from AttributeError.
+        name = native_error_code(err)
+        if name is None:
+            raise
+        if codes and 'ANY' not in codes and name not in codes:
+            raise
+        if fallback is _NO_FALLBACK:
+            # The error as a value, which is what MOO yields here.  It is
+            # built fresh rather than wrapping the Python exception,
+            # because what the verb goes on to compare against, store, or
+            # return is the *code*, and MOOError equality is by code.
+            return MOOError(name, str(err))
         return fallback() if callable(fallback) else fallback
 
     # A missing property does not raise here -- it returns the falsy

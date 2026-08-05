@@ -625,6 +625,40 @@ def test_the_rename_is_applied_to_reads_and_writes_alike():
     assert 'class_ = class_ + 1' in r.code
 
 
+def test_dollar_name_with_arguments_is_a_verb_call_on_zero():
+    # `$foo(args)` is LambdaMOO grammar for `#0:foo(args)`, not a read of
+    # the property $foo.  LambdaCore's own help says so, calling
+    # $core_objects() "the verb" and spelling it #0:core_objects().
+    r = port('return $core_objects(1);')
+    assert "call_verb(#0, 'core_objects', 1)" in r.code
+    assert 'sysobj' not in r.code
+
+
+def test_a_dollar_verb_call_is_not_marked_as_a_missing_property():
+    # Read as a property this looked like an unresolved $ref and got
+    # marked -- asking a human for a property that was never meant to
+    # exist.  The resolver answers about #0's properties, so it must not
+    # be consulted about a verb.
+    r = port('return $core_objects();', resolve=lambda name: False)
+    assert r.marks == 0
+
+
+def test_a_dollar_name_without_arguments_is_still_a_property():
+    # The paren is the whole distinction; without one nothing changes.
+    r = port('return $string_utils;', resolve=lambda name: True)
+    assert "sysobj('string_utils')" in r.code
+    assert 'call_verb' not in r.code
+
+
+def test_shutdown_is_a_builtin_now():
+    # LambdaCore's @shutdown and make-core-database both end in a call to
+    # it, and both ported cleanly apart from this one name.
+    r = port('shutdown("bye");')
+    assert r.code.strip().endswith('shutdown("bye")')
+    assert 'call_function' not in r.code
+    assert r.marks == 0
+
+
 def test_a_called_name_is_not_renamed():
     # raise() is a MOO builtin whose name Python has claimed.  Renaming it
     # as though it were a variable would hide it from the branch that
@@ -633,12 +667,41 @@ def test_a_called_name_is_not_renamed():
     assert 'moo_raise(E_PERM)' in r.code
 
 
-def test_range_assignment_inside_an_expression_is_refused():
+def test_range_assignment_inside_an_expression_goes_through_moo_splice():
     # MOO's x[i..j] = v arrives as a Python slice, and `a:b` is not an
-    # expression, so it cannot be handed to moo_setitem.
+    # expression, so it cannot be handed to a helper whole.  Splitting it
+    # at the colon gives two bounds that are, and moo_splice takes them
+    # separately -- so the write stays an expression, as MOO's is.
     r = port('(args[2][1..1] != "w") && (args[2][1..1] = " ");')
-    assert 'moo_setitem' not in r.code
-    assert r.marks >= 1
+    assert 'moo_splice(' in r.code
+    assert r.marks == 0
+
+
+def test_range_assignment_rebinds_rather_than_slicing_in_place():
+    # Python's slice assignment would serve for a list and raise for a
+    # string, and which one this holds is not knowable here.  It also
+    # mutates, which loses MOO's value semantics.  Both are why the write
+    # is a rebind through moo_splice instead.
+    r = port('perms[1..0] = " ";')
+    assert 'perms = moo_splice(perms, 0, 0, " ")' in r.code
+    assert '[0:0] =' not in r.code
+
+
+def test_a_nested_range_write_stores_the_result_back():
+    # LambdaCore's @display does `inf[2][1..0] = " "`, splicing a string
+    # that lives inside a list.  Rebuilding the string is only half of it:
+    # the new one has to go back into the list, or the write is lost.
+    r = port('inf[2][1..0] = " ";')
+    assert 'inf = moo_listset(inf, 1, moo_splice(inf[1], 0, 0, " "))' in r.code
+
+
+def test_a_colon_inside_a_string_index_is_not_a_range():
+    # The split scans for a colon at bracket depth zero, and has to skip
+    # string literals too -- x[index("a:b")] is an ordinary element write,
+    # and splitting it would produce two halves that are not expressions.
+    r = port('x[$string_utils:index(y, "a:b")] = 1;')
+    assert 'moo_splice' not in r.code
+    assert 'moo_listset' in r.code
 
 
 def test_assigning_to_a_true_constant_is_still_refused():

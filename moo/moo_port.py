@@ -177,17 +177,44 @@ def _provably_not_string(text: str) -> bool:
     return False
 
 
-def _has_bare_colon(text: str) -> bool:
-    """Whether *text* is a slice rather than a single index."""
+def _bare_colon_at(text: str):
+    """
+    Where *text* separates a slice's two bounds, or None if it is a
+    single index.
+
+    Depth-aware because either bound may carry brackets of its own, and
+    quote-aware because a colon inside a string literal separates
+    nothing -- ``x[index("a:b")]`` is an ordinary index, and splitting it
+    would produce two halves that are not expressions.
+    """
     depth = 0
-    for ch in text:
-        if ch in '([{':
+    quote = ''
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if quote:
+            # A backslash hides whatever follows, including the closing
+            # quote, so it takes two characters at once.
+            if ch == '\\':
+                i += 2
+                continue
+            if ch == quote:
+                quote = ''
+        elif ch in '"\'':
+            quote = ch
+        elif ch in '([{':
             depth += 1
         elif ch in ')]}':
             depth -= 1
         elif ch == ':' and depth == 0:
-            return True
-    return False
+            return i
+        i += 1
+    return None
+
+
+def _has_bare_colon(text: str) -> bool:
+    """Whether *text* is a slice rather than a single index."""
+    return _bare_colon_at(text) is not None
 
 
 def _safe_name(name: str) -> str:
@@ -1011,6 +1038,21 @@ class Porter:
                     left = f'set_sysobj({target[1]}, {rhs})'
                 elif target[0] == 'prop':
                     left = f'moo_setprop({target[1]}, {target[2]}, {rhs})'
+                elif target[0] == 'range':
+                    # A range write in expression position -- LambdaCore's
+                    # @display does two, guarded by a backtick catch, and
+                    # $gender_utils:parse a third inside an `&&`.
+                    seq, lo, hi = target[1], target[2], target[3]
+                    rebound = self._rebind(
+                        seq, f'moo_splice({seq}, {lo}, {hi}, {rhs})')
+                    if rebound is None:
+                        left = self.mark_expr(
+                            'range assignment inside an expression whose '
+                            'container cannot be rebound; MOO would leave '
+                            'the original untouched and this will not',
+                            f'{seq}[{lo}:{hi}] = {rhs}')
+                    else:
+                        left = rebound
                 else:
                     # An indexed write has to rebind, because MOO lists are
                     # values -- see _assign.  In expression position that
@@ -1137,12 +1179,21 @@ class Porter:
                         seq, index = text[:i], text[i + 1:-1]
                         if not seq or not index:
                             return None
-                        # A range target -- MOO's x[i..j] = v -- arrives as
-                        # a Python slice, and `a:b` is not an expression,
-                        # so it cannot be passed to a helper.  Refuse it
-                        # rather than emit something that will not compile.
+                        # A range target -- MOO's x[i..j] = v -- arrives
+                        # as a Python slice.  `a:b` is not an expression,
+                        # so it cannot be handed to a helper whole; split
+                        # at the colon and pass the bounds separately.
+                        #
+                        # The split is a depth-aware scan for the same
+                        # reason the bracket scan above is: either bound
+                        # may itself contain a slice, as in x[f(a[1:2]):n].
                         if _has_bare_colon(index):
-                            return None
+                            cut = _bare_colon_at(index)
+                            if cut is None:
+                                return None
+                            return ('range', seq,
+                                    index[:cut].strip() or '0',
+                                    index[cut + 1:].strip() or f'len({seq})')
                         return ('item', seq, index)
             return None
         head, dot, name = text.rpartition('.')
@@ -1292,6 +1343,27 @@ class Porter:
             return '#' + num
         if k == 'sysref':
             name = t[1:]
+            if self.at('('):
+                # `$foo(args)` is not a read of the property $foo -- it is
+                # LambdaMOO grammar for `#0:foo(args)`, a verb call on the
+                # system object.  LambdaCore's own help says so in as many
+                # words, calling $core_objects() "the verb" and spelling it
+                # #0:core_objects() where it explains @grepcore.
+                #
+                # Read as a property this looked like an unresolved $ref
+                # and got marked, which is doubly wrong: the mark asks for
+                # a property that was never supposed to exist, and the
+                # emitted code called the property's value as a function.
+                #
+                # No existence check here, deliberately.  The resolver
+                # answers questions about #0's *properties*, and this is a
+                # verb; guessing from the wrong index would mark verbs that
+                # are fine.  Verb calls go unchecked everywhere else too --
+                # `$foo:bar()` never asks whether bar exists.
+                self.next()
+                args = self.arglist(')')
+                inner = ''.join(f', {a}' for a in args)
+                return f'call_verb(#0, {name!r}{inner})'
             if name in SYSCONSTANTS:
                 return SYSCONSTANTS[name]
             # The database's own object wins over the shim.
@@ -1658,6 +1730,14 @@ def _assign(target: str, value: str) -> str:
     if parts and parts[0] == 'item':
         seq, index = parts[1], parts[2]
         return _assign(seq, f'moo_listset({seq}, {index}, {value})')
+    if parts and parts[0] == 'range':
+        # `x[i..j] = v` rebinds for the same reason an indexed write does,
+        # and additionally cannot use Python's slice assignment at all:
+        # that works on lists and raises on strings, and MOO's ranges span
+        # both.  moo_splice serves either, so the type is settled at run
+        # time by the value rather than guessed at here.
+        seq, lo, hi = parts[1], parts[2], parts[3]
+        return _assign(seq, f'moo_splice({seq}, {lo}, {hi}, {value})')
 
     m = re.fullmatch(r'getattr\((.*), (.*)\)', target, re.S)
     if m:

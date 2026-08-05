@@ -37,7 +37,7 @@ __all__ = [
     'TYPE_LIST', 'TYPE_FLOAT',
     # Expression forms Python lacks
     'moo_raise', 'moo_setprop', 'moo_setitem', 'moo_listset',
-    'moo_index',
+    'moo_splice', 'moo_index',
     # Operators whose meaning differs from Python's
     'moo_eq', 'moo_ne', 'moo_lt', 'moo_le', 'moo_gt', 'moo_ge', 'moo_in',
     'moo_div', 'moo_mod',
@@ -49,7 +49,7 @@ __all__ = [
     'setadd', 'setremove',
     # Players and connections
     'players', 'idle_seconds', 'connected_seconds', 'connection_name',
-    'boot_player',
+    'boot_player', 'shutdown',
     # Properties and verbs
     'is_clear_property', 'clear_property', 'set_verb_info',
     # The server itself
@@ -369,6 +369,40 @@ def boot_player(who) -> None:
             conn._disconnected = True
         except Exception:
             pass
+
+
+def shutdown(message: str = '') -> None:
+    """
+    MOO's ``shutdown()``: stop the server, telling everyone why.
+
+    LambdaCore's ``$wiz:@shutdown`` calls this at the end of its countdown,
+    and ``make-core-database`` calls it to stop the server once the dump is
+    written.  Both ported cleanly and then failed on this one name.
+
+    The work already existed as ``shutdown_server()``; what was missing was
+    MOO's spelling and MOO's rule about who may use it.  This is one of the
+    few builtins LambdaMOO guards itself rather than leaving to the core,
+    and the guard has to be here for the same reason @checkpoint's is in
+    the verb body: the command parser's auth check does not cover a call
+    that arrives through call_verb.
+
+    Args:
+        message: Broadcast to every connected player.  MOO allows it to be
+            omitted, and the server supplies its own wording then.
+
+    Raises:
+        MOOError: E_PERM if the caller is not a wizard.
+
+    Note:
+        Returns immediately.  The shutdown is scheduled on the event loop,
+        so the calling verb runs to completion first -- which is what MOO
+        does too, and what lets @shutdown log the reason afterwards.
+    """
+    from .builtins import caller_perms, shutdown_server
+    who = caller_perms()
+    if who is None or not getattr(who, 'is_wizard', False):
+        raise MOOError('E_PERM', 'shutdown() is for wizards')
+    shutdown_server(str(message) or 'Server shutting down')
 
 
 # ---------------------------------------------------------------------------
@@ -1238,6 +1272,55 @@ def moo_listset(seq, index, value):
         return seq[:i] + str(value) + seq[i + 1:]
     seq[index] = value
     return seq
+
+
+def moo_splice(seq, lo, hi, value):
+    """
+    Range assignment -- MOO's ``x[i..j] = v`` -- as a value.
+
+    MOO writes to a *range*, not just an element, and uses it for insert
+    and delete as much as for replace: ``words[1..1] = {}`` drops the
+    first word, and ``perms[1..0] = " "`` inserts a space at the front by
+    naming an empty range.  LambdaCore does both, in @display and in
+    $gender_utils:parse.
+
+    Python's slice assignment covers the list case and nothing else, which
+    is the trap: ``words[0:1] = []`` is right, but the identical-looking
+    ``perms[0:0] = " "`` raises TypeError, because Python strings are
+    immutable.  MOO's ranges work on strings and lists alike, and which
+    one a variable holds is not knowable when the verb is translated.  So
+    both go through here, where the same expression serves for either.
+
+    Returning rather than mutating also preserves MOO's value semantics,
+    for the reason described on moo_listset: the caller rebinds.
+
+    Args:
+        seq: The list or string being spliced.
+        lo:  Start of the range, already 0-based.
+        hi:  End of the range, already exclusive -- so ``i..j`` in MOO
+             arrives here as ``i - 1, j``, and an empty range has
+             ``hi == lo``.
+        value: What to splice in.  A list for a list, a string for a
+             string, as MOO requires.
+
+    Returns:
+        The spliced list or string.  A new one either way.
+
+    Raises:
+        MOOError: If the value's type does not match the container's,
+            which is MOO's E_TYPE.  Python would raise TypeError for a
+            list and silently concatenate for some string cases, so the
+            check is made here rather than left to the ``+``.
+    """
+    if isinstance(seq, str):
+        if not isinstance(value, str):
+            raise MOOError('E_TYPE: a string range takes a string')
+        return seq[:lo] + value + seq[hi:]
+    if isinstance(seq, list):
+        if not isinstance(value, list):
+            raise MOOError('E_TYPE: a list range takes a list')
+        return list(seq[:lo]) + list(value) + list(seq[hi:])
+    raise MOOError('E_TYPE: only lists and strings have ranges')
 
 
 # ---------------------------------------------------------------------------
