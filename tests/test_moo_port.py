@@ -598,7 +598,16 @@ def test_return_with_assignment_becomes_two_statements():
 
 
 def test_raise_as_a_statement():
-    assert 'raise E_PERM' in py('raise(E_PERM);').code
+    assert 'moo_raise(E_PERM)' in py('raise(E_PERM);').code
+
+
+def test_raise_with_a_message_is_not_python_2():
+    # `raise E_TYPE, "msg"` is Python 2 and does not compile.  The
+    # statement path was emitting it while the expression path already
+    # used the helper.
+    r = py('raise(E_TYPE, "msg");')
+    assert 'moo_raise(E_TYPE, "msg")' in r.code
+    assert r.marks == 0
 
 
 def test_a_moo_variable_named_from_is_renamed():
@@ -870,3 +879,48 @@ def test_read_translates_now_that_it_exists():
     r = py('answer = read(player);')
     assert 'answer = read(pobj)' in r.code
     assert r.marks == 0
+
+
+# --------------------------------------------------------------------------
+# The translator checking its own output
+# --------------------------------------------------------------------------
+
+def test_the_translator_checks_that_its_own_output_parses():
+    # The undefined-name and dropped-control-flow checks both fail *open*
+    # on a SyntaxError, returning nothing rather than complaining, so
+    # invalid Python sailed through both and came out clean.  Across the
+    # two stock cores that was 161 verbs claiming to have been handled
+    # completely while not compiling at all.
+    from moo.moo_port import _will_not_parse
+    assert _will_not_parse('x = 1') is None
+    assert _will_not_parse('def =') is not None
+    assert _will_not_parse('') is None
+    # A bare return is legal in a verb body and must not be flagged.
+    assert _will_not_parse('return 1') is None
+    # Object literals are this engine's spelling, not Python's.
+    assert _will_not_parse('x = #12') is None
+
+
+def test_a_negative_object_number_is_not_an_object():
+    # #-1 is $nothing, #-2 ambiguous, #-3 failed match.  Emitting them
+    # literally produced code that did not compile, because the objref
+    # preprocessor reads a `#` not followed by a digit as a comment.
+    assert 'x = None' in port('x = #-1;').code
+    assert 'x = FAILED_MATCH' in port('x = #-3;').code
+    # A positive one is left alone -- #12 is this engine's own spelling,
+    # resolved by the objref preprocessor rather than by the translator.
+    assert 'x = #12' in port('x = #12;').code
+    assert port('x = #-1;').marks == 0
+
+
+def test_a_property_named_like_a_python_keyword():
+    # Cores define `and`, `in`, `for` and `return` as properties, and
+    # ToastStunt's waifs use `.class`.  Unlike a variable this cannot be
+    # renamed -- the property really is called that -- so getattr is the
+    # only exact spelling.
+    r = py('x = this.class;')
+    assert "getattr(this, 'class')" in r.code
+
+
+def test_an_ordinary_property_keeps_the_readable_spelling():
+    assert 'this.name' in py('x = this.name;').code

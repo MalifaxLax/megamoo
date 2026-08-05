@@ -421,12 +421,15 @@ class Porter:
                 self.eat_semi()
                 return [f'{pad}return {e}']
             if t == 'raise' and self.peek(1)[1] == '(':
-                # The whole statement is a raise, which Python can express.
+                # A raise as the whole statement.  It goes through the
+                # same helper the expression form uses -- `raise E_TYPE,
+                # "msg"` is Python 2 and does not compile, and MOO's
+                # raise() takes up to three arguments in any case.
                 self.next()
                 self.expect('(')
                 what = self._paren(lambda: ', '.join(self.arglist(')')))
                 self.eat_semi()
-                return [f'{pad}raise {what}']
+                return [f'{pad}moo_raise({what})']
             if t in ('break', 'continue'):
                 self.next()
                 # `break searching;` names the loop to leave.  The name was
@@ -1229,7 +1232,19 @@ class Porter:
         if k == 'string':
             return t
         if k == 'objnum':
-            return '#' + t[1:].strip()
+            num = t[1:].strip()
+            if num.startswith('-'):
+                # MOO's negative object numbers are its "no object"
+                # values -- #-1 is $nothing, #-2 ambiguous, #-3 failed.
+                # They are not objects and there is nothing to look up,
+                # so they map to the same things the $ spellings do.
+                #
+                # Emitting `#-1` produced code that did not compile at
+                # all, because the objref preprocessor reads a `#` not
+                # followed by a digit as a comment.
+                return {'-1': 'None', '-2': 'AMBIGUOUS_MATCH',
+                        '-3': 'FAILED_MATCH'}.get(num, 'None')
+            return '#' + num
         if k == 'sysref':
             name = t[1:]
             if name in SYSREFS:
@@ -1306,6 +1321,18 @@ class Porter:
                 k, t, ln = self.next()
                 if k == 'string':          # obj."name"
                     val = f'getattr({val}, {t})'
+                    continue
+                if keyword.iskeyword(t) or t in ('None', 'True', 'False'):
+                    # A property whose name Python has claimed.  MOO cores
+                    # define `and`, `in`, `for` and `return` as ordinary
+                    # properties, and ToastStunt's waifs use `.class`.
+                    #
+                    # Unlike a *variable* of the same name, this cannot be
+                    # renamed: the property really is called that, and
+                    # `o.class_` would read something that does not exist.
+                    # getattr() is exact and needs no cooperation from
+                    # anything else.
+                    val = f'getattr({val}, {t!r})'
                     continue
                 val = f'{val}.{t}'
             elif self.at(':'):
@@ -1668,6 +1695,36 @@ def _known_names() -> set:
     return names | _VERB_CONTEXT | set(dir(_py))
 
 
+def _will_not_parse(code: str) -> Optional[str]:
+    """
+    Why the translated code is not valid Python, if it is not.
+
+    Args:
+        code: Translated Python, ``# PORT:`` lines and all.
+
+    Returns:
+        The syntax error's message, or None when it parses.  Object
+        literals are resolved first, since ``#1`` is this engine's
+        spelling and not Python's; the body is wrapped in a function
+        because a verb may legitimately use a bare ``return``.
+    """
+    body = '\n'.join(l for l in code.splitlines()
+                      if not l.strip().startswith(MARK))
+    if not body.strip():
+        return None
+    try:
+        from .verbs import preprocess_verb_code
+        body = preprocess_verb_code(body)
+    except Exception:
+        pass
+    try:
+        ast.parse('def _v():\n' +
+                  '\n'.join('    ' + l for l in body.splitlines()))
+    except SyntaxError as err:
+        return err.msg
+    return None
+
+
 def undefined_names(code: str) -> List[str]:
     """
     Names the translated code uses but nothing defines.
@@ -1817,6 +1874,25 @@ def port(source: str, resolve=None) -> PortResult:
         p.marks += 1
         p.note(f"'{name}' is not defined anywhere a verb can see; it is "
                f"probably a MOO builtin with no equivalent here")
+
+    # Does the output actually parse?
+    #
+    # This check was missing, and its absence was worse than any single
+    # bug it would have caught.  The two checks above -- undefined names
+    # and dropped control flow -- both fail *open* on a SyntaxError,
+    # returning nothing rather than complaining, so invalid Python sailed
+    # through both and came out marked clean.  Across the two stock cores
+    # that was 161 verbs claiming the translator "believes it handled
+    # this completely" while not compiling at all.
+    #
+    # It is a one-line check that subsumes an open-ended class of bugs,
+    # which is the argument for having it at the end of the pipeline
+    # rather than trusting each emitter to be right.
+    syntax_error = _will_not_parse('\n'.join(lines))
+    if syntax_error:
+        p.marks += 1
+        p.note(f'the translation does not parse as Python ({syntax_error}); '
+               f'this is a bug in the translator, not in your MOO')
 
     # A MARK can be emitted from a module-level helper that has no way to
     # reach the counter, and `clean` is built on the counter.  Reconciling
