@@ -16,6 +16,9 @@ Switches:
                translating them.  See Verbs below.
     /only    - Import just what the named $refs need, rather than the
                whole database.  See Selective import below.
+    /nosource - Do not keep a copy of the original MOO under each verb.
+               Halves the size of every one; costs you the reference you
+               would fix a bad translation against.
     /players - Include player objects.  Off by default; see below.
 
 Auth: gm3+ (auth_level 3)
@@ -200,6 +203,7 @@ report = import_lambda_db(ldb, db,
                           resolve=(lambda n: n.lower() in _core_refs)
                                   if _core_refs else None,
                           only=only,
+                          keep_source='nosource' not in switches,
                           skip_players='players' not in switches)
 
 pobj.msg("")

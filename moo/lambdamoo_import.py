@@ -232,7 +232,7 @@ docs/guide/ and the README's "Porting from LambdaMOO" section for the rest.
 
 
 def build_ported_verb(verb: LambdaVerbDef, objid: int, when: str,
-                      resolve=None):
+                      resolve=None, keep_source: bool = True):
     """
     Translate a MOO verb to Python, keeping the original for reference.
 
@@ -240,6 +240,11 @@ def build_ported_verb(verb: LambdaVerbDef, objid: int, when: str,
         verb:  The verb definition, with its ``code`` filled in.
         objid: The object number in the *source* database.
         when:  Timestamp string for the provenance line.
+        keep_source: Keep the original MOO at the foot.  On by default:
+            when a translation turns out to be wrong, the source is what
+            you fix it against, and it is much easier to have it sitting
+            below the code than to go back to the .db.  It roughly doubles
+            each verb, which is why it can be turned off.
         resolve: Passed to :func:`~moo.moo_port.port` -- ``name -> bool``
             for whether ``$name`` exists.  During an import this should
             answer against the database *being built*, not the one being
@@ -269,27 +274,24 @@ def build_ported_verb(verb: LambdaVerbDef, objid: int, when: str,
         return build_inert_verb(verb, objid, when), None
 
     original = '\n'.join(f'#     {line}' for line in source.split('\n'))
+    # Two lines, not twenty.
+    #
+    # This used to explain what a ported verb is, what the markers mean and
+    # why they are not spelled out -- all true, all identical on every one
+    # of them, and 20 lines apiece across 1695 verbs.  It pushed the code
+    # that runs to 37% of the file and left it looking, from either end,
+    # as though there were no Python at all.
+    #
+    # What has to be *here* is what differs per verb and is otherwise
+    # unrecoverable: where it came from, and how MOO called it.  The rest
+    # is documentation and belongs in the guide.
     header = f'''"""
-Ported from a LambdaMOO database on {when}.
-
-Original
-    object      #{objid}
-    verb        {names}
-    owner       #{verb.owner}
-    permissions {_moo_perms(verb.perms)}
-    called as   <{verb.dobj}> {verb.prep_name} <{verb.iobj}>
-
-The MOO source is kept as comments at the foot of this verb.  Anything the
-translator could not render faithfully carries a marker comment; a verb
-with none of those is one it believes it handled completely, which is a
-claim about the mechanical parts only and never about the logic.
-
-The marker is deliberately not spelled out here.  Writing it would put the
-literal string in every ported verb's header, so a search for verbs that
-actually carry one would match all of them -- which is exactly what
-happened, and made the search useless on an import of 1695 verbs.
+#{objid}:{names} from a LambdaMOO database, ported {when}.
+Called as <{verb.dobj}> {verb.prep_name} <{verb.iobj}>, owner #{verb.owner}, \
+perms {_moo_perms(verb.perms)}.  Original MOO at the foot.
 """'''
-    footer = ('\n\n# --- original MOO source, for reference ---\n' + original)
+    footer = (('\n\n# --- original MOO source, for reference ---\n' + original)
+              if keep_source else '')
 
     # Shift the line numbers in the notes by the header we are adding.
     #
@@ -391,7 +393,8 @@ def closure_for(ldb: LambdaDB, roots, max_objects: int = 500):
 def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                      root_parent: int = 1, dry_run: bool = False,
                      skip_players: bool = True, translate: bool = True,
-                     resolve=None, only=None) -> Dict:
+                     resolve=None, only=None,
+                     keep_source: bool = True) -> Dict:
     """
     Create MegaMOO objects for everything in a parsed LambdaMOO database.
 
@@ -484,7 +487,8 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                 continue
             for verb in src.verbs:
                 _code, marks = build_ported_verb(verb, src.objid, when,
-                                                 resolve=resolve)
+                                                 resolve=resolve,
+                                                 keep_source=keep_source)
                 if marks is None:
                     report['unported'] += 1
                 else:
@@ -627,7 +631,8 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                     clean.append(raw)
             if translate:
                 vcode, marks = build_ported_verb(verb, src.objid, when,
-                                                 resolve=resolve)
+                                                 resolve=resolve,
+                                                 keep_source=keep_source)
             else:
                 vcode, marks = build_inert_verb(verb, src.objid, when), None
 
