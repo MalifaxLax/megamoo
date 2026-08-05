@@ -868,7 +868,7 @@ class MOOObject:
         # through it with getattr(obj, name, default) as usual.
         from .properties import PropertyNotFound
         raise PropertyNotFound(
-            f'E_PROPNF: #{self.objnum}.{name} is not defined')
+            f'#{self.objnum}.{name} is not defined')
     
     def _make_verb_callable(self, verb_name: str, db):
         """
