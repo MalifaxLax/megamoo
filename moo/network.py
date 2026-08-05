@@ -738,6 +738,17 @@ class PlayerConnection:
 
                     command = command.strip()
 
+                # A verb may be parked waiting for this line -- MOO's
+                # read().  It is offered the line before anything else
+                # looks at it, including the quit check, because a verb
+                # that asked "are you sure? " must be able to receive the
+                # word "quit" as an answer rather than have the server
+                # act on it.
+                from .verb_read import deliver_line
+                if deliver_line(self, command):
+                    await self.flush_messages()
+                    continue
+
                 # Handle quit / logout
                 if command.lower() in ('quit', 'logout'):
                     await self.send("Goodbye!\n")
@@ -796,7 +807,20 @@ class PlayerConnection:
            ICharacter — the original OCharacter still sits in the pool
            and must not remain flagged as active).
         5. Close the TCP socket.
+
+        Before any of that, fail any verb parked on this connection
+        waiting for a line.  Without it the verb sits until read()'s
+        timeout, holding a worker from the verb pool for a player who has
+        already gone -- and it happens first because the on_disconnect
+        hook below runs verb code, which would otherwise queue behind the
+        parked one for the baton.
         """
+        try:
+            from .verb_read import fail_pending_reads
+            fail_pending_reads(self, 'the connection closed')
+        except Exception:
+            logger.debug('failing pending reads', exc_info=True)
+
         if self.player_obj and self.authenticated:
             active = self.player_obj
             db = self.server.database

@@ -668,3 +668,122 @@ def test_a_connection_option_reads_back_what_was_set():
         assert connection_option(1, 'never-set') == 0
     finally:
         mb._connection = real
+
+
+# --------------------------------------------------------------------------
+# read() -- taking a line of input from inside a verb
+#
+# The interesting cases are all the ones where no line arrives, because an
+# input wait is the easiest place in a server to leak a thread.
+# --------------------------------------------------------------------------
+
+class _Conn:
+    """Enough of a connection for the read machinery to act on."""
+
+    def __init__(self):
+        self._pending_read = None
+        self._interactive_session = None
+        self.sent = []
+
+    def queue_message(self, text):
+        self.sent.append(text)
+
+
+def test_a_delivered_line_wakes_the_waiter():
+    from moo.verb_read import PendingRead, deliver_line, has_pending_read
+    conn = _Conn()
+    conn._pending_read = p = PendingRead()
+    assert has_pending_read(conn)
+    assert deliver_line(conn, 'yes') is True
+    assert p.line == 'yes'
+    # The slot is cleared, so the next line is an ordinary command again.
+    assert not has_pending_read(conn)
+
+
+def test_a_line_with_nobody_waiting_stays_a_command():
+    from moo.verb_read import deliver_line
+    assert deliver_line(_Conn(), 'look') is False
+
+
+def test_disconnect_fails_the_waiter_rather_than_leaving_it_parked():
+    # Without this the verb waits out the full timeout holding a worker
+    # for a player who has already gone.
+    from moo.verb_read import PendingRead, fail_pending_reads
+    conn = _Conn()
+    conn._pending_read = p = PendingRead()
+    fail_pending_reads(conn, 'the connection closed')
+    assert p.failed == 'the connection closed'
+    assert p.line is None
+    assert conn._pending_read is None
+
+
+def test_failing_pending_reads_is_safe_when_there_are_none():
+    from moo.verb_read import fail_pending_reads
+    fail_pending_reads(_Conn())          # must not raise
+
+
+def test_read_outside_a_verb_says_so_rather_than_hanging():
+    import pytest
+    from moo.properties import MOOError
+    from moo.verb_read import read
+    with pytest.raises(MOOError):
+        read()
+
+
+def test_a_pending_read_reports_whether_a_line_arrived():
+    from moo.verb_read import PendingRead
+    p = PendingRead()
+    assert p.wait(0.01) is False         # nothing yet
+    p.deliver('hi')
+    assert p.wait(0.01) is True
+
+
+# --------------------------------------------------------------------------
+# MOO's list builtins as functions
+#
+# @port expands these inline for almost every call.  They exist for the
+# case it cannot expand -- `listset(@args)`, splatted, arity unknown until
+# it runs -- which was falling through to call_function and failing on a
+# builtin the server plainly ought to have.
+# --------------------------------------------------------------------------
+
+def test_listset_takes_moos_argument_order():
+    # The value comes before the index, which is not the obvious order.
+    # A splat forwards positionally, so the shim has to match MOO rather
+    # than the emitter's internal convention.
+    from moo.moo_builtins import listset
+    assert listset([1, 2, 3], 9, 2) == [1, 9, 3]
+
+
+def test_the_list_builtins_copy():
+    from moo.moo_builtins import listset, listdelete, setadd
+    original = [1, 2, 3]
+    listset(original, 9, 1)
+    listdelete(original, 1)
+    setadd(original, 4)
+    assert original == [1, 2, 3]
+
+
+def test_listappend_goes_after_and_listinsert_before():
+    from moo.moo_builtins import listappend, listinsert
+    assert listappend([1, 2, 3], 9, 1) == [1, 9, 2, 3]
+    assert listinsert([1, 2, 3], 9, 1) == [9, 1, 2, 3]
+
+
+def test_listappend_and_listinsert_default_to_the_ends():
+    from moo.moo_builtins import listappend, listinsert
+    assert listappend([1, 2], 9) == [1, 2, 9]
+    assert listinsert([1, 2], 9) == [9, 1, 2]
+
+
+def test_setadd_membership_ignores_case_like_moos():
+    from moo.moo_builtins import setadd, setremove
+    assert setadd(['Foo'], 'foo') == ['Foo']
+    assert setremove(['Foo', 'bar'], 'FOO') == ['bar']
+
+
+def test_a_splatted_list_builtin_works():
+    # The case the inline expansion cannot cover.
+    from moo.moo_builtins import listset
+    args = [[1, 2, 3], 9, 2]
+    assert listset(*args) == [1, 9, 3]

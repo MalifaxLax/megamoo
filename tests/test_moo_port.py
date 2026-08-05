@@ -644,7 +644,7 @@ def test_a_mark_from_a_helper_is_still_counted():
     # `clean` is built on the counter, and marks can be emitted by
     # module-level helpers that cannot reach it.  A verb reported clean
     # while carrying a # PORT: line is the one lie this tool must not tell.
-    r = port('x = read();')
+    r = port('x = frobnicate();')
     assert not r.clean
     assert any(MARK in l for l in r.code.splitlines())
 
@@ -861,3 +861,12 @@ def test_a_bare_undefined_name_is_not_wrapped():
     # wrapping it would turn a missing value into a bogus function call.
     r = port('x = who;')
     assert 'call_function' not in r.code
+
+
+def test_read_translates_now_that_it_exists():
+    # It used to be refused as blocking for player input.  It still does
+    # block -- on a parked thread, the way suspend() does, so the verb
+    # keeps its stack and the call can be at any depth.
+    r = py('answer = read(player);')
+    assert 'answer = read(pobj)' in r.code
+    assert r.marks == 0

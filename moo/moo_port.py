@@ -106,10 +106,11 @@ TYPE_TESTS = {
     'TYPE_ERR': 'MOOError',
 }
 
-#: Constructs deliberately not translated.
-REFUSED = {
-    'read': 'read() blocks for player input; use an interactive session',
-}
+#: Constructs deliberately not translated.  Empty now: read() used to be
+#: here, and everything else that was ever in it turned out to have an
+#: honest translation.  Kept because the mechanism is still the right
+#: answer for anything that genuinely has none.
+REFUSED = {}
 
 
 #: Comparisons whose Python spelling means something else, because MOO
@@ -1658,6 +1659,10 @@ def _known_names() -> set:
         names |= {'list_utils', 'command_utils', 'code_utils', 'perm_utils'}
         from . import moo_builtins as _mb
         names |= set(_mb.__all__)
+        # read() is engine machinery rather than a compatibility shim --
+        # it takes the baton off the verb thread -- so it is bound by the
+        # namespace builder and has to be named here.
+        names.add('read')
     except Exception:
         pass
     return names | _VERB_CONTEXT | set(dir(_py))

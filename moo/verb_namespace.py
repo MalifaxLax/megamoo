@@ -491,6 +491,13 @@ def _inject_moo_builtins(namespace: Dict[str, Any], pobj, db) -> None:
     # already taken here by object matching, and a ported verb calling the
     # wrong one of those would compile and then quietly misbehave, so MOO's
     # regex keeps the moo_ prefix rather than fighting for the short name.
+    # MOO's read(), which parks the verb until the player types a line.
+    # Bound here rather than in moo_builtins because it is engine
+    # machinery -- it takes the baton off this thread -- not a
+    # compatibility shim.
+    from .verb_read import read as _moo_read
+    namespace['read'] = _moo_read
+
     namespace['moo_match'] = moo_match
     namespace['moo_rmatch'] = moo_rmatch
     namespace['moo_substitute'] = moo_substitute

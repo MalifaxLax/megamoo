@@ -42,6 +42,10 @@ __all__ = [
     'moo_div', 'moo_mod',
     # Values and strings
     'random', 'strcmp', 'sqrt',
+    # MOO's list builtins, as functions rather than only as inline
+    # translations -- see the note above listset.
+    'listset', 'listappend', 'listinsert', 'listdelete',
+    'setadd', 'setremove',
     # Players and connections
     'players', 'idle_seconds', 'connected_seconds', 'connection_name',
     'boot_player',
@@ -1661,3 +1665,130 @@ def set_connection_option(who, name: str, value) -> None:
         except Exception:
             return
     conn.moo_options[str(name)] = value
+
+
+# ---------------------------------------------------------------------------
+# MOO's list builtins
+#
+# @port also expands these inline, which reads better and is what happens
+# to almost every call.  They exist as functions for the case it cannot
+# expand: `listset(@args)`, where the arguments are splatted and the
+# arity is not known until the call runs.  Those were falling through to
+# call_function and failing at runtime on a builtin the server plainly
+# ought to have.
+#
+# All of them take MOO's argument order and MOO's 1-based indices, which
+# is the point -- a splat forwards positionally, so the shim has to match
+# the language rather than the emitter's internal convention.
+# ---------------------------------------------------------------------------
+
+def listset(lst: List, value, index: int) -> List:
+    """
+    MOO's ``listset()``: a copy of *lst* with the *index*'th item replaced.
+
+    Note the argument order, which is MOO's and not the obvious one: the
+    value comes before the index.
+
+    Args:
+        lst: The list.
+        value: What to put there.
+        index: 1-based position.
+
+    Returns:
+        list: A new list.  MOO lists are values, so the original is
+        untouched.
+    """
+    out = list(lst)
+    out[int(index) - 1] = value
+    return out
+
+
+def listappend(lst: List, value, index: int = None) -> List:
+    """
+    MOO's ``listappend()``: a copy with *value* inserted **after**
+    *index*.
+
+    Args:
+        lst: The list.
+        value: What to add.
+        index: 1-based position to insert after.  Defaults to the end.
+
+    Returns:
+        list: A new list.
+    """
+    out = list(lst)
+    out.insert(len(out) if index is None else int(index), value)
+    return out
+
+
+def listinsert(lst: List, value, index: int = None) -> List:
+    """
+    MOO's ``listinsert()``: a copy with *value* inserted **before**
+    *index*.
+
+    Args:
+        lst: The list.
+        value: What to add.
+        index: 1-based position to insert before.  Defaults to the front.
+
+    Returns:
+        list: A new list.
+    """
+    out = list(lst)
+    out.insert(0 if index is None else max(0, int(index) - 1), value)
+    return out
+
+
+def listdelete(lst: List, index: int) -> List:
+    """
+    MOO's ``listdelete()``: a copy without the *index*'th item.
+
+    Args:
+        lst: The list.
+        index: 1-based position.
+
+    Returns:
+        list: A new list.
+    """
+    out = list(lst)
+    del out[int(index) - 1]
+    return out
+
+
+def setadd(lst: List, value) -> List:
+    """
+    MOO's ``setadd()``: a copy with *value* appended if not already in it.
+
+    Membership is MOO's, so strings match without regard to case -- see
+    :func:`equal`.
+
+    Args:
+        lst: The list.
+        value: What to add.
+
+    Returns:
+        list: A new list.
+    """
+    out = list(lst)
+    if not any(moo_eq(x, value) for x in out):
+        out.append(value)
+    return out
+
+
+def setremove(lst: List, value) -> List:
+    """
+    MOO's ``setremove()``: a copy without the first occurrence of *value*.
+
+    Args:
+        lst: The list.
+        value: What to drop.
+
+    Returns:
+        list: A new list.
+    """
+    out = list(lst)
+    for i, x in enumerate(out):
+        if moo_eq(x, value):
+            del out[i]
+            break
+    return out
