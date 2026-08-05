@@ -38,7 +38,7 @@ __all__ = [
     # Expression forms Python lacks
     'moo_raise', 'moo_setprop', 'moo_setitem',
     # Values and strings
-    'random', 'strcmp',
+    'random', 'strcmp', 'sqrt',
     # Players and connections
     'players', 'idle_seconds', 'connected_seconds', 'connection_name',
     'boot_player',
@@ -49,6 +49,8 @@ __all__ = [
     # Values and membership
     'equal', 'is_member', 'set_player_flag', 'listeners',
     'set_property_info', 'property_info',
+    # Tasks, verbs and dynamic dispatch
+    'queued_tasks', 'call_function', 'set_verb_args', 'crypt',
 ]
 
 
@@ -614,3 +616,135 @@ def set_property_info(obj, name: str, info) -> None:
         prop.perms = str(info[1])
     except Exception:
         pass
+
+
+def queued_tasks() -> List:
+    """
+    MOO's ``queued_tasks()``: the tasks this player has waiting.
+
+    MOO returns ``{{task-id, start-time, ticks, clock-id, programmer,
+    verb-loc, verb-name, line, this}, ...}``.  The engine already tracks
+    the same queue for ``@ps``, so this reshapes what it has into MOO's
+    order rather than inventing a second accounting.
+
+    ``ticks`` is 0 for the reason given in :func:`ticks_left` -- nothing
+    here counts them -- and ``line`` is 0 because these verbs are Python
+    source rather than a bytecode program with a counter.
+
+    Returns:
+        list: One list per queued task, in MOO's field order.
+    """
+    try:
+        from .builtins import task_list
+        rows = task_list()
+    except Exception:
+        return []
+    out = []
+    for t in rows:
+        out.append([
+            t.get('id', 0), t.get('start', 0), 0, 0,
+            t.get('owner', t.get('player', 0)),
+            t.get('this', 0), t.get('verb', ''), 0, t.get('this', 0),
+        ])
+    return out
+
+
+def call_function(name: str, *args):
+    """
+    MOO's ``call_function()``: call a builtin chosen at runtime.
+
+    Only builtins are reachable, which is MOO's rule too -- it is not a
+    way to reach arbitrary Python.  The lookup goes through the same
+    namespace template a verb gets, so what is callable here is exactly
+    what is callable by name in a verb.
+
+    Args:
+        name: The builtin's name.
+        *args: Its arguments.
+
+    Returns:
+        Whatever the builtin returns.
+
+    Raises:
+        MOOError: If there is no such builtin.
+    """
+    ns = {}
+    try:
+        from .builtins import _get_builtin_ns_template
+        ns.update(_get_builtin_ns_template())
+    except Exception:
+        pass
+    ns.update({n: globals()[n] for n in __all__ if n in globals()})
+    fn = ns.get(str(name))
+    if not callable(fn):
+        raise MOOError(f'call_function: no builtin named {name!r}')
+    return fn(*args)
+
+
+def set_verb_args(obj, verb, args) -> None:
+    """
+    MOO's ``set_verb_args()``: set a verb's argument specification.
+
+    This engine parses verbs by their verb *type* rather than by a stored
+    ``dobj/prep/iobj`` triple, so there is nothing here for the
+    specification to change -- which is why ``verb_args()`` reports the
+    permissive default rather than reading one back.
+
+    It accepts and does nothing rather than raising, because ported code
+    sets this while creating a verb and would otherwise fail at a line
+    that has no bearing on what the verb does.  Nothing is silently
+    granted: the verb's parsing is unchanged either way.
+
+    Args:
+        obj: Object holding the verb.
+        verb: Verb name or 1-based index.
+        args: ``[dobj, prep, iobj]``, ignored.
+    """
+    return None
+
+
+def crypt(text: str, salt: str = '') -> str:
+    """
+    MOO's ``crypt()``: the one-way hash used for stored passwords.
+
+    MOO wraps the C library's ``crypt(3)``.  Python dropped its ``crypt``
+    module in 3.13, so this uses hashlib and marks the result with a
+    ``$6$``-style prefix to say what it is.
+
+    **Hashes made here do not match hashes made by LambdaMOO.**  That
+    matters in exactly one place: an imported core's existing password
+    hashes cannot be verified against, so those players need new
+    passwords.  Saying so is the point -- an implementation that returned
+    a plausible-looking string would leave every imported account
+    unopenable with no indication why.
+
+    Args:
+        text: The string to hash.
+        salt: Salt.  A random one is generated if omitted.
+
+    Returns:
+        str: The salted hash, prefixed with the salt as MOO's is.
+    """
+    import hashlib
+    import os
+    if not salt:
+        salt = os.urandom(6).hex()
+    salt = str(salt)
+    if salt.startswith('$6$'):
+        salt = salt[3:].split('$')[0]
+    digest = hashlib.sha512((salt + str(text)).encode()).hexdigest()
+    return f'$6${salt}${digest}'
+
+
+def sqrt(x) -> float:
+    """
+    MOO's ``sqrt()``.
+
+    Args:
+        x: A number.
+
+    Returns:
+        float: Its square root.
+    """
+    import math
+    return math.sqrt(float(x))

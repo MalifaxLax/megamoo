@@ -447,12 +447,58 @@ def test_scatter_with_rest():
     assert 'a, *rest = args' in py('{a, @rest} = args;').code
 
 
-def test_scatter_optional_is_marked():
-    # Python unpacking raises when the right side is short; MOO leaves the
-    # name unbound.  Not the same thing, so it is not pretended.
-    r = port('{prop, ?who = caller} = args;')
+def test_scatter_with_an_optional_expands_to_statements():
+    # Python's unpacking *statement* has no optional form, but the scatter
+    # does expand -- as a run of indexed assignments.  Refusing it was
+    # expensive out of proportion: an unbound target is then an undefined
+    # name everywhere it is read.
+    r = py('{prop, ?who = caller} = args;')
+    assert 'prop = args[0]' in r.code
+    assert 'who = args[1] if len(args) > 1 else caller' in r.code
+    assert r.marks == 0
+
+
+def test_scatter_optional_without_a_default_is_none():
+    # MOO leaves it genuinely unbound and raises on a read, which cannot be
+    # expressed without restructuring the verb.  None is what this engine
+    # uses everywhere else a value is absent.
+    r = py('{?who} = args;')
+    assert 'who = args[0] if len(args) > 0 else None' in r.code
+
+
+def test_scatter_evaluates_its_right_side_once():
+    # A call with side effects must not run once per target.
+    r = py('{a, ?b = 1} = this:parse(argstr);')
+    assert r.code.count("call_verb(this, 'parse'") == 1
+
+
+def test_scatter_rest_follows_the_optionals():
+    r = py('{who, ?indx = 1, @rest} = args;')
+    assert 'rest = args[2:]' in r.code
+
+
+def test_labelled_break_of_its_own_loop_is_just_break():
+    # The label alone is harmless; warning on it marked every labelled
+    # loop, including the great majority that break out of themselves.
+    r = py('while searching (args)\n  break searching;\nendwhile')
+    assert r.marks == 0
+    assert 'searching' not in r.code
+
+
+def test_labelled_break_of_an_enclosing_loop_is_marked():
+    # Python's break leaves only the innermost loop, so emitting it plain
+    # would silently carry on running the outer one.
+    r = port('while outer (args)\n  while (args)\n    break outer;\n'
+             '  endwhile\nendwhile')
     assert r.marks >= 1
-    assert 'optional' in ' '.join(r.notes)
+    assert 'enclosing' in ' '.join(r.notes)
+
+
+def test_the_loop_label_is_not_left_behind_as_a_statement():
+    # It used to be emitted after the break: dead code, and an undefined
+    # name on top of it.
+    r = py('while searching (args)\n  break searching;\nendwhile')
+    assert not any(l.strip() == 'searching' for l in r.code.splitlines())
 
 
 def test_a_list_literal_is_still_a_list():
@@ -515,17 +561,34 @@ def test_range_assignment_inside_an_expression_is_refused():
 
 
 def test_assigning_to_a_constant_sysref_is_refused():
-    # `$nothing = ""` maps to `None = ""`, which does not compile at all.
-    # The original survives in the mark; what must not survive is a live
+    # `$shutdown_message = ""` maps to `None = ""`, which does not compile.
+    # The original survives in a comment; what must not survive is a live
     # assignment statement, so this checks the result parses.
-    r = py('$nothing = "";')
-    assert r.marks >= 1
+    r = py('$shutdown_message = "";')
     assert not any(l.startswith('None = ') for l in r.code.splitlines())
 
 
+def test_one_problem_is_reported_once():
+    # The unknown sysref is marked where it is read.  Marking the
+    # assignment as well made the count say two things were wrong when
+    # only one was.
+    r = port('$shutdown_message = "";')
+    assert r.marks == 1
+
+
 def test_a_mark_from_a_helper_is_still_counted():
-    # `clean` is built on the counter, and some marks are emitted by
+    # `clean` is built on the counter, and marks can be emitted by
     # module-level helpers that cannot reach it.  A verb reported clean
     # while carrying a # PORT: line is the one lie this tool must not tell.
-    r = port('$nothing = "";')
+    r = port('x = read();')
     assert not r.clean
+    assert any(MARK in l for l in r.code.splitlines())
+
+
+def test_a_loop_inside_a_fork_is_not_reported_as_dropped():
+    # The forked body is a string in the output, so the structural check
+    # cannot see its loops.  Uncounted, it accused a perfectly good
+    # translation of losing them.
+    r = port('fork (0)\n  while (args)\n    x = 1;\n  endwhile\nendfork')
+    assert r.marks == 0
+    assert not any('dropped' in n for n in r.notes)

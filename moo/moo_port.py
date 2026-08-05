@@ -218,6 +218,10 @@ class Porter:
         self.needs_import = set()
         self.depth = 0
         self.receiver: List[str] = []
+        #: Labels of the loops we are inside, innermost last.  MOO lets
+        #: break and continue name a loop; Python does not, so the label
+        #: only matters when it is not the innermost one.
+        self.loops: List[Optional[str]] = []
 
     # -- token helpers ----------------------------------------------------
     def peek(self, ahead=0):
@@ -338,7 +342,20 @@ class Porter:
                 return [f'{pad}raise {what}']
             if t in ('break', 'continue'):
                 self.next()
+                # `break searching;` names the loop to leave.  The name was
+                # being left behind as a statement of its own -- dead code
+                # after the break, and an undefined name on top of it.
+                label = None
+                if self.peek()[0] == 'name' and self.peek(1)[1] == ';':
+                    label = self.next()[1]
                 self.eat_semi()
+                if label and label != (self.loops[-1] if self.loops else None):
+                    # Targeting an enclosing loop.  Python's break leaves
+                    # only the innermost one, so emitting it plain would
+                    # silently continue running the outer loop.
+                    self.mark(f'{t} {label!r} leaves an enclosing loop; '
+                              f'Python only leaves the innermost one, so '
+                              f'this needs a flag or a helper function')
                 return [f'{pad}{t}']
 
         # scatter assignment:  {a, ?b = d, @rest} = expr
@@ -372,12 +389,21 @@ class Porter:
         Parse `{a, ?b = d, @rest} = expr`, or give up and return None.
 
         MOO's scatter has three item kinds: required, optional (with an
-        optional default), and rest.  Python unpacking covers required and
-        rest exactly; it has nothing for optionals, because it raises when
-        the right-hand side is too short rather than leaving a name unbound.
-        Those are marked rather than approximated -- silently binding a
-        default that MOO would have left unset is the sort of difference
-        that surfaces much later.
+        optional default), and rest.  Python's unpacking *statement* covers
+        required and rest but has nothing for optionals -- it raises when
+        the right side is too short rather than leaving a name unbound.
+
+        That is a limit of the one-line form, not of Python, so when there
+        are optionals the whole thing is expanded into a run of statements
+        that index the value directly.  Refusing it was expensive out of
+        proportion to the construct: an unbound target is an undefined name
+        everywhere it is read afterwards, so a single unhandled `?width =
+        79` marked the verb several times over.
+
+        An optional with no default is left as None.  MOO leaves it
+        genuinely unbound and raises E_VARNF on a read, which Python cannot
+        express without restructuring the whole verb, and None matches what
+        this engine already does everywhere else a value is absent.
         """
         self.expect('{')
         names, optional, rest = [], [], None
@@ -413,18 +439,54 @@ class Porter:
         value = self.expr()
         self.eat_semi()
 
-        required = [n for n in names if n not in {o[0] for o in optional}]
-        target = ', '.join(required + ([f'*{rest}'] if rest else []))
-        out = []
-        if optional:
+        opt_names = {o[0] for o in optional}
+        required = [n for n in names if n not in opt_names]
+
+        if not optional:
+            # No optionals: Python's own unpacking says exactly this, and
+            # it raises on a length mismatch just as MOO does.
+            target = ', '.join(_safe_name(n) for n in required)
+            if rest:
+                target = ', '.join(filter(None, [target, f'*{_safe_name(rest)}']))
+            if not target:
+                return [f'# {value}']
+            return [f'{target} = {value}']
+
+        # With optionals, expand to indexed statements.  This only reads
+        # correctly if every required target precedes every optional one,
+        # which is how MOO code is actually written; anything else is
+        # marked rather than guessed at, since the fill order would be a
+        # guess about which target a short value was meant to reach.
+        order = [n for n in names]
+        first_opt = min(order.index(n) for n in opt_names)
+        if any(order.index(n) < first_opt for n in opt_names) or \
+                any(n not in opt_names for n in order[first_opt:]):
             for nm, default in optional:
-                out.append(self.mark(
-                    f'optional scatter target {nm!r}'
-                    + (f' defaulting to {default}' if default else '')
-                    + ': Python unpacking has no equivalent, set it by hand'))
-        if not target:
-            return out + [f'# {value}']
-        return out + [f'{target} = {value}']
+                self.mark(f'scatter target {nm!r} is optional but does not '
+                          f'follow the required ones; fill order is '
+                          f'ambiguous, so set it by hand')
+            return [f'{_safe_name(order[0])} = {value}']
+
+        # The value is bound to a name first when it is not already one, so
+        # a right side with side effects is evaluated once rather than once
+        # per target.
+        if value.isidentifier():
+            src = value
+            out = []
+        else:
+            self._scatters = getattr(self, '_scatters', 0) + 1
+            src = f'_scatter_{self._scatters}'
+            out = [f'{src} = {value}']
+
+        for i, nm in enumerate(required):
+            out.append(f'{_safe_name(nm)} = {src}[{i}]')
+        for j, (nm, default) in enumerate(optional):
+            i = len(required) + j
+            out.append(f'{_safe_name(nm)} = {src}[{i}] if len({src}) > {i} '
+                       f'else {default if default else "None"}')
+        if rest:
+            out.append(f'{_safe_name(rest)} = {src}[{len(names)}:]')
+        return out
 
     def _refuse(self, indent, word) -> List[str]:
         """Consume a construct we will not translate, and mark it."""
@@ -484,7 +546,7 @@ class Porter:
     def for_stmt(self, indent) -> List[str]:
         pad = '    ' * indent
         self.expect('for')
-        var = self.next()[1]
+        var = _safe_name(self.next()[1])
         self.expect('in')
         # Two forms, and only one of them is parenthesised:
         #   for x in (a_list)      iterate a list
@@ -501,7 +563,13 @@ class Porter:
             seq = self._paren(self.expr)
             self.expect(')')
             head = f'{pad}for {var} in {seq}:'
+        # A for loop's *variable* is its label -- `for x in (l) ... break
+        # x; ... endfor` is MOO's spelling.  Pushing None here instead
+        # made every one of those look like a break out of an enclosing
+        # loop, which is the opposite of what it is.
+        self.loops.append(var)
         out = [head] + self.block(indent + 1, ('endfor',))
+        self.loops.pop()
         if self.at_name('endfor'):
             self.next()
             self.eat_semi()
@@ -614,18 +682,21 @@ class Porter:
     def while_stmt(self, indent) -> List[str]:
         pad = '    ' * indent
         self.expect('while')
-        # MOO 1.8 allows a loop label: `while searching (queue)`.  It only
-        # matters to break/continue targeting it, which Python cannot do
-        # anyway, so it is consumed and noted rather than kept.
+        # MOO 1.8 allows a loop label: `while searching (queue)`.  The
+        # label alone is harmless -- it only matters if a break or continue
+        # names an *enclosing* loop, and that is caught at the break
+        # itself, where it can be described precisely.  Warning here
+        # marked every labelled loop, including the great majority whose
+        # breaks target the loop they are already in.
+        label = None
         if self.peek()[0] == 'name' and self.peek(1)[1] == '(':
             label = self.next()[1]
-            self.note(f'loop label {label!r} dropped; Python cannot break '
-                      f'to a label, so check any break/continue inside')
-            self.marks += 1
         self.expect('(')
         cond = self._paren(self.expr)
         self.expect(')')
+        self.loops.append(label)
         out = [f'{pad}while {cond}:'] + self.block(indent + 1, ('endwhile',))
+        self.loops.pop()
         if self.at_name('endwhile'):
             self.next()
             self.eat_semi()
@@ -681,7 +752,7 @@ class Porter:
                         'no inline form; lift it to its own statement',
                         f'{left} = {rhs}')
                 elif target[0] == 'prop':
-                    left = f'moo_setprop({target[1]}, {target[2]!r}, {rhs})'
+                    left = f'moo_setprop({target[1]}, {target[2]}, {rhs})'
                 else:
                     left = f'moo_setitem({target[1]}, {target[2]}, {rhs})'
         return left
@@ -697,12 +768,22 @@ class Porter:
 
         Returns:
             ``('prop', obj, name)``, ``('item', seq, index)``, or None if
-            it is not a shape that can be written through a helper.
+            it is not a shape that can be written through a helper.  For
+            'prop' the *name* is already Python source -- quoted for a
+            plain ``a.b``, left as an expression for MOO's computed
+            ``a.(expr)`` form -- so the caller does not have to know which
+            it came from.
 
         The bracket scan counts depth rather than searching for the first
         ``[``, because the container is itself an expression and may carry
         brackets of its own -- ``x[1][2]`` must split at the last pair.
         """
+        # MOO's computed property access, a.(expr), has already become a
+        # getattr() by the time it reaches here.  The statement form turns
+        # that into setattr(); in an expression it needs the helper.
+        m = re.fullmatch(r'getattr\((.*), (.*)\)', text, re.S)
+        if m:
+            return ('prop', m.group(1), m.group(2))
         if text.endswith(']'):
             depth = 0
             for i in range(len(text) - 1, -1, -1):
@@ -724,7 +805,7 @@ class Porter:
             return None
         head, dot, name = text.rpartition('.')
         if dot and name.isidentifier() and head:
-            return ('prop', head, name)
+            return ('prop', head, repr(name))
         return None
 
     def binary(self, level: int) -> str:
@@ -1081,13 +1162,16 @@ def _assign(target: str, value: str) -> str:
     if m:
         return f'setattr({m.group(1)}, {m.group(2)}, {value})'
     if target in ('None', 'True', 'False'):
-        # A sysref that maps to a constant rather than an object, being
-        # written to: `$nothing = ""` in core setup code.  There is no
-        # object here to store it on, and guessing at one would be worse
-        # than saying so, so the line becomes a mark carrying the
-        # original.  Rare -- two verbs in JHCore -- but it produced code
-        # that did not compile at all.
-        return f'{MARK} cannot assign to {target}  --  was: {target} = {value}'
+        # Writing to something that translated to a constant.  In practice
+        # this is `$shutdown_message = ""` -- an unknown sysref, whose
+        # placeholder is None, being assigned to.
+        #
+        # It is emitted as a plain comment rather than a MARK, because the
+        # unknown sysref has already been marked where it was read.  One
+        # problem should be reported once; a second mark here made the
+        # count say two things were wrong when only one was.  The original
+        # is kept so the line is not silently lost.
+        return f'# cannot assign to {target}  --  was: {target} = {value}'
     return f'{target} = {value}'
 
 
@@ -1238,6 +1322,17 @@ def structure_of_python(code: str) -> dict:
             counts['while'] += 1
         elif isinstance(node, ast.Return):
             counts['return'] += 1
+        # A forked body is a string here, so its loops are invisible to the
+        # walk above.  Left uncounted, a verb that forked a loop was
+        # reported as having dropped one -- an alarm about code that was
+        # translated perfectly well, which is worse than no check at all.
+        elif (isinstance(node, ast.Assign) and
+                isinstance(node.value, ast.Constant) and
+                isinstance(node.value.value, str) and
+                any(isinstance(t, ast.Name) and t.id.startswith('_forked_')
+                    for t in node.targets)):
+            for k, v in structure_of_python(node.value.value).items():
+                counts[k] = counts.get(k, 0) + v
     return counts
 
 
