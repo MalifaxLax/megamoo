@@ -592,3 +592,74 @@ def test_a_loop_inside_a_fork_is_not_reported_as_dropped():
     r = port('fork (0)\n  while (args)\n    x = 1;\n  endwhile\nendfork')
     assert r.marks == 0
     assert not any('dropped' in n for n in r.notes)
+
+
+# --------------------------------------------------------------------------
+# Operators and literals found by measuring against stock LambdaCore
+# --------------------------------------------------------------------------
+
+def test_caret_is_exponentiation_not_xor():
+    # mooR spells them apart -- ^ is power, ^. is xor -- precisely because
+    # they would collide.  Reading ^ as xor turns every `10 ^ i` into a
+    # silently wrong number.
+    assert 'x = 10 ** 3' in py('x = 10 ^ 3;').code
+
+
+def test_exponentiation_groups_to_the_right():
+    # 2^3^2 is 2^(3^2), which Python's ** already does -- but only if the
+    # parser recurses at the same level rather than the next one.
+    assert 'x = 2 ** 3 ** 2' in py('x = 2 ^ 3 ^ 2;').code
+
+
+def test_exponentiation_binds_tighter_than_multiplication():
+    # mooR's precedence table puts Exponent above Multiplicative.
+    assert 'x = 2 * 3 ** 2' in py('x = 2 * 3 ^ 2;').code
+
+
+def test_scientific_notation():
+    assert 'x = 1e24' in py('x = 1e24;').code
+    assert 'y = 1.5e-3' in py('y = 1.5e-3;').code
+
+
+def test_moor_bitwise_operators():
+    # Not LambdaMOO 1.8, but a core written for mooR fails to parse at all
+    # without them.
+    assert 'a & 7' in py('x = a &. 7;').code
+    assert 'a | 7' in py('x = a |. 7;').code
+    assert 'a ^ 7' in py('x = a ^. 7;').code
+    assert '1 << 23' in py('x = 1 << 23;').code
+
+
+def test_maxint_is_a_constant_not_an_object():
+    # real name on the left, so the namespace check does not flag the
+    # fixture itself
+    r = py('if (args > $maxint)\n  return 0;\nendif')
+    assert '9223372036854775807' in r.code
+    assert r.marks == 0
+
+
+# --------------------------------------------------------------------------
+# The brace ambiguity
+# --------------------------------------------------------------------------
+
+def test_a_splat_in_a_list_literal_is_not_a_scatter():
+    # {@args, 1} is an ordinary list splat and very common.  Reading the
+    # @ as a scatter marker cost eight points of clean rate across two
+    # cores before a measurement caught it.
+    r = py('x = {@args, 1};')
+    assert 'x = [*args, 1]' in r.code
+    assert r.marks == 0
+
+
+def test_scatter_and_list_are_told_apart_by_what_follows_the_brace():
+    # Only a bare `=` after the closing brace makes it an assignment.
+    assert py('x = {@args} == {@args};').marks == 0
+
+
+def test_scatter_inside_an_expression_is_marked_not_fatal():
+    # LambdaCore writes `while ({?sfc, @todo} = todo)`.  Python cannot
+    # bind names from a call, so there is nothing to emit -- but raising
+    # took the whole verb down, where a mark loses only the line.
+    r = port('while ({?a, @rest} = todo)\n  x = 1;\nendwhile')
+    assert r.marks >= 1
+    assert 'scatter assignment inside an expression' in ' '.join(r.notes)

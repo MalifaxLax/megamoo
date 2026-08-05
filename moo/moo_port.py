@@ -63,6 +63,12 @@ SYSREFS = {
 SYSCONSTANTS = {
     'nothing': 'None',
     'no_one': 'None',
+    # MOO's integer limits.  A 64-bit server's values, because that is
+    # what both this engine and a modern LambdaMOO use; a core comparing
+    # against them is asking about the server it runs on, not the one it
+    # was written on.
+    'maxint': '9223372036854775807',
+    'minint': '-9223372036854775808',
     'failed_match': 'FAILED_MATCH',
     'ambiguous_match': 'AMBIGUOUS_MATCH',
 }
@@ -174,10 +180,10 @@ TOKEN_RE = re.compile(r"""
   | (?P<objnum>\#\s*-?\d+)
   | (?P<sysref>\$[A-Za-z_]\w*)
   | (?P<dollar>\$)
-  | (?P<number>\d+\.\d+|\d+)
+  | (?P<number>\d+\.\d+(?:[eE][-+]?\d+)?|\d+[eE][-+]?\d+|\d+)
   | (?P<name>[A-Za-z_]\w*)
   | (?P<range>\.\.)
-  | (?P<op><=|>=|==|!=|&&|\|\||=>|[-+*/%<>=!?|:.,;()\[\]{}@`'])
+  | (?P<op>>>>|<<|>>|&\.|\|\.|\^\.|<=|>=|==|!=|&&|\|\||=>|[-+*/%^<>=!?|:.,;()\[\]{}@`'])
 """, re.X)
 
 
@@ -708,11 +714,27 @@ class Porter:
     #: where Python binds `and` tighter than `or`.  They are kept together
     #: here and the result parenthesised, so `a || b && c` stays
     #: `(a or b) and c` instead of being reread as `a or (b and c)`.
+    #: Binary operators, loosest first.  The order is mooR's precedence
+    #: table (crates/compiler/src/precedence.rs), which is the closest
+    #: thing to a specification of the language that exists.
+    #:
+    #: The bitwise level and `^.` are mooR extensions rather than
+    #: LambdaMOO 1.8, and they are here because a core written for mooR
+    #: otherwise fails to parse outright.  Note `^` is exponentiation and
+    #: `^.` is xor -- mooR spells them apart precisely because the two
+    #: would collide, and reading `^` as xor would turn every ported
+    #: `10 ^ i` into a silently wrong number.
     BIN = [
         (('||', '&&'), None),
+        (('|.',), None), (('^.',), None), (('&.',), None),
         (('==', '!=', '<', '>', '<=', '>=', 'in'), None),
+        (('<<', '>>', '>>>'), None),
         (('+', '-'), None), (('*', '/', '%'), None),
+        (('^',), None),
     ]
+
+    #: How MOO spells an operator vs how Python does.
+    OPS = {'|.': '|', '^.': '^', '&.': '&', '>>>': '>>', '^': '**'}
 
     def expr(self) -> str:
         """A full expression: conditional, then assignment."""
@@ -756,6 +778,34 @@ class Porter:
                 else:
                     left = f'moo_setitem({target[1]}, {target[2]}, {rhs})'
         return left
+
+    def _is_scatter_expr(self) -> bool:
+        """
+        Whether the ``{`` just consumed opens a scatter, not a list.
+
+        The two are only told apart by what follows the closing brace: a
+        bare ``=`` makes it an assignment target.  Looking for ``?`` or
+        ``@`` inside is not enough, because ``{@args, 1}`` is an ordinary
+        list splat and extremely common -- treating those as scatter
+        marked a large fraction of the corpus and cost eight points of
+        clean rate before the measurement caught it.
+        """
+        saved, depth = self.i, 0
+        try:
+            while True:
+                k, t, _ = self.peek()
+                if k == 'eof':
+                    return False
+                if t in '([{':
+                    depth += 1
+                elif t == '}' and depth == 0:
+                    self.next()
+                    return self.at('=') and self.peek(1)[1] != '='
+                elif t in ')]}':
+                    depth -= 1
+                self.next()
+        finally:
+            self.i = saved
 
     @staticmethod
     def _split_target(text: str):
@@ -826,7 +876,13 @@ class Porter:
                 continue
             if k == 'op' and t in ops:
                 op = self.next()[1]
-                right = self.binary(level + 1)
+                # Exponentiation groups to the right in both languages, so
+                # 2^3^2 is 2^(3^2).  Recursing at the same level rather
+                # than the next one is what makes that true; the loop
+                # below is left-associative, which is right for everything
+                # else and wrong only for this.
+                right = (self.binary(level) if op == '^'
+                         else self.binary(level + 1))
                 if op in ('||', '&&'):
                     # Parenthesised because MOO and Python disagree about
                     # how these two bind relative to each other.
@@ -844,7 +900,7 @@ class Porter:
                     test = f'isinstance({inner}, {pair})'
                     left = test if op == '==' else f'not {test}'
                     continue
-                left = f'{left} {word or op} {right}'
+                left = f'{left} {word or self.OPS.get(op, op)} {right}'
                 continue
             return left
 
@@ -928,6 +984,34 @@ class Porter:
             self.expect(')')
             return f'({e})'
         if t == '{':
+            # `{?a, @rest} = value` in expression position -- MOO's
+            # scatter is an expression, and LambdaCore writes
+            # `while ({?sfc, @todo} = todo)`.  Python cannot bind names
+            # from inside an expression at all, so there is nothing to
+            # emit; the point of catching it here is that raising took
+            # the whole verb down, where a mark loses only this line.
+            if self._is_scatter_expr():
+                depth, raw = 0, []
+                while True:
+                    k, t, _ = self.peek()
+                    if k == 'eof':
+                        break
+                    if t in '([{':
+                        depth += 1
+                    elif t == '}' and depth == 0:
+                        self.next()
+                        break
+                    elif t in ')]}':
+                        depth -= 1
+                    raw.append(t)
+                    self.next()
+                if self.at('=') and self.peek(1)[1] != '=':
+                    self.next()
+                    self.expr()
+                return self.mark_expr(
+                    'scatter assignment inside an expression; Python cannot '
+                    'bind names from a call, so lift it above the statement '
+                    'that uses it', '{' + ' '.join(raw) + '} = ...')
             items = self.arglist('}')
             return '[' + ', '.join(items) + ']'
         if k == 'dollar':

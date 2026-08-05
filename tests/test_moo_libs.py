@@ -481,3 +481,37 @@ def test_catch_keeps_a_property_that_really_holds_a_falsy_value():
     from moo.builtins import catch
     assert catch(lambda: 0, ('E_PROPNF',), lambda: 'd') == 0
     assert catch(lambda: '', ('E_PROPNF',), lambda: 'd') == ''
+
+
+def test_atan_two_argument_form_keeps_the_quadrant():
+    # atan(y, x) is C's atan2; atan(y / x) loses which quadrant it was in.
+    import math
+    from moo.moo_builtins import atan
+    assert round(atan(1, -1), 6) == round(math.pi * 3 / 4, 6)
+    assert round(atan(1), 6) == round(math.pi / 4, 6)
+
+
+def test_ceil_and_trunc_return_floats_like_moos():
+    from moo.moo_builtins import ceil, trunc
+    assert ceil(1.2) == 2.0 and isinstance(ceil(1.2), float)
+    assert trunc(-1.8) == -1.0
+
+
+def test_floatstr_honours_precision():
+    from moo.moo_builtins import floatstr
+    assert floatstr(3.14159, 2) == '3.14'
+    assert floatstr(3.0, 0) == '3'
+    assert 'e' in floatstr(1234.5, 2, True)
+
+
+def test_value_bytes_recurses_into_containers():
+    # A big list must not report the size of a pointer.
+    from moo.moo_builtins import value_bytes
+    assert value_bytes([1, 2, 3, 4]) > value_bytes([1])
+
+
+def test_force_input_does_nothing():
+    # It would let ported code issue commands as another player, under
+    # their permissions, without their knowledge.
+    from moo.moo_builtins import force_input
+    assert force_input(None, 'quit') is None

@@ -51,6 +51,14 @@ __all__ = [
     'set_property_info', 'property_info',
     # Tasks, verbs and dynamic dispatch
     'queued_tasks', 'call_function', 'set_verb_args', 'crypt',
+    'task_stack', 'function_info',
+    # Maths
+    'sin', 'cos', 'tan', 'asin', 'acos', 'atan',
+    'sinh', 'cosh', 'tanh', 'exp', 'log', 'log10', 'ceil', 'trunc',
+    'floatstr',
+    # Server measurement and connection control
+    'value_bytes', 'memory_usage', 'dump_database',
+    'flush_input', 'force_input', 'output_delimiters',
 ]
 
 
@@ -748,3 +756,301 @@ def sqrt(x) -> float:
     """
     import math
     return math.sqrt(float(x))
+
+
+# ---------------------------------------------------------------------------
+# Maths
+#
+# MOO's floating-point builtins are C's, and so are Python's, so these are
+# thin by design.  They are here rather than left to `import math` because
+# a verb namespace has no modules in it -- an unwrapped math call is an
+# undefined name, which is what these were before.
+# ---------------------------------------------------------------------------
+
+def _m(fn, *a):
+    import math
+    return getattr(math, fn)(*[float(x) for x in a])
+
+
+def sin(x):
+    """MOO's ``sin()``: sine of *x* radians."""
+    return _m('sin', x)
+
+
+def cos(x):
+    """MOO's ``cos()``: cosine of *x* radians."""
+    return _m('cos', x)
+
+
+def tan(x):
+    """MOO's ``tan()``: tangent of *x* radians."""
+    return _m('tan', x)
+
+
+def asin(x):
+    """MOO's ``asin()``: arc sine, in radians."""
+    return _m('asin', x)
+
+
+def acos(x):
+    """MOO's ``acos()``: arc cosine, in radians."""
+    return _m('acos', x)
+
+
+def atan(y, x=None):
+    """
+    MOO's ``atan()``: arc tangent, in radians.
+
+    Args:
+        y: The value, or the numerator of the two-argument form.
+        x: If given, the denominator -- ``atan(y, x)`` is C's ``atan2``,
+            which keeps the quadrant that ``atan(y / x)`` loses.
+
+    Returns:
+        float: The angle in radians.
+    """
+    return _m('atan', y) if x is None else _m('atan2', y, x)
+
+
+def sinh(x):
+    """MOO's ``sinh()``: hyperbolic sine."""
+    return _m('sinh', x)
+
+
+def cosh(x):
+    """MOO's ``cosh()``: hyperbolic cosine."""
+    return _m('cosh', x)
+
+
+def tanh(x):
+    """MOO's ``tanh()``: hyperbolic tangent."""
+    return _m('tanh', x)
+
+
+def exp(x):
+    """MOO's ``exp()``: e raised to *x*."""
+    return _m('exp', x)
+
+
+def log(x):
+    """MOO's ``log()``: natural logarithm."""
+    return _m('log', x)
+
+
+def log10(x):
+    """MOO's ``log10()``: base-10 logarithm."""
+    return _m('log10', x)
+
+
+def ceil(x):
+    """MOO's ``ceil()``: round up.  Returns a float, as MOO's does."""
+    import math
+    return float(math.ceil(float(x)))
+
+
+def trunc(x):
+    """MOO's ``trunc()``: round toward zero.  Returns a float."""
+    return float(int(float(x)))
+
+
+def floatstr(x, precision: int = 0, scientific=False) -> str:
+    """
+    MOO's ``floatstr()``: format a float with a chosen precision.
+
+    Unlike ``tostr()``, this says exactly how many digits it wants, which
+    is why cores use it for money and measurements.
+
+    Args:
+        x: The number.
+        precision: Digits after the point.
+        scientific: Use exponential notation.
+
+    Returns:
+        str: The formatted number.
+    """
+    p = max(0, int(precision))
+    return f'{float(x):.{p}e}' if scientific else f'{float(x):.{p}f}'
+
+
+# ---------------------------------------------------------------------------
+# Server measurement, and connection control
+# ---------------------------------------------------------------------------
+
+def value_bytes(value) -> int:
+    """
+    MOO's ``value_bytes()``: how much memory a value occupies.
+
+    MOO reports its own internal representation; this reports Python's,
+    recursing into lists and dicts so a big list does not read as the
+    size of a pointer.  The number is therefore the right shape -- bigger
+    things are bigger -- without being LambdaMOO's exact figure, which
+    was a fact about a C struct that does not exist here.
+
+    Args:
+        value: Anything.
+
+    Returns:
+        int: Approximate size in bytes.
+    """
+    import sys
+    seen = set()
+
+    def size(v):
+        if id(v) in seen:
+            return 0
+        seen.add(id(v))
+        n = sys.getsizeof(v, 0)
+        if isinstance(v, (list, tuple, set)):
+            n += sum(size(x) for x in v)
+        elif isinstance(v, dict):
+            n += sum(size(k) + size(x) for k, x in v.items())
+        return n
+
+    return size(value)
+
+
+def memory_usage() -> List:
+    """
+    MOO's ``memory_usage()``: the server's memory, in MOO's shape.
+
+    MOO returns ``{{block-size, nused, nfree}, ...}`` for its own
+    allocator.  There is no such allocator here, so this reports one
+    entry describing the process as a whole rather than inventing a
+    breakdown that would be fiction.
+
+    Returns:
+        list: A single ``[block-size, nused, nfree]`` entry.
+    """
+    try:
+        import resource
+        used = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    except Exception:
+        used = 0
+    return [[1, int(used), 0]]
+
+
+def dump_database() -> int:
+    """
+    MOO's ``dump_database()``: checkpoint the database to disk now.
+
+    Returns:
+        int: 1 on success, 0 on failure.
+    """
+    try:
+        from .builtins import checkpoint_db
+        checkpoint_db()
+        return 1
+    except Exception:
+        logger.exception('dump_database failed')
+        return 0
+
+
+def task_stack(task=None, include_line_numbers=False) -> List:
+    """
+    MOO's ``task_stack()``: the call stack of a suspended task.
+
+    Only the running task's stack is reachable here.  A suspended task in
+    this engine is a parked thread, and its frames live on that thread --
+    they are not recorded anywhere a second thread could read them.  For
+    any other task this returns ``[]`` rather than a plausible-looking
+    stack belonging to the wrong task.
+
+    Args:
+        task: Task id.  Omitted, or the current task, gives this stack.
+        include_line_numbers: Accepted for compatibility; line numbers
+            are always 0, as in :func:`~moo.builtins.callers`.
+
+    Returns:
+        list: Frames, innermost last, or ``[]``.
+    """
+    from .builtins import callers, task_id
+    if task is None or task == task_id():
+        return callers()
+    return []
+
+
+def function_info(name: str = None):
+    """
+    MOO's ``function_info()``: what builtins exist.
+
+    MOO returns ``{{name, min-args, max-args, types}, ...}``.  Argument
+    counts here come from the Python signature, and the types column is
+    empty because these functions are not declared with MOO's type codes.
+
+    Args:
+        name: A single builtin to describe, or None for all of them.
+
+    Returns:
+        list: One ``[name, min_args, max_args, types]`` entry per builtin.
+    """
+    import inspect
+    from .builtins import _get_builtin_ns_template
+    ns = dict(_get_builtin_ns_template())
+    ns.update({n: globals()[n] for n in __all__ if n in globals()})
+    out = []
+    for n, fn in sorted(ns.items()):
+        if not callable(fn) or (name is not None and n != name):
+            continue
+        try:
+            params = list(inspect.signature(fn).parameters.values())
+        except (TypeError, ValueError):
+            continue
+        required = sum(1 for p in params
+                       if p.default is p.empty and
+                       p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD))
+        variadic = any(p.kind == p.VAR_POSITIONAL for p in params)
+        out.append([n, required, -1 if variadic else len(params), []])
+    return out
+
+
+def flush_input(who, show_messages=False) -> None:
+    """
+    MOO's ``flush_input()``: discard whatever *who* has typed ahead.
+
+    Args:
+        who: A player object or object number.
+        show_messages: Whether to tell them, accepted for compatibility.
+    """
+    conn = _connection(who)
+    buf = getattr(conn, 'input_buffer', None) if conn else None
+    if buf is not None:
+        try:
+            buf.clear()
+        except Exception:
+            pass
+
+
+def force_input(who, line: str, at_front=False) -> None:
+    """
+    MOO's ``force_input()``: make *who* appear to have typed *line*.
+
+    Not implemented, and deliberately so.  It is the one builtin here
+    that would let ported code act as another player -- issuing commands
+    under their name, with their permissions, without their knowledge.
+    That is worth more than the handful of marks it costs, so it does
+    nothing and says why rather than quietly working.
+
+    Args:
+        who: A player object or object number.
+        line: What they would have typed.
+        at_front: Whether to jump the queue.
+    """
+    logger.warning('force_input(%s, %r) ignored: injecting input as another '
+                   'player is not supported', who, line)
+
+
+def output_delimiters(who) -> List:
+    """
+    MOO's ``output_delimiters()``: the prefix and suffix strings set by
+    the ``PREFIX``/``SUFFIX`` out-of-band commands.
+
+    This engine has no out-of-band command layer, so both are empty --
+    which is also what MOO returns when a connection has never set them.
+
+    Args:
+        who: A player object or object number.
+
+    Returns:
+        list: ``[prefix, suffix]``.
+    """
+    return ['', '']
