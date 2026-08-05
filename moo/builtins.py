@@ -2865,7 +2865,12 @@ def port_verb(pobj, spec: str, db):
             return
 
         try:
-            result = port(source)
+            # Hand the translator the live database, so a `$foo` is
+            # checked against #0 rather than guessed at.  This is the one
+            # advantage @port has over an offline translator: it runs
+            # inside the server it is porting into.
+            from .moo_builtins import has_sysobj
+            result = port(source, resolve=has_sysobj)
         except MooSyntaxError as err:
             notify(pobj, f"That does not parse as MOO: {err}")
             notify(pobj, "Nothing was changed.")

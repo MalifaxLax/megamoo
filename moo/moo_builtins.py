@@ -52,6 +52,8 @@ __all__ = [
     # Values and membership
     'equal', 'is_member', 'set_player_flag', 'listeners',
     'set_property_info', 'property_info',
+    # System references
+    'sysobj', 'has_sysobj', 'set_sysobj',
     # Tasks, verbs and dynamic dispatch
     'queued_tasks', 'call_function', 'set_verb_args', 'crypt',
     'task_stack', 'function_info',
@@ -1227,3 +1229,93 @@ def moo_listset(seq, index, value):
         return seq[:i] + str(value) + seq[i + 1:]
     seq[index] = value
     return seq
+
+
+# ---------------------------------------------------------------------------
+# System references
+#
+# `$foo` is not special syntax in MOO.  It is exactly `#0.foo` -- a
+# property on the system object -- and the core sets those up at build
+# time.  This engine already works the same way: #0 is SystemObject and
+# carries $chair, $item, $obj and the rest.
+#
+# So there was never anything to guess at here.  @port marked every
+# unknown $reference as "point this at the right one" only because it had
+# no way to look, which is odd given that it runs inside the server.
+# ---------------------------------------------------------------------------
+
+def sysobj(name: str):
+    """
+    Resolve MOO's ``$name`` -- the property *name* on object #0.
+
+    Args:
+        name: The reference, without the ``$``.
+
+    Returns:
+        Whatever ``#0.name`` holds, usually an object.
+
+    Raises:
+        MOOError: If #0 has no such property, which is MOO's E_PROPNF.
+            Raising matters: a missing $reference that returned None would
+            turn `$mail_agent:send(...)` into a call on nothing, and the
+            failure would surface somewhere else entirely.
+    """
+    from .builtins import _database
+    if _database is None:
+        raise MOOError(f'${name}: no database')
+    zero = _database.get_object(0)
+    if zero is None:
+        raise MOOError(f'${name}: no system object')
+    value = getattr(zero, str(name), None)
+    if value is None or repr(value) == 'None':
+        raise MOOError(f'${name} is not defined on #0')
+    return value
+
+
+def has_sysobj(name: str) -> bool:
+    """
+    Whether ``$name`` resolves, without raising if it does not.
+
+    This is what @port calls at translation time to decide between a
+    clean reference and a marked one.
+
+    Args:
+        name: The reference, without the ``$``.
+
+    Returns:
+        bool: True if #0 defines it.
+    """
+    try:
+        sysobj(name)
+        return True
+    except Exception:
+        return False
+
+
+def set_sysobj(name: str, value):
+    """
+    Assign MOO's ``$name`` -- that is, set the property on object #0.
+
+    Cores do this in their setup verbs: ``$shutdown_message = "";`` is
+    ordinary configuration, not a special form.  It needs its own
+    function only because the read side is a call, and Python cannot
+    assign to one.
+
+    Args:
+        name: The reference, without the ``$``.
+        value: What to store.
+
+    Returns:
+        *value*, so this works in expression position too.
+
+    Raises:
+        MOOError: If there is no database or no #0 to store it on.
+    """
+    from .builtins import _database
+    if _database is None:
+        raise MOOError(f'${name}: no database')
+    zero = _database.get_object(0)
+    if zero is None:
+        raise MOOError(f'${name}: no system object')
+    setattr(zero, str(name), value)
+    return value

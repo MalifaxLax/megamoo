@@ -272,7 +272,13 @@ def tokenise(src: str) -> List[Tuple[str, str, int]]:
 # ---------------------------------------------------------------------------
 
 class Porter:
-    def __init__(self, src: str):
+    def __init__(self, src: str, resolve=None):
+        #: Answers "is $name defined on #0?".  port() supplies the
+        #: running server's.  None when translating outside one --
+        #: under test, or from a script -- and then every $reference is
+        #: taken on trust, because an absent database is not evidence
+        #: that an object is missing.
+        self._resolve = resolve
         self.toks = tokenise(src)
         self.i = 0
         self.notes: List[str] = []
@@ -287,6 +293,17 @@ class Porter:
         #: break and continue name a loop; Python does not, so the label
         #: only matters when it is not the innermost one.
         self.loops: List[Optional[str]] = []
+
+    def sysref_resolves(self, name: str) -> bool:
+        """Whether ``$name`` is defined on #0 right now."""
+        if self._resolve is None:
+            return True
+        try:
+            return bool(self._resolve(name))
+        except Exception:
+            # A resolver that errors tells us nothing about the
+            # reference, so it must not be read as an absence.
+            return True
 
     # -- token helpers ----------------------------------------------------
     def peek(self, ahead=0):
@@ -832,10 +849,30 @@ class Porter:
                         'assignment inside an expression to something with '
                         'no inline form; lift it to its own statement',
                         f'{left} = {rhs}')
+                elif target[0] == 'sys':
+                    left = f'set_sysobj({target[1]}, {rhs})'
                 elif target[0] == 'prop':
                     left = f'moo_setprop({target[1]}, {target[2]}, {rhs})'
                 else:
-                    left = f'moo_setitem({target[1]}, {target[2]}, {rhs})'
+                    # An indexed write has to rebind, because MOO lists are
+                    # values -- see _assign.  In expression position that
+                    # needs a form which both rebinds and yields, and there
+                    # are two: the walrus for a plain name, and moo_setprop
+                    # for a property, which returns what it stored.
+                    seq, index = target[1], target[2]
+                    rebound = self._rebind(
+                        seq, f'moo_listset({seq}, {index}, {rhs})')
+                    if rebound is None:
+                        # Nowhere to store the new list, so MOO's value
+                        # semantics are genuinely lost here rather than
+                        # merely untranslated.  Worth saying.
+                        left = self.mark_expr(
+                            'indexed assignment inside an expression whose '
+                            'container cannot be rebound; MOO would leave '
+                            'the original list untouched and this will not',
+                            f'{seq}[{index}] = {rhs}')
+                    else:
+                        left = rebound
         return left
 
     def _is_scatter_expr(self) -> bool:
@@ -866,6 +903,41 @@ class Porter:
         finally:
             self.i = saved
 
+    def _rebind(self, target: str, value: str):
+        """
+        An *expression* that stores *value* back into *target*.
+
+        MOO's indexed assignment rebinds rather than writing through, and
+        in expression position that needs a form which both stores and
+        yields.  There are three, and which one applies depends on what
+        the container is: the walrus for a plain name, moo_setprop for a
+        property, set_sysobj for a ``$ref``.
+
+        It recurses, because a nested target has to be rebuilt from the
+        inside out and then stored at the outermost level -- rebinding
+        only the inner list would mutate in place one level down, which
+        is the bug this is here to avoid.
+
+        Args:
+            target: Translated Python for the container.
+            value:  Translated Python for what it should become.
+
+        Returns:
+            The expression, or None when there is nowhere to store it --
+            assigning into the result of a call, for instance.
+        """
+        if target.isidentifier():
+            return f'({target} := {value})'
+        parts = self._split_target(target)
+        if parts is None:
+            return None
+        if parts[0] == 'prop':
+            return f'moo_setprop({parts[1]}, {parts[2]}, {value})'
+        if parts[0] == 'sys':
+            return f'set_sysobj({parts[1]}, {value})'
+        seq, index = parts[1], parts[2]
+        return self._rebind(seq, f'moo_listset({seq}, {index}, {value})')
+
     @staticmethod
     def _split_target(text: str):
         """
@@ -890,6 +962,9 @@ class Porter:
         # MOO's computed property access, a.(expr), has already become a
         # getattr() by the time it reaches here.  The statement form turns
         # that into setattr(); in an expression it needs the helper.
+        m = re.fullmatch(r'sysobj\((.*)\)', text, re.S)
+        if m:
+            return ('sys', m.group(1), None)
         m = re.fullmatch(r'getattr\((.*), (.*)\)', text, re.S)
         if m:
             return ('prop', m.group(1), m.group(2))
@@ -1046,9 +1121,20 @@ class Porter:
                 return SYSREFS[name]
             if name in SYSCONSTANTS:
                 return SYSCONSTANTS[name]
-            return self.mark_expr(
-                f'${name}: no equivalent object; point this at the right one',
-                f'${name}')
+            # `$foo` is not special syntax in MOO -- it is `#0.foo`, a
+            # property on the system object -- and this engine already
+            # works the same way, carrying $chair and $item on #0 today.
+            # So the translation never varied; what varies is whether it
+            # will resolve, and that is a question the live database can
+            # answer rather than something to guess at.  It used to be
+            # marked unconditionally, which is a strange thing for a tool
+            # that runs inside the server it is porting into.
+            if not self.sysref_resolves(name):
+                self.mark_expr(
+                    f'${name} is not defined on #0; whatever it refers to '
+                    f'has not been brought across yet',
+                    f'${name}')
+            return f'sysobj({name!r})'
         if t == '(':
             e = self._paren(self.expr)
             self.expect(')')
@@ -1245,10 +1331,12 @@ class Porter:
             # As index(), but the last occurrence.  1-based, 0 when absent.
             return f'({args[0]}.rfind({args[1]}) + 1)'
         if fn == 'listset' and len(args) >= 3:
-            # MOO's listset(list, value, index) returns a *new* list, so
-            # the copy is the point -- writing through would mutate a list
-            # the caller still holds.
-            return f'moo_setitem(list({args[0]}), {args[2]}, {args[1]})'
+            # listset(list, value, index) returns a *new* list; writing
+            # through would mutate one the caller still holds.  The index
+            # is MOO's, so it shifts like every other subscript -- it was
+            # being passed straight through, which put the write one place
+            # too far along.
+            return f'moo_listset({args[0]}, {_minus1(args[2])}, {args[1]})'
         if fn == 'listdelete' and len(args) == 2:
             lst, i = args
             return f'({lst}[:{_minus1(i)}] + {lst}[{i}:])'
@@ -1301,20 +1389,80 @@ class Porter:
             return f'db.get_object({joined})'
         if fn in BUILTINS and BUILTINS[fn]:
             return f'{BUILTINS[fn]}({joined})'
+        if fn not in _known_names():
+            # A builtin this server does not have.  Emitting the bare name
+            # produced code that compiled and then died on a NameError
+            # naming a Python identifier, which tells a MOO author
+            # nothing.  Routing it through call_function keeps the verb
+            # loadable and turns the failure into a MOO error naming the
+            # builtin -- and only on the path that actually calls it, so a
+            # verb whose unsupported branch is never taken simply works.
+            #
+            # This is mooR's trick for textdump imports
+            # (compile_options.call_unsupported_builtins), and it is worth
+            # copying for the same reason: refusing to load a whole verb
+            # over one unreachable line helps nobody.
+            #
+            # Still marked.  mooR imports databases unattended, where a
+            # runtime failure is the only option; @port has a human
+            # watching, and telling them now is better than telling them
+            # later.
+            self.mark_expr(
+                f'{fn}() is not a builtin here; it is wrapped in '
+                f'call_function so the verb still loads, and will raise '
+                f'naming {fn} if that line runs',
+                f'{fn}({joined})')
+            args = f', {joined}' if joined else ''
+            return f'call_function({fn!r}{args})'
         return f'{fn}({joined})'
 
 
 
 def _assign(target: str, value: str) -> str:
     """
-    An assignment statement, allowing for computed property names.
+    An assignment statement, in MOO's terms rather than Python's.
 
-    `this.(verb) = x` translates its left side to getattr(this, verb),
-    which cannot be assigned to.  Python spells that setattr().
+    Two of MOO's assignment forms do not survive a direct translation.
+
+    ``this.(verb) = x`` translates its left side to ``getattr(this,
+    verb)``, which cannot be assigned to; Python spells that ``setattr``.
+
+    ``l[1] = v`` is the one that matters more, because the direct
+    translation compiles and runs.  **MOO lists are values, not
+    references.**  The assignment builds a new list and rebinds the
+    variable, so after ``l2 = l1; l2[1] = 5;`` the list ``l1`` is
+    untouched.  Python's lists are references, so ``l2[0] = 5`` reaches
+    through and changes ``l1`` too -- a bug that only shows when
+    something else still holds the original, and then nowhere near the
+    line that caused it.  So an indexed assignment becomes a rebind
+    through moo_listset.
+
+    The rebinding recurses, which is what makes nesting come out right:
+    ``a[i][j] = v`` must rebuild the inner list *and* store it back into
+    the outer one, and rebinding only the inner would mutate in place
+    again one level down.
+
+    Args:
+        target: Translated Python for the left side.
+        value:  Translated Python for the right side.
+
+    Returns:
+        A single Python statement.
     """
+    parts = Porter._split_target(target)
+    if parts and parts[0] == 'item':
+        seq, index = parts[1], parts[2]
+        return _assign(seq, f'moo_listset({seq}, {index}, {value})')
+
     m = re.fullmatch(r'getattr\((.*), (.*)\)', target, re.S)
     if m:
         return f'setattr({m.group(1)}, {m.group(2)}, {value})'
+    m = re.fullmatch(r"sysobj\((.*)\)", target, re.S)
+    if m:
+        # `$foo = v` is `#0.foo = v` -- ordinary configuration, which
+        # cores do in their setup verbs.  It needs a function only
+        # because the read side is a call and Python cannot assign to one.
+        return f'set_sysobj({m.group(1)}, {value})'
     if target in ('None', 'True', 'False'):
         # Writing to something that translated to a constant.  In practice
         # this is `$shutdown_message = ""` -- an unknown sysref, whose
@@ -1494,12 +1642,16 @@ def structure_of_python(code: str) -> dict:
 # Entry point
 # ---------------------------------------------------------------------------
 
-def port(source: str) -> PortResult:
+def port(source: str, resolve=None) -> PortResult:
     """
     Translate MOO source to Python.
 
     Args:
         source: MOO verb code.
+        resolve: Optional ``name -> bool`` answering whether ``$name``
+            is defined on #0.  @port passes the live database's, so a
+            reference to an object that really is there translates
+            clean instead of being marked on suspicion.
 
     Returns:
         A :class:`PortResult`.  ``code`` is Python; ``notes`` lists what
@@ -1510,7 +1662,7 @@ def port(source: str) -> PortResult:
             partial is returned -- a half-parsed verb would be worse than
             none.
     """
-    p = Porter(source)
+    p = Porter(source, resolve=resolve)
     body = p.block(0, ())
     lines = [ln for ln in body if ln.strip()]
 

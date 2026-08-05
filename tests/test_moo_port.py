@@ -249,24 +249,31 @@ def test_assignment_to_a_property_inside_an_expression():
 
 
 def test_assignment_to_an_element_inside_an_expression():
-    # The index is shifted here, in the translation -- which is why
-    # moo_setitem must not shift it a second time.
+    # MOO lists are values, so this rebinds rather than writing through.
+    # The walrus does both jobs: it stores the new list and yields it,
+    # which is what MOO's indexed assignment evaluates to.
     r = port('if (args[1] = 3)\n  x = 1;\nendif')
-    assert 'moo_setitem(args, 0, 3)' in r.code
+    assert '(args := moo_listset(args, 0, 3))' in r.code
 
 
 def test_indexed_assignment_splits_at_the_last_bracket():
     # The container is itself an expression and may carry brackets of its
     # own, so a scan for the first `[` would split in the wrong place.
     r = port('if (args[1][2] = 3)\n  x = 1;\nendif')
-    assert 'moo_setitem(args[0], 1, 3)' in r.code
+    assert 'moo_listset(args[0], 1, 3)' in r.code
 
 
 def test_listset_copies_rather_than_writing_through():
     # MOO's listset returns a new list; mutating would hit one the caller
     # still holds.
     r = port('x = listset(args, 9, 2);')
-    assert 'moo_setitem(list(args), 2, 9)' in r.code
+    assert 'moo_listset(args, 1, 9)' in r.code
+
+
+def test_listset_shifts_its_index_like_any_other_subscript():
+    # It was being passed straight through, which put the write one place
+    # too far along -- listset(l, v, 2) touched the third element.
+    assert 'moo_listset(args, 0, 9)' in port('x = listset(args, 9, 1);').code
 
 
 def test_rindex_is_one_based_like_index():
@@ -291,10 +298,40 @@ def test_try_with_any_catches_everything():
     assert 'not in' not in r.code
 
 
-def test_unknown_sysref_is_marked_rather_than_invented():
+def test_a_sysref_becomes_a_lookup_on_the_system_object():
+    # $foo is not special syntax in MOO -- it is #0.foo -- and this engine
+    # already keeps $chair and $item there.  So there was never anything
+    # to invent.
     r = port('x = $mail_agent:send();')
+    assert "call_verb(sysobj('mail_agent'), 'send')" in r.code
+
+
+def test_a_sysref_is_marked_when_the_database_says_it_is_absent():
+    r = port('x = $mail_agent:send();', resolve=lambda n: n == 'chair')
     assert r.marks >= 1
     assert 'mail_agent' in ' '.join(r.notes)
+
+
+def test_a_sysref_that_resolves_is_clean():
+    r = port('x = $chair;', resolve=lambda n: n == 'chair')
+    assert r.marks == 0
+    assert "sysobj('chair')" in r.code
+
+
+def test_without_a_database_a_sysref_is_trusted_not_accused():
+    # An absent database is not evidence that an object is missing, and
+    # marking on that basis would make every offline translation look
+    # worse than it is.
+    assert port('x = $mail_agent:send();').marks == 0
+
+
+def test_assigning_to_a_sysref_sets_it_on_the_system_object():
+    # `$shutdown_message = ""` is ordinary configuration; cores do it in
+    # their setup verbs.  It needs a setter only because the read side is
+    # a call, and Python cannot assign to one.
+    r = py('$shutdown_message = "";')
+    assert 'set_sysobj(\'shutdown_message\', "")' in r.code
+    assert r.marks == 0
 
 
 def test_clean_translation_reports_clean():
@@ -560,20 +597,12 @@ def test_range_assignment_inside_an_expression_is_refused():
     assert r.marks >= 1
 
 
-def test_assigning_to_a_constant_sysref_is_refused():
-    # `$shutdown_message = ""` maps to `None = ""`, which does not compile.
-    # The original survives in a comment; what must not survive is a live
-    # assignment statement, so this checks the result parses.
-    r = py('$shutdown_message = "";')
+def test_assigning_to_a_true_constant_is_still_refused():
+    # $nothing maps to None, which cannot be assigned to.  Unlike an
+    # unknown sysref there is no property to store it on, so the line
+    # becomes a comment carrying the original.
+    r = py('$nothing = "";')
     assert not any(l.startswith('None = ') for l in r.code.splitlines())
-
-
-def test_one_problem_is_reported_once():
-    # The unknown sysref is marked where it is read.  Marking the
-    # assignment as well made the count say two things were wrong when
-    # only one was.
-    r = port('$shutdown_message = "";')
-    assert r.marks == 1
 
 
 def test_a_mark_from_a_helper_is_still_counted():
@@ -696,3 +725,86 @@ def test_division_always_goes_through_the_helper():
 
 def test_modulo_always_goes_through_the_helper():
     assert 'moo_mod(args, 4)' in py('x = args % 4;').code
+
+
+# --------------------------------------------------------------------------
+# MOO lists are values, not references
+# --------------------------------------------------------------------------
+
+def test_indexed_assignment_rebinds_rather_than_mutating():
+    # After `l2 = l1; l2[1] = 5;` MOO leaves l1 alone.  Writing through
+    # would reach into l1 as well, and only somewhere far from this line.
+    assert 'args = moo_listset(args, 0, 5)' in py('args[1] = 5;').code
+
+
+def test_rebinding_recurses_through_nesting():
+    # a[i][j] = v must rebuild the inner list *and* store it back into the
+    # outer one; rebinding only the inner mutates in place a level down.
+    r = py('args[1][2] = 9;')
+    assert 'args = moo_listset(args, 0, moo_listset(args[0], 1, 9))' in r.code
+
+
+def test_a_property_holding_a_list_is_written_back():
+    # This one matters twice over: rebinding is MOO's semantics, and it is
+    # also what makes the change reach the database rather than mutating a
+    # value the property still holds by reference.
+    r = py('this.stuff[i] = x;')
+    assert 'this.stuff = moo_listset(this.stuff, i - 1, x)' in r.code
+
+
+def test_a_sysref_holding_a_list_is_written_back():
+    r = py('$chair[1] = 2;')
+    assert "set_sysobj('chair', moo_listset(sysobj('chair'), 0, 2))" in r.code
+
+
+def test_an_unrebindable_container_is_marked():
+    # Assigning into the result of a call has nowhere to store the new
+    # list, so MOO's value semantics are genuinely lost -- which is worth
+    # saying rather than silently writing through.
+    r = port('if (this:parts()[1] = 5)\n  x = 1;\nendif')
+    assert r.marks >= 1
+    assert 'rebound' in ' '.join(r.notes)
+
+
+def test_rebinding_in_an_expression_recurses_too():
+    # The nested target has to be rebuilt inside-out and stored at the
+    # outermost level; rebinding only the inner list mutates in place a
+    # level down, which is the bug being avoided.
+    r = py('if (args[1][2] = 3)\n  x = 1;\nendif')
+    assert '(args := moo_listset(args, 0, moo_listset(args[0], 1, 3)))' in r.code
+
+
+# --------------------------------------------------------------------------
+# Builtins this server does not have
+# --------------------------------------------------------------------------
+
+def test_an_unknown_builtin_is_wrapped_rather_than_left_bare():
+    # mooR's trick for textdump imports.  The bare name compiled and then
+    # died on a NameError naming a Python identifier, which tells a MOO
+    # author nothing; this keeps the verb loadable and fails, if it fails,
+    # naming the builtin.
+    r = port('x = frobnicate(1, 2);')
+    assert "call_function('frobnicate', 1, 2)" in r.code
+
+
+def test_an_unknown_builtin_with_no_arguments():
+    assert "call_function('frobnicate')" in port('x = frobnicate();').code
+
+
+def test_wrapping_still_marks():
+    # mooR imports databases unattended, where deferring to runtime is the
+    # only option.  @port has a human watching, and telling them now beats
+    # telling them later.
+    assert port('x = frobnicate();').marks >= 1
+
+
+def test_a_known_builtin_is_not_wrapped():
+    assert 'len(args)' in py('x = length(args);').code
+    assert 'call_function' not in py('x = length(args);').code
+
+
+def test_a_bare_undefined_name_is_not_wrapped():
+    # Only names in call position are builtins.  `who` is a variable --
+    # wrapping it would turn a missing value into a bogus function call.
+    r = port('x = who;')
+    assert 'call_function' not in r.code
