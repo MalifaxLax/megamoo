@@ -790,20 +790,15 @@ class Porter:
             return f'({args[0]} + [{args[1]}])'
         if fn == 'listinsert' and len(args) >= 2:
             return f'([{args[1]}] + {args[0]})'
-        if fn in ('callers', 'task_id', 'ctime', 'substitute', 'seconds_left',
-                  'queued_tasks', 'kill_task', 'server_log', 'boot_player'):
+        if fn == 'substitute':
+            return f'cdu.substitute({joined})'
+        if fn in ('ctime', 'seconds_left', 'server_log', 'boot_player'):
             return self.mark_expr(
                 f'{fn}() has no equivalent here', f'{fn}({joined})')
         if fn == 'strsub' and len(args) >= 3:
             return f'{args[0]}.replace({args[1]}, {args[2]})'
         if fn == 'toliteral':
             return f'repr({joined})'
-        if fn in ('verb_info', 'verb_args', 'verb_code', 'set_verb_info',
-                  'set_verb_args', 'set_verb_code'):
-            return self.mark_expr(
-                f'{fn}() has no equivalent; verbs here are VerbDef objects '
-                f'on obj.verbs, with .names/.owner/.perms/.code',
-                f'{fn}({joined})')
         if fn == 'raise':
             # Python can only raise as a statement.  statement() handles the
             # case where raise() *is* the whole statement; anywhere else --
@@ -844,10 +839,6 @@ class Porter:
             return self.mark_expr(
                 "match() means regex in MOO but object-matching here; use "
                 "re.search() or su, not match()", f'match({joined})')
-        if fn == 'set_task_perms':
-            return self.mark_expr(
-                'set_task_perms() has no equivalent; permissions here follow '
-                'the verb owner', f'set_task_perms({joined})')
         if fn == 'notify':
             # MOO's notify(who, text) is the raw output builtin.  The
             # MegaMOO spelling is who.msg(text), and the difference is not

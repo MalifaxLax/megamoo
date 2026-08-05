@@ -71,6 +71,7 @@ License: MIT
 from typing import Any, List, Optional, Union, Dict
 import math
 import random
+import threading
 import time
 import logging
 
@@ -1594,6 +1595,11 @@ def make_call_verb(pobj, db, _depth=0):
         processed = preprocess_verb_code(verb_def.code)
         from .verb_namespace import verb_body_vetoed, run_at_post_cmd
         token = set_verb_context(pobj, db, _depth + 1)
+        # Record the frame so callers() and caller_perms() have a stack to
+        # read.  This is the only place a verb calls a verb, so it is the
+        # only place a frame can be pushed.
+        push_frame(target, clean_verb_name, ns.get('caller'), pobj,
+                   owner=getattr(verb_def, 'owner', None))
         try:
             # The lifecycle applies to verb-to-verb calls too: at_pre_cmd()
             # ran when this namespace was built, and may have vetoed.
@@ -1604,6 +1610,7 @@ def make_call_verb(pobj, db, _depth=0):
             run_at_post_cmd(ns, error=e)
             raise
         finally:
+            pop_frame()
             clear_verb_context(token)
 
         result = ns.get('result')
@@ -2955,3 +2962,218 @@ def catch(attempt, codes=None, fallback=_NO_FALLBACK):
             # No `=>` clause: in MOO the expression evaluates to the error.
             return err
         return fallback() if callable(fallback) else fallback
+
+
+# =============================================================================
+# VERB AND TASK INTROSPECTION
+#
+# The builtins a MOO core's utility objects are written in terms of.  mooR
+# supplies these (bf_verbs.rs, bf_callers) and then runs $code_utils
+# unchanged; without them, ported code that inspects verbs has nothing to
+# call.  Adding them is what lets that half of $code_utils work here rather
+# than stay marked forever.
+#
+# A verb-desc is a name or a 1-based index, as in MOO.
+# =============================================================================
+
+#: The verb call stack, innermost last.  Frames are pushed by call_verb.
+#: A list per thread, since verbs run on the verb pool.
+_call_frames = threading.local()
+
+
+def _frames() -> list:
+    if not hasattr(_call_frames, 'stack'):
+        _call_frames.stack = []
+    return _call_frames.stack
+
+
+def push_frame(this, verb_name, caller, player, owner=None):
+    """
+    Record a verb call.  Called by the engine; not for verb code.
+
+    *owner* is the verb's own owner where the caller knows it.  MOO's
+    caller_perms() means the programmer of the calling *verb*, which is not
+    always the owner of the object it sits on, so it is recorded separately
+    and only falls back to the object's owner when unknown.
+    """
+    _frames().append({
+        'this': this, 'verb': verb_name, 'caller': caller, 'player': player,
+        'owner': owner if owner is not None else getattr(this, 'owner', None),
+    })
+
+
+def pop_frame():
+    """Drop the innermost frame.  Called by call_verb; not for verb code."""
+    stack = _frames()
+    if stack:
+        stack.pop()
+
+
+def _find_verbdef(obj, desc):
+    """Resolve a verb-desc -- a name or a 1-based index -- to a VerbDef."""
+    try:
+        own = list(obj.verbs or [])
+    except Exception:
+        return None
+    if isinstance(desc, int):
+        return own[desc - 1] if 1 <= desc <= len(own) else None
+    for v in own:
+        if desc in (v.names or []):
+            return v
+    return None
+
+
+def verb_info(obj, desc):
+    """
+    ``{owner, perms, names}`` for a verb, as MOO returns it.
+
+    Args:
+        obj:  The object carrying the verb.
+        desc: Verb name, or 1-based index.
+
+    Returns:
+        list: ``[owner, perms, names]``, or ``E_VERBNF`` when absent.
+    """
+    v = _find_verbdef(obj, desc)
+    if v is None:
+        from .moo_compat import E_VERBNF
+        return E_VERBNF
+    return [v.owner or 0, v.perms or '', ' '.join(v.names or [])]
+
+
+def verb_args(obj, desc):
+    """
+    ``{dobj, prep, iobj}`` for a verb.
+
+    MegaMOO verbs are parsed by their verb *type* rather than by a stored
+    argument specification, so this reports the permissive default that
+    matches how they actually behave.
+    """
+    v = _find_verbdef(obj, desc)
+    if v is None:
+        from .moo_compat import E_VERBNF
+        return E_VERBNF
+    return ['any', 'any', 'any']
+
+
+def verb_code(obj, desc, fully_paren=False, indent=True):
+    """
+    A verb's source, as a list of lines.
+
+    ``fully_paren`` and ``indent`` are accepted for call compatibility --
+    MOO decompiles from bytecode and can re-render it -- but the source is
+    stored verbatim here, so there is nothing to re-render.
+    """
+    v = _find_verbdef(obj, desc)
+    if v is None:
+        from .moo_compat import E_VERBNF
+        return E_VERBNF
+    return (v.code or '').splitlines()
+
+
+def set_verb_code(obj, desc, code):
+    """Replace a verb's source.  *code* may be a list of lines or a string."""
+    v = _find_verbdef(obj, desc)
+    if v is None:
+        from .moo_compat import E_VERBNF
+        return E_VERBNF
+    v.code = '\n'.join(code) if isinstance(code, (list, tuple)) else str(code)
+    v.compiled_code = None
+    if _database is not None:
+        _database.save_object(obj)
+    return []
+
+
+def property_info(obj, name):
+    """``{owner, perms}`` for a property."""
+    try:
+        info = obj.get_property_info(name, _database)
+        return [info.owner, info.perms]
+    except Exception:
+        from .moo_compat import E_PROPNF
+        return E_PROPNF
+
+
+def callers():
+    """
+    The verbs that called this one, innermost first.
+
+    MOO's callers() describes the chain *above* the running verb, not the
+    verb itself, so the frame for the current call is excluded.  Each entry
+    is ``{this, verb-name, programmer, verb-loc, player, line-number}``.
+
+    Line numbers are always 0: MOO reads them from a bytecode program
+    counter, and verbs here are Python source with no equivalent.
+
+    A verb invoked straight from the command line has an empty stack, as
+    in MOO.
+    """
+    stack = _frames()
+    out = []
+    for frame in reversed(stack[:-1]):          # drop our own frame
+        this = frame.get('this')
+        out.append([
+            this,
+            frame.get('verb', ''),
+            frame.get('owner', 0),
+            this,
+            frame.get('player'),
+            0,
+        ])
+    return out
+
+
+def caller_perms():
+    """
+    Who the verb that called this one runs as.
+
+    MOO returns the permissions of the calling verb, or the player when the
+    current verb was invoked from the command line.  Here a verb runs as its
+    owner, so that is what comes back.
+
+    The current verb's own frame is skipped -- asking for your caller and
+    getting yourself would make `caller_perms().wizard` a test of the wrong
+    object, and that idiom guards real permission checks in ported code.
+    """
+    stack = _frames()
+    if len(stack) < 2:
+        # Called from the command line: the caller is the player.
+        return stack[0].get('player') if stack else None
+    owner = stack[-2].get('owner')
+    if owner is None or _database is None:
+        return None
+    try:
+        return _database.get_object(owner)
+    except Exception:
+        return None
+
+
+def set_task_perms(who=None):
+    """
+    Accepted, and deliberately does nothing.
+
+    MOO uses this to run the rest of a task as somebody else, usually as
+    ``set_task_perms(caller_perms())`` at the top of a utility verb.  This
+    engine does not have task permissions: what a verb may do follows its
+    owner, decided when it runs, and there is nothing to reassign.
+
+    It is a no-op rather than an error because ported utility verbs open
+    with it as a matter of habit, and raising would stop code that is
+    otherwise correct.  Nothing is silently granted -- the verb's own
+    permissions were already in force and are unchanged.
+    """
+    return None
+
+
+def task_id():
+    """The current task's id, or 0 outside one."""
+    try:
+        from .tasks import get_task_queue
+        queue = get_task_queue()
+        if queue is None:
+            return 0
+        with queue.lock:
+            running = list(queue.running_tasks)
+        return running[-1] if running else 0
+    except Exception:
+        return 0

@@ -145,9 +145,28 @@ def run_guarded(compiled, namespace, record: Optional['Execution'] = None):
     rec.started = time.time()
     rec.parked = 0.0
     _local.record = rec
+
+    # Push the outermost call frame, so callers() and caller_perms() see a
+    # complete chain.  It has to happen here rather than at the dispatch
+    # site: frames are thread-local and this is the thread the verb runs
+    # on.  Nested calls push their own frames from call_verb.
+    framed = False
+    try:
+        from .builtins import push_frame, pop_frame
+        push_frame(namespace.get('this'), namespace.get('verb', ''),
+                   namespace.get('caller'), namespace.get('pobj'))
+        framed = True
+    except Exception:
+        pass
+
     try:
         exec(compiled, namespace)
     finally:
+        if framed:
+            try:
+                pop_frame()
+            except Exception:
+                pass
         _local.record = None
         rec.started = None
         release()

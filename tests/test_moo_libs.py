@@ -223,3 +223,74 @@ def test_verb_documentation_reads_the_docstring():
     doc = cdu.verb_documentation(_O(), 'look')
     assert doc[0] == 'Look at a thing.'
     assert cdu.verb_usage(_O(), 'look') == 'look <thing>'
+
+
+# --------------------------------------------------------------------------
+# The verb-introspection builtins
+#
+# These are the engine half of $code_utils.  mooR supplies them (bf_verbs,
+# bf_callers) and then runs the object unchanged; without them the ported
+# half had nothing to call.
+# --------------------------------------------------------------------------
+
+class _FakeVerb:
+    def __init__(self, names, owner=7, perms='rx', code='x = 1\n'):
+        self.names, self.owner, self.perms, self.code = names, owner, perms, code
+        self.compiled_code = None
+
+
+class _FakeObj:
+    objnum = 42
+    owner = 3
+
+    def __init__(self):
+        self.verbs = [_FakeVerb(['look', 'l']), _FakeVerb(['get'])]
+
+
+def test_verb_info_by_name():
+    from moo.builtins import verb_info
+    assert verb_info(_FakeObj(), 'look') == [7, 'rx', 'look l']
+
+
+def test_verb_info_by_one_based_index():
+    from moo.builtins import verb_info
+    assert verb_info(_FakeObj(), 2)[2] == 'get'
+
+
+def test_verb_info_missing_returns_the_moo_error():
+    from moo.builtins import verb_info
+    from moo.moo_compat import E_VERBNF
+    assert verb_info(_FakeObj(), 'nope') == E_VERBNF
+
+
+def test_verb_code_returns_lines():
+    from moo.builtins import verb_code
+    assert verb_code(_FakeObj(), 'look') == ['x = 1']
+
+
+def test_frames_unwind():
+    from moo.builtins import push_frame, pop_frame, callers
+    before = len(callers())
+    push_frame(_FakeObj(), 'outer', None, None, owner=3)
+    push_frame(_FakeObj(), 'inner', None, None, owner=3)
+    # callers() drops your own frame, so from `inner` you see `outer`
+    assert [f[1] for f in callers()] == ['outer']
+    pop_frame()
+    pop_frame()
+    assert len(callers()) == before
+
+
+def test_caller_perms_skips_your_own_frame():
+    # Returning yourself would make `caller_perms().wizard` test the wrong
+    # object, and that idiom guards real permission checks.
+    from moo.builtins import push_frame, pop_frame, callers
+    push_frame(_FakeObj(), 'only', None, None, owner=3)
+    assert callers() == []      # nothing called us
+    pop_frame()
+
+
+def test_set_task_perms_is_accepted_and_does_nothing():
+    # Ported utility verbs open with it out of habit; raising would stop
+    # code that is otherwise correct.
+    from moo.builtins import set_task_perms
+    assert set_task_perms(None) is None
