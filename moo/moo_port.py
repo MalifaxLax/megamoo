@@ -79,6 +79,11 @@ SYSCONSTANTS = {
 VARIABLES = {
     'player': 'pobj',
     'prepstr': 'prep',
+    # MOO's shorthand for the room you are in.  Marking it was the
+    # translator being lazy: the fix is one word, it is the same word
+    # every time, and a mark should mean "a human has to decide
+    # something" rather than "I did not bother".
+    'here': 'pobj.location',
 }
 
 #: Mapped sysrefs that are Python objects rather than MOO objects.  A
@@ -1780,8 +1785,22 @@ def _missing_shim_methods(code: str):
         shims = {'su': su, 'ou': ou, 'lu': lu, 'cu': cu, 'cdu': cdu, 'pu': pu}
     except Exception:          # importable standalone, e.g. under test
         return []
+    # A verb may bind one of these names itself.  LambdaCore writes
+    # `su = $string_utils;` and then `su:match_string(...)`, which
+    # translates correctly to a call on the imported object -- but it
+    # looks exactly like a call on the bundled shim, and reporting it
+    # sent people to fix code that was already right.
+    #
+    # An assignment to the name anywhere in the verb is enough to say the
+    # receiver is local.  Being wrong in this direction costs a missed
+    # warning; being wrong in the other cries wolf, which is worse for a
+    # tool whose whole value is that its marks mean something.
+    bound = set(re.findall(r'^\s*(\w+)\s*=(?!=)', body, re.M))
+
     out = set()
     for recv, meth in _SHIM_CALL.findall(body):
+        if recv in bound:
+            continue
         if recv in shims and not hasattr(shims[recv], meth):
             out.add((recv, meth))
     return sorted(out)

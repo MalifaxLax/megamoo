@@ -650,9 +650,28 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                         # the way in -- reporting #6 sent people to their
                         # own #6, which is a different object entirely
                         # and usually has no verbs at all.
+                        # Say what is wrong, not how many things are.
+                        #
+                        # A bare "(1)" reads as a line number to anyone
+                        # holding a list of things to go and fix.  Line
+                        # numbers would be honest but useless: most marks
+                        # are notes about the verb as a whole and have no
+                        # line, so they all pointed at the header.
+                        #
+                        # The note itself is the thing worth carrying --
+                        # it is usually enough to fix from without opening
+                        # the verb at all.
+                        notes = [ln.split('-', 1)[1].strip()
+                                 for ln in vcode.splitlines()
+                                 if ln.lstrip().startswith(MARK_TEXT)
+                                 and '-' in ln
+                                 and 'thing(s) here need' not in ln]
+                        first = notes[0] if notes else 'see the # PORT: lines'
+                        if len(first) > 62:
+                            first = first[:59] + '...'
+                        more = f' (+{len(notes) - 1} more)' if len(notes) > 1 else ''
                         report['marked_verbs'].append(
-                            f"#{obj.objnum}:{clean[0]} ({marks})"
-                            f"  %<245>was #{src.objid}%n")
+                            f"#{obj.objnum}:{clean[0]}  %<245>{first}{more}%n")
                 else:
                     report['unported'] += 1
             except Exception as err:

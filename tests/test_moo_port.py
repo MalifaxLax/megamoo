@@ -986,3 +986,28 @@ def test_a_subscript_defers_to_run_time_where_maps_exist():
         'args[1]', 'moo_index(args, 2)') or True
     from moo.moo_port import port
     assert 'moo_index(args, 2)' in port('x = args[2];', maps=True).code
+
+
+def test_here_is_the_room_you_are_in():
+    # MOO's shorthand.  Marking it was the translator being lazy: the fix
+    # is one word, it is the same word every time, and a mark should mean
+    # "a human has to decide something".
+    r = py('x = here;')
+    assert 'x = pobj.location' in r.code
+    assert r.marks == 0
+
+
+def test_a_locally_bound_shim_name_is_not_the_shim():
+    # LambdaCore writes `su = $string_utils;` then `su:match_string(...)`.
+    # That translates correctly to a call on the imported object, but it
+    # looks exactly like a call on the bundled shim -- and reporting it
+    # sent people to fix code that was already right.
+    r = port('su = $string_utils;\nx = su:match_string(argstr, argstr);',
+             resolve=lambda n: n == 'string_utils')
+    assert not any('not implemented' in n for n in r.notes)
+
+
+def test_an_unbound_shim_name_is_still_checked():
+    # The check still has to fire when the receiver really is the shim.
+    r = port('x = $string_utils:pronoun_sub(argstr);')
+    assert any('not implemented' in n for n in r.notes)
