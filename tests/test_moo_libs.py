@@ -587,3 +587,84 @@ def test_listset_leaves_the_original_alone():
     l1 = [1, 2, 3]
     l2 = moo_listset(l1, 0, 9)
     assert l1 == [1, 2, 3] and l2 == [9, 2, 3]
+
+
+# --------------------------------------------------------------------------
+# Scatter, loop signals and the binary-string builtins
+# --------------------------------------------------------------------------
+
+def test_scatter_fills_required_targets_before_optional_ones():
+    # {?a, b, c} with two values binds b and c, not a and b.  The order of
+    # the targets does not decide it; the required ones are satisfied
+    # first wherever they sit.
+    from moo.moo_builtins import moo_scatter
+    spec = [('opt', 0), ('req',), ('req',)]
+    assert moo_scatter([1, 2], spec) == [0, 1, 2]
+    assert moo_scatter([1, 2, 3], spec) == [1, 2, 3]
+
+
+def test_scatter_rest_takes_what_is_left_over():
+    from moo.moo_builtins import moo_scatter
+    spec = [('req',), ('opt', 79), ('rest',)]
+    assert moo_scatter([1], spec) == [1, 79, []]
+    assert moo_scatter([1, 2, 3, 4], spec) == [1, 2, [3, 4]]
+
+
+def test_scatter_with_a_rest_target_in_the_middle():
+    from moo.moo_builtins import moo_scatter
+    spec = [('opt', 0), ('req',), ('rest',), ('req',)]
+    assert moo_scatter([1, 2, 3], spec) == [1, 2, [], 3]
+
+
+def test_scatter_raises_when_the_required_targets_cannot_be_filled():
+    import pytest
+    from moo.moo_builtins import moo_scatter
+    from moo.properties import MOOError
+    with pytest.raises(MOOError):
+        moo_scatter([1], [('req',), ('req',)])
+
+
+def test_scatter_raises_when_there_is_nowhere_to_put_the_extras():
+    import pytest
+    from moo.moo_builtins import moo_scatter
+    from moo.properties import MOOError
+    with pytest.raises(MOOError):
+        moo_scatter([1, 2, 3], [('req',), ('opt', 0)])
+
+
+def test_binary_strings_round_trip():
+    from moo.moo_builtins import encode_binary, decode_binary
+    assert decode_binary(encode_binary('AB', 10)) == ['AB', 10]
+    assert decode_binary(encode_binary(0, 255)) == [0, 255]
+
+
+def test_an_escaped_tilde_comes_back_inside_a_string():
+    # A tilde must be *written* ~7E because it is the escape character,
+    # but it is printable, so it belongs in the string run.  Treating
+    # every escape as an integer would split runs MOO keeps whole.
+    from moo.moo_builtins import decode_binary
+    assert decode_binary('A~7EB') == ['A~B']
+
+
+def test_decode_binary_fully_returns_every_byte():
+    from moo.moo_builtins import decode_binary
+    assert decode_binary('AB', True) == [65, 66]
+
+
+def test_a_connection_option_reads_back_what_was_set():
+    # The common idiom sets an option, does something, and puts it back.
+    # That round-trip has to work even where the option has no effect.
+    from moo.moo_builtins import set_connection_option, connection_option
+
+    class Conn:
+        moo_options = None
+
+    conn = Conn()
+    import moo.moo_builtins as mb
+    real, mb._connection = mb._connection, lambda who: conn
+    try:
+        set_connection_option(1, 'binary', 1)
+        assert connection_option(1, 'binary') == 1
+        assert connection_option(1, 'never-set') == 0
+    finally:
+        mb._connection = real

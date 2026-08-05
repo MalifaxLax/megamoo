@@ -54,6 +54,7 @@ __all__ = [
     'set_property_info', 'property_info',
     # System references
     'sysobj', 'has_sysobj', 'set_sysobj',
+    'moo_notify', 'moo_scatter', 'MooLoopSignal',
     # Tasks, verbs and dynamic dispatch
     'queued_tasks', 'call_function', 'set_verb_args', 'crypt',
     'task_stack', 'function_info',
@@ -64,6 +65,9 @@ __all__ = [
     # Server measurement and connection control
     'value_bytes', 'memory_usage', 'dump_database',
     'flush_input', 'force_input', 'output_delimiters',
+    'object_bytes', 'encode_binary', 'decode_binary', 'ftime',
+    'load_server_options', 'server_options', 'set_connection_option',
+    'connection_options', 'connection_option',
 ]
 
 
@@ -1319,3 +1323,341 @@ def set_sysobj(name: str, value):
         raise MOOError(f'${name}: no system object')
     setattr(zero, str(name), value)
     return value
+
+
+def moo_notify(who, text, no_flush=None) -> int:
+    """
+    MOO's ``notify()``, routed through ``msg`` and returning what MOO
+    returns.
+
+    Two details that a direct translation drops, and the second one hangs.
+
+    MOO's third argument is *no-flush*, which asks the server not to
+    discard buffered output when the connection's queue overflows.  There
+    is no such queue here, so it is accepted and ignored -- there is
+    nothing for it to mean.
+
+    The **return value** is the one that matters.  MOO's notify returns
+    whether the line was accepted, and cores loop on it::
+
+        while (!notify(conn, line, 1))
+          suspend(0);
+        endwhile
+
+    which is a retry until the buffer drains.  ``who.msg(text)`` returns
+    None, so the obvious translation makes that loop spin forever.  Output
+    here is never refused, so this returns 1 and the loop exits at once,
+    which is the same behaviour a MOO server with room in the buffer has.
+
+    Args:
+        who: Object to tell.
+        text: What to say.
+        no_flush: Accepted and ignored; see above.
+
+    Returns:
+        int: Always 1 -- the line was accepted.
+    """
+    if who is not None:
+        try:
+            who.msg(text)
+        except AttributeError:
+            from .builtins import notify as _raw
+            _raw(who, text)
+    return 1
+
+
+def moo_scatter(values, spec) -> List:
+    """
+    MOO's scatter assignment, in the general case.
+
+    Most scatters are written required-first, then optionals, then a rest
+    target, and @port expands those inline.  MOO does not require that
+    order, and when the kinds interleave -- ``{?a, b, @c, d}`` -- the fill
+    is not left-to-right greedy, so an inline expansion would be wrong.
+
+    The rule is not ambiguous, which is what I had assumed: required
+    targets are satisfied first wherever they sit, and whatever is left
+    over feeds the optionals in the order they appear.  So with three
+    values, ``{?a, b, c}`` binds b and c from the first two and gives a
+    the third -- reading a value into ``a`` only once the required ones
+    are safe.
+
+    Args:
+        values: The right-hand side.
+        spec: One tuple per target, in source order: ``('req',)``,
+            ``('opt', default)`` or ``('rest',)``.
+
+    Returns:
+        list: One value per target, in the same order.
+
+    Raises:
+        MOOError: If there are too few values for the required targets, or
+            too many for the targets to absorb -- MOO's E_ARGS.
+    """
+    values = list(values or [])
+    n = len(values)
+    required = sum(1 for s in spec if s[0] == 'req')
+    optional = sum(1 for s in spec if s[0] == 'opt')
+    has_rest = any(s[0] == 'rest' for s in spec)
+
+    if n < required:
+        raise MOOError(f'scatter needs {required} value(s), got {n}')
+    if not has_rest and n > required + optional:
+        raise MOOError(f'scatter has {n} value(s) for at most '
+                       f'{required + optional} target(s)')
+
+    to_fill = min(optional, n - required)
+    rest_n = max(0, n - required - to_fill) if has_rest else 0
+
+    out, i, filled = [], 0, 0
+    for s in spec:
+        if s[0] == 'req':
+            out.append(values[i])
+            i += 1
+        elif s[0] == 'opt':
+            if filled < to_fill:
+                out.append(values[i])
+                i += 1
+                filled += 1
+            else:
+                out.append(s[1] if len(s) > 1 else None)
+        else:
+            out.append(values[i:i + rest_n])
+            i += rest_n
+    return out
+
+
+class MooLoopSignal(Exception):
+    """
+    A ``break`` or ``continue`` aimed at a loop further out.
+
+    MOO lets both name the loop they act on; Python's leave the innermost
+    one and nothing else.  A flag variable would work but has to be tested
+    after every enclosing loop, and every one of those tests is a place to
+    get it wrong.  An exception unwinds to the right loop on its own, and
+    the handler that catches it is generated next to the loop it belongs
+    to.
+
+    Attributes:
+        label: The loop named at the break or continue.
+        kind:  ``'break'`` or ``'continue'``.
+    """
+
+    __slots__ = ('label', 'kind')
+
+    def __init__(self, label, kind):
+        super().__init__(f'{kind} {label}')
+        self.label = label
+        self.kind = kind
+
+
+def object_bytes(obj) -> int:
+    """
+    MOO's ``object_bytes()``: how much memory an object occupies.
+
+    Like :func:`value_bytes`, this measures Python's representation
+    rather than LambdaMOO's C structs, so the number is the right shape
+    -- an object with more properties and verbs is bigger -- without
+    being MOO's exact figure, which described a layout that does not
+    exist here.
+
+    Args:
+        obj: The object.
+
+    Returns:
+        int: Approximate size in bytes, properties and verb source
+        included.
+    """
+    total = 0
+    try:
+        for name, prop in (getattr(obj, 'properties', None) or {}).items():
+            total += value_bytes(name) + value_bytes(getattr(prop, 'value', None))
+        for v in getattr(obj, 'verbs', None) or []:
+            total += value_bytes(getattr(v, 'code', '') or '')
+            total += value_bytes(getattr(v, 'names', []) or [])
+    except Exception:
+        pass
+    return total
+
+
+def encode_binary(*args) -> str:
+    """
+    MOO's ``encode_binary()``: pack values into MOO's binary string form.
+
+    MOO has no bytes type, so it carries binary data in a string with
+    non-printable bytes written as ``~XX`` hex escapes and a literal
+    tilde as ``~7E``.
+
+    Args:
+        *args: Integers (single bytes) and strings, concatenated in order.
+
+    Returns:
+        str: The encoded string.
+    """
+    out = []
+    for a in args:
+        items = [a] if not isinstance(a, (list, tuple)) else list(a)
+        for item in items:
+            data = (bytes([int(item) & 0xFF]) if isinstance(item, int)
+                    else str(item).encode('latin-1', 'replace'))
+            for b in data:
+                out.append(chr(b) if 32 <= b < 127 and b != 0x7E
+                           else f'~{b:02X}')
+    return ''.join(out)
+
+
+def decode_binary(text: str, fully: bool = False) -> List:
+    """
+    MOO's ``decode_binary()``: unpack a binary string.
+
+    The grouping is decided by whether a byte is *printable*, not by
+    whether it arrived escaped.  A tilde has to be written ``~7E`` because
+    the tilde is the escape character, but it is an ordinary printable
+    character and comes back inside a string like any other -- treating
+    every escape as a separate integer would split runs that MOO keeps
+    whole.
+
+    Args:
+        text: A string in MOO's ``~XX`` binary form.
+        fully: When true, every byte comes back as an integer.  Otherwise
+            runs of printable characters stay as strings, which is MOO's
+            default and what its callers expect.
+
+    Returns:
+        list: Integers and strings, in order.
+    """
+    text = str(text)
+    raw, i = [], 0
+    while i < len(text):
+        if text[i] == '~' and i + 2 < len(text) + 1:
+            try:
+                raw.append(int(text[i + 1:i + 3], 16))
+                i += 3
+                continue
+            except ValueError:
+                pass
+        raw.append(ord(text[i]))
+        i += 1
+
+    if fully:
+        return raw
+
+    out, run = [], []
+    for b in raw:
+        if 32 <= b < 127:
+            run.append(chr(b))
+        else:
+            if run:
+                out.append(''.join(run))
+                run = []
+            out.append(b)
+    if run:
+        out.append(''.join(run))
+    return out
+
+
+def ftime(monotonic: bool = False) -> float:
+    """
+    MOO's ``ftime()``: the time, with sub-second resolution.
+
+    Args:
+        monotonic: Use a clock that cannot go backwards.  Worth passing
+            when timing something, since the wall clock can step.
+
+    Returns:
+        float: Seconds.
+    """
+    return _time.monotonic() if monotonic else _time.time()
+
+
+def server_options() -> List:
+    """
+    MOO's ``$server_options`` in list form: the tunables and their values.
+
+    Returns:
+        list: ``[name, value]`` pairs, from this engine's globals.
+    """
+    try:
+        from . import globals as g
+    except Exception:
+        return []
+    return [[n, getattr(g, n)] for n in sorted(dir(g))
+            if n.isupper() and not n.startswith('_')
+            and isinstance(getattr(g, n), (int, float, str, bool))]
+
+
+def load_server_options() -> int:
+    """
+    MOO's ``load_server_options()``: re-read the server's tunables.
+
+    In LambdaMOO these live on ``$server_options`` and the server caches
+    them, so a core has to say when it has changed one.  Nothing is
+    cached here -- the globals are read where they are used -- so there
+    is nothing to reload, and this reports success rather than pretending
+    to do work.
+
+    Returns:
+        int: 1.
+    """
+    return 1
+
+
+def connection_options(who) -> List:
+    """
+    MOO's ``connection_options()``: every option set on a connection.
+
+    Args:
+        who: A player object or object number.
+
+    Returns:
+        list: ``[name, value]`` pairs, empty if not connected.
+    """
+    conn = _connection(who)
+    opts = getattr(conn, 'moo_options', None) if conn else None
+    return [[k, v] for k, v in sorted((opts or {}).items())]
+
+
+def connection_option(who, name: str):
+    """
+    MOO's ``connection_option()``: read one connection option.
+
+    Args:
+        who: A player object or object number.
+        name: The option.
+
+    Returns:
+        Its value, or 0 if unset.
+    """
+    conn = _connection(who)
+    opts = getattr(conn, 'moo_options', None) if conn else None
+    return (opts or {}).get(str(name), 0)
+
+
+def set_connection_option(who, name: str, value) -> None:
+    """
+    MOO's ``set_connection_option()``: set one connection option.
+
+    LambdaMOO's options govern its own line protocol -- ``binary``,
+    ``hold-input``, ``client-echo``, ``flush-command``.  This engine's
+    connection layer does not work that way, so the value is recorded and
+    read back faithfully but does not change how input is handled.
+
+    Recording it rather than discarding it matters for the common idiom,
+    which sets an option, does something, and puts it back: that
+    round-trip now works, and code depending on the *effect* is a
+    different problem from code depending on the value.
+
+    Args:
+        who: A player object or object number.
+        name: The option.
+        value: Its new value.
+    """
+    conn = _connection(who)
+    if conn is None:
+        return
+    if getattr(conn, 'moo_options', None) is None:
+        try:
+            conn.moo_options = {}
+        except Exception:
+            return
+    conn.moo_options[str(name)] = value

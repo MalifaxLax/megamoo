@@ -78,23 +78,32 @@ def test_splat_argument():
     assert '*args' in py('this:foo(@args);').code
 
 
-def test_notify_becomes_msg_not_a_raw_call():
+def test_notify_routes_through_msg_not_the_raw_builtin():
     # msg is a verb and overridable per object -- a deafened character
-    # overrides it.  notify() walks straight past that, so a port must not
-    # leave it in place.
+    # overrides it.  The raw notify() builtin walks straight past that.
     r = py('notify(player, "hi");')
-    assert 'pobj.msg("hi")' in r.code
-    assert 'notify' not in r.code
+    assert 'moo_notify(pobj, "hi")' in r.code
 
 
 def test_notify_on_any_object():
-    assert 'this.msg(x)' in py('notify(this, x);').code
+    assert 'moo_notify(this, args)' in py('notify(this, args);').code
 
 
-def test_notify_with_extra_arguments_is_marked():
-    r = port('notify(player, "hi", 1);')
-    assert 'pobj.msg("hi")' in r.code
-    assert r.marks >= 1
+def test_notify_keeps_moos_return_value():
+    # `while (!notify(conn, line, 1))` is a retry until the output buffer
+    # drains.  msg() returns None, so a direct translation would spin
+    # forever; moo_notify returns 1 and the loop exits at once.
+    from moo.moo_builtins import moo_notify
+    assert moo_notify(None, 'x') == 1
+
+
+def test_notifys_no_flush_argument_is_accepted_and_ignored():
+    # MOO's third argument is about an output queue this engine does not
+    # have, so there is nothing for it to mean -- and nothing to warn
+    # about either.
+    r = py('notify(this, args, 1);')
+    assert 'moo_notify(this, args, 1)' in r.code
+    assert r.marks == 0
 
 
 def test_length_becomes_len():
@@ -522,13 +531,39 @@ def test_labelled_break_of_its_own_loop_is_just_break():
     assert 'searching' not in r.code
 
 
-def test_labelled_break_of_an_enclosing_loop_is_marked():
-    # Python's break leaves only the innermost loop, so emitting it plain
-    # would silently carry on running the outer one.
-    r = port('while outer (args)\n  while (args)\n    break outer;\n'
-             '  endwhile\nendwhile')
+def test_labelled_break_of_an_enclosing_loop_unwinds_to_it():
+    # Python's break leaves only the innermost loop.  Raising unwinds to
+    # the right one on its own, and the handler is generated beside the
+    # loop that owns the label.
+    r = py('while outer (args)\n  while (args)\n    break outer;\n'
+           '  endwhile\nendwhile')
+    assert "raise MooLoopSignal('outer', 'break')" in r.code
+    assert 'except MooLoopSignal as _sig:' in r.code
+    assert r.marks == 0
+
+
+def test_a_non_local_continue_wraps_the_body_not_the_loop():
+    # break leaves the loop; continue has to end this iteration and start
+    # the next.  Swallowing the signal inside the body does exactly that.
+    r = py('while o (args)\n  for x in (args)\n    continue o;\n'
+           '  endfor\nendwhile')
+    lines = [l.strip() for l in r.code.splitlines()]
+    assert lines.index('try:') > lines.index('while args:')
+    assert r.marks == 0
+
+
+def test_an_ordinary_labelled_loop_gets_no_handler():
+    # MOO labels loops far more often than it jumps out of them
+    # non-locally; wrapping every one would put a try around code that
+    # never needed it.
+    r = py('while plain (args)\n  break plain;\nendwhile')
+    assert 'try:' not in r.code
+    assert 'MooLoopSignal' not in r.code
+
+
+def test_a_label_naming_no_open_loop_is_marked():
+    r = port('while (args)\n  break nowhere;\nendwhile')
     assert r.marks >= 1
-    assert 'enclosing' in ' '.join(r.notes)
 
 
 def test_the_loop_label_is_not_left_behind_as_a_statement():
@@ -685,13 +720,31 @@ def test_scatter_and_list_are_told_apart_by_what_follows_the_brace():
     assert py('x = {@args} == {@args};').marks == 0
 
 
-def test_scatter_inside_an_expression_is_marked_not_fatal():
+def test_scatter_inside_an_expression_binds_with_walruses():
     # LambdaCore writes `while ({?sfc, @todo} = todo)`.  Python cannot
-    # bind names from a call, so there is nothing to emit -- but raising
-    # took the whole verb down, where a mark loses only the line.
-    r = port('while ({?a, @rest} = todo)\n  x = 1;\nendwhile')
-    assert r.marks >= 1
-    assert 'scatter assignment inside an expression' in ' '.join(r.notes)
+    # bind names from a *call*, which is not the same as not being able to
+    # bind inside an expression -- the walrus does, and a tuple display
+    # evaluates left to right.
+    r = py('while ({?a, @rest} = args)\n  x = 1;\nendwhile')
+    assert '(a := _scatter_1[0]' in r.code
+    assert '(rest := _scatter_1[1:])' in r.code
+    assert r.marks == 0
+
+
+def test_scatter_as_an_expression_evaluates_to_its_right_side():
+    # MOO's scatter yields the value it was given, so the tuple ends with
+    # it and is indexed [-1].
+    r = py('x = ({a, b} = args);')
+    assert '_scatter_1)[-1]' in r.code
+
+
+def test_scatter_as_an_expression_reads_the_value_before_rebinding():
+    # A rest target routinely rebinds the very name it was read from --
+    # `{?sfc, @todo} = todo`.  Without a temp, the result would be the
+    # list after the assignment rather than the one that was assigned.
+    r = py('x = ({?a, @args} = args);')
+    assert '(_scatter_1 := args)' in r.code
+    assert '_scatter_1)[-1]' in r.code
 
 
 # --------------------------------------------------------------------------

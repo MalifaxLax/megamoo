@@ -293,6 +293,10 @@ class Porter:
         #: break and continue name a loop; Python does not, so the label
         #: only matters when it is not the innermost one.
         self.loops: List[Optional[str]] = []
+        #: Labels some break or continue actually named.  A handler is
+        #: only wrapped around a loop when one was, so the ordinary loop
+        #: keeps its ordinary shape.
+        self.labels_used = set()
 
     def sysref_resolves(self, name: str) -> bool:
         """Whether ``$name`` is defined on #0 right now."""
@@ -432,12 +436,17 @@ class Porter:
                     label = self.next()[1]
                 self.eat_semi()
                 if label and label != (self.loops[-1] if self.loops else None):
-                    # Targeting an enclosing loop.  Python's break leaves
+                    # Aimed at a loop further out.  Python's break leaves
                     # only the innermost one, so emitting it plain would
-                    # silently continue running the outer loop.
-                    self.mark(f'{t} {label!r} leaves an enclosing loop; '
-                              f'Python only leaves the innermost one, so '
-                              f'this needs a flag or a helper function')
+                    # carry on running the outer loop.  Raising unwinds to
+                    # the right place on its own; while_stmt and for_stmt
+                    # generate the handler beside the loop that owns the
+                    # label.
+                    if label in self.loops:
+                        self.labels_used.add((label, t))
+                        return [f'{pad}raise MooLoopSignal({label!r}, {t!r})']
+                    self.mark(f'{t} {label!r} names a loop that is not open '
+                              f'here; nothing encloses this to leave')
                 return [f'{pad}{t}']
 
         # scatter assignment:  {a, ?b = d, @rest} = expr
@@ -466,7 +475,7 @@ class Porter:
             return [pad + _assign(t, value) for t in targets[:-1]]
         return [pad + ' = '.join(targets)]
 
-    def try_scatter(self) -> Optional[List[str]]:
+    def try_scatter(self, want_expr: bool = False):
         """
         Parse `{a, ?b = d, @rest} = expr`, or give up and return None.
 
@@ -488,11 +497,13 @@ class Porter:
         this engine already does everywhere else a value is absent.
         """
         self.expect('{')
-        names, optional, rest = [], [], None
+        # Kept in source order, because the order is what decides how a
+        # short right-hand side is distributed.
+        items = []
         while not self.at('}'):
             if self.at('@'):
                 self.next()
-                rest = self.next()[1]
+                items.append(('rest', self.next()[1], None))
             elif self.at('?'):
                 self.next()
                 nm = self.next()[1]
@@ -500,14 +511,13 @@ class Porter:
                 if self.at('='):
                     self.next()
                     default = self._paren(self.expr)
-                optional.append((nm, default))
-                names.append(nm)
+                items.append(('opt', nm, default))
             else:
                 k, t, _ = self.peek()
                 if k != 'name':
                     return None
                 self.next()
-                names.append(t)
+                items.append(('req', t, None))
             if self.at(','):
                 self.next()
                 continue
@@ -521,8 +531,10 @@ class Porter:
         value = self.expr()
         self.eat_semi()
 
-        opt_names = {o[0] for o in optional}
-        required = [n for n in names if n not in opt_names]
+        names = [nm for kind, nm, _ in items if kind != 'rest']
+        optional = [(nm, d) for kind, nm, d in items if kind == 'opt']
+        rest = next((nm for kind, nm, _ in items if kind == 'rest'), None)
+        required = [nm for kind, nm, _ in items if kind == 'req']
 
         if not optional:
             # No optionals: Python's own unpacking says exactly this, and
@@ -531,34 +543,64 @@ class Porter:
             if rest:
                 target = ', '.join(filter(None, [target, f'*{_safe_name(rest)}']))
             if not target:
-                return [f'# {value}']
+                return None if want_expr else [f'# {value}']
+            if want_expr:
+                # Plain unpacking has no expression form, so this one goes
+                # through the general path instead.
+                self._scatters = getattr(self, '_scatters', 0) + 1
+                tmp = f'_scatter_{self._scatters}'
+                lines = [f'{tmp} = {value}']
+                lines += [f'{_safe_name(nm)} = {tmp}[{i}]'
+                          for i, nm in enumerate(required)]
+                if rest:
+                    lines.append(
+                        f'{_safe_name(rest)} = {tmp}[{len(required)}:]')
+                return self._assignments_as_expression(lines, tmp)
             return [f'{target} = {value}']
 
-        # With optionals, expand to indexed statements.  This only reads
-        # correctly if every required target precedes every optional one,
-        # which is how MOO code is actually written; anything else is
-        # marked rather than guessed at, since the fill order would be a
-        # guess about which target a short value was meant to reach.
-        order = [n for n in names]
-        first_opt = min(order.index(n) for n in opt_names)
-        if any(order.index(n) < first_opt for n in opt_names) or \
-                any(n not in opt_names for n in order[first_opt:]):
-            for nm, default in optional:
-                self.mark(f'scatter target {nm!r} is optional but does not '
-                          f'follow the required ones; fill order is '
-                          f'ambiguous, so set it by hand')
-            return [f'{_safe_name(order[0])} = {value}']
+        # Two shapes, and the difference is only about readability.
+        #
+        # Written the usual way -- required, then optionals, then a rest
+        # target -- each binding is a plain indexed read and says so.  When
+        # the kinds interleave, the fill is no longer positional and the
+        # general rule applies instead: required targets are satisfied
+        # first wherever they sit, and what is left over feeds the
+        # optionals in order.  That was previously refused as "ambiguous",
+        # which was wrong -- MOO specifies it; I was describing my parser,
+        # not the language.
+        kinds = [kind for kind, _, _ in items]
+        tidy = (kinds == sorted(kinds, key=('req', 'opt', 'rest').index)
+                and kinds.count('rest') <= 1)
 
         # The value is bound to a name first when it is not already one, so
         # a right side with side effects is evaluated once rather than once
         # per target.
-        if value.isidentifier():
+        if value.isidentifier() and not want_expr:
             src = value
             out = []
         else:
+            # In expression position the temp is not an optimisation, it
+            # is required: the whole thing evaluates to the right-hand
+            # side, and a rest target routinely rebinds the very name it
+            # was read from -- `{?sfc, @todo} = todo`.  Without the temp
+            # the result would be the list after the assignment rather
+            # than before it.
             self._scatters = getattr(self, '_scatters', 0) + 1
             src = f'_scatter_{self._scatters}'
             out = [f'{src} = {value}']
+
+        if not tidy:
+            spec = ', '.join(
+                "('rest',)" if kind == 'rest' else
+                "('req',)" if kind == 'req' else
+                f"('opt', {d if d else 'None'})"
+                for kind, _, d in items)
+            self._scatters = getattr(self, '_scatters', 0) + 1
+            got = f'_scattered_{self._scatters}'
+            out.append(f'{got} = moo_scatter({src}, [{spec}])')
+            out += [f'{_safe_name(nm)} = {got}[{i}]'
+                    for i, (_, nm, _) in enumerate(items)]
+            return self._assignments_as_expression(out, src) if want_expr else out
 
         for i, nm in enumerate(required):
             out.append(f'{_safe_name(nm)} = {src}[{i}]')
@@ -568,7 +610,25 @@ class Porter:
                        f'else {default if default else "None"}')
         if rest:
             out.append(f'{_safe_name(rest)} = {src}[{len(names)}:]')
-        return out
+        return self._assignments_as_expression(out, src) if want_expr else out
+
+    @staticmethod
+    def _assignments_as_expression(lines, result):
+        """
+        Fold ``name = value`` lines into one expression that binds them.
+
+        Args:
+            lines: Statements, each ``target = source``.
+            result: What the whole expression should evaluate to.
+
+        Returns:
+            A tuple display of walrus bindings, indexed to yield *result*.
+        """
+        parts = []
+        for line in lines:
+            name, _, rhs = line.partition(' = ')
+            parts.append(f'({name.strip()} := {rhs})')
+        return '(' + ', '.join(parts) + f', {result})[-1]'
 
     def _refuse(self, indent, word) -> List[str]:
         """Consume a construct we will not translate, and mark it."""
@@ -650,8 +710,9 @@ class Porter:
         # made every one of those look like a break out of an enclosing
         # loop, which is the opposite of what it is.
         self.loops.append(var)
-        out = [head] + self.block(indent + 1, ('endfor',))
+        body = self.block(indent + 1, ('endfor',))
         self.loops.pop()
+        out = self._wrap_labelled(var, indent, head, body)
         if self.at_name('endfor'):
             self.next()
             self.eat_semi()
@@ -761,6 +822,58 @@ class Porter:
                 ["'''",
                  f'{pad}{lhs}fork({secs}, {name}, dict(globals()))'])
 
+    def _wrap_labelled(self, label, indent, head, body):
+        """
+        Give a loop the handlers for breaks and continues aimed at it.
+
+        The two go in different places, which is the whole point of doing
+        it this way rather than with a flag.
+
+        A ``break outer`` has to leave the loop, so its handler wraps the
+        loop.  A ``continue outer`` has to end this iteration and start
+        the next, so its handler wraps the loop *body* -- swallowing the
+        signal there lets the body finish and the loop carry on, which is
+        what continue means.
+
+        Both handlers re-raise anything not meant for them, so a signal
+        aimed several levels out passes cleanly through the ones between.
+
+        Only emitted when something actually named the label.  MOO labels
+        loops far more often than it jumps out of them non-locally, and
+        wrapping every labelled loop would put a try around code that
+        never needed one.
+
+        Args:
+            label: The loop's name, or None.
+            indent: Its indentation level.
+            head: The `while ...:` or `for ...:` line.
+            body: The loop body, already indented one level in.
+
+        Returns:
+            The loop, wrapped as required.
+        """
+        pad = '    ' * indent
+        wants_break = (label, 'break') in self.labels_used
+        wants_continue = (label, 'continue') in self.labels_used
+        self.labels_used.discard((label, 'break'))
+        self.labels_used.discard((label, 'continue'))
+
+        if wants_continue:
+            body = ([f'{pad}    try:'] +
+                    ['    ' + l for l in body] +
+                    [f'{pad}    except MooLoopSignal as _sig:',
+                     f"{pad}        if _sig.label != {label!r} or "
+                     f"_sig.kind != 'continue':",
+                     f'{pad}            raise'])
+        out = [head] + body
+        if wants_break:
+            out = ([f'{pad}try:'] + ['    ' + l for l in out] +
+                   [f'{pad}except MooLoopSignal as _sig:',
+                    f"{pad}    if _sig.label != {label!r} or "
+                    f"_sig.kind != 'break':",
+                    f'{pad}        raise'])
+        return out
+
     def while_stmt(self, indent) -> List[str]:
         pad = '    ' * indent
         self.expect('while')
@@ -777,8 +890,9 @@ class Porter:
         cond = self._paren(self.expr)
         self.expect(')')
         self.loops.append(label)
-        out = [f'{pad}while {cond}:'] + self.block(indent + 1, ('endwhile',))
+        body = self.block(indent + 1, ('endwhile',))
         self.loops.pop()
+        out = self._wrap_labelled(label, indent, f'{pad}while {cond}:', body)
         if self.at_name('endwhile'):
             self.next()
             self.eat_semi()
@@ -1140,34 +1254,27 @@ class Porter:
             self.expect(')')
             return f'({e})'
         if t == '{':
-            # `{?a, @rest} = value` in expression position -- MOO's
-            # scatter is an expression, and LambdaCore writes
-            # `while ({?sfc, @todo} = todo)`.  Python cannot bind names
-            # from inside an expression at all, so there is nothing to
-            # emit; the point of catching it here is that raising took
-            # the whole verb down, where a mark loses only this line.
             if self._is_scatter_expr():
-                depth, raw = 0, []
-                while True:
-                    k, t, _ = self.peek()
-                    if k == 'eof':
-                        break
-                    if t in '([{':
-                        depth += 1
-                    elif t == '}' and depth == 0:
-                        self.next()
-                        break
-                    elif t in ')]}':
-                        depth -= 1
-                    raw.append(t)
-                    self.next()
-                if self.at('=') and self.peek(1)[1] != '=':
-                    self.next()
-                    self.expr()
-                return self.mark_expr(
-                    'scatter assignment inside an expression; Python cannot '
-                    'bind names from a call, so lift it above the statement '
-                    'that uses it', '{' + ' '.join(raw) + '} = ...')
+                # `while ({?sfc, @todo} = todo)` -- MOO's scatter is an
+                # expression, and LambdaCore uses one as a loop condition.
+                #
+                # I had this filed as impossible, on the grounds that
+                # Python cannot bind names from inside an expression.  It
+                # cannot bind from a *call*, which is not the same claim:
+                # the walrus binds, and a tuple display evaluates its
+                # elements left to right.  So the same fill the statement
+                # form does fits in one expression, ending with the
+                # right-hand side, because that is what MOO's scatter
+                # evaluates to.
+                #
+                # It is not pretty.  The alternative was losing the loop.
+                self.i -= 1
+                expr = self.try_scatter(want_expr=True)
+                if expr is None:
+                    return self.mark_expr(
+                        'scatter inside an expression that could not be '
+                        'read as one', '{...}')
+                return expr
             items = self.arglist('}')
             return '[' + ', '.join(items) + ']'
         if k == 'dollar':
@@ -1357,22 +1464,25 @@ class Porter:
         if fn == 'substitute':
             return f'moo_substitute({joined})'
         if fn == 'notify':
-            # MOO's notify(who, text) is the raw output builtin.  The
+            # MOO's notify(who, text) is the raw output builtin; the
             # MegaMOO spelling is who.msg(text), and the difference is not
-            # cosmetic: msg is a verb and overridable per object, which is
-            # how a deafened or filtered character stops hearing things.
-            # notify() walks straight past that -- the same bug msg_room
-            # had until it was fixed.
+            # cosmetic -- msg is a verb and overridable per object, which
+            # is how a deafened or filtered character stops hearing
+            # things.  notify() walks straight past that.
+            #
+            # It goes through a helper rather than becoming a bare
+            # who.msg(text) because MOO's notify *returns* whether the
+            # line was accepted, and cores loop on it:
+            # `while (!notify(conn, line, 1)) suspend(0); endwhile`.
+            # msg() returns None, so the direct translation turns that
+            # retry loop into an infinite one.  moo_notify returns 1.
+            #
+            # The third argument is MOO's no-flush flag, about an output
+            # queue this engine does not have.  It is accepted and
+            # ignored, which is why extra arguments no longer need saying.
             if len(args) >= 2:
-                who, text = args[0], args[1]
-                if len(args) > 2:
-                    self.note('notify() had extra arguments beyond the text; '
-                              'msg() takes substitution kwargs instead')
-                    self.marks += 1
-                return f'{who}.msg({text})'
-            self.note('notify() with unexpected arguments; check by hand')
-            self.marks += 1
-            return f'notify({joined})'
+                return f'moo_notify({joined})'
+            return f'moo_notify({joined})'
         if fn == 'pass':
             # `pass` is a Python keyword.  MegaMOO spells MOO's pass() as
             # pass_(), which is why that alias exists at all.
