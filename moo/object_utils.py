@@ -423,3 +423,123 @@ def _inline_title(obj: 'MOOObject'):
     cname = name[0].upper() + name[1:] if name else ''
     _set_property(obj, 'cname', cname)
     _set_property(obj, 'name_mod_list', nml)
+
+
+# ===========================================================================
+# LambdaMOO $object_utils compatibility
+#
+# The five methods below are 85% of $object_utils' use across JHCore, added
+# so code brought over by @port has somewhere to land.  Written from
+# JHCore's own definitions (#47, "object utilities"); each docstring quotes
+# the original.
+# ===========================================================================
+
+def ancestors(*objs):
+    """
+    Every ancestor of the given object(s), nearest first, without duplicates.
+
+    JHCore: "Return a list of all ancestors of the object(s) in args, with
+    no duplicates.  If called with a single object, the result will be in
+    order ascending up the inheritance hierarchy."  The object itself is
+    not included.
+    """
+    out = []
+    for obj in objs:
+        node = _parent_of(obj)
+        seen = set()
+        while node is not None and getattr(node, 'objnum', None) not in seen:
+            seen.add(node.objnum)
+            if node not in out:
+                out.append(node)
+            node = _parent_of(node)
+    return out
+
+
+def _parent_of(obj):
+    """The parent as a live object, or None.  Parents may be stored as ints."""
+    from .builtins import _database
+    parent = getattr(obj, 'parent', None)
+    if not parent:
+        return None
+    if isinstance(parent, int):
+        if parent <= 0:
+            return None
+        try:
+            return _database.get_object(parent)
+        except Exception:
+            return None
+    return parent
+
+
+def isa(what, targ) -> bool:
+    """
+    Whether *what* is *targ* or descends from it.
+
+    JHCore: ":isa(x,y) == valid(x) && (y==x || y in :ancestors(x))".  Walks
+    the parent chain, with a guard against a cycle in a damaged database.
+    """
+    if what is None or targ is None:
+        return False
+    want = getattr(targ, 'objnum', targ)
+    node, seen = what, set()
+    while node is not None:
+        num = getattr(node, 'objnum', None)
+        if num == want:
+            return True
+        if num in seen:
+            return False
+        seen.add(num)
+        node = _parent_of(node)
+    return False
+
+
+def has_verb(obj, name: str) -> bool:
+    """Whether *obj* or an ancestor defines a verb called *name*."""
+    node = obj
+    seen = set()
+    while node is not None and getattr(node, 'objnum', None) not in seen:
+        seen.add(node.objnum)
+        try:
+            for v in node.verbs or []:
+                if name in (v.names or []):
+                    return True
+        except Exception:
+            pass
+        node = _parent_of(node)
+    return False
+
+
+def has_callable_verb(obj, name: str) -> bool:
+    """
+    As has_verb, but only counting verbs that can actually be called.
+
+    A verb without the execute permission is defined but not callable, and
+    JHCore distinguishes the two.
+    """
+    node = obj
+    seen = set()
+    while node is not None and getattr(node, 'objnum', None) not in seen:
+        seen.add(node.objnum)
+        try:
+            for v in node.verbs or []:
+                if name in (v.names or []) and 'x' in (v.perms or ''):
+                    return True
+        except Exception:
+            pass
+        node = _parent_of(node)
+    return False
+
+
+def has_property(obj, name: str) -> bool:
+    """
+    Whether *obj* has the named property, inherited or its own.
+
+    A missing property reads back as the falsy sentinel rather than
+    raising, so the test is against that rather than against an exception.
+    """
+    if obj is None or not name:
+        return False
+    try:
+        return getattr(obj, name) != None      # noqa: E711 -- sentinel
+    except AttributeError:
+        return False

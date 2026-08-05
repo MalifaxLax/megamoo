@@ -465,8 +465,24 @@ def _inject_moo_builtins(namespace: Dict[str, Any], pobj, db) -> None:
     namespace['string_utils'] = su
 
     # Object utilities (ou.make_object, ou.make_room, etc.)
+    #
+    # Bound under both names, as su is: `object_utils` is what code ported
+    # from a MOO already says, so `$object_utils` resolves without an
+    # object behind it.
     from . import object_utils as ou
     namespace['ou'] = ou
+    namespace['object_utils'] = ou
+
+    # The other LambdaMOO utility objects, ported far enough to carry the
+    # calls a real core makes.  Same trick: the MOO spelling is an alias,
+    # so ported code needs no rewriting beyond dropping the $.
+    from .moo_libs import lu, cu, cdu
+    namespace['lu'] = lu
+    namespace['list_utils'] = lu
+    namespace['cu'] = cu
+    namespace['command_utils'] = cu
+    namespace['cdu'] = cdu
+    namespace['code_utils'] = cdu
 
     # Effects utility (screen effects, delays, etc.)
     from .effects import eu as _effects_mgr

@@ -39,7 +39,9 @@ MARK = '# PORT:'
 SYSREFS = {
     'string_utils': 'su',
     'object_utils': 'ou',
-    'list_utils': 'su',
+    'list_utils': 'lu',
+    'command_utils': 'cu',
+    'code_utils': 'cdu',
     'player': 'pobj',
 }
 
@@ -53,7 +55,7 @@ VARIABLES = {
 
 #: Mapped sysrefs that are Python objects rather than MOO objects.  A
 #: ``:verb()`` call on one of these is a method call, not a verb call.
-_PY_RECEIVERS = {'su', 'ou'}
+_PY_RECEIVERS = {'su', 'ou', 'lu', 'cu', 'cdu'}
 
 #: MOO builtins that map straight onto Python.
 BUILTINS = {
@@ -64,9 +66,16 @@ BUILTINS = {
 }
 
 #: MOO's type constants, which only ever appear in `typeof(x) == LIST`.
+#: Both spellings, because the two common cores disagree.  JHCore writes
+#: LIST and STR; LambdaCore writes TYPE_LIST and TYPE_STR, and neither uses
+#: the other's form at all -- 350 vs 0 and 253 vs 0 across the two.  A
+#: translator that knew only one would leave the other as an undefined name.
 TYPE_TESTS = {
     'LIST': 'list', 'STR': 'str', 'NUM': 'int', 'INT': 'int',
     'FLOAT': 'float', 'OBJ': 'MOOObject', 'ERR': 'MOOError',
+    'TYPE_LIST': 'list', 'TYPE_STR': 'str', 'TYPE_NUM': 'int',
+    'TYPE_INT': 'int', 'TYPE_FLOAT': 'float', 'TYPE_OBJ': 'MOOObject',
+    'TYPE_ERR': 'MOOError',
 }
 
 #: Constructs deliberately not translated.
@@ -921,8 +930,12 @@ _VERB_CONTEXT = {
     'pobj', 'this', 'caller', 'location', 'db', 'verb', 'args', 'argstr',
     'dobj', 'dobjstr', 'iobj', 'iobjstr', 'prep', 'switches', 'lhs', 'rhs',
     'arglist', 'kwargs', 'sub', 'dob', 'iob', 'uob', 'exclude', 'result',
-    'su', 'string_utils', 'ou', 'call_verb', 'search', 'find', 'pass_',
-    'tell', 'player',
+    'su', 'string_utils', 'ou', 'object_utils', 'call_verb', 'search',
+    'find', 'pass_', 'tell', 'player',
+    # The ported LambdaMOO utility objects, bound by the namespace builder
+    # rather than being module-level builtins, so they must be listed here
+    # or every ported $list_utils call looks undefined.
+    'lu', 'list_utils', 'cu', 'command_utils', 'cdu', 'code_utils',
 }
 
 
