@@ -1389,7 +1389,7 @@ class Porter:
             return f'db.get_object({joined})'
         if fn in BUILTINS and BUILTINS[fn]:
             return f'{BUILTINS[fn]}({joined})'
-        if fn not in _known_names():
+        if fn.isidentifier() and fn not in _known_names():
             # A builtin this server does not have.  Emitting the bare name
             # produced code that compiled and then died on a NameError
             # naming a Python identifier, which tells a MOO author
@@ -1407,6 +1407,11 @@ class Porter:
             # runtime failure is the only option; @port has a human
             # watching, and telling them now is better than telling them
             # later.
+            #
+            # Only a bare name can be a builtin.  When the callee is an
+            # expression -- `$core_object_info(...)`, which calls whatever
+            # #0 holds under that name -- the call is already correct and
+            # wrapping it would break a working translation.
             self.mark_expr(
                 f'{fn}() is not a builtin here; it is wrapped in '
                 f'call_function so the verb still loads, and will raise '
