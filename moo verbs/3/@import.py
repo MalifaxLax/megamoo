@@ -3,6 +3,7 @@ Imports a LambdaMOO database.
 
 Usage: @import <file>
        @import/dry <file>
+       @import/inert <file>
 
 Arguments:
     file - A .db file in the imports/ directory.
@@ -10,6 +11,8 @@ Arguments:
 Switches:
     /dry     - Report what would be imported without creating anything.
                Do this first.
+    /inert   - Keep verbs as unexecutable MOO source instead of
+               translating them.  See Verbs below.
     /players - Include player objects.  Off by default; see below.
 
 Auth: gm3+ (auth_level 3)
@@ -24,10 +27,24 @@ already taken by the shipped hierarchy.  Everything gets a fresh number,
 and object references inside properties are rewritten to match.  Each
 imported object records where it came from in `moo_import_id`.
 
-Verbs.  MOO verb code is the MOO language, and MegaMOO runs Python, so
-nothing imported can execute.  The original source is kept verbatim under
-a docstring explaining what it is and how to port it, and the verb is
-stored hidden and without the execute permission.  @grep for
+Verbs.  MOO verb code is the MOO language and MegaMOO runs Python, so each
+verb goes through the same translator @port uses and arrives as live
+Python, with the MOO original kept as comments beneath it.
+
+A verb that translates cleanly is given 'rx' and is reachable.  One that
+carries `# PORT:` marks is *also* live -- the marks say which lines need a
+human, and leaving the whole verb dead over one unresolved line would make
+the core untestable, since you cannot find out what else is wrong until it
+runs.  Only a verb that could not be read as MOO at all stays inert.
+
+Run /dry first.  It reports how much of the core translates before
+anything is created, which is the number to decide on.
+
+/inert keeps the old behaviour: every verb stored hidden and without the
+execute permission, its MOO source verbatim under a docstring explaining
+how to port it by hand.  Nothing is lost by not using it -- the translated
+form carries the same original -- so it is for when you mean to do the
+work yourself.  @grep for
 'UNPORTED MOO SOURCE' to find what is left to do.
 
 Players.  Left out unless you ask.  A player object carries a password
@@ -100,18 +117,47 @@ for warning in ldb.warnings[:5]:
     pobj.msg(f"  %<245>note: {warning}%n")
 
 dry = 'dry' in switches
+translate = 'inert' not in switches
+
+# During an import, `$foo` has to be judged against the core arriving, not
+# against this database.  A core brings its own $string_utils and friends,
+# so asking the destination would mark every reference to them -- and the
+# objects it is asking about are being created in the same pass.
+_core_refs = set()
+try:
+    _zero = next((o for o in ldb.live_objects if o.objid == 0), None)
+    if _zero is not None:
+        from moo.lambdamoo_import import property_names_for
+        _core_refs = {n.lower() for n in property_names_for(_zero, ldb)}
+except Exception:
+    pass
+
 report = import_lambda_db(ldb, db,
                           owner=pobj.objnum,
                           root_parent=1,
                           dry_run=dry,
+                          translate=translate,
+                          resolve=(lambda n: n.lower() in _core_refs)
+                                  if _core_refs else None,
                           skip_players='players' not in switches)
 
 pobj.msg("")
 pobj.msg(f"%<245>{'Would import' if dry else 'Imported'}:%n")
 pobj.msg(f"  {report['objects']:>6}  objects")
 pobj.msg(f"  {report['properties']:>6}  properties")
-pobj.msg(f"  {report['verbs']:>6}  verbs %<245>(inert -- MOO source, kept "
-         f"for porting)%n")
+pobj.msg(f"  {report['verbs']:>6}  verbs")
+if translate:
+    _clean = report['ported'] - report['ported_with_marks']
+    pobj.msg(f"  {_clean:>6}  %<245>translated clean%n")
+    if report['ported_with_marks']:
+        pobj.msg(f"  {report['ported_with_marks']:>6}  %<245>translated, "
+                 f"but carrying # PORT: marks -- live, and needing a look%n")
+    if report['unported']:
+        pobj.msg(f"  {report['unported']:>6}  %<245>could not be read as "
+                 f"MOO at all; kept inert%n")
+else:
+    pobj.msg(f"  {report['verbs']:>6}  %<245>kept inert -- MOO source, for "
+             f"porting by hand%n")
 if report['skipped_players']:
     pobj.msg(f"  {report['skipped_players']:>6}  players skipped "
              f"%<245>(/players to include)%n")

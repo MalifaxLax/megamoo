@@ -51,12 +51,14 @@ from .lambdamoo import (
     PF_READ, PF_WRITE, VF_READ, VF_WRITE, VF_EXEC, VF_DEBUG,
 )
 
-__all__ = ['import_lambda_db', 'build_inert_verb', 'property_names_for']
+__all__ = ['import_lambda_db', 'build_inert_verb', 'build_ported_verb',
+           'property_names_for']
 
 
 #: Marks an imported verb.  Anything scanning for un-ported code looks for
 #: this line, so it is a constant rather than typed out in two places.
 UNPORTED_MARKER = 'UNPORTED MOO SOURCE -- this verb does not run.'
+MARK_TEXT = '# PORT:'
 
 #: Property recording where an object came from.
 ORIGIN_PROP = 'moo_import_id'
@@ -220,9 +222,67 @@ docs/guide/ and the README's "Porting from LambdaMOO" section for the rest.
     return f"{header}\n{body}\n\nreturn None\n"
 
 
+def build_ported_verb(verb: LambdaVerbDef, objid: int, when: str,
+                      resolve=None):
+    """
+    Translate a MOO verb to Python, keeping the original for reference.
+
+    Args:
+        verb:  The verb definition, with its ``code`` filled in.
+        objid: The object number in the *source* database.
+        when:  Timestamp string for the provenance line.
+        resolve: Passed to :func:`~moo.moo_port.port` -- ``name -> bool``
+            for whether ``$name`` exists.  During an import this should
+            answer against the database *being built*, not the one being
+            imported into, since the core brings its own objects.
+
+    Returns:
+        ``(code, marks)``.  *marks* is how many ``# PORT:`` lines the
+        translation carries, or None when it could not be parsed as MOO at
+        all -- in which case *code* is the inert form and the verb should
+        stay unexecutable.
+
+    The MOO original is kept in the docstring either way.  It costs a few
+    kilobytes per verb and it is the only record of what the author wrote;
+    a translation that turns out to be wrong is much easier to fix with
+    the source sitting above it than without.
+    """
+    from .moo_port import port, MooSyntaxError
+
+    names = verb.names or '(unnamed)'
+    source = verb.code or ''
+    if not source.strip():
+        return build_inert_verb(verb, objid, when), None
+
+    try:
+        result = port(source, resolve=resolve)
+    except MooSyntaxError:
+        return build_inert_verb(verb, objid, when), None
+
+    original = '\n'.join(f'#     {line}' for line in source.split('\n'))
+    header = f'''"""
+Ported from a LambdaMOO database on {when}.
+
+Original
+    object      #{objid}
+    verb        {names}
+    owner       #{verb.owner}
+    permissions {_moo_perms(verb.perms)}
+    called as   <{verb.dobj}> {verb.prep_name} <{verb.iobj}>
+
+The MOO source is kept as comments at the foot of this verb.  Anything the
+translator could not render faithfully is marked with a {MARK_TEXT} line;
+a verb with none of those is one it believes it handled completely, which
+is a claim about the mechanical parts only and never about the logic.
+"""'''
+    footer = ('\n\n# --- original MOO source, for reference ---\n' + original)
+    return f'{header}\n\n{result.code.rstrip()}\n{footer}\n', result.marks
+
+
 def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                      root_parent: int = 1, dry_run: bool = False,
-                     skip_players: bool = True) -> Dict:
+                     skip_players: bool = True, translate: bool = True,
+                     resolve=None) -> Dict:
     """
     Create MegaMOO objects for everything in a parsed LambdaMOO database.
 
@@ -237,6 +297,20 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                       object carries a password hash and a connection
                       history that mean nothing here, and importing one
                       creates an account nobody can log into.
+        translate:    Run each verb through @port so the import arrives
+                      able to run.  **On by default**, because the ported
+                      form contains the MOO original as comments anyway --
+                      it strictly dominates the inert form as a record --
+                      and translating all of LambdaCore costs about two
+                      seconds against an import that takes minutes.
+                      Turning it off (@import/inert) keeps every verb as
+                      unexecutable MOO source, which is what you want if
+                      you mean to port by hand.
+        resolve:      ``name -> bool`` for whether ``$name`` resolves.  It
+                      should answer against the database being *built*,
+                      not the one being imported into: a core brings its
+                      own $string_utils and friends, and asking the
+                      destination would mark every reference to them.
 
     Returns:
         A report dict: counts, the old-to-new object map, and lists of
@@ -252,12 +326,23 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
         'considered': len(ldb.live_objects),
         'skipped_players': len(ldb.live_objects) - len(sources),
         'objects': 0, 'properties': 0, 'verbs': 0,
+        # Of the verbs, how many arrived as live Python, how many of those
+        # still carry marks, and how many could not be read as MOO at all.
+        'ported': 0, 'ported_with_marks': 0, 'unported': 0,
+        'marked_verbs': [],
         'objmap': {}, 'unresolved_refs': [], 'failures': [], 'renamed': {},
     }
 
     if dry_run:
         # Nothing is created, so there is no map to remap through; count
         # what would happen and stop.
+        #
+        # The verbs are translated anyway, and thrown away.  That is the
+        # whole value of a dry run: translating all of LambdaCore costs
+        # about two seconds against an import that takes minutes, so the
+        # question worth answering here is not "how big is this" but "how
+        # much of it will actually work" -- and answering it without
+        # creating anything is exactly what a dry run is for.
         for src in sources:
             report['objects'] += 1
             names = property_names_for(src, ldb)
@@ -265,6 +350,17 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                 if value is not None and i < len(names):
                     report['properties'] += 1
             report['verbs'] += len(src.verbs)
+            if not translate:
+                continue
+            for verb in src.verbs:
+                _code, marks = build_ported_verb(verb, src.objid, when,
+                                                 resolve=resolve)
+                if marks is None:
+                    report['unported'] += 1
+                else:
+                    report['ported'] += 1
+                    if marks:
+                        report['ported_with_marks'] += 1
         return report
 
     # ---- pass 1: make every object, so references have something to hit --
@@ -374,20 +470,42 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                     mins[word] = len(before)
                 else:
                     clean.append(raw)
+            if translate:
+                vcode, marks = build_ported_verb(verb, src.objid, when,
+                                                 resolve=resolve)
+            else:
+                vcode, marks = build_inert_verb(verb, src.objid, when), None
+
+            # A verb that translated is live.  One that did not parse as
+            # MOO at all stays inert -- no execute permission, hidden from
+            # dispatch and help -- because an un-ported verb reachable by
+            # typing its name is worse than one that is missing.
+            #
+            # A verb that translated *with* marks is still live.  Its marks
+            # say which lines need a human, and leaving the whole verb dead
+            # over one unresolved line would make the core untestable: you
+            # cannot find out what else is wrong until the thing runs.
+            ported = marks is not None
             try:
                 vd = VerbDef(
                     names=clean,
-                    code=build_inert_verb(verb, src.objid, when),
+                    code=vcode,
                     owner=owner,
-                    # No 'x': an un-ported verb must not be executable.
-                    perms='r',
+                    perms='rx' if ported else 'r',
                     min_lengths=mins,
-                    # Hidden keeps it out of dispatch and out of help.
-                    hidden=True,
+                    hidden=not ported,
                     auth=3,
                 )
                 obj.add_verb(vd)
                 report['verbs'] += 1
+                if ported:
+                    report['ported'] += 1
+                    if marks:
+                        report['ported_with_marks'] += 1
+                        report['marked_verbs'].append(
+                            f"#{src.objid}:{clean[0]} ({marks})")
+                else:
+                    report['unported'] += 1
             except Exception as err:
                 report['failures'].append(
                     f"#{src.objid}:{clean[0]}: {err}")

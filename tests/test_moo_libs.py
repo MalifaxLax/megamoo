@@ -808,3 +808,43 @@ def test_moo_in_on_two_strings_is_a_substring_search():
     from moo.moo_builtins import moo_in
     assert moo_in('ell', 'Hello') == 2
     assert moo_in('xyz', 'Hello') == 0
+
+
+def test_sysref_lookup_ignores_case():
+    # MOO looks properties up without regard to case, and cores rely on
+    # it: JHCore writes $List_utils and $failed_Match meaning the same
+    # objects as the lower-case spellings.
+    import moo.moo_builtins as mb
+
+    class Zero:
+        properties = {'List_utils': None, 'plain': None}
+        List_utils = 'the object'
+        plain = 'p'
+
+    class DB:
+        def get_object(self, n):
+            return Zero()
+
+    real = mb.__dict__.get('_database')
+    import moo.builtins as b
+    saved, b._database = b._database, DB()
+    try:
+        assert mb.sysobj('list_utils') == 'the object'
+        assert mb.sysobj('List_utils') == 'the object'
+        assert mb.sysobj('plain') == 'p'
+    finally:
+        b._database = saved
+
+
+def test_moo_index_shifts_lists_and_strings_but_not_maps():
+    from moo.moo_builtins import moo_index
+    assert moo_index([10, 20, 30], 2) == 20
+    assert moo_index('abc', 1) == 'a'
+    assert moo_index({'alpha': 1}, 'alpha') == 1
+
+
+def test_moo_index_gets_integer_map_keys_right():
+    # The silent case: a string key fails loudly, an integer key would
+    # have quietly returned whatever was under index-1.
+    from moo.moo_builtins import moo_index
+    assert moo_index({1: 'a', 3: 'c'}, 3) == 'c'

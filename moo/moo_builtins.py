@@ -37,6 +37,7 @@ __all__ = [
     'TYPE_LIST', 'TYPE_FLOAT',
     # Expression forms Python lacks
     'moo_raise', 'moo_setprop', 'moo_setitem', 'moo_listset',
+    'moo_index',
     # Operators whose meaning differs from Python's
     'moo_eq', 'moo_ne', 'moo_lt', 'moo_le', 'moo_gt', 'moo_ge', 'moo_in',
     'moo_div', 'moo_mod',
@@ -1276,6 +1277,17 @@ def sysobj(name: str):
         raise MOOError(f'${name}: no system object')
     value = getattr(zero, str(name), None)
     if value is None or repr(value) == 'None':
+        # MOO looks properties up without regard to case, and cores rely
+        # on it: JHCore writes $List_utils and $failed_Match in places,
+        # meaning the same objects as $list_utils and $failed_match.  The
+        # exact spelling is tried first so the common path stays a single
+        # attribute read.
+        want = str(name).lower()
+        for prop in (getattr(zero, 'properties', None) or {}):
+            if prop.lower() == want:
+                value = getattr(zero, prop, None)
+                break
+    if value is None or repr(value) == 'None':
         raise MOOError(f'${name} is not defined on #0')
     return value
 
@@ -1827,3 +1839,31 @@ def moo_in(value, lst) -> int:
         if moo_eq(item, value):
             return i
     return 0
+
+
+def moo_index(seq, index):
+    """
+    MOO's ``x[i]``, for an *x* whose type is not known until it runs.
+
+    MOO counts lists and strings from one, so @port shifts every
+    subscript.  Maps are not indexed positionally at all -- ``m["alpha"]``
+    is a key lookup -- so shifting there is wrong, and the two cannot be
+    told apart by looking at the source.
+
+    A string or object key at least fails loudly.  An **integer** key does
+    not: maps are commonly keyed by number, and ``m[3]`` would silently
+    have returned whatever was under 2.  That is the exact failure the
+    translator exists to prevent, in the one place it was causing it.
+
+    Args:
+        seq: A list, string, or map.
+        index: A **1-based** index for a list or string, or a key.
+
+    Returns:
+        The element or value.
+    """
+    if isinstance(seq, dict):
+        return seq[index]
+    if isinstance(index, int) and not isinstance(index, bool):
+        return seq[index - 1]
+    return seq[index]

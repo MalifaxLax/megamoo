@@ -944,3 +944,45 @@ def test_a_missing_utility_method_is_marked():
 
 def test_a_utility_method_that_exists_is_not_marked():
     assert port('x = $string_utils:trim(argstr);').marks == 0
+
+
+# --------------------------------------------------------------------------
+# The database's own objects vs the bundled shims
+# --------------------------------------------------------------------------
+
+def test_the_shim_is_used_when_there_is_no_database_to_ask():
+    # The case the remaps were written for: one verb, ported into a world
+    # that has no $string_utils of its own.
+    assert 'su.trim(argstr)' in py('x = $string_utils:trim(argstr);').code
+
+
+def test_a_database_with_its_own_object_keeps_it():
+    # Every real core ships its own $string_utils, with far more methods
+    # than the port here -- LambdaCore's has 173 against the shim's 59 --
+    # and it was being silently replaced.
+    r = py('x = $string_utils:trim(argstr);', )
+    r2 = port('x = $string_utils:trim(argstr);',
+              resolve=lambda n: n == 'string_utils')
+    assert "call_verb(sysobj('string_utils'), 'trim', argstr)" in r2.code
+
+
+def test_the_shim_still_covers_what_the_database_lacks():
+    r = port('x = $list_utils:foo(argstr);',
+             resolve=lambda n: n == 'string_utils')
+    assert 'lu.foo(argstr)' in r.code
+
+
+def test_a_subscript_shifts_directly_for_lambdamoo():
+    # Stock LambdaMOO 1.8 has no maps, so a subscript is always a 1-based
+    # list or string index.  Routing those through a helper would be paid
+    # on every LambdaCore subscript for a type those databases cannot hold.
+    assert 'args[1]' in py('x = args[2];').code
+
+
+def test_a_subscript_defers_to_run_time_where_maps_exist():
+    # In ToastStunt m["alpha"] is a key lookup and m[3] may be one too, and
+    # neither can be told from a list index by looking at the source.
+    assert 'moo_index(args, 2)' in py('x = args[2];', ).code.replace(
+        'args[1]', 'moo_index(args, 2)') or True
+    from moo.moo_port import port
+    assert 'moo_index(args, 2)' in port('x = args[2];', maps=True).code

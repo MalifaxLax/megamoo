@@ -273,13 +273,22 @@ def tokenise(src: str) -> List[Tuple[str, str, int]]:
 # ---------------------------------------------------------------------------
 
 class Porter:
-    def __init__(self, src: str, resolve=None):
+    def __init__(self, src: str, resolve=None, maps: bool = False):
         #: Answers "is $name defined on #0?".  port() supplies the
         #: running server's.  None when translating outside one --
         #: under test, or from a script -- and then every $reference is
         #: taken on trust, because an absent database is not evidence
         #: that an object is missing.
         self._resolve = resolve
+        #: Whether the source dialect has maps.  Stock LambdaMOO 1.8 does
+        #: not -- they are a ToastStunt addition -- so a subscript there
+        #: is always a 1-based list or string index and shifts directly.
+        #: Where maps exist the two cannot be told apart by looking, so
+        #: every subscript has to go through moo_index and decide at run
+        #: time.  That is uglier and slower, which is why it is not the
+        #: default: it would be paid on every LambdaCore subscript for a
+        #: type those databases cannot contain.
+        self.maps = maps
         self.toks = tokenise(src)
         self.i = 0
         self.notes: List[str] = []
@@ -299,10 +308,20 @@ class Porter:
         #: keeps its ordinary shape.
         self.labels_used = set()
 
-    def sysref_resolves(self, name: str) -> bool:
-        """Whether ``$name`` is defined on #0 right now."""
+    def sysref_resolves(self, name: str, default: bool = True) -> bool:
+        """
+        Whether ``$name`` is defined on #0 right now.
+
+        Args:
+            name: The reference, without the ``$``.
+            default: What to answer with no resolver to ask.  True when
+                deciding whether to *mark* -- an absent database is not
+                evidence that an object is missing.  False when deciding
+                whether to prefer the database over a shim, since with no
+                database there is nothing to prefer.
+        """
         if self._resolve is None:
-            return True
+            return default
         try:
             return bool(self._resolve(name))
         except Exception:
@@ -1252,10 +1271,25 @@ class Porter:
             return '#' + num
         if k == 'sysref':
             name = t[1:]
-            if name in SYSREFS:
-                return SYSREFS[name]
             if name in SYSCONSTANTS:
                 return SYSCONSTANTS[name]
+            # The database's own object wins over the shim.
+            #
+            # These remaps exist so a single verb can be ported into a
+            # world that has no $string_utils.  A database that *does*
+            # have one -- every real core ships its own, with far more
+            # methods than the port here -- was getting it silently
+            # replaced by MegaMOO's Python module, which is both wrong
+            # and worse: LambdaCore's #20 has all 173 methods and the
+            # shim has 59.
+            #
+            # So the shim is the fallback, not the default.  With no
+            # resolver at all -- porting one verb offline -- nothing
+            # changes, which is the case the remaps were written for.
+            if self.sysref_resolves(name, default=False):
+                return f'sysobj({name!r})'
+            if name in SYSREFS:
+                return SYSREFS[name]
             # `$foo` is not special syntax in MOO -- it is `#0.foo`, a
             # property on the system object -- and this engine already
             # works the same way, carrying $chair and $item on #0 today.
@@ -1389,7 +1423,8 @@ class Porter:
                         val = f'{val}[{_minus1(lo)}:{hi}]'
                     else:
                         self.expect(']')
-                        val = f'{val}[{_minus1(lo)}]'
+                        val = (f'moo_index({val}, {lo})' if self.maps
+                               else f'{val}[{_minus1(lo)}]')
                 finally:
                     self.depth -= 1
                     self.receiver.pop()
@@ -1480,12 +1515,13 @@ class Porter:
         if fn == 'listdelete' and len(args) == 2:
             lst, i = args
             return f'({lst}[:{_minus1(i)}] + {lst}[{i}:])'
-        if fn == 'setadd' and len(args) == 2:
-            lst, x = args
-            return f'({lst} if {x} in {lst} else {lst} + [{x}])'
-        if fn == 'setremove' and len(args) == 2:
-            lst, x = args
-            return f'[_e for _e in {lst} if _e != {x}]'
+        # setadd and setremove used to be expanded inline.  Both forms
+        # were wrong: the setadd one compared with Python's `in` and the
+        # setremove one with `!=`, where MOO uses its own equality and
+        # folds case, so `setremove(l, "Foo")` missed "foo".  The
+        # comprehension had a second problem -- a walrus anywhere in the
+        # list it iterated made the verb fail to compile, which is how
+        # this was found.  The builtins do it properly.
         if fn in ('match', 'rmatch'):
             # A false friend, and the dangerous kind: MOO's match() is a
             # regex and this engine's match() matches objects, so passing
@@ -1766,9 +1802,15 @@ def _will_not_parse(code: str) -> Optional[str]:
         body = preprocess_verb_code(body)
     except Exception:
         pass
+    wrapped = 'def _v():\n' + '\n'.join('    ' + l for l in body.splitlines())
     try:
-        ast.parse('def _v():\n' +
-                  '\n'.join('    ' + l for l in body.splitlines()))
+        # compile(), not ast.parse().  Some restrictions are enforced after
+        # the parse tree is built and only compile() sees them -- a walrus
+        # in a comprehension's iterable parses fine and will not compile,
+        # which is exactly what the emitter was producing.  The check has
+        # to be the same one the server will apply on load, or it is
+        # promising something it did not test.
+        compile(wrapped, '<verb>', 'exec')
     except SyntaxError as err:
         return err.msg
     return None
@@ -1868,7 +1910,7 @@ def structure_of_python(code: str) -> dict:
 # Entry point
 # ---------------------------------------------------------------------------
 
-def port(source: str, resolve=None) -> PortResult:
+def port(source: str, resolve=None, maps: bool = False) -> PortResult:
     """
     Translate MOO source to Python.
 
@@ -1878,6 +1920,9 @@ def port(source: str, resolve=None) -> PortResult:
             is defined on #0.  @port passes the live database's, so a
             reference to an object that really is there translates
             clean instead of being marked on suspicion.
+        maps: Whether the source dialect has maps.  False for LambdaMOO
+            1.8, which has none; True for ToastStunt, where a subscript
+            may be a key lookup and cannot be shifted blindly.
 
     Returns:
         A :class:`PortResult`.  ``code`` is Python; ``notes`` lists what
@@ -1888,7 +1933,7 @@ def port(source: str, resolve=None) -> PortResult:
             partial is returned -- a half-parsed verb would be worse than
             none.
     """
-    p = Porter(source, resolve=resolve)
+    p = Porter(source, resolve=resolve, maps=maps)
     body = p.block(0, ())
     lines = [ln for ln in body if ln.strip()]
 
