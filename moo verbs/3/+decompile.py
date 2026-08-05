@@ -7,8 +7,10 @@ Usage: +decompile <object>.<verb_name>
 Switches:
     /line - Number the lines.  A ported verb's `# PORT:` notes cite line
             numbers, and this is how you find the line they mean.
-    /body - Skip the docstring and the original-MOO footer, showing only
-            the code that runs.  An imported verb is mostly provenance.
+    /body - Skip the provenance: the docstring above and the original MOO
+            below.  The `# PORT:` notes are kept -- they are usually why
+            you are looking -- and numbering stays absolute, so a note
+            citing line 17 still means line 17.
 
 Auth: gm3+ (auth_level 3)
 
@@ -79,6 +81,10 @@ if 'body' in switches:
             if lines[i].rstrip().endswith('"""'):
                 first = i + 2
                 break
+    # Step over blank lines so the view opens on something.  The gap
+    # between the docstring and the code is a separator, not content.
+    while first <= len(lines) and not lines[first - 1].strip():
+        first += 1
     for i, line in enumerate(lines, 1):
         if line.startswith('# --- original MOO source'):
             last = i - 1
