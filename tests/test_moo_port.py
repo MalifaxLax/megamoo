@@ -303,3 +303,77 @@ def test_type_constants_do_not_leak_as_bare_names():
     from moo.moo_port import undefined_names
     r = port('if (typeof(x) == LIST)\n y=1;\nendif')
     assert 'LIST' not in undefined_names(r.code)
+
+
+# --------------------------------------------------------------------------
+# Constructs found by running the corpus, with mooR's grammar as the
+# reference for precedence and for what the syntax actually means
+# --------------------------------------------------------------------------
+
+def test_computed_property_name():
+    assert 'getattr(this, verb)' in py('x = this.(verb);').code
+
+
+def test_computed_property_with_an_expression():
+    assert 'getattr(this, verb[0:3])' in py('x = this.(verb[1..3]);').code
+
+
+def test_assigning_a_computed_property_uses_setattr():
+    # getattr(...) = x would not compile
+    assert 'setattr(this, p, 1)' in py('this.(p) = 1;').code
+
+
+def test_computed_verb_name():
+    assert 'call_verb(obj, verb, *args)' in py('y = obj:(verb)(@args);').code
+
+
+def test_scatter_assignment():
+    assert 'a, b = args' in py('{a, b} = args;').code
+
+
+def test_scatter_with_rest():
+    assert 'a, *rest = args' in py('{a, @rest} = args;').code
+
+
+def test_scatter_optional_is_marked():
+    # Python unpacking raises when the right side is short; MOO leaves the
+    # name unbound.  Not the same thing, so it is not pretended.
+    r = port('{prop, ?who = caller} = args;')
+    assert r.marks >= 1
+    assert 'optional' in ' '.join(r.notes)
+
+
+def test_a_list_literal_is_still_a_list():
+    # `{1, 2}` on the right of an assignment must not be read as a scatter
+    assert 'x = [1, 2]' in py('x = {1, 2};').code
+
+
+def test_chained_assignment():
+    assert 'x = y = z = []' in py('x = y = z = {};').code
+
+
+def test_dollar_is_the_length_of_the_thing_indexed():
+    assert 'v[len(v) - 1]' in py('x = v[$];').code
+
+
+def test_dollar_in_a_range():
+    assert 'v[1:len(v)]' in py('x = v[2..$];').code
+
+
+def test_return_with_assignment_becomes_two_statements():
+    r = py('return this.(verb) = args[1];')
+    lines = [l for l in r.code.splitlines() if l.strip() and not l.startswith('#')]
+    assert lines[0] == 'setattr(this, verb, args[0])'
+    assert lines[1] == 'return getattr(this, verb)'
+
+
+def test_raise_as_a_statement():
+    assert 'raise E_PERM' in py('raise(E_PERM);').code
+
+
+def test_raise_inside_an_expression_is_marked():
+    # Python raises only as a statement; `expr || raise(E_PERM)` cannot be
+    # written inline, so it must not be emitted as though it could.
+    r = port('x || raise(E_PERM);')
+    assert r.marks >= 1
+    assert not any('or raise' in l for l in r.code.splitlines())

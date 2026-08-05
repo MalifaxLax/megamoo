@@ -104,6 +104,7 @@ TOKEN_RE = re.compile(r"""
   | (?P<string>"[^"\\]*(?:\\.[^"\\]*)*")
   | (?P<objnum>\#\s*-?\d+)
   | (?P<sysref>\$[A-Za-z_]\w*)
+  | (?P<dollar>\$)
   | (?P<number>\d+\.\d+|\d+)
   | (?P<name>[A-Za-z_]\w*)
   | (?P<range>\.\.)
@@ -143,6 +144,7 @@ class Porter:
         self.notes: List[str] = []
         self.marks = 0
         self.depth = 0
+        self.receiver: List[str] = []
 
     # -- token helpers ----------------------------------------------------
     def peek(self, ahead=0):
@@ -237,23 +239,112 @@ class Porter:
                     self.next()
                     return [f'{pad}return']
                 e = self.expr()
+                # `return x = y` assigns and then returns.  Python cannot
+                # do both in one statement unless the target is a plain
+                # name, so it becomes two lines.
+                if self.at('=') and self.peek(1)[1] != '=':
+                    self.next()
+                    rhs = self.expr()
+                    self.eat_semi()
+                    return [pad + _assign(e, rhs), f'{pad}return {e}']
                 self.eat_semi()
                 return [f'{pad}return {e}']
+            if t == 'raise' and self.peek(1)[1] == '(':
+                # The whole statement is a raise, which Python can express.
+                self.next()
+                self.expect('(')
+                what = self._paren(lambda: ', '.join(self.arglist(')')))
+                self.eat_semi()
+                return [f'{pad}raise {what}']
             if t in ('break', 'continue'):
                 self.next()
                 self.eat_semi()
                 return [f'{pad}{t}']
 
-        # assignment or bare expression
-        start = self.i
-        lhs = self.expr()
-        if self.at('='):
+        # scatter assignment:  {a, ?b = d, @rest} = expr
+        if self.at('{'):
+            saved = self.i
+            scatter = self.try_scatter()
+            if scatter is not None:
+                return [pad + line for line in scatter]
+            self.i = saved
+
+        # assignment, possibly chained:  a = b = c = expr
+        targets = [self.expr()]
+        while self.at('=') and self.peek(1)[1] != '=':
             self.next()
-            rhs = self.expr()
-            self.eat_semi()
-            return [f'{pad}{lhs} = {rhs}']
+            targets.append(self.expr())
         self.eat_semi()
-        return [f'{pad}{lhs}']
+        if len(targets) == 1:
+            return [f'{pad}{targets[0]}']
+        if len(targets) == 2:
+            return [pad + _assign(targets[0], targets[1])]
+        # Python chains natively and right-to-left, same as MOO.  Only
+        # plain names can chain, so a computed target falls back to
+        # separate statements.
+        if any(t.startswith('getattr(') for t in targets[:-1]):
+            value = targets[-1]
+            return [pad + _assign(t, value) for t in targets[:-1]]
+        return [pad + ' = '.join(targets)]
+
+    def try_scatter(self) -> Optional[List[str]]:
+        """
+        Parse `{a, ?b = d, @rest} = expr`, or give up and return None.
+
+        MOO's scatter has three item kinds: required, optional (with an
+        optional default), and rest.  Python unpacking covers required and
+        rest exactly; it has nothing for optionals, because it raises when
+        the right-hand side is too short rather than leaving a name unbound.
+        Those are marked rather than approximated -- silently binding a
+        default that MOO would have left unset is the sort of difference
+        that surfaces much later.
+        """
+        self.expect('{')
+        names, optional, rest = [], [], None
+        while not self.at('}'):
+            if self.at('@'):
+                self.next()
+                rest = self.next()[1]
+            elif self.at('?'):
+                self.next()
+                nm = self.next()[1]
+                default = None
+                if self.at('='):
+                    self.next()
+                    default = self._paren(self.expr)
+                optional.append((nm, default))
+                names.append(nm)
+            else:
+                k, t, _ = self.peek()
+                if k != 'name':
+                    return None
+                self.next()
+                names.append(t)
+            if self.at(','):
+                self.next()
+                continue
+            break
+        if not self.at('}'):
+            return None
+        self.next()
+        if not self.at('='):
+            return None            # a list literal, not a scatter target
+        self.next()
+        value = self.expr()
+        self.eat_semi()
+
+        required = [n for n in names if n not in {o[0] for o in optional}]
+        target = ', '.join(required + ([f'*{rest}'] if rest else []))
+        out = []
+        if optional:
+            for nm, default in optional:
+                out.append(self.mark(
+                    f'optional scatter target {nm!r}'
+                    + (f' defaulting to {default}' if default else '')
+                    + ': Python unpacking has no equivalent, set it by hand'))
+        if not target:
+            return out + [f'# {value}']
+        return out + [f'{target} = {value}']
 
     def _refuse(self, indent, word) -> List[str]:
         """Consume a construct we will not translate, and mark it."""
@@ -465,6 +556,10 @@ class Porter:
         if t == '{':
             items = self.arglist('}')
             return '[' + ', '.join(items) + ']'
+        if k == 'dollar':
+            if not self.receiver:
+                raise MooSyntaxError(f'line {ln}: $ outside an index')
+            return f'len({self.receiver[-1]})'
         if k == 'name':
             return VARIABLES.get(t, t)
         raise MooSyntaxError(f'line {ln}: unexpected {t!r}')
@@ -473,13 +568,30 @@ class Porter:
         while True:
             if self.at('.'):
                 self.next()
+                if self.at('('):
+                    # obj.(expr) -- the property name is computed.
+                    self.next()
+                    name = self._paren(self.expr)
+                    self.expect(')')
+                    val = f'getattr({val}, {name})'
+                    continue
                 k, t, ln = self.next()
-                if k == 'string':          # obj.("name") -- dynamic
-                    self.mark('dynamic property name; getattr() it')
-                    return f'getattr({val}, {t})'
+                if k == 'string':          # obj."name"
+                    val = f'getattr({val}, {t})'
+                    continue
                 val = f'{val}.{t}'
             elif self.at(':'):
                 self.next()
+                # obj:(expr)(args) -- the verb name is computed.
+                if self.at('('):
+                    self.next()
+                    vname = self._paren(self.expr)
+                    self.expect(')')
+                    self.expect('(')
+                    args = self.arglist(')')
+                    inner = ''.join(f', {a}' for a in args)
+                    val = f'call_verb({val}, {vname}{inner})'
+                    continue
                 name = self.next()[1]
                 self.expect('(')
                 args = self.arglist(')')
@@ -502,16 +614,25 @@ class Porter:
                     val = f"call_verb({val}, '{name}'{inner})"
             elif self.at('['):
                 self.next()
-                lo = self.expr()
-                if self.at('..'):
-                    self.next()
-                    hi = self.expr()
-                    self.expect(']')
-                    # 1-based and inclusive both ends -> [lo-1:hi]
-                    val = f'{val}[{_minus1(lo)}:{hi}]'
-                else:
-                    self.expect(']')
-                    val = f'{val}[{_minus1(lo)}]'
+                # Inside an index, a bare $ is MOO for "the length of the
+                # thing being indexed", so x[$] is the last element and
+                # x[2..$] runs to the end.
+                self.receiver.append(val)
+                self.depth += 1
+                try:
+                    lo = self.expr()
+                    if self.at('..'):
+                        self.next()
+                        hi = self.expr()
+                        self.expect(']')
+                        # 1-based, inclusive both ends -> [lo-1:hi]
+                        val = f'{val}[{_minus1(lo)}:{hi}]'
+                    else:
+                        self.expect(']')
+                        val = f'{val}[{_minus1(lo)}]'
+                finally:
+                    self.depth -= 1
+                    self.receiver.pop()
             elif self.at('('):
                 self.next()
                 args = self.arglist(')')
@@ -563,16 +684,14 @@ class Porter:
                 f'on obj.verbs, with .names/.owner/.perms/.code',
                 f'{fn}({joined})')
         if fn == 'raise':
-            # `raise(E_PERM)` happens to be valid Python as a *statement* --
-            # raise followed by a parenthesised expression -- but MOO also
-            # uses it as an operand (`expr || raise(E_PERM)`), where Python
-            # has no equivalent because raise is a statement.
-            if self.depth:
-                return self.mark_expr(
-                    'raise() used inside an expression; Python can only '
-                    'raise as a statement, so restructure this',
-                    f'raise({joined})')
-            return f'raise {joined}'
+            # Python can only raise as a statement.  statement() handles the
+            # case where raise() *is* the whole statement; anywhere else --
+            # `expr || raise(E_PERM)` is the common MOO idiom -- there is no
+            # equivalent, so it is marked rather than emitted inline.
+            return self.mark_expr(
+                'raise() inside an expression; Python raises only as a '
+                'statement, so restructure this',
+                f'raise({joined})')
         if fn == 'caller_perms':
             return 'caller'
         if fn == 'is_player':
@@ -642,6 +761,20 @@ class Porter:
         if fn in BUILTINS and BUILTINS[fn]:
             return f'{BUILTINS[fn]}({joined})'
         return f'{fn}({joined})'
+
+
+
+def _assign(target: str, value: str) -> str:
+    """
+    An assignment statement, allowing for computed property names.
+
+    `this.(verb) = x` translates its left side to getattr(this, verb),
+    which cannot be assigned to.  Python spells that setattr().
+    """
+    m = re.fullmatch(r'getattr\((.*), (.*)\)', target, re.S)
+    if m:
+        return f'setattr({m.group(1)}, {m.group(2)}, {value})'
+    return f'{target} = {value}'
 
 
 def _minus1(expr: str) -> str:
