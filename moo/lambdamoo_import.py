@@ -347,7 +347,12 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
             report['objects'] += 1
             names = property_names_for(src, ldb)
             for i, (value, _o, _p) in enumerate(src.propvals):
-                if value is not None and i < len(names):
+                if i >= len(names):
+                    break
+                # Same rule as the real pass: a declared-but-unset
+                # property is carried, an inherited-and-not-overridden
+                # one is not.
+                if value is not None or names[i] in (src.propdefs or ()):
                     report['properties'] += 1
             report['verbs'] += len(src.verbs)
             if not translate:
@@ -409,10 +414,23 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
         for i, (value, _powner, pperms) in enumerate(src.propvals):
             if i >= len(names):
                 break
-            # A clear value means "inherit", which is what an absent
-            # MegaMOO property already means.  Writing it would turn an
-            # inherited value into a local None.
-            if value is None:
+            # A clear value means one of two different things, and the
+            # difference is what this has to tell apart.
+            #
+            # On a slot the object *inherits*, clear means "I do not
+            # override this" -- and an absent MegaMOO property already
+            # means that, so writing one would turn an inherited value
+            # into a local None.  Skip it.
+            #
+            # On a property the object *declares itself*, clear means "this
+            # property exists here and is unset", which is an ordinary MOO
+            # state: @show lists it and reading it gives none rather than
+            # E_PROPNF.  Skipping those lost them entirely -- 716 of them
+            # across JHCore, including $module, $mcp and $local, which #0
+            # declares and leaves unset.  They are created with a null
+            # value so the declaration survives.
+            declares_it = names[i] in (src.propdefs or ())
+            if value is None and not declares_it:
                 continue
             perms = ''.join(['r' if pperms & PF_READ else '',
                              'w' if pperms & PF_WRITE else '']) or 'r'
