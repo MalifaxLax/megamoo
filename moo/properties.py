@@ -214,6 +214,54 @@ class MOOError(Exception):
         return hash(self.code)
 
 
+
+class PropertyNotFound(MOOError, AttributeError):
+    r"""
+    MOO's ``E_PROPNF``: a property that is not defined.
+
+    It is both errors on purpose.
+
+    As a :class:`MOOError` it is what ported MOO code expects -- MOO code
+    is written knowing that reading a missing property raises, and
+    ``\`x.foo ! E_PROPNF => 0'`` and ``except E_PROPNF`` both work because
+    of it.
+
+    As an ``AttributeError`` it is what *Python* expects, which is what
+    makes the engine's own code readable again.  ``getattr(obj, name,
+    default)`` and ``hasattr(obj, name)`` are built on AttributeError, so
+    both start working the moment this inherits from it.  Before, a
+    missing property came back as a falsy sentinel and ``getattr``'s
+    default was unreachable -- a trap that had to be remembered rather
+    than one the language handled.
+
+    So the same raise serves both: a MOO verb catches it as E_PROPNF, and
+    engine Python reads through it with the ordinary idiom.
+    """
+
+    def __init__(self, message: str = ''):
+        """
+        Args:
+            message: What was missing, for the human reading the traceback.
+                The code is always ``E_PROPNF``; unlike its base class this
+                does not take one, because there is only one error it can
+                be.
+        """
+        super().__init__('E_PROPNF', message)
+
+    def __str__(self) -> str:
+        """
+        The code, with what was missing appended.
+
+        MOOError prints as its bare code, which is right for a value that
+        MOO code compares and stores.  This one is nearly always read by a
+        person looking at a traceback, and 'E_PROPNF' alone does not say
+        which property on which object -- which is the only thing they
+        need.  Equality and ``.code`` are untouched, so MOO-side
+        comparisons behave exactly as before.
+        """
+        return f'{self.code}: {self.message}' if self.message else self.code
+
+
 # =============================================================================
 # PropertyInfo -- Property Specification Parsing / Formatting
 # =============================================================================

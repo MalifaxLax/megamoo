@@ -467,7 +467,7 @@ def puppet(target: Union[int, MOOObject]) -> bool:
 
     # Save active tickers before storing, then unsubscribe them so
     # they don't fire while the object is in storage.
-    active_tickers = current_player.tickers
+    active_tickers = getattr(current_player, 'tickers', None)
     if active_tickers:
         current_player.saved_tickers = list(active_tickers)
         ticker_remove_all(current_player)
@@ -616,7 +616,10 @@ def unpuppet(obj: Union[int, MOOObject, None] = None):
             clear_verb_context(token)
 
     # Save active tickers before storing, then unsubscribe
-    active_tickers = obj_instance.tickers
+    # getattr, not a bare read: tickers is only declared once a
+    # character has subscribed to one, so a bot that never did does
+    # not have the property at all.
+    active_tickers = getattr(obj_instance, 'tickers', None)
     if active_tickers:
         obj_instance.saved_tickers = list(active_tickers)
         ticker_remove_all(obj_instance)
@@ -896,7 +899,12 @@ def _send_room_gmcp(obj, dest_num):
         obj (MOOObject): The object that just moved.
         dest_num (int): The destination room's object number.
     """
-    if not obj.is_char and not obj.is_player:
+    # getattr with a default, not a bare read: is_char is declared on the
+    # character prototypes, so an object that is not one does not have it
+    # at all.  This used to work by accident, because a missing property
+    # returned a falsy sentinel; now that it raises E_PROPNF -- which is
+    # also an AttributeError -- the ordinary Python idiom says it properly.
+    if not getattr(obj, 'is_char', False) and not getattr(obj, 'is_player', False):
         return
     try:
         from .network import get_connection_for_player

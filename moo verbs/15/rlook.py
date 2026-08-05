@@ -49,7 +49,11 @@ for obj in clist:
             if obj.objnum not in furn_sitters[tbl]:
                 furn_sitters[tbl].append(obj.objnum)
 for obj in clist:
-    sitters = obj.sitters
+    # getattr, not a bare read: sitters belongs to furniture,
+    # and a rock is not furniture.  This used to work because a
+    # missing property came back falsy; now it raises E_PROPNF,
+    # which is what MOO does and what makes a typo visible.
+    sitters = getattr(obj, 'sitters', None)
     if sitters and isinstance(sitters, list):
         room_nums = {c.objnum for c in clist}
         room_nums.add(player.objnum)

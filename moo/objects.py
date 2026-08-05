@@ -218,21 +218,6 @@ class _NullAttr:
     a non-number returns ``NotImplemented`` and so still raises, because
     ``obj.name > 5`` is a real mistake rather than a missing value.
 
-    Ordering is where the forgiveness stops, and that edge has one trap
-    worth knowing.  ``max()`` and ``min()`` *return one of their
-    arguments* rather than computing a new value, so::
-
-        max(pobj.no_such_prop, 0)   # -> the sentinel, not 0
-
-    The comparison inside ``max`` is right -- the sentinel orders as zero
-    -- but the value handed back is still the sentinel, which then
-    travels on and raises somewhere else entirely.  Write
-    ``max(pobj.prop or 0, 0)`` when the result is used as a number.
-    Arithmetic dunders are deliberately *not* defined: a missing property
-    inside a sum is usually a misspelled property name, and that should
-    fail loudly at the point of the mistake rather than quietly read as
-    zero.
-
     A single module-level instance (``_null_attr``) is reused for all
     missing-property returns to avoid unnecessary allocations.
 
@@ -863,8 +848,27 @@ class MOOObject:
             raise AttributeError(
                 f"'{type(self).__name__}' object has no attribute '{name}'"
             )
-        # Missing MOO property — return _null_attr (falsy, safely callable)
-        return _null_attr
+        # Missing MOO property.  MOO raises E_PROPNF here, and so do we.
+        #
+        # This used to return a falsy sentinel so that `if pobj.rt > 0:`
+        # worked without declaring rt anywhere.  That is convenient and it
+        # is wrong, in the way that costs most: a misspelled property name
+        # reads as nothing and travels, and the failure surfaces somewhere
+        # else entirely.  It also broke every port of MOO code, since MOO
+        # code is written knowing a missing property is an error -- the
+        # backtick catch `x.foo ! E_PROPNF => 0' had to be special-cased
+        # in catch() to work at all, which was the sign that the two
+        # models were fighting.
+        #
+        # The replacement for the old idiom is to declare the property
+        # with a default on the parent, which is what MOO does and what
+        # the prototype hierarchy is for.
+        # PropertyNotFound is both a MOOError and an AttributeError, so
+        # a ported verb catches it as E_PROPNF and engine Python reads
+        # through it with getattr(obj, name, default) as usual.
+        from .properties import PropertyNotFound
+        raise PropertyNotFound(
+            f'E_PROPNF: #{self.objnum}.{name} is not defined')
     
     def _make_verb_callable(self, verb_name: str, db):
         """

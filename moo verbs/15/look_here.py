@@ -57,7 +57,11 @@ for obj in all_contents:
 
 # Also check furniture sitters lists (catches all cases)
 for obj in all_contents:
-    sitters = obj.sitters
+    # getattr, not a bare read: sitters belongs to furniture,
+    # and a rock is not furniture.  This used to work because a
+    # missing property came back falsy; now it raises E_PROPNF,
+    # which is what MOO does and what makes a typo visible.
+    sitters = getattr(obj, 'sitters', None)
     if sitters and isinstance(sitters, list):
         room_nums = {c.objnum for c in all_contents}
         room_nums.add(player.objnum)
