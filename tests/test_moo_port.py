@@ -146,7 +146,16 @@ def test_string_utils_becomes_su():
 
 def test_boolean_operators():
     r = py('if (a && b || !c)\n  x = 1;\nendif')
-    assert 'a and b or not c' in r.code
+    # Parenthesised on purpose: MOO gives && and || the same precedence,
+    # Python does not, so `a && b || !c` must stay ((a and b) or not c)
+    # rather than being reread as a and (b or not c).
+    assert '((a and b) or not c)' in r.code
+
+
+def test_and_or_keep_moo_precedence():
+    # mooR's table gives || and && the same binding power, left-assoc.
+    assert '((a or b) and c)' in py('x = a || b && c;').code
+    assert '((a and b) or c)' in py('x = a && b || c;').code
 
 
 def test_bare_string_becomes_a_comment():

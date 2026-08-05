@@ -501,8 +501,13 @@ class Porter:
         return out
 
     # -- expressions ------------------------------------------------------
+    #: Precedence, loosest first, following mooR's binding-power table.
+    #: `||` and `&&` share a level there -- both (3, 4), left-associative --
+    #: where Python binds `and` tighter than `or`.  They are kept together
+    #: here and the result parenthesised, so `a || b && c` stays
+    #: `(a or b) and c` instead of being reread as `a or (b and c)`.
     BIN = [
-        (('||',), 'or'), (('&&',), 'and'),
+        (('||', '&&'), None),
         (('==', '!=', '<', '>', '<=', '>=', 'in'), None),
         (('+', '-'), None), (('*', '/', '%'), None),
     ]
@@ -557,6 +562,12 @@ class Porter:
             if k == 'op' and t in ops:
                 op = self.next()[1]
                 right = self.binary(level + 1)
+                if op in ('||', '&&'):
+                    # Parenthesised because MOO and Python disagree about
+                    # how these two bind relative to each other.
+                    py = 'or' if op == '||' else 'and'
+                    left = f'({left} {py} {right})'
+                    continue
                 # `typeof(x) == LIST` is how MOO asks about a type, and it
                 # is the only place its type constants appear.  Turn the
                 # whole comparison into an isinstance(), rather than emit
@@ -977,6 +988,43 @@ def undefined_names(code: str) -> List[str]:
     return sorted(used - assigned - _known_names())
 
 
+
+def structure_of(source: str) -> dict:
+    """Count the control flow in MOO source, from its tokens."""
+    counts = {'if': 0, 'for': 0, 'while': 0, 'return': 0}
+    try:
+        for kind, text, _ in tokenise(source):
+            if kind == 'name' and text in counts:
+                counts[text] += 1
+    except MooSyntaxError:
+        return {}
+    return counts
+
+
+def structure_of_python(code: str) -> dict:
+    """The same counts for the translated Python."""
+    body = '\n'.join(l for l in code.splitlines()
+                      if not l.strip().startswith('#'))
+    counts = {'if': 0, 'for': 0, 'while': 0, 'return': 0}
+    if not body.strip():
+        return counts
+    try:
+        tree = ast.parse('def _v():\n' +
+                         '\n'.join('    ' + l for l in body.splitlines()))
+    except SyntaxError:
+        return {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.If):
+            counts['if'] += 1
+        elif isinstance(node, (ast.For, ast.AsyncFor)):
+            counts['for'] += 1
+        elif isinstance(node, ast.While):
+            counts['while'] += 1
+        elif isinstance(node, ast.Return):
+            counts['return'] += 1
+    return counts
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -1007,6 +1055,24 @@ def port(source: str) -> PortResult:
     # up the first time the verb ran.  So the last step is to look up every
     # free name in the real verb namespace and mark the ones that are not
     # in it.
+    # mooR proves its parser lost nothing by round-tripping: parse,
+    # unparse, parse again, compare the trees.  Python cannot be unparsed
+    # back to MOO, but the same property is worth checking -- a translation
+    # claiming to be complete should still contain the control flow it
+    # started with.  A mismatch means the parser quietly swallowed
+    # something, which is the one failure that leaves no trace.
+    if not p.marks:
+        was, now = structure_of(source), structure_of_python('\n'.join(lines))
+        if was and now:
+            # `elseif` becomes a nested If in Python's tree, so if-counts
+            # legitimately differ; the rest should match exactly.
+            for kind in ('for', 'while', 'return'):
+                if was.get(kind, 0) != now.get(kind, 0):
+                    p.marks += 1
+                    p.note(f'{was.get(kind, 0)} {kind} in the source but '
+                           f'{now.get(kind, 0)} in the translation -- '
+                           f'something was dropped, check this by hand')
+
     for name in undefined_names('\n'.join(lines)):
         p.marks += 1
         p.note(f"'{name}' is not defined anywhere a verb can see; it is "
