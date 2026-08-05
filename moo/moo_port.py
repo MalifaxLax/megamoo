@@ -297,6 +297,8 @@ class Porter:
         self.toks = tokenise(src)
         self.i = 0
         self.notes: List[str] = []
+        #: One per note, parallel: a snippet to find it by, or None.
+        self.locators: List[Optional[str]] = []
         self.marks = 0
         #: Modules the translation needs that a verb namespace
         #: does not already provide.  Emitted as imports rather
@@ -357,17 +359,31 @@ class Porter:
             raise MooSyntaxError(f"line {ln}: expected {text!r}, got {t!r}")
         return t
 
-    def note(self, msg):
+    def note(self, msg, find=None):
+        """
+        Record something a human should see.
+
+        Args:
+            msg: What to tell them.
+            find: A snippet of the *emitted Python* this note is about.
+                port() looks it up afterwards and puts the line number on
+                the front, which is the difference between "something in
+                this verb needs attention" and a place to put the cursor.
+                The verb is Python by the time anyone reads it, so the
+                output line is the useful one -- the MOO line it came from
+                no longer exists to be edited.
+        """
         if msg not in self.notes:
             self.notes.append(msg)
+            self.locators.append(find)
 
-    def mark(self, msg) -> str:
+    def mark(self, msg, find=None) -> str:
         """Mark something for a human.  Safe only at end of statement."""
         self.marks += 1
-        self.note(msg)
+        self.note(msg, find=find)
         return f"{MARK} {msg}"
 
-    def mark_expr(self, msg: str, original: str) -> str:
+    def mark_expr(self, msg: str, original: str, find=None) -> str:
         """
         Mark something *inside* an expression.
 
@@ -377,7 +393,7 @@ class Porter:
         header reproduces.
         """
         self.marks += 1
-        self.note(f'{msg}  --  was: {original}')
+        self.note(f'{msg}  --  was: {original}', find=find)
         return 'None'
 
 
@@ -1307,7 +1323,7 @@ class Porter:
                 self.mark_expr(
                     f'${name} is not defined on #0; whatever it refers to '
                     f'has not been brought across yet',
-                    f'${name}')
+                    f'${name}', find=f'sysobj({name!r})')
             return f'sysobj({name!r})'
         if t == '(':
             e = self._paren(self.expr)
@@ -1600,7 +1616,7 @@ class Porter:
                 f'{fn}() is not a builtin here; it is wrapped in '
                 f'call_function so the verb still loads, and will raise '
                 f'naming {fn} if that line runs',
-                f'{fn}({joined})')
+                f'{fn}({joined})', find=f'call_function({fn!r}')
             args = f', {joined}' if joined else ''
             return f'call_function({fn!r}{args})'
         return f'{fn}({joined})'
@@ -1806,6 +1822,41 @@ def _missing_shim_methods(code: str):
     return sorted(out)
 
 
+def _line_of(lines, needle) -> Optional[int]:
+    """
+    The 1-based line in *lines* holding *needle*, or None.
+
+    Comment lines are skipped so a note does not point at the header
+    describing it, and the first match wins: a name used three times is
+    reported once, at the place someone would start reading.
+
+    Args:
+        lines: The emitted body, without the header.
+        needle: A snippet to look for, or None.
+
+    Returns:
+        The line number, or None when there is nothing to find or the
+        snippet does not appear -- some notes are about the verb as a
+        whole and genuinely have no line.
+    """
+    if not needle:
+        return None
+    # Word boundaries at *both* ends.  Anchoring only the start made the
+    # needle 'a' match inside 'args', so a note about an undefined `a`
+    # pointed at `name = args` -- confidently, and at the wrong line.
+    # The trailing boundary is skipped when the needle already ends in a
+    # non-word character, as `call_function('read'` does, since \b after
+    # a quote would never match.
+    tail = r'\b' if needle[-1:].isalnum() or needle[-1:] == '_' else ''
+    pattern = re.compile(r'\b' + re.escape(needle) + tail)
+    for i, line in enumerate(lines, 1):
+        if line.lstrip().startswith(MARK):
+            continue
+        if pattern.search(line):
+            return i
+    return None
+
+
 def _will_not_parse(code: str) -> Optional[str]:
     """
     Why the translated code is not valid Python, if it is not.
@@ -2007,13 +2058,14 @@ def port(source: str, resolve=None, maps: bool = False) -> PortResult:
     for name in undefined_names('\n'.join(lines)):
         p.marks += 1
         p.note(f"'{name}' is not defined anywhere a verb can see; it is "
-               f"probably a MOO builtin with no equivalent here")
+               f"probably a MOO builtin with no equivalent here", find=name)
 
     for recv, meth in _missing_shim_methods('\n'.join(lines)):
         p.marks += 1
         p.note(f'{recv}.{meth}() is not implemented; ${_SHIM_NAMES[recv]} '
                f'has this method in a real MOO and the port of it here '
-               f'does not, so this line will fail when it runs')
+               f'does not, so this line will fail when it runs',
+               find=f'{recv}.{meth}')
 
     # Does the output actually parse?
     #
@@ -2047,9 +2099,19 @@ def port(source: str, resolve=None, maps: bool = False) -> PortResult:
     if emitted > p.marks:
         p.marks = emitted
 
+    # Put a line number on every note we can place.  The numbering is of
+    # the finished verb -- header included -- because that is the file a
+    # person opens, and "line 34" has to mean line 34 of what they are
+    # looking at.
+    header_len = (len(p.notes) + 2) if p.notes else 0
+    located = []
+    for note, find in zip(p.notes, p.locators + [None] * len(p.notes)):
+        n = _line_of(lines, find)
+        located.append(f'line {n + header_len}: {note}' if n else note)
+
     header = []
     if p.notes:
         header = [f'{MARK} {len(p.notes)} thing(s) here need a human:']
-        header += [f'{MARK}   - {n}' for n in p.notes]
+        header += [f'{MARK}   - {n}' for n in located]
         header += ['']
-    return PortResult('\n'.join(header + lines) + '\n', p.notes, p.marks)
+    return PortResult('\n'.join(header + lines) + '\n', located, p.marks)

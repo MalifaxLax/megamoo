@@ -1011,3 +1011,58 @@ def test_an_unbound_shim_name_is_still_checked():
     # The check still has to fire when the receiver really is the shim.
     r = port('x = $string_utils:pronoun_sub(argstr);')
     assert any('not implemented' in n for n in r.notes)
+
+
+# --------------------------------------------------------------------------
+# Notes carry a line number
+# --------------------------------------------------------------------------
+
+def test_a_note_says_which_line():
+    # "something in this verb needs attention" is not as useful as a place
+    # to put the cursor, and the translator knows the place.
+    r = port('x = 1;\ny = 2;\nz = frobnicate(argstr);')
+    note = next(n for n in r.notes if 'frobnicate' in n)
+    assert note.startswith('line ')
+
+
+def test_the_line_number_counts_the_header_too():
+    # The header is part of the verb a person opens, so "line 5" has to
+    # mean line 5 of what they are looking at.
+    r = port('x = 1;\ny = 2;\nz = frobnicate(argstr);')
+    note = next(n for n in r.notes if 'frobnicate' in n)
+    lineno = int(note.split()[1].rstrip(':'))
+    assert 'call_function' in r.code.splitlines()[lineno - 1]
+
+
+def test_a_note_about_the_whole_verb_has_no_line():
+    # Some notes genuinely have no line -- a break that leaves an
+    # enclosing loop is about the verb's shape, not a place in it -- and
+    # inventing a number would be worse than leaving it off.
+    r = port('if (this:parts()[1] = 5)\n  x = 1;\nendif')
+    note = next(n for n in r.notes if 'rebound' in n)
+    assert not note.startswith('line ')
+
+
+def test_the_line_skips_the_header_when_searching():
+    # The header names the very thing being searched for, so an unguarded
+    # search would always point at the note describing the problem.
+    r = port('x = frobnicate(argstr);')
+    note = next(n for n in r.notes if 'frobnicate' in n)
+    lineno = int(note.split()[1].rstrip(':'))
+    assert not r.code.splitlines()[lineno - 1].lstrip().startswith('# PORT:')
+
+
+def test_a_short_name_does_not_match_inside_a_longer_one():
+    # Anchoring only the start of the needle made 'a' match inside 'args',
+    # so a note about an undefined `a` pointed at `name = args` -- at the
+    # wrong line, confidently.
+    from moo.moo_port import _line_of
+    assert _line_of(['name = args', 'x = a + 1'], 'a') == 2
+
+
+def test_a_needle_ending_in_punctuation_still_matches():
+    # A trailing \b after a quote would never match, so it is only added
+    # when the needle ends in a word character.
+    from moo.moo_port import _line_of
+    assert _line_of(['x = 1', "y = call_function('read')"],
+                    "call_function('read'") == 2

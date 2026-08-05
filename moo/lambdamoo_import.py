@@ -290,7 +290,20 @@ actually carry one would match all of them -- which is exactly what
 happened, and made the search useless on an import of 1695 verbs.
 """'''
     footer = ('\n\n# --- original MOO source, for reference ---\n' + original)
-    return f'{header}\n\n{result.code.rstrip()}\n{footer}\n', result.marks
+
+    # Shift the line numbers in the notes by the header we are adding.
+    #
+    # port() numbers against its own output, which is right for @port,
+    # where that *is* the verb.  Here the verb gains a docstring first, so
+    # every number was short by the header's length and pointed into the
+    # provenance block -- "line 4" landing on the word "Original" while
+    # the code it meant was at line 35.  A wrong line number is worse than
+    # none: it sends someone to the wrong place with confidence.
+    offset = len(header.splitlines()) + 1
+    body = re.sub(r'\bline (\d+):',
+                  lambda m: f'line {int(m.group(1)) + offset}:',
+                  result.code.rstrip())
+    return f'{header}\n\n{body}\n{footer}\n', result.marks
 
 
 def closure_for(ldb: LambdaDB, roots, max_objects: int = 500):
@@ -661,10 +674,12 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                         # The note itself is the thing worth carrying --
                         # it is usually enough to fix from without opening
                         # the verb at all.
-                        notes = [ln.split('-', 1)[1].strip()
+                        # The notes now carry their own line numbers,
+                        # so the report is just the first one verbatim.
+                        notes = [ln.split('- ', 1)[1].strip()
                                  for ln in vcode.splitlines()
                                  if ln.lstrip().startswith(MARK_TEXT)
-                                 and '-' in ln
+                                 and '- ' in ln
                                  and 'thing(s) here need' not in ln]
                         first = notes[0] if notes else 'see the # PORT: lines'
                         if len(first) > 62:
