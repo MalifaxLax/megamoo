@@ -644,8 +644,15 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                     report['ported'] += 1
                     if marks:
                         report['ported_with_marks'] += 1
+                        # The number this database gave it, not the one
+                        # it had in the source.  The list exists to be
+                        # looked up, and every object was renumbered on
+                        # the way in -- reporting #6 sent people to their
+                        # own #6, which is a different object entirely
+                        # and usually has no verbs at all.
                         report['marked_verbs'].append(
-                            f"#{src.objid}:{clean[0]} ({marks})")
+                            f"#{obj.objnum}:{clean[0]} ({marks})"
+                            f"  %<245>was #{src.objid}%n")
                 else:
                     report['unported'] += 1
             except Exception as err:
