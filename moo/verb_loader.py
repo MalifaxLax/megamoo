@@ -97,7 +97,11 @@ def resolve_verb_base_path(db) -> Optional[str]:
     Returns:
         The absolute path, or ``None`` if the property is unset.
     """
-    verb_path = getattr(db.get_object(8), 'moo_verb_path', None)
+    from .object_utils import system_ref
+    verb_path = system_ref(db, 'moo_verb_path')
+    if not verb_path:
+        holder = system_ref(db, 'config', fallback_objnum=8)
+        verb_path = getattr(holder, 'moo_verb_path', None)
     if not verb_path:
         return None
     return os.path.expanduser('~/' + verb_path.replace('.', '/'))

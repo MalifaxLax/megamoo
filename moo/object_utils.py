@@ -595,3 +595,41 @@ def all_verbs(obj) -> list:
                     seen.add(name)
                     out.append(name)
     return out
+
+
+def system_ref(db, name, fallback_objnum=None):
+    """
+    Resolve a ``$ref`` -- a property on #0 -- to whatever it holds.
+
+    The engine used to reach for object numbers directly: the verb tree's
+    location was on #8, player storage was #2, and both were written into
+    the code.  That made those two numbers part of the engine's contract
+    with every database, which is a strange thing for an engine to require
+    when it already has a perfectly good name-to-object mechanism.
+
+    Now they are ``$refs`` like everything else, which means a minimal
+    database is #0 and #1 and nothing more.
+
+    Args:
+        db: The database.
+        name: The property name on #0.
+        fallback_objnum: Where to look if #0 does not define it.  This is
+            how databases built before the move keep working: they have the
+            object at its old number and no $ref pointing at it.
+
+    Returns:
+        The value, or None.
+    """
+    try:
+        zero = db.get_object(0)
+    except Exception:
+        zero = None
+    value = getattr(zero, name, None) if zero is not None else None
+    if value is not None and repr(value) != 'None':
+        return value
+    if fallback_objnum is None:
+        return None
+    try:
+        return db.get_object(fallback_objnum)
+    except Exception:
+        return None

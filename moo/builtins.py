@@ -539,7 +539,8 @@ def puppet(target: Union[int, MOOObject]) -> bool:
 
     logger.info(f"puppet(): conn.player_obj=#{conn.player_obj.objnum}, conn={id(conn)}")
 
-    storage = _database.get_object(2)  # #2 PlayerObjectDB
+    from .object_utils import system_ref
+    storage = system_ref(_database, 'player_db', fallback_objnum=2)
 
     # --- Store the current active object ---
     # Fire on_unpuppet hook before storing
@@ -671,7 +672,8 @@ def unpuppet(obj: Union[int, MOOObject, None] = None):
         obj, _, _ = ctx
 
     obj_instance = obj if isinstance(obj, MOOObject) else _database.get_object(obj)
-    storage = _database.get_object(2)  # #2 PlayerObjectDB
+    from .object_utils import system_ref
+    storage = system_ref(_database, 'player_db', fallback_objnum=2)
 
     # Guard: skip if already stored in #2 (e.g. shutdown + disconnect double-call)
     if obj_instance._location_id == 2:
@@ -1914,7 +1916,9 @@ def program_verb(pobj, spec: str, db, file_path=None):
 
         # --- Save to file on disk ---
         # Resolve base verb path from #8.moo_verb_path
-        verb_path_prop = getattr(db.get_object(8), 'moo_verb_path', None)
+        from .object_utils import system_ref
+        verb_path_prop = system_ref(db, 'moo_verb_path') or getattr(
+            system_ref(db, 'config', fallback_objnum=8), 'moo_verb_path', None)
         if verb_path_prop:
             base_path = os.path.expanduser('~/' + verb_path_prop.replace('.', '/'))
             save_path = file_path or os.path.join(base_path, str(target.objnum), verb_name + '.py')
