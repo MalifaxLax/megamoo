@@ -49,7 +49,7 @@ __all__ = [
     'setadd', 'setremove',
     # Players and connections
     'players', 'idle_seconds', 'connected_seconds', 'connection_name',
-    'boot_player', 'shutdown',
+    'boot_player', 'shutdown', 'renumber', 'reset_max_object',
     # Properties and verbs
     'is_clear_property', 'clear_property', 'set_verb_info',
     # The server itself
@@ -403,6 +403,72 @@ def shutdown(message: str = '') -> None:
     if who is None or not getattr(who, 'is_wizard', False):
         raise MOOError('E_PERM', 'shutdown() is for wizards')
     shutdown_server(str(message) or 'Server shutting down')
+
+
+# ---------------------------------------------------------------------------
+# Object numbering
+#
+# LambdaMOO hands out object numbers by incrementing a counter, so a
+# recycled number stays a hole until something deliberately fills it.  Its
+# cores grew two builtins to manage that: renumber() to drop an object into
+# the lowest hole, and reset_max_object() to pull the high-water mark back
+# down afterwards.  $recycler:resurrect uses both, one line apart.
+#
+# This engine's allocator scans from zero on every create and reuses
+# recycled numbers as it goes -- see Database.create_object.  So the holes
+# are filled as they are made, and both builtins describe work that is
+# already done by the time they are called.
+#
+# They are implemented rather than left missing because that is the honest
+# answer.  A verb asking for the lowest free number is not wrong to ask,
+# and here it has already got one.
+# ---------------------------------------------------------------------------
+
+def renumber(obj):
+    """
+    MOO's ``renumber()``: give an object the lowest free number.
+
+    Returns the object unchanged, because it already has one.
+
+    This is not a shortcut.  LambdaMOO's renumber does not rewrite any
+    reference to the old number -- not in properties, not in verb code --
+    which is why its own manual limits the call to an object nothing
+    points at yet, in practice one just created.  For that case this
+    engine has already done the work: create_object took the lowest free
+    number to begin with.
+
+    For any *other* case the two servers agree by refusing: LambdaMOO
+    renumbers and leaves every reference dangling, which is a corruption
+    dressed as a feature, and here nothing moves at all.  Doing nothing is
+    the better of the two failures.
+
+    Args:
+        obj: The object.
+
+    Returns:
+        The same object, as MOO returns the renumbered one.
+
+    Raises:
+        MOOError: E_INVARG if *obj* is not an object.
+    """
+    if not hasattr(obj, 'objnum'):
+        raise MOOError('E_INVARG', 'renumber() takes an object')
+    return obj
+
+
+def reset_max_object():
+    """
+    MOO's ``reset_max_object()``: forget object numbers above the highest
+    in use, so they can be handed out again.
+
+    Does nothing, because they never stopped being available: this
+    engine's allocator looks for the lowest free number on every create
+    rather than counting upward from a mark.  See :func:`renumber`.
+
+    Returns:
+        None, as MOO's does.
+    """
+    return None
 
 
 # ---------------------------------------------------------------------------

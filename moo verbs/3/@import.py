@@ -220,6 +220,13 @@ if translate:
     if report['unported']:
         pobj.msg(f"  {report['unported']:>6}  %<245>could not be read as "
                  f"MOO at all; kept inert%n")
+    if report.get('empty'):
+        # Said separately from the line above, because it is not a
+        # problem.  A verb with no program is how a core declares a hook
+        # for its children to override, and lumping the two together
+        # reported LambdaCore's two stubs as translation failures.
+        pobj.msg(f"  {report['empty']:>6}  %<245>defined with no code -- "
+                 f"hook stubs, nothing to translate%n")
 else:
     pobj.msg(f"  {report['verbs']:>6}  %<245>kept inert -- MOO source, for "
              f"porting by hand%n")

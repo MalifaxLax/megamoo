@@ -650,6 +650,40 @@ def test_a_dollar_name_without_arguments_is_still_a_property():
     assert 'call_verb' not in r.code
 
 
+def test_an_unset_name_is_reported_as_a_variable_not_a_builtin():
+    # This note used to guess "probably a MOO builtin with no equivalent
+    # here", which is wrong every time it fires: an undefined *called*
+    # name is wrapped in call_function elsewhere, so what reaches this
+    # path is always a name read as a value.  MOO raises E_VARNF on those,
+    # meaning the line is broken in the original too.
+    r = port('return nosuchthing;')
+    assert r.marks == 1
+    assert 'E_VARNF' in r.notes[0]
+    assert 'builtin' not in r.notes[0]
+
+
+def test_a_misspelled_name_is_matched_against_what_is_in_scope():
+    # LambdaCore and Inferno between them contain plyaer, dobjt, defeneder
+    # and fMont.  Pointing at the name two lines up beats sending somebody
+    # to look for a builtin that was never missing.
+    r = port('player_name = "x"; return player_nmae;')
+    assert 'did you mean player_name' in r.notes[0]
+
+
+def test_a_name_with_no_near_match_gets_no_suggestion():
+    # A guess offered for everything would be worth nothing.
+    r = port('return zzzzqqq;')
+    assert 'did you mean' not in r.notes[0]
+
+
+def test_renumber_and_reset_max_object_are_builtins_now():
+    # Both describe work this engine's allocator has already done, so they
+    # port clean rather than being wrapped in call_function.
+    r = port('o = renumber(x); reset_max_object();')
+    assert 'call_function' not in r.code
+    assert r.code.count('renumber(x)') == 1
+
+
 def test_shutdown_is_a_builtin_now():
     # LambdaCore's @shutdown and make-core-database both end in a call to
     # it, and both ported cleanly apart from this one name.

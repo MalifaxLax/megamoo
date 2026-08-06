@@ -231,6 +231,28 @@ docs/guide/ and the README's "Porting from LambdaMOO" section for the rest.
     return f"{header}\n{body}\n\nreturn None\n"
 
 
+def _why_inert(verb: LambdaVerbDef) -> str:
+    """
+    Which report bucket a verb that did not translate belongs in.
+
+    ``build_ported_verb`` returns no mark count for two quite different
+    reasons, and counting them together made the report say something
+    untrue.  A verb with no program is *normal* -- cores are full of hook
+    stubs defined so a child can override them, and LambdaCore ships two
+    (#10:special_action and #76:check_@prop_flags).  Reporting those as
+    "could not be read as MOO at all" invites somebody to go looking for
+    a translator bug that is not there.
+
+    Args:
+        verb: The verb definition.
+
+    Returns:
+        ``'empty'`` when there was no code to read, ``'unported'`` when
+        there was and it would not parse.
+    """
+    return 'empty' if not (verb.code or '').strip() else 'unported'
+
+
 def build_ported_verb(verb: LambdaVerbDef, objid: int, when: str,
                       resolve=None, keep_source: bool = True):
     """
@@ -453,7 +475,7 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
         'objects': 0, 'properties': 0, 'verbs': 0,
         # Of the verbs, how many arrived as live Python, how many of those
         # still carry marks, and how many could not be read as MOO at all.
-        'ported': 0, 'ported_with_marks': 0, 'unported': 0,
+        'ported': 0, 'ported_with_marks': 0, 'unported': 0, 'empty': 0,
         'marked_verbs': [],
         # $names copied onto this database's #0, and the ones that were
         # already taken and so left alone.
@@ -490,7 +512,7 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                                                  resolve=resolve,
                                                  keep_source=keep_source)
                 if marks is None:
-                    report['unported'] += 1
+                    report[_why_inert(verb)] += 1
                 else:
                     report['ported'] += 1
                     if marks:
@@ -693,7 +715,7 @@ def import_lambda_db(ldb: LambdaDB, db, *, owner: int = 1,
                         report['marked_verbs'].append(
                             f"#{obj.objnum}:{clean[0]}  %<245>{first}{more}%n")
                 else:
-                    report['unported'] += 1
+                    report[_why_inert(verb)] += 1
             except Exception as err:
                 report['failures'].append(
                     f"#{src.objid}:{clean[0]}: {err}")

@@ -34,6 +34,7 @@ mechanical parts only, never about whether the logic is right.
 """
 
 import ast
+import difflib
 import keyword
 import re
 from typing import List, Optional, Tuple
@@ -2015,6 +2016,38 @@ def undefined_names(code: str) -> List[str]:
     return sorted(used - assigned - _known_names())
 
 
+def names_in_scope(code: str) -> set:
+    """
+    Every name the translated code could legitimately have meant.
+
+    That is what the verb assigns plus what the namespace provides -- the
+    pool a misspelling was drawn from.  Used to turn "'plyaer' is not
+    defined" into "did you mean player".
+
+    Args:
+        code: Translated Python.
+
+    Returns:
+        The set of names in scope.  Empty if the code does not parse.
+    """
+    body = '\n'.join(l for l in code.splitlines()
+                      if not l.strip().startswith('#'))
+    if not body.strip():
+        return set()
+    try:
+        tree = ast.parse('def _v():\n' +
+                         '\n'.join('    ' + l for l in body.splitlines()))
+    except SyntaxError:
+        return set()
+    assigned = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            assigned.add(node.id)
+        elif isinstance(node, ast.arg):
+            assigned.add(node.arg)
+    return assigned | _known_names()
+
+
 
 def structure_of(source: str) -> dict:
     """Count the control flow in MOO source, from its tokens."""
@@ -2135,10 +2168,26 @@ def port(source: str, resolve=None, maps: bool = False) -> PortResult:
     if p.needs_import:
         lines = [f'import {m}' for m in sorted(p.needs_import)] + [''] + lines
 
+    # An undefined *called* name is handled elsewhere, and wrapped in
+    # call_function with a note saying so.  What reaches here is a name
+    # being read as a value, and that is a different thing entirely: MOO
+    # raises E_VARNF on an unset variable, so the line is broken in the
+    # original too.
+    #
+    # This used to guess "probably a MOO builtin with no equivalent here",
+    # which is wrong every single time.  Across LambdaCore and Inferno the
+    # note fires on sixty-odd names and not one of them is a builtin --
+    # they are pObj, succ, maxLearned, and three outright typos (plyaer,
+    # dobjt, prestr).  Sending somebody to look for a missing builtin when
+    # the answer is a misspelling two lines up wastes the trip.
+    scope = names_in_scope('\n'.join(lines))
     for name in undefined_names('\n'.join(lines)):
         p.marks += 1
-        p.note(f"'{name}' is not defined anywhere a verb can see; it is "
-               f"probably a MOO builtin with no equivalent here", find=name)
+        near = difflib.get_close_matches(name, scope, n=1, cutoff=0.8)
+        hint = f'; did you mean {near[0]}' if near else ''
+        p.note(f"'{name}' is read but never set, so MOO raises E_VARNF "
+               f"here too -- broken in the original unless the error is "
+               f"deliberate{hint}", find=name)
 
     for recv, meth in _missing_shim_methods('\n'.join(lines)):
         p.marks += 1

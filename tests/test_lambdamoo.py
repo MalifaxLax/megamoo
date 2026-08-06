@@ -345,6 +345,23 @@ def test_inert_verb_survives_source_containing_triple_quotes():
     ast.parse(body)             # comments cannot be escaped out of
 
 
+def test_a_verb_with_no_code_is_not_a_translation_failure():
+    # build_ported_verb returns no mark count for two different reasons,
+    # and counting them together made the report say LambdaCore had two
+    # verbs that "could not be read as MOO at all".  Both are hook stubs
+    # defined with no program -- #10:special_action and
+    # #76:check_@prop_flags -- which is how a core invites a child to
+    # override something, and is not a problem at all.
+    from moo.lambdamoo import LambdaVerbDef
+    from moo.lambdamoo_import import _why_inert
+    stub = LambdaVerbDef(names='special_action', owner=1, perms=173,
+                         prep=-1, code='')
+    broken = LambdaVerbDef(names='x', owner=1, perms=173, prep=-1,
+                           code='if (')
+    assert _why_inert(stub) == 'empty'
+    assert _why_inert(broken) == 'unported'
+
+
 # --------------------------------------------------------------------------
 # Auth derived from a verb's own text
 # --------------------------------------------------------------------------

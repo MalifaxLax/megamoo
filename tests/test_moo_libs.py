@@ -526,6 +526,27 @@ def test_an_engine_failure_is_not_disguised_as_a_moo_error():
         catch(boom, ('ANY',), lambda: 'ok')
 
 
+def test_renumber_returns_the_object_it_was_given():
+    # This engine's allocator takes the lowest free number on every create
+    # and reuses recycled ones, so an object is already renumbered by the
+    # time a verb asks.  LambdaMOO's own renumber rewrites no references
+    # either, which is why its manual limits the call to a new object.
+    from moo.moo_builtins import renumber, reset_max_object
+
+    class Obj:
+        objnum = 7
+    o = Obj()
+    assert renumber(o) is o
+    assert reset_max_object() is None
+
+
+def test_renumber_refuses_a_non_object():
+    from moo.moo_builtins import renumber
+    from moo.properties import MOOError
+    with pytest.raises(MOOError):
+        renumber('not an object')
+
+
 def test_eval_sees_the_same_moo_builtins_a_verb_does():
     # `/` eval is assembled by a different function from the one that
     # assembles a verb namespace, so the two can drift.  They had: the
