@@ -694,20 +694,6 @@ class StringUtils:
     # their place by carrying the name a MOO programmer will search for;
     # anything genuinely identical to a str method is deliberately absent.
 
-    def from_list(self, items, sep=''):
-        """
-        Join *items* with *sep*.  MOO: ``$string_utils:from_list``.
-
-        Non-string items are stringified, matching MOO's willingness to
-        take numbers and object references inline.
-
-        Examples::
-
-            su.from_list(['a', 'b', 'c'], ', ')   # 'a, b, c'
-            su.from_list([1, 2, 3])               # '123'
-        """
-        return str(sep).join(str(i) for i in items)
-
     def english_list(self, items, none_str='nothing', and_str=' and ',
                      sep=', '):
         """
@@ -731,84 +717,6 @@ class StringUtils:
         if len(items) == 2:
             return items[0] + and_str + items[1]
         return sep.join(items[:-1]) + and_str + items[-1]
-
-    def explode(self, subject, break_char=' '):
-        """
-        Split *subject* on *break_char*, discarding empty pieces.
-
-        MOO: ``$string_utils:explode``.  Unlike ``str.split`` this drops
-        empties, so repeated separators do not produce blanks -- which is
-        what the MOO verb does and what callers depend on.
-
-        Examples::
-
-            su.explode('a  b   c')        # ['a', 'b', 'c']
-            su.explode('1,2,,3', ',')     # ['1', '2', '3']
-        """
-        return [p for p in str(subject).split(break_char) if p]
-
-    def words(self, subject):
-        """Split on any whitespace.  MOO: ``$string_utils:words``."""
-        return str(subject).split()
-
-    def first_word(self, subject):
-        """First whitespace-delimited word, or ''.  MOO: ``first_word``."""
-        parts = str(subject).split(None, 1)
-        return parts[0] if parts else ''
-
-    def rest(self, subject):
-        """Everything after the first word.  MOO: ``$string_utils:rest``."""
-        parts = str(subject).split(None, 1)
-        return parts[1] if len(parts) > 1 else ''
-
-    def trim(self, subject):
-        """Strip leading and trailing whitespace.  MOO: ``trim``."""
-        return str(subject).strip()
-
-    def triml(self, subject):
-        """Strip leading whitespace.  MOO: ``triml``."""
-        return str(subject).lstrip()
-
-    def trimr(self, subject):
-        """Strip trailing whitespace.  MOO: ``trimr``."""
-        return str(subject).rstrip()
-
-    def space(self, count, fill=' '):
-        """
-        A run of *count* fill characters.  MOO: ``$string_utils:space``.
-
-        A negative or zero count gives an empty string rather than an
-        error, as the MOO verb does.  If *count* is a string, its length
-        is used -- MOO callers pass either.
-        """
-        if isinstance(count, str):
-            count = len(count)
-        return str(fill) * max(0, int(count))
-
-    def left(self, subject, width, fill=' '):
-        """Pad or truncate to *width*, text at the left.  MOO: ``left``."""
-        s = str(subject)
-        width = int(width)
-        return s[:width] if len(s) >= width else s + str(fill) * (width - len(s))
-
-    def right(self, subject, width, fill=' '):
-        """Pad or truncate to *width*, text at the right.  MOO: ``right``."""
-        s = str(subject)
-        width = int(width)
-        return s[-width:] if len(s) >= width else str(fill) * (width - len(s)) + s
-
-    def centre(self, subject, width, fill=' '):
-        """Centre within *width*.  MOO: ``centre`` (``center`` also works)."""
-        s = str(subject)
-        width = int(width)
-        if len(s) >= width:
-            return s[:width]
-        total = width - len(s)
-        leftpad = total // 2
-        return str(fill) * leftpad + s + str(fill) * (total - leftpad)
-
-    #: American spelling, as LambdaMOO provides both.
-    center = centre
 
     def capitalise(self, subject):
         """
@@ -848,32 +756,6 @@ class StringUtils:
         else:
             suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(abs(n) % 10, 'th')
         return f'{n}{suffix}'
-
-    def group_number(self, n, sep=','):
-        """
-        Insert thousands separators.  MOO: ``$string_utils:group_number``.
-
-        Examples::
-
-            su.group_number(1234567)   # '1,234,567'
-        """
-        return f'{int(n):,}'.replace(',', str(sep))
-
-    def is_numeric(self, subject):
-        """
-        Does *subject* read as a number?  MOO: ``is_numeric``.
-
-        Accepts a leading sign and a decimal point, so it answers for
-        floats as well as integers.
-        """
-        s = str(subject).strip()
-        if not s:
-            return False
-        try:
-            float(s)
-            return True
-        except ValueError:
-            return False
 
     def pluralise(self, word, count=2):
         """
@@ -923,20 +805,6 @@ class StringUtils:
             return parts.index(str(target))
         except ValueError:
             return -1
-
-    def strip_chars(self, subject, chars):
-        """Remove every occurrence of any character in *chars*."""
-        drop = set(str(chars))
-        return ''.join(c for c in str(subject) if c not in drop)
-
-    def strip_all_but(self, subject, chars):
-        """Keep only characters that appear in *chars*."""
-        keep = set(str(chars))
-        return ''.join(c for c in str(subject) if c in keep)
-
-    def char_list(self, subject):
-        """The string as a list of single characters.  MOO: ``char_list``."""
-        return list(str(subject))
 
 # ============================================================================
 # MODULE-LEVEL SINGLETON

@@ -79,6 +79,22 @@ from .objects import MOOObject, ObjectFlags, _null_attr
 from .properties import MOOObjectRef, MOOError
 from .permissions import PermissionChecker
 from .utils import interactive  # noqa: F401 — re-exported for verb code
+# Small, general helpers a verb should be able to call by name.
+#
+# Re-exported here rather than bound in build_verb_namespace because
+# _get_builtin_ns_template() scans this module: one import reaches the verb
+# namespace, the `/` eval namespace and the porting translator's
+# known-names check at once.  Binding them anywhere else would reach one of
+# the three and leave the other two disagreeing, which has happened twice.
+#
+# esub is the substitution every message in the game goes through, and it
+# was reachable only as su.esub -- a needless indirection for the most-used
+# function in the engine.
+from .utils import (  # noqa: F401 — re-exported for verb code
+    article, capitalize_first, elapsed_time, match_pattern, parse_object_ref,
+)
+from .string_utils import su as _su
+esub = _su.esub
 from .verb_context import MAX_VERB_DEPTH
 from .match_utils import (      # noqa: F401 — re-exported for verb code
     omatch, match, match_all, bmatch, pmatch,
