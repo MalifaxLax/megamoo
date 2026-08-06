@@ -736,6 +736,26 @@ class MOOObject:
                     return db.get_object(int(value[1:]))
                 except (KeyError, Exception):
                     pass
+            return value
+        # Inside a list or dict, too.
+        #
+        # A reference only resolved when it was the whole value, so a room
+        # whose `exits` held ['#14079'] got back a list of strings and
+        # rendered "Obvious exits: none" -- every room in an imported world
+        # disconnected, with nothing raising anywhere.
+        #
+        # Only '#N' strings resolve, so a list that genuinely holds numbers
+        # is untouched, and so is one holding objnums the way
+        # _store_objref writes them.  That matters for code ported from a
+        # MOO: there OBJ is its own type, distinct from INT, and code
+        # branches on the difference -- `typeof(elt) == INT` decides
+        # whether an entry is a direction or an exit.  Handing back an
+        # integer where the source had an object silently takes the wrong
+        # branch.
+        if isinstance(value, list):
+            return [self._resolve_objref(v) for v in value]
+        if isinstance(value, dict):
+            return {k: self._resolve_objref(v) for k, v in value.items()}
         return value
 
     def msg_room(self, message: str, exclude=None, **kwargs):
