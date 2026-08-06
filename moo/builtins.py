@@ -94,8 +94,9 @@ from .utils import (  # noqa: F401 — re-exported for verb code
     article, capitalize_first, elapsed_time, match_pattern, parse_object_ref,
 )
 from .object_utils import (  # noqa: F401 — re-exported for verb code
-    all_properties, all_verbs,
+    all_properties, all_verbs, has_property, has_verb, isa,
 )
+from .utils import flatten_list  # noqa: F401 — re-exported for verb code
 from .verb_read import read, read_lines  # noqa: F401 — for verb code
 from .string_utils import su as _su
 esub = _su.esub
