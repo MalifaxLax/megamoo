@@ -248,3 +248,35 @@ def read(who=None, prompt: str = '') -> str:
     if pending.failed:
         raise MOOError(f'read(): {pending.failed}')
     return pending.line or ''
+
+
+def read_lines(max_lines=None, terminator: str = '.') -> list:
+    """
+    Read lines from a player until they type a lone ``.``.
+
+    The shape every editor in every MOO uses, and the one MegaMOO's own
+    @program already implements privately.  MOO's cores spell it
+    ``$command_utils:read_lines()``; ported code calls it thirteen times
+    across LambdaCore, for note text, mail bodies and verb source.
+
+    Args:
+        max_lines: Stop after this many lines, or None for no limit.  MOO
+            takes the same optional cap.
+        terminator: The line that ends input.  A lone ``.`` by convention,
+            and the reason a line of just ``.`` cannot be entered directly.
+
+    Returns:
+        list: The lines, without the terminator.  Empty if the player ended
+        input immediately.
+
+    Note:
+        Blocks the calling verb, on the same machinery as :func:`read` --
+        the verb is parked and the world keeps running.
+    """
+    lines = []
+    while max_lines is None or len(lines) < int(max_lines):
+        line = read()
+        if line is None or line.strip() == terminator:
+            break
+        lines.append(line)
+    return lines

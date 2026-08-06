@@ -96,6 +96,7 @@ from .utils import (  # noqa: F401 — re-exported for verb code
 from .object_utils import (  # noqa: F401 — re-exported for verb code
     all_properties, all_verbs,
 )
+from .verb_read import read, read_lines  # noqa: F401 — for verb code
 from .string_utils import su as _su
 esub = _su.esub
 from .verb_context import MAX_VERB_DEPTH
