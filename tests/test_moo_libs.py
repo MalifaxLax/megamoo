@@ -526,6 +526,32 @@ def test_an_engine_failure_is_not_disguised_as_a_moo_error():
         catch(boom, ('ANY',), lambda: 'ok')
 
 
+def test_eval_sees_the_same_moo_builtins_a_verb_does():
+    # `/` eval is assembled by a different function from the one that
+    # assembles a verb namespace, so the two can drift.  They had: the
+    # eval side saw one of moo_builtins' hundred names, which made it
+    # useless for poking at freshly imported verbs, since ported code is
+    # written entirely in terms of that layer.
+    from moo.builtins import _build_eval_globals
+    from moo import moo_builtins as mb
+    ns = _build_eval_globals({})
+    assert [n for n in mb.__all__ if n not in ns] == []
+
+
+def test_eval_resolves_a_clashing_name_the_way_a_verb_does():
+    # Where both modules define a name, moo_builtins wins in a verb, so it
+    # must win here too.  `random` is the one that bites: moo_builtins has
+    # MOO's random(n), returning 1..n inclusive, while moo.builtins has the
+    # Python *module* of that name -- which is not even callable, so
+    # `/random(6)` failed while random(6) in a verb worked.
+    from moo.builtins import _build_eval_globals
+    from moo import moo_builtins as mb
+    ns = _build_eval_globals({})
+    for name in ('random', 'property_info'):
+        assert ns[name] is getattr(mb, name)
+    assert sorted({ns['random'](6) for _ in range(200)}) == [1, 2, 3, 4, 5, 6]
+
+
 def test_moo_splice_inserts_deletes_and_replaces():
     # MOO uses range assignment for all three, naming an empty range to
     # insert -- LambdaCore's @display does `perms[1..0] = " "`.

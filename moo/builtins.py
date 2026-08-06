@@ -2278,6 +2278,32 @@ def _build_eval_globals(context: dict) -> dict:
         if callable(attr) or isinstance(attr, (str, int, type)):
             ns[name] = attr
 
+    # The MOO compatibility surface -- moo_splice, moo_eq, typeof, sysobj
+    # and the rest of moo_builtins.__all__.
+    #
+    # This is the same pair of injections build_verb_namespace does, in the
+    # same order, so moo_builtins keeps winning over this module where the
+    # two define a name.  Without it the eval namespace saw one of those
+    # hundred names, which made `/` useless for exactly the job it is best
+    # at: poking at a freshly imported verb to find out why it misbehaves.
+    # Ported code is written in terms of this layer, so none of it could be
+    # evaluated by hand.
+    #
+    # It is the second time the two namespaces have quietly disagreed --
+    # see the note on getattr below -- and the failure has the same shape
+    # both times: eval is assembled by a different function from the one
+    # that assembles a verb, so anything added to the verb side has to be
+    # remembered here too.
+    try:
+        from . import moo_files as _mf
+        for _n in _mf.__all__:
+            ns[_n] = getattr(_mf, _n)
+    except ImportError:
+        pass
+    from . import moo_builtins as _mb
+    for _n in _mb.__all__:
+        ns[_n] = getattr(_mb, _n)
+
     # Common Python builtins that verb code expects
     ns.update({
         'len': len, 'str': str, 'int': int, 'float': float, 'bool': bool,
