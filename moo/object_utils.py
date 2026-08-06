@@ -543,3 +543,55 @@ def has_property(obj, name: str) -> bool:
         return getattr(obj, name) != None      # noqa: E711 -- sentinel
     except AttributeError:
         return False
+
+
+def all_properties(obj) -> list:
+    """
+    Every property name defined on *obj* or any of its ancestors.
+
+    MOO's ``$object_utils:all_properties``, which its cores use wherever
+    something has to touch an object's whole property surface -- chowning
+    it, listing its messages, gathering help topics.  MegaMOO had no way to
+    ask, and the question is a fair one.
+
+    Nearest first: the object's own definitions, then up the chain.  A name
+    redefined further down appears once, at the point that wins.
+
+    Args:
+        obj: The object.
+
+    Returns:
+        list: Property names, without duplicates.
+    """
+    out, seen = [], set()
+    for node in (obj,) + tuple(ancestors(obj)):
+        for name in (getattr(node, 'properties', None) or ()):
+            if name not in seen:
+                seen.add(name)
+                out.append(name)
+    return out
+
+
+def all_verbs(obj) -> list:
+    """
+    Every verb name defined on *obj* or any of its ancestors.
+
+    The companion to :func:`all_properties`, and the same shape: nearest
+    first, no duplicates.  A verb with several names contributes each of
+    them, since any of them is what a caller would use.
+
+    Args:
+        obj: The object.
+
+    Returns:
+        list: Verb names, without duplicates.
+    """
+    out, seen = [], set()
+    for node in (obj,) + tuple(ancestors(obj)):
+        for verb in (getattr(node, 'verbs', None) or ()):
+            names = getattr(verb, 'names', None) or []
+            for name in ([names] if isinstance(names, str) else names):
+                if name not in seen:
+                    seen.add(name)
+                    out.append(name)
+    return out

@@ -93,6 +93,9 @@ from .utils import interactive  # noqa: F401 — re-exported for verb code
 from .utils import (  # noqa: F401 — re-exported for verb code
     article, capitalize_first, elapsed_time, match_pattern, parse_object_ref,
 )
+from .object_utils import (  # noqa: F401 — re-exported for verb code
+    all_properties, all_verbs,
+)
 from .string_utils import su as _su
 esub = _su.esub
 from .verb_context import MAX_VERB_DEPTH
@@ -288,6 +291,34 @@ def _call_hook(obj, hook_name: str, args_str: str = '') -> Any:
 # The ``auth_level()`` function extracts the highest level, and
 # ``sync_auth_flags()`` keeps the object's PROGRAMMER / WIZARD flags
 # in sync with the auth list.
+
+
+def connection_host(who) -> str:
+    """
+    Where a player is connected from.
+
+    MOO answers this in two steps -- ``connection_name()`` builds a string
+    like ``"port 7777 from lambda.moo.mud.org, port 34215"`` and
+    ``$string_utils:connection_hostname()`` parses the host back out of it,
+    with a note telling the archwizard to swap in the verb matching their
+    network interface.  LambdaCore does that dance in sixteen places.
+
+    The connection here already knows its host, so there is nothing to
+    format and nothing to parse.  Staff verbs want it for the same reasons
+    LambdaCore did: @who listings, connection logs, site bans.
+
+    Args:
+        who: A player object or object number.
+
+    Returns:
+        str: The hostname or address, or ``''`` if they are not connected.
+    """
+    from .network import get_connection_for_player
+    try:
+        conn = get_connection_for_player(int(getattr(who, 'objnum', who)))
+    except Exception:
+        return ''
+    return str(getattr(conn, 'host', '') or '') if conn is not None else ''
 
 
 def auth_level(obj: Union[int, MOOObject]) -> int:
