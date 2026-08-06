@@ -770,3 +770,43 @@ def defines_verb(obj, name: str) -> bool:
         if name in ([names] if isinstance(names, str) else names):
             return True
     return False
+
+
+def login_room(db):
+    """
+    Where a player lands when they log in.
+
+    Resolved as a ``$ref`` rather than an object number.  It used to be the
+    constant ``LOGIN_ROOM = 14``, which is right for the shipped database
+    and arbitrary everywhere else: in a world built from nothing, #14 is
+    whatever happened to be created fourteenth -- in practice a pooled
+    blank character, so logging in moved the player *into another player*
+    and the first command failed with "look_here not found on
+    PlayerPlace (#14)".
+
+    Order: ``$login_room``, then ``$start_room``, then the old constant.
+    A world that wants an out-of-character entry hall points $login_room at
+    it; one that does not lands people wherever it starts.
+
+    Args:
+        db: The database.
+
+    Returns:
+        The room, or None if nothing sensible resolves -- in which case the
+        caller should leave the player where they are rather than move them
+        somewhere arbitrary.
+    """
+    from .object_utils import system_ref
+    for ref in ('login_room', 'start_room'):
+        room = system_ref(db, ref)
+        if room is not None and repr(room) != 'None':
+            return room
+    from .globals import LOGIN_ROOM
+    try:
+        room = db.get_object(LOGIN_ROOM)
+    except Exception:
+        return None
+    # The constant is a guess about a database it may know nothing about,
+    # so it has to be checked.  A player parked in another player is worse
+    # than a player left standing where they were.
+    return room if getattr(room, 'is_room', False) else None

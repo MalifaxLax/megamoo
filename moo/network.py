@@ -581,17 +581,22 @@ class PlayerConnection:
                 # Session takeover — player stays where they are
                 logger.info(f"Player {player.name} reconnected (takeover)")
             else:
-                # Normal login — move to LOGIN_ROOM
-                from .globals import LOGIN_ROOM
-                try:
-                    player.set_property('last_location', LOGIN_ROOM)
-                except KeyError:
-                    player.add_property('last_location', LOGIN_ROOM)
-                if self.server.database.valid(LOGIN_ROOM):
-                    player.move_to(LOGIN_ROOM, self.server.database)
+                # Normal login -- move to wherever this world starts people.
+                from .object_utils import login_room as _login_room
+                room = _login_room(self.server.database)
+                if room is not None:
+                    try:
+                        player.set_property('last_location', room.objnum)
+                    except KeyError:
+                        player.add_property('last_location', room.objnum)
+                    player.move_to(room.objnum, self.server.database)
                     from .builtins import msg_room
-                    login_room = self.server.database.get_object(LOGIN_ROOM)
-                    msg_room(login_room, f"{player.name} arrives.", exclude=[player])
+                    msg_room(room, f"{player.name} arrives.",
+                             exclude=[player])
+                else:
+                    logger.warning(
+                        'No login room resolves ($login_room, $start_room); '
+                        'leaving %s where they are.', player.name)
 
             self.server.database.save_object(player)
 
