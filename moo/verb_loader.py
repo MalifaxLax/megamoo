@@ -104,7 +104,42 @@ def resolve_verb_base_path(db) -> Optional[str]:
         verb_path = getattr(holder, 'moo_verb_path', None)
     if not verb_path:
         return None
-    return os.path.expanduser('~/' + verb_path.replace('.', '/'))
+    return expand_verb_path(verb_path)
+
+
+def expand_verb_path(verb_path: str) -> str:
+    """
+    Turn a stored verb-tree location into an absolute path.
+
+    Two forms, because the old one cannot be dropped and should not be
+    inflicted on anybody new.
+
+    An ordinary path is used as an ordinary path: absolute, or starting
+    with ``~``, or containing a separator.  ``/opt/world/verbs`` means
+    that.
+
+    Anything else is read the old way -- dotted and relative to the home
+    directory, so ``"sfdev.moo verbs"`` is ``~/sfdev/moo verbs``.  That
+    spelling came from ``#8.moo_verb_path`` being a Python-ish module path
+    and is why an absolute path used to silently become ``~//opt/...``,
+    and why a directory with a dot in its name broke.
+
+    Args:
+        verb_path: Whatever the database stores.
+
+    Returns:
+        An absolute filesystem path.
+    """
+    text = str(verb_path).strip()
+    if text.startswith(('/', '~')):
+        return os.path.abspath(os.path.expanduser(text))
+    if os.sep in text:
+        # Relative, but written as a path.  Anchored at home rather than
+        # at the working directory: this is a stored value and the
+        # directory a server happens to be started from is not something
+        # the database should depend on.
+        return os.path.expanduser('~/' + text)
+    return os.path.expanduser('~/' + text.replace('.', '/'))
 
 
 def is_blank_verb_file(code: str) -> bool:
