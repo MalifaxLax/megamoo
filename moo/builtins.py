@@ -295,6 +295,41 @@ def _call_hook(obj, hook_name: str, args_str: str = '') -> Any:
 # in sync with the auth list.
 
 
+def files_dir() -> str:
+    """
+    Where this server keeps the files verb code reads and writes.
+
+    The engine supplies the place; Python supplies the verbs::
+
+        from pathlib import Path
+        lines = Path(files_dir(), 'admin', 'info').read_text().splitlines()
+
+    There is deliberately no read_file() or write_file() to go with it.
+    Python has pathlib, and a house-brand wrapper for something the
+    standard library already does is the shape this engine keeps trying
+    not to grow.  What Python cannot supply is a *root*: code ported from
+    a MOO with the FileIO extension says ``fileread("admin", "info")``
+    with no leading slash, because those servers rooted everything at a
+    configured directory.  Resolved against the process's working
+    directory instead, it lands wherever the server was started from.
+
+    A function rather than a constant because the configuration is set
+    after this module is imported, and rather than exposing ``config``
+    itself because this is the only part of it a verb has needed.
+
+    This is not a sandbox and does not pretend to be one.  Verb code is
+    Python and can open anything the process can; that is the bargain
+    MegaMOO makes, and staff who can write verbs can already do anything.
+
+    Returns:
+        str: The configured directory, or ``''`` if none is set -- in
+        which case a relative path means what it means to the process,
+        and probably not what the author intended.
+    """
+    database = getattr(_config, 'database', None) if _config else None
+    return str(getattr(database, 'files_dir', '') or '')
+
+
 def connection_host(who) -> str:
     """
     Where a player is connected from.

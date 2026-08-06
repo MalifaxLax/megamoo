@@ -179,6 +179,29 @@ class DatabaseConfig:
     compress_checkpoints: bool = True
     backup_on_start: bool = True
     max_object_cache: int = 1000
+    #: Where verb code reads and writes files, or '' for nowhere.
+    #:
+    #: A world legitimately wants files: logs, exports, notes it keeps
+    #: outside the database.  What it needs from the engine is not a file
+    #: API -- Python has one, and a house-brand read_file() would be
+    #: exactly the sort of MOO-shaped wrapper for a thing Python already
+    #: does that this engine is trying not to accumulate.
+    #:
+    #: What it needs is a *place*.  Code ported from a MOO with the FileIO
+    #: extension says fileread("admin", "info") with no leading slash,
+    #: because those servers rooted everything at a configured directory.
+    #: Resolved against the process's working directory instead, that
+    #: lands wherever the server happened to be started from.
+    #:
+    #: So the engine supplies the root and Python supplies the verbs::
+    #:
+    #:     Path(config.database.files_dir, 'admin', 'info').read_text()
+    #:
+    #: Empty by default.  This is not a sandbox and does not pretend to
+    #: be one -- verb code is Python and can open anything the process
+    #: can.  It is a default location, so that relative paths mean
+    #: something deliberate.
+    files_dir: str = ''
 
 
 # =============================================================================
