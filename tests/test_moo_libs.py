@@ -389,26 +389,6 @@ def test_none_never_equals_a_match_sentinel():
     assert (None == FAILED_MATCH) is False
 
 
-def test_port_translates_match_rather_than_marking_it():
-    from moo.moo_port import port
-    r = port('r = match(argstr, "^%(foo%)$");')
-    assert 'moo_match' in r.code and 'match(' in r.code
-    assert r.marks == 0
-
-
-def test_port_supplies_the_import_time_needs():
-    from moo.moo_port import port
-    r = port('x = time(); y = ctime(x);')
-    assert r.code.startswith('import time')
-    assert r.marks == 0
-
-
-def test_port_maps_the_nothing_constants():
-    from moo.moo_port import port
-    r = port('if (dobj == $nothing || dobj == $failed_match) return; endif')
-    assert 'None' in r.code and 'FAILED_MATCH' in r.code
-    assert r.marks == 0
-
 
 def test_setitem_does_not_shift_an_already_shifted_index():
     # @port shifts subscripts as it translates, so MOO's x[1] arrives as

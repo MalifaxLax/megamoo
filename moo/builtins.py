@@ -2843,9 +2843,24 @@ def port_verb(pobj, spec: str, db):
         db:   Database.
     """
     from .utils import interactive
-    from .moo_port import port, MooSyntaxError, MARK
     from .verbs import VerbDef
     from .match_utils import omatch
+
+    # The translator lives outside the engine, in the mooport package.
+    #
+    # Reading a 1994 textdump and deciding what its verbs mean is a
+    # different job from running a game, and it was two thousand lines of
+    # engine that no world written in Python has any use for.  The command
+    # stays here because the editor plumbing is an engine concern; the
+    # translation does not.
+    try:
+        from mooport.translator import port, MooSyntaxError, MARK
+    except ImportError:
+        notify(pobj, "@port needs the mooport package, which is not "
+                     "installed.")
+        notify(pobj, "It lives outside the engine on purpose -- see "
+                     "mooport/docs/PORTING_NOTES.md.")
+        return
 
     if '.' not in spec:
         notify(pobj, "Usage: @port <object>.<verb-name>")

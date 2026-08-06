@@ -33,7 +33,12 @@ Constructs left alone, because no short equivalent is faithful:
 A verb saved with marks left in it is stored hidden, so a half-ported verb
 cannot be reached by a player typing its name.  Unhide it when it is done.
 
-See also: @program, @import
+The translator itself is not part of the engine.  It lives in the mooport
+package, along with the tools for reading a whole LambdaMOO database, and
+this command says so if it is not installed.  Deciding what a 1994
+textdump means is a different job from running a game.
+
+See also: @program
 """
 if auth_level(pobj) < 3:
     pobj.msg("Do what?")

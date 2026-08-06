@@ -12,9 +12,10 @@ Writes a consistent snapshot of the database to the checkpoint directory,
 after flushing anything still only in memory.
 
 Worth having as a command rather than only a timer, because the moments
-you most want a snapshot are the ones no schedule knows about: before an
-@import, before a mass @set, before restarting into engine changes.  The
-automatic checkpoint runs on its own clock and may be twenty minutes away.
+you most want a snapshot are the ones no schedule knows about: before a
+mass @set, before restarting into engine changes, before a bulk import.
+The automatic checkpoint runs on its own clock and may be twenty minutes
+away.
 
 It is also what makes a copy of the live database trustworthy.  SQLite
 keeps recent writes in a WAL sidecar and folds them into the main file
