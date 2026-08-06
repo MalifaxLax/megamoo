@@ -633,3 +633,140 @@ def system_ref(db, name, fallback_objnum=None):
         return db.get_object(fallback_objnum)
     except Exception:
         return None
+
+
+def descendants(obj) -> list:
+    """
+    Every object below *obj* in the inheritance tree, breadth-first.
+
+    The counterpart to :func:`ancestors`, and the question `@kids` answers
+    one level at a time.  MOO's cores reach for it whenever something has
+    to apply to a whole family -- rechowning a hierarchy, finding what
+    would break if a property changed.
+
+    Args:
+        obj: The object.
+
+    Returns:
+        list: Descendants, nearest generation first, without duplicates.
+    """
+    out, seen, queue = [], set(), list(getattr(obj, 'children', None) or ())
+    while queue:
+        node = queue.pop(0)
+        num = getattr(node, 'objnum', None)
+        if num is None or num in seen:
+            continue
+        seen.add(num)
+        out.append(node)
+        queue.extend(getattr(node, 'children', None) or ())
+    return out
+
+
+def leaves(obj) -> list:
+    """
+    The descendants of *obj* that have no children of their own.
+
+    In a MOO hierarchy these are the things somebody actually made, as
+    against the generic parents they were made from -- so "every real
+    room" is ``leaves($room)``.
+
+    Args:
+        obj: The object.
+
+    Returns:
+        list: Childless descendants.
+    """
+    return [o for o in descendants(obj)
+            if not (getattr(o, 'children', None) or ())]
+
+
+def all_contents(obj) -> list:
+    """
+    Everything inside *obj*, and inside those things, all the way down.
+
+    Args:
+        obj: The container, room or character.
+
+    Returns:
+        list: Contents, recursively, without duplicates.
+    """
+    out, seen, queue = [], set(), list(getattr(obj, 'contents', None) or ())
+    while queue:
+        node = queue.pop(0)
+        num = getattr(node, 'objnum', None)
+        if num is None or num in seen:
+            continue
+        seen.add(num)
+        out.append(node)
+        queue.extend(getattr(node, 'contents', None) or ())
+    return out
+
+
+def contains(obj, thing) -> bool:
+    """
+    Whether *thing* is inside *obj*, at any depth.
+
+    Args:
+        obj: The container.
+        thing: What to look for.
+
+    Returns:
+        bool: True if it is in there somewhere.
+    """
+    want = getattr(thing, 'objnum', thing)
+    return any(getattr(o, 'objnum', None) == want for o in all_contents(obj))
+
+
+def locations(obj) -> list:
+    """
+    Where *obj* is, and where that is, out to the outermost container.
+
+    Args:
+        obj: The object.
+
+    Returns:
+        list: Containing objects, innermost first.
+    """
+    out, seen = [], set()
+    node = getattr(obj, 'location', None)
+    while node is not None and getattr(node, 'objnum', None) not in seen:
+        seen.add(node.objnum)
+        out.append(node)
+        node = getattr(node, 'location', None)
+    return out
+
+
+def defines_property(obj, name: str) -> bool:
+    """
+    Whether *obj* declares *name* itself, rather than inheriting it.
+
+    The distinction :func:`has_property` does not make.  MOO's cores need
+    it to tell "this object has its own description" from "this object
+    shows its parent's".
+
+    Args:
+        obj: The object.
+        name: Property name.
+
+    Returns:
+        bool: True if the definition is this object's own.
+    """
+    return name in (getattr(obj, 'properties', None) or {})
+
+
+def defines_verb(obj, name: str) -> bool:
+    """
+    Whether *obj* carries a verb called *name* itself, not inherited.
+
+    Args:
+        obj: The object.
+        name: Verb name.
+
+    Returns:
+        bool: True if the verb is defined here.
+    """
+    for verb in (getattr(obj, 'verbs', None) or ()):
+        names = getattr(verb, 'names', None) or []
+        if name in ([names] if isinstance(names, str) else names):
+            return True
+    return False
