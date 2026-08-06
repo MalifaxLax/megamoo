@@ -94,7 +94,8 @@ else:
             import os
             verb_path = getattr(db.get_object(8), 'moo_verb_path', None)
             if verb_path:
-                base_path = os.path.expanduser('~/' + verb_path.replace('.', '/'))
+                from moo.verb_loader import expand_verb_path
+                base_path = expand_verb_path(verb_path)
                 obj_dir = os.path.join(base_path, str(target.objnum))
                 if not os.path.isdir(obj_dir):
                     os.makedirs(obj_dir, exist_ok=True)

@@ -1922,7 +1922,8 @@ def program_verb(pobj, spec: str, db, file_path=None):
         verb_path_prop = system_ref(db, 'moo_verb_path') or getattr(
             system_ref(db, 'config', fallback_objnum=8), 'moo_verb_path', None)
         if verb_path_prop:
-            base_path = os.path.expanduser('~/' + verb_path_prop.replace('.', '/'))
+            from .verb_loader import expand_verb_path
+            base_path = expand_verb_path(verb_path_prop)
             save_path = file_path or os.path.join(base_path, str(target.objnum), verb_name + '.py')
             try:
                 if os.path.isfile(save_path):

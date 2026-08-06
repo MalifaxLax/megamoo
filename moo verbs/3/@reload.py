@@ -42,7 +42,8 @@ verb_path = getattr(db.get_object(8), 'moo_verb_path', None)
 if not verb_path:
     pobj.msg("#8.moo_verb_path is not set.")
     return
-base_path = os.path.expanduser('~/' + verb_path.replace('.', '/'))
+from moo.verb_loader import expand_verb_path
+base_path = expand_verb_path(verb_path)
 
 # --- @reload all ---
 if args.strip().lower() == 'all':
