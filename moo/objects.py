@@ -50,6 +50,7 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 import asyncio
 import logging
+from contextlib import contextmanager
 import time
 
 logger = logging.getLogger('megamoo.objects')
@@ -1252,6 +1253,10 @@ class MOOObject:
         if not db:
             return
 
+        # Under bulk_load() the sweep is deferred -- see the note there.
+        if _BULK_LOAD:
+            return
+
         # Propagate via children list
         for child_objnum in list(self.children):
             try:
@@ -1945,3 +1950,52 @@ class MOOObject:
         obj.verbs = [VerbDef.from_dict(v) for v in data.get('verbs', [])]
 
         return obj
+
+
+# ---------------------------------------------------------------------------
+# Bulk loading
+# ---------------------------------------------------------------------------
+#
+# invalidate_inheritance_cache() walks every descendant, which is right for
+# a live game: change a property on a generic parent and each child holding
+# a resolved copy has to be told.  During a bulk load it is quadratic, and
+# ruinously so -- an import of Inferno writes 483,851 properties into a tree
+# of 60,967 objects mostly descending from a handful of parents, so each
+# write sweeps most of the database.  Measured at 1,500 objects: 2.36
+# million invalidation calls, and the full import took 72 minutes.
+#
+# Nothing is *reading* resolved values while a world is being built, so the
+# sweeps have nobody to correct.  This defers them, and one pass at the end
+# does the job all of them together would have.
+
+_BULK_LOAD = False
+
+
+@contextmanager
+def bulk_load(db=None):
+    """
+    Defer inheritance-cache propagation for the duration.
+
+    Use for building or importing a world, never for anything a player can
+    reach: inside the block a child may serve a resolved value its parent
+    has since changed.
+
+    On exit every object in memory is invalidated once, which is what the
+    deferred sweeps would have added up to.
+
+    Args:
+        db: The database to sweep on the way out.  Optional; without it the
+            caller is responsible for invalidating.
+    """
+    global _BULK_LOAD
+    was, _BULK_LOAD = _BULK_LOAD, True
+    try:
+        yield
+    finally:
+        _BULK_LOAD = was
+        if db is not None and not _BULK_LOAD:
+            for obj in list((getattr(db, '_objects', None) or {}).values()):
+                obj._inheritance_cache_valid = False
+                obj._resolved_properties = None
+                obj._resolved_verbs = None
+                obj._cache_dirty = True
