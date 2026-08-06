@@ -634,6 +634,21 @@ def build_verb_namespace(
         'verb': verb_name,
         'args': args,
         'argstr': argstr,
+        # MOO's `args` is a *list* of the arguments; this engine's is the
+        # argument string.  Both are useful and they are not the same
+        # thing, so they get different names -- and code ported from a MOO
+        # is translated to say argv.
+        #
+        # Without this, a ported verb doing args[1] became args[0], which
+        # is the first *character* of a string, or IndexError on an empty
+        # one.  1,570 of Inferno's 3,336 verbs index their arguments, so
+        # nearly half a ported world was broken at runtime while reporting
+        # as translated clean.
+        #
+        # call_verb overwrites this with the real list when a verb is
+        # called with arguments; for a command it is the words the player
+        # typed, which is what MOO would have put there.
+        'argv': (args.split() if isinstance(args, str) else list(args or [])),
     })
 
     if context is not None:
