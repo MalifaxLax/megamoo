@@ -34,3 +34,8 @@ dumps/
 
 # @import staging area — source databases, not part of the tree
 imports/
+
+# Scratch verb tree for test.db -- try things here, then copy the file
+# into "moo verbs/" once it works.  Keeping it out of git is the point:
+# a scratch tree that gets committed is just a second real tree.
+test verbs/
