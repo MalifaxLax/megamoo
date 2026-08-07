@@ -2915,7 +2915,7 @@ def suspend(seconds: float = 0.0) -> None:
     _suspend(seconds)
 
 
-def port_verb(pobj, spec: str, db):
+def port_verb(pobj, spec: str, db, switches=None):
     """
     Paste MOO source, get Python, review it before it is saved.
 
@@ -2945,7 +2945,8 @@ def port_verb(pobj, spec: str, db):
     # stays here because the editor plumbing is an engine concern; the
     # translation does not.
     try:
-        from mooport.translator import port, MooSyntaxError, MARK
+        from mooport.translator import (MARK, MooSyntaxError, attach_source,
+                                        extract_source, port)
     except ImportError:
         notify(pobj, "@port needs the mooport package, which is not "
                      "installed.")
@@ -2969,41 +2970,14 @@ def port_verb(pobj, spec: str, db):
         notify(pobj, f"I don't see '{obj_part}' here.")
         return
 
-    @interactive
-    def _editor(pobj, **kw):
-        existing = None
-        for v in target.verbs:
-            if verb_name in v.names:
-                existing = v
-                break
+    def _finish(source, existing):
+        """
+        Translate, show, and save if the answer is yes.
 
-        notify(pobj, f"Porting MOO code into '{verb_name}' on "
-                     f"{target.name} (#{target.objnum}).")
-        if existing and (existing.code or '').strip():
-            notify(pobj, f"%<245>[{verb_name} already has "
-                         f"{len(existing.code.splitlines())} lines; you will "
-                         f"be asked before it is replaced.]%n")
-        notify(pobj, "Paste MOO source.  '.' alone to finish, '@abort' to cancel.")
-        notify(pobj, "-----")
-
-        lines = []
-        while True:
-            line = yield ""
-            if line is None:
-                notify(pobj, "Cancelled.")
-                return
-            if line.strip() == '@abort':
-                notify(pobj, "Cancelled.  Nothing was changed.")
-                return
-            if line.strip() == '.':
-                break
-            lines.append(line)
-
-        source = '\n'.join(lines)
-        if not source.strip():
-            notify(pobj, "Nothing to port.")
-            return
-
+        Shared by pasting and by /again, so the two cannot drift --
+        the review a re-translation gets is the same review the
+        first translation got.
+        """
         try:
             # Hand the translator the live database, so a `$foo` is
             # checked against #0 rather than guessed at.  This is the one
@@ -3043,12 +3017,18 @@ def port_verb(pobj, spec: str, db):
             return
 
         try:
+            # The original goes under the translation, as the importer
+            # does it.  When a translation turns out to be wrong -- and
+            # five separate ways it could be were found in one day -- the
+            # source is what you fix it against, and it is what /again
+            # translates from later.
+            saved_code = attach_source(result.code, source)
             if existing:
-                existing.code = result.code
+                existing.code = saved_code
                 existing.compiled_code = None
             else:
                 target.add_verb(VerbDef(
-                    names=[verb_name], code=result.code,
+                    names=[verb_name], code=saved_code,
                     owner=pobj.objnum, perms='rx',
                     # Not executable-by-players until a human has been
                     # through it; a half-ported verb should not be callable.
@@ -3063,6 +3043,61 @@ def port_verb(pobj, spec: str, db):
             notify(pobj, f"%<245>Hidden until ported: @grep '{MARK}' finds "
                          f"what is left.%n")
 
+
+    @interactive
+    def _editor(pobj, **kw):
+        existing = None
+        for v in target.verbs:
+            if verb_name in v.names:
+                existing = v
+                break
+
+        if 'again' in (switches or []):
+            # Re-translate from the source the verb kept, rather than
+            # asking for it again.  The translator improves -- five
+            # separate ways it was wrong were found in one day -- and a
+            # verb that still carries its original can simply be redone.
+            kept = extract_source(existing.code if existing else '')
+            if kept is None:
+                notify(pobj, f"'{verb_name}' carries no MOO source, so "
+                             f"there is nothing to translate again.")
+                notify(pobj, "%<245>Only verbs ported with the source kept "
+                             "can be redone; paste it instead.%n")
+                return
+            notify(pobj, f"Re-translating '{verb_name}' on "
+                         f"{target.name} (#{target.objnum}) from its "
+                         f"kept source ({len(kept.splitlines())} lines).")
+            yield from _finish(kept, existing)
+            return
+
+        notify(pobj, f"Porting MOO code into '{verb_name}' on "
+                     f"{target.name} (#{target.objnum}).")
+        if existing and (existing.code or '').strip():
+            notify(pobj, f"%<245>[{verb_name} already has "
+                         f"{len(existing.code.splitlines())} lines; you will "
+                         f"be asked before it is replaced.]%n")
+        notify(pobj, "Paste MOO source.  '.' alone to finish, '@abort' to cancel.")
+        notify(pobj, "-----")
+
+        lines = []
+        while True:
+            line = yield ""
+            if line is None:
+                notify(pobj, "Cancelled.")
+                return
+            if line.strip() == '@abort':
+                notify(pobj, "Cancelled.  Nothing was changed.")
+                return
+            if line.strip() == '.':
+                break
+            lines.append(line)
+
+        source = '\n'.join(lines)
+        if not source.strip():
+            notify(pobj, "Nothing to port.")
+            return
+
+        yield from _finish(source, existing)
     _editor(pobj)
 
 
