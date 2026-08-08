@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "megamoo"
+version = "0.9.0b0"
+description = "A programmable, persistent, multiplayer text world engine — the LambdaMOO model, with verbs written in Python"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Shan Hollen" }]
+keywords = ["mud", "moo", "lambdamoo", "text-game", "multiplayer",
+            "game-engine", "world-building", "interactive-fiction"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Games/Entertainment :: Multi-User Dungeons (MUD)",
+]
+
+# No dependencies, and this is load-bearing rather than a boast: the
+# engine runs on the standard library, so a world can be installed
+# anywhere Python is without a build toolchain or a wheel to compile.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/MalifaxLax/megamoo"
+Source = "https://github.com/MalifaxLax/megamoo"
+
+[project.scripts]
+# The whole point of packaging: `megamoo run world.db` from any
+# directory, with no PYTHONPATH and no copy of the engine beside the
+# game.  Until this existed, every use of MegaMOO was a fork of it.
+megamoo = "moo.cli:main"
+
+[tool.setuptools]
+# Only the engine is a package.  `moo verbs/`, `mm.db` and `web/` are a
+# *game*, not part of the library -- shipping them as package data is
+# what makes the engine and the world the same directory, which is the
+# problem this is meant to solve.  They become templates for
+# `megamoo init` instead.
+packages = ["moo", "moo.web"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
