@@ -51,7 +51,7 @@ if val_str:
 try:
     target.add_property(prop_name, value)
     if value is not None:
-        pobj.msg(f"Property '{prop_name}' added to &<245>#{target.objnum}:{target.name}&n = {repr(value).replace('%', '%%')}")
+        pobj.msg(f"Property '{prop_name}' added to &<245>#{target.objnum}:{target.name}&n = {repr(value).replace('&', '&&')}")
     else:
         pobj.msg(f"Property '{prop_name}' added to &<245>#{target.objnum}:{target.name}&n.")
 except ValueError as e:

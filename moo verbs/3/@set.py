@@ -80,7 +80,7 @@ if not val_str:
     # (it auto-resolves on normal attribute access), so show it resolved here
     # too rather than leaking the raw storage form.
     cur = target._resolve_objref(cur)
-    pobj.msg(f"&<245>#{target.objnum}:{target.name}&n.{prop_name} = {repr(cur).replace('%', '%%')}{origin}")
+    pobj.msg(f"&<245>#{target.objnum}:{target.name}&n.{prop_name} = {repr(cur).replace('&', '&&')}{origin}")
     return
 
 # Resolve object references the same way verb source does: rewrite each bare
@@ -102,7 +102,7 @@ except Exception as e:
         # The value contained #N / $name references but didn't evaluate --
         # a bad object number or malformed literal. Surface it rather than
         # silently storing broken text.
-        pobj.msg(f"Could not resolve value {repr(val_str).replace('%', '%%')}: {e}")
+        pobj.msg(f"Could not resolve value {repr(val_str).replace('&', '&&')}: {e}")
         return
     # No references: a bare word like `Champion` -- store it as a raw string.
     value = val_str
@@ -133,4 +133,4 @@ pobj._set_undo = {
 }
 
 origin = "" if had_local else "  (overriding inherited)"
-pobj.msg(f"&<245>#{target.objnum}:{target.name}&n.{prop_name} = {repr(value).replace('%', '%%')}  (was {repr(old_resolved).replace('%', '%%')}){origin}")
+pobj.msg(f"&<245>#{target.objnum}:{target.name}&n.{prop_name} = {repr(value).replace('&', '&&')}  (was {repr(old_resolved).replace('&', '&&')}){origin}")

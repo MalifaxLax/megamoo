@@ -44,13 +44,13 @@ try:
     if rec['had_local']:
         # There was a local value before — restore it.
         target.set_property(prop, rec['old'], database=db)
-        result = f"restored to {repr(rec['old']).replace('%', '%%')}"
+        result = f"restored to {repr(rec['old']).replace('&', '&&')}"
     else:
         # No local value before — the property was inherited. Drop the local
         # override @set created so the inherited value shows through again.
         if had_local_now:
             target.delete_property(prop)
-        result = f"reverted to its inherited value ({repr(getattr(target, prop, None)).replace('%', '%%')})"
+        result = f"reverted to its inherited value ({repr(getattr(target, prop, None)).replace('&', '&&')})"
 except Exception as e:
     pobj.msg(f"Could not undo: {e}")
     return

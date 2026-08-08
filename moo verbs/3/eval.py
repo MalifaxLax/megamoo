@@ -33,7 +33,7 @@ else:
             'MOOObjectRef': MOOObjectRef,
         })
         if result is not None:
-            player.msg(f"=> {repr(result).replace('%', '%%')}")
+            player.msg(f"=> {repr(result).replace('&', '&&')}")
         else:
             player.msg("=> None")
     except Exception as e:

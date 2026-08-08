@@ -12,14 +12,14 @@ and legacy content can all produce coloured output:
 
 1. **MOO-style basic codes** -- Single-letter codes prefixed with ``%``.
    Lowercase letters produce normal-intensity colours; uppercase letters
-   produce bright/bold variants.  Examples: ``%r`` (red), ``%G`` (bright
-   green), ``%n`` (reset to default).
+   produce bright/bold variants.  Examples: ``&r`` (red), ``&G`` (bright
+   green), ``&n`` (reset to default).
 
-2. **MOO-style extended codes** -- Bracket syntax ``%<...>`` supporting:
-   - Xterm 256-colour palette indices: ``%<123>`` (foreground),
-     ``%<bg123>`` (background).
-   - Hex RGB colours: ``%<#FF0000>`` (foreground),
-     ``%<bg#FF0000>`` (background).
+2. **MOO-style extended codes** -- Bracket syntax ``&<...>`` supporting:
+   - Xterm 256-colour palette indices: ``&<123>`` (foreground),
+     ``&<bg123>`` (background).
+   - Hex RGB colours: ``&<#FF0000>`` (foreground),
+     ``&<bg#FF0000>`` (background).
 
 3. **ANSI named colours** -- Curly-brace names like ``{red}``, ``{bold}``,
    ``{normal}``.  Primarily used in configuration strings.
@@ -55,7 +55,7 @@ License: MIT
 from typing import Dict, Optional, Tuple
 import re
 
-from .globals import SIGIL_CLASS
+from .globals import SIGIL_CLASS, SIGIL
 from enum import IntEnum
 import logging
 
@@ -219,7 +219,7 @@ class ColorProcessor:
     Typical usage::
 
         processor = ColorProcessor(enable_color=True)
-        output = processor.process("%rDanger!%n Safe now.", color_type='moo')
+        output = processor.process("%rDanger!&n Safe now.", color_type='moo')
         # => "\\x1b[31mDanger!\\x1b[0m Safe now."
 
     Thread Safety:
@@ -275,15 +275,15 @@ class ColorProcessor:
 
         Handles two sub-formats:
 
-        **Basic codes** (``%<letter>``):
+        **Basic codes** (``&<letter>``):
             Single-letter codes looked up in ``MOO_COLOR_CODES``.
-            Examples: ``%r`` (red), ``%G`` (bright green), ``%n`` (reset).
+            Examples: ``&r`` (red), ``&G`` (bright green), ``&n`` (reset).
 
-        **Extended codes** (``%<...>``):
-            - Xterm 256-colour index: ``%<123>`` sets foreground to
-              palette colour 123.  ``%<bg123>`` sets background.
-            - Hex RGB: ``%<#FF0000>`` sets foreground to red via RGB.
-              ``%<bg#FF0000>`` sets background.
+        **Extended codes** (``&<...>``):
+            - Xterm 256-colour index: ``&<123>`` sets foreground to
+              palette colour 123.  ``&<bg123>`` sets background.
+            - Hex RGB: ``&<#FF0000>`` sets foreground to red via RGB.
+              ``&<bg#FF0000>`` sets background.
 
         **Literal percent**:
             ``%%`` is converted to a literal ``%``.  The method uses a
@@ -292,8 +292,8 @@ class ColorProcessor:
 
         Processing order:
             1. ``%%`` is replaced with a placeholder.
-            2. Extended ``%<...>`` codes are resolved.
-            3. Basic ``%x`` codes are resolved.
+            2. Extended ``&<...>`` codes are resolved.
+            3. Basic ``&x`` codes are resolved.
             4. The placeholder is restored to ``%``.
 
         Args:
@@ -304,25 +304,30 @@ class ColorProcessor:
 
         Examples::
 
-            processor.process_moo_colors("This is %rred%n text")
+            processor.process_moo_colors("This is %rred&n text")
             # => "This is \\x1b[31mred\\x1b[0m text"
 
-            processor.process_moo_colors("%<196>bright red%n")
+            processor.process_moo_colors("&<196>bright red&n")
             # => "\\x1b[38;5;196mbright red\\x1b[0m"
 
-            processor.process_moo_colors("%<#FF0000>red%n")
+            processor.process_moo_colors("&<#FF0000>red&n")
             # => "\\x1b[38;5;196mred\\x1b[0m"  (approximate)
 
-            processor.process_moo_colors("%<bg21>blue background%n")
+            processor.process_moo_colors("&<bg21>blue background&n")
             # => "\\x1b[48;5;21mblue background\\x1b[0m"
         """
-        # Step 1: Protect literal '%%' with a null-byte placeholder
+        # Step 1: Protect a doubled sigil with a null-byte placeholder
+        #
+        # The escape has to follow the sigil.  This protected '%%' while
+        # the sigil was '%'; after the move to '&' that left '&&' being
+        # read as a colour code and a literal per-cent still being eaten,
+        # which is precisely backwards.
         PLACEHOLDER = '\x00PCT\x00'
-        text = text.replace('%%', PLACEHOLDER)
+        text = text.replace(SIGIL + SIGIL, PLACEHOLDER)
 
         # Step 2: Extended codes -- %<...>
         def replace_extended(match):
-            """Callback for _RE_MOO_EXTENDED: resolve %<...> tokens."""
+            """Callback for _RE_MOO_EXTENDED: resolve &<...> tokens."""
             inner = match.group(1)
             # Check for 'bg' prefix indicating a background colour
             bg = inner.startswith('bg')
@@ -349,7 +354,7 @@ class ColorProcessor:
 
         # Step 3: Basic single-letter codes -- %r, %G, %n, etc.
         def replace_code(match):
-            """Callback for _RE_MOO_BASIC: resolve %<letter> tokens."""
+            """Callback for _RE_MOO_BASIC: resolve &<letter> tokens."""
             code = match.group(1)
             if code in MOO_COLOR_CODES:
                 ansi_code = MOO_COLOR_CODES[code]
@@ -360,7 +365,7 @@ class ColorProcessor:
         text = _RE_MOO_BASIC.sub(replace_code, text)
 
         # Step 4: Restore literal '%' from placeholder
-        return text.replace(PLACEHOLDER, '%')
+        return text.replace(PLACEHOLDER, SIGIL)
 
     def process_ansi_colors(self, text: str) -> str:
         """

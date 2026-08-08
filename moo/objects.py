@@ -769,11 +769,11 @@ class MOOObject:
         per-object override of ``msg`` applies to room broadcasts too.
 
         Args:
-            message: Message text (supports %S/%d/%i emit substitution and
-                %0/%1/... raw-string slots).
+            message: Message text (supports &S/&d/&i emit substitution and
+                &0/&1/... raw-string slots).
             exclude: List of objects to exclude from receiving the message.
             **kwargs: Optional sub, dob, iob, uob for emit substitution, plus
-                s0/s1/... raw-string slots (%N).
+                s0/s1/... raw-string slots (&N).
         """
         exclude_nums = set()
         for obj in (exclude or []):
@@ -1424,7 +1424,7 @@ class MOOObject:
         from .builtins import notify
         # Calculate border width from the longest line in the string
         width = max(len(line) for line in string.split('\n'))
-        border = f"%<245>{'=' * width}%n"
+        border = f"&<245>{'=' * width}&n"
         notify(self, f"{border}\n{string}\n{border}")
 
     # ========================================================================

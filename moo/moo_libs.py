@@ -877,10 +877,10 @@ def _match(subject, pattern, case_matters, last):
 
 def moo_substitute(template: str, subs) -> str:
     """
-    MOO's ``substitute()``: fill ``%1``..``%9`` from a match result.
+    MOO's ``substitute()``: fill ``&1``..``&9`` from a match result.
 
     Args:
-        template: Text containing ``%0``-``%9`` placeholders, where ``%0``
+        template: Text containing ``&0``-``&9`` placeholders, where ``&0``
             is the whole match.
         subs: A result from :func:`moo_match`.
 

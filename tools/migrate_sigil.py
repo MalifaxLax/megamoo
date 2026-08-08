@@ -104,20 +104,45 @@ def _format_operand_positions(src: str):
         src: Python source.
 
     Returns:
-        set[tuple[int, int]]: ``(lineno, col_offset)`` of each such literal.
+        set[int]: Source line numbers occupied by such literals.
     """
     try:
         tree = ast.parse(_parseable(src))
     except SyntaxError:
         return None
     skip = set()
+
+    def mark(node):
+        """
+        Mark every source line the literal occupies.
+
+        Lines, not (line, column).  Python folds implicitly-concatenated
+        literals into a single Constant carrying only the *first* line's
+        position, so marking that one position left the continuation
+        lines unprotected -- and a two-line logging format string had its
+        second line converted while the first was spared.
+        """
+        start = getattr(node, 'lineno', None)
+        end = getattr(node, 'end_lineno', start)
+        if start:
+            skip.update(range(start, (end or start) + 1))
+
     for node in ast.walk(tree):
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod):
-            left = node.left
-            for part in ([left] if not isinstance(left, ast.JoinedStr)
-                         else left.values):
-                if isinstance(part, ast.Constant) and isinstance(part.value, str):
-                    skip.add((part.lineno, part.col_offset))
+            mark(node.left)
+            continue
+        # Lazy logging: logger.warning('... %s ...', value).  The literal
+        # is not the left operand of a `%`, so the check above cannot see
+        # it, but logging applies %-formatting to it all the same -- and
+        # converting its %s produced "not all arguments converted during
+        # string formatting" at the first line that logged anything.
+        if isinstance(node, ast.Call) and len(node.args) > 1:
+            fn = node.func
+            name = fn.attr if isinstance(fn, ast.Attribute) else (
+                fn.id if isinstance(fn, ast.Name) else '')
+            if name in ('debug', 'info', 'warning', 'warn', 'error',
+                        'exception', 'critical', 'log'):
+                mark(node.args[0])
     return skip
 
 
@@ -152,7 +177,7 @@ def convert_python(src: str):
     # carried `%<245>` after a run that reported success.
     literal = (tokenize.STRING, tokenize.FSTRING_MIDDLE)
     for tok in toks:
-        if tok.type in literal and (tok.start not in skip):
+        if tok.type in literal and (tok.start[0] not in skip):
             new = convert_text(tok.string)
             if new != tok.string:
                 changed += 1

@@ -596,7 +596,7 @@ class PlayerConnection:
                 else:
                     logger.warning(
                         'No login room resolves ($login_room, $start_room); '
-                        'leaving %s where they are.', player.name)
+                        'leaving &s where they are.', player.name)
 
             self.server.database.save_object(player)
 

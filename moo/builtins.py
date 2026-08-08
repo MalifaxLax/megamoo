@@ -70,6 +70,7 @@ License: MIT
 
 from typing import Any, List, Optional, Union, Dict
 import math
+import os
 import random
 import threading
 import time
@@ -1779,6 +1780,55 @@ def _get_builtin_ns_template() -> Dict[str, Any]:
 # ============================================================================
 
 
+def verb_file_path(db, objnum, verb_name):
+    """
+    Where a verb's file lives, or None if this world has no verb tree.
+
+    Args:
+        db: Database, for reading ``#8.moo_verb_path``.
+        objnum: Object the verb is on.
+        verb_name: Verb name.
+
+    Returns:
+        str or None: Absolute path, or None when no verb path is set.
+    """
+    from .object_utils import system_ref
+    prop = system_ref(db, 'moo_verb_path') or getattr(
+        system_ref(db, 'config', fallback_objnum=8), 'moo_verb_path', None)
+    if not prop:
+        return None
+    from .verb_loader import expand_verb_path
+    return os.path.join(expand_verb_path(prop), str(objnum), verb_name + '.py')
+
+
+def write_verb_file(path, code):
+    """
+    Write a verb's source to disk, durably.
+
+    Disk is authoritative -- it is what git tracks and what an editor
+    opens -- so every command that saves a verb writes the file *before*
+    the database, and abandons the save if the file cannot be written.
+    Having that rule implemented once means @program and @port cannot
+    disagree about it.
+
+    Args:
+        path: Destination, from :func:`verb_file_path`.
+        code: Source to write.
+
+    Returns:
+        str or None: An error message, or None on success.
+    """
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            f.write(code + '\n')
+            f.flush()
+            os.fsync(f.fileno())
+        return None
+    except Exception as exc:
+        return str(exc)
+
+
 def program_verb(pobj, spec: str, db, file_path=None):
     """
     Interactive line-by-line verb editor.
@@ -1909,23 +1959,11 @@ def program_verb(pobj, spec: str, db, file_path=None):
         # Disk is authoritative: it is what git tracks and what an editor
         # opens.  Writing it first means a failure there leaves *nothing*
         # changed, rather than a live verb with no file behind it.
-        from .object_utils import system_ref
-        verb_path_prop = system_ref(db, 'moo_verb_path') or getattr(
-            system_ref(db, 'config', fallback_objnum=8), 'moo_verb_path', None)
-        save_path = None
-        if verb_path_prop:
-            from .verb_loader import expand_verb_path
-            base_path = expand_verb_path(verb_path_prop)
-            save_path = file_path or os.path.join(
-                base_path, str(target.objnum), verb_name + '.py')
-            try:
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                with open(save_path, 'w') as f:
-                    f.write(code + '\n')
-                    f.flush()
-                    os.fsync(f.fileno())
-            except Exception as e:
-                notify(pobj, f"Could not write {save_path}: {e}")
+        save_path = file_path or verb_file_path(db, target.objnum, verb_name)
+        if save_path:
+            err = write_verb_file(save_path, code)
+            if err:
+                notify(pobj, f"Could not write {save_path}: {err}")
                 notify(pobj, "Verb NOT saved — the file is the source of "
                              "truth, so nothing was changed.")
                 return
@@ -1947,7 +1985,7 @@ def program_verb(pobj, spec: str, db, file_path=None):
         notify(pobj,f"Verb '{verb_name}' saved on {target.name} (#{target.objnum}).  "
                   f"{len(lines)} lines.")
         if save_path:
-            notify(pobj, f"%<245>{save_path}%n".replace('%', '&'))
+            notify(pobj, f"&<245>{save_path}&n".replace('%', '&'))
 
 
     _editor(pobj)
@@ -1973,19 +2011,19 @@ def notify(player, message, sub=None, dob=None, iob=None, uob=None, svals=None):
     If any substitution objects are provided (``sub``, ``dob``, ``iob``,
     ``uob``), the message is processed through the emit-substitution
     engine (``moo.string_utils.su.esub()``) before sending.  This
-    allows pronoun/name substitution tokens like ``%S``, ``%D``,
-    ``%OMODE``, etc.
+    allows pronoun/name substitution tokens like ``&S``, ``&D``,
+    ``&OMODE``, etc.
 
     Args:
         player (MOOObject or int): Player object or object number.
         message (str): Message text to send.
-        sub (MOOObject or None): Subject object for ``%S``/``%s``
+        sub (MOOObject or None): Subject object for ``&S``/``&s``
             substitution.
-        dob (MOOObject or None): Direct-object for ``%D``/``%d``
+        dob (MOOObject or None): Direct-object for ``&D``/``&d``
             substitution.
-        iob (MOOObject or None): Indirect-object for ``%I``/``%i``
+        iob (MOOObject or None): Indirect-object for ``&I``/``&i``
             substitution.
-        uob (MOOObject or None): Noun object for ``%N``/``%n``
+        uob (MOOObject or None): Noun object for ``&N``/``&n``
             substitution (uses the ``noun`` property).
     """
     if _database is None:
@@ -2054,7 +2092,7 @@ def msg_room(location: Union[int, MOOObject], message: str,
 
     Supports emit substitution via keyword arguments (``sub``, ``dob``,
     ``iob``, ``uob``) and raw-string slots (``s0``, ``s1``, ... ``sN`` ->
-    ``%0``/``%1``/...).
+    ``&0``/``&1``/...).
 
     Args:
         location (int or MOOObject): The room or container whose
@@ -2068,7 +2106,7 @@ def msg_room(location: Union[int, MOOObject], message: str,
 
         msg_room(location, f"{player.name} arrives.", exclude=[player])
         msg_room(this, "The room shakes violently!")
-        msg_room(source, "%S %OMODE north.", exclude=[player], sub=player)
+        msg_room(source, "&S &OMODE north.", exclude=[player], sub=player)
     """
     if exclude is None:
         exclude = []
@@ -2867,7 +2905,7 @@ def request(url: str, *, reply: str, on=None, method: str = 'GET',
 
         # in npc_said, some time later
         if not ok:
-            this.msg_room("%S looks momentarily vacant.", sub=this)
+            this.msg_room("&S looks momentarily vacant.", sub=this)
             return
         import json as _j
         this.msg_room(_j.loads(body).get('response', ''), sub=this)
@@ -3001,24 +3039,24 @@ def port_verb(pobj, spec: str, db, switches=None):
             return
 
         notify(pobj, "")
-        notify(pobj, "%<245>-- translated --%n")
+        notify(pobj, "&<245>-- translated --&n")
         for ln in result.code.rstrip().splitlines():
             # The code is shown raw, so % must be doubled or the colour
             # processor eats it -- MOO code is full of them.
-            notify(pobj, '  ' + ln.replace('%', '%%'))
+            notify(pobj, '  ' + ln.replace('&', '&&'))
         notify(pobj, "")
 
         if result.notes:
-            notify(pobj, f"%<245>{len(result.notes)} thing(s) need you:%n")
+            notify(pobj, f"&<245>{len(result.notes)} thing(s) need you:&n")
             for n in result.notes:
                 notify(pobj, f"  - {n}")
             notify(pobj, "")
 
-        verdict = ('%<245>Nothing needed marking, but read it anyway: this '
-                   'checks the mechanics, never the meaning.%n'
+        verdict = ('&<245>Nothing needed marking, but read it anyway: this '
+                   'checks the mechanics, never the meaning.&n'
                    if result.clean else
-                   f'%<245>{result.marks} line(s) marked {MARK} -- the verb '
-                   f'will not work until those are done.%n')
+                   f'&<245>{result.marks} line(s) marked {MARK} -- the verb '
+                   f'will not work until those are done.&n')
         notify(pobj, verdict)
 
         answer = yield f"Save this to {verb_name} on #{target.objnum}? [y/N] "
@@ -3033,6 +3071,20 @@ def port_verb(pobj, spec: str, db, switches=None):
             # source is what you fix it against, and it is what /again
             # translates from later.
             saved_code = attach_source(result.code, source)
+
+            # Same rule as @program: the file is the source of truth, so
+            # it is written first and a failure there abandons the save.
+            # @port used to write only the database, which meant a ported
+            # verb was live but absent from the tree git tracks -- it
+            # existed until the next time somebody edited that file.
+            port_path = verb_file_path(db, target.objnum, verb_name)
+            if port_path:
+                err = write_verb_file(port_path, saved_code)
+                if err:
+                    notify(pobj, f"Could not write {port_path}: {err}")
+                    notify(pobj, "Nothing was saved.")
+                    return
+
             if existing:
                 existing.code = saved_code
                 existing.compiled_code = None
@@ -3049,9 +3101,11 @@ def port_verb(pobj, spec: str, db, switches=None):
             return
 
         notify(pobj, f"Saved to {verb_name} on #{target.objnum}.")
+        if port_path:
+            notify(pobj, f"&<245>{port_path}&n")
         if result.marks:
-            notify(pobj, f"%<245>Hidden until ported: @grep '{MARK}' finds "
-                         f"what is left.%n")
+            notify(pobj, f"&<245>Hidden until ported: @grep '{MARK}' finds "
+                         f"what is left.&n")
 
 
     @interactive
@@ -3071,8 +3125,8 @@ def port_verb(pobj, spec: str, db, switches=None):
             if kept is None:
                 notify(pobj, f"'{verb_name}' carries no MOO source, so "
                              f"there is nothing to translate again.")
-                notify(pobj, "%<245>Only verbs ported with the source kept "
-                             "can be redone; paste it instead.%n")
+                notify(pobj, "&<245>Only verbs ported with the source kept "
+                             "can be redone; paste it instead.&n")
                 return
             notify(pobj, f"Re-translating '{verb_name}' on "
                          f"{target.name} (#{target.objnum}) from its "
@@ -3083,9 +3137,9 @@ def port_verb(pobj, spec: str, db, switches=None):
         notify(pobj, f"Porting MOO code into '{verb_name}' on "
                      f"{target.name} (#{target.objnum}).")
         if existing and (existing.code or '').strip():
-            notify(pobj, f"%<245>[{verb_name} already has "
+            notify(pobj, f"&<245>[{verb_name} already has "
                          f"{len(existing.code.splitlines())} lines; you will "
-                         f"be asked before it is replaced.]%n")
+                         f"be asked before it is replaced.]&n")
         notify(pobj, "Paste MOO source.  '.' alone to finish, '@abort' to cancel.")
         notify(pobj, "-----")
 

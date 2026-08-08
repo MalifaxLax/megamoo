@@ -101,7 +101,7 @@ if 'screen' in switches:
     for line in text.splitlines():
         # Raw JSON on a colour-processing channel: % is the escape
         # character, so it has to be doubled or the output is mangled.
-        pobj.msg(line.replace('%', '%%'))
+        pobj.msg(line.replace('&', '&&'))
     return
 
 slug = ''.join(ch if ch.isalnum() else '-' for ch in str(target.name or 'object'))

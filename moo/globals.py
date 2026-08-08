@@ -596,16 +596,16 @@ RETEXIT = {
 # Default directional exit messages
 # %MODE/%OMODE are substituted at move time with movement mode verbs
 # %S is the player's display name, %1 is the direction name
-ESUCC = "You %MODE %1."
-EOSUCC = "%S %OMODE %1."
-EODROP = "%S %OMODE in from the %1."
+ESUCC = "You &MODE &1."
+EOSUCC = "&S &OMODE &1."
+EODROP = "&S &OMODE in from the &1."
 
 # Default directional exit failure messages
 DIRECTIONAL_EXIT_FAILURES = {
-    'succ': "You %MODE %dir.",
-    'osucc': "%S %OMODE %dir.",
+    'succ': "You &MODE &dir.",
+    'osucc': "&S &OMODE &dir.",
     'drop': '',
-    'odrop': "%S %OMODE in from the %dir.",
+    'odrop': "&S &OMODE in from the &dir.",
 }
 
 # Success message property aliases (short -> canonical mapping).

@@ -11,17 +11,17 @@ Color code syntax
 
 **Basic codes** (single letter after ``%``)::
 
-    %r  -> <span class="cr">  (red)
-    %G  -> <span class="cG">  (bright green)
-    %h  -> <span class="ch">  (highlight/bold)
-    %n  -> closes all open spans (reset)
+    &r  -> <span class="cr">  (red)
+    &G  -> <span class="cG">  (bright green)
+    &h  -> <span class="ch">  (highlight/bold)
+    &n  -> closes all open spans (reset)
 
-**Extended codes** (``%<...>`` syntax)::
+**Extended codes** (``&<...>`` syntax)::
 
-    %<123>      -> <span class="c123">    (xterm-256 color)
-    %<#FF0000>  -> <span style="color:#FF0000">  (hex color)
-    %<bg245>    -> <span class="bg245">   (xterm-256 background)
-    %<bg#00FF00> -> <span style="background-color:#00FF00">
+    &<123>      -> <span class="c123">    (xterm-256 color)
+    &<#FF0000>  -> <span style="color:#FF0000">  (hex color)
+    &<bg245>    -> <span class="bg245">   (xterm-256 background)
+    &<bg#00FF00> -> <span style="background-color:#00FF00">
 
 **Escaped percent** -- ``%%`` produces a literal ``%`` character.
 
@@ -31,26 +31,26 @@ Basic color code mapping
 =========  ===========  ===========================
 Code       CSS Class    Typical Color
 =========  ===========  ===========================
-``%x``     ``cx``       Dark gray / black
-``%r``     ``cr``       Red
-``%g``     ``cg``       Green
-``%y``     ``cy``       Yellow / brown
-``%b``     ``cb``       Blue
-``%m``     ``cm``       Magenta
-``%c``     ``cc``       Cyan
-``%w``     ``cw``       White / light gray
-``%X``     ``cX``       Bright black (dark gray)
-``%R``     ``cR``       Bright red
-``%G``     ``cG``       Bright green
-``%Y``     ``cY``       Bright yellow
-``%B``     ``cB``       Bright blue
-``%M``     ``cM``       Bright magenta
-``%C``     ``cC``       Bright cyan
-``%W``     ``cW``       Bright white
-``%h``     ``ch``       Highlight / bold
-``%u``     ``cu``       Underline
-``%f``     ``cf``       Flash / blink
-``%i``     ``ci``       Italic / inverse
+``&x``     ``cx``       Dark gray / black
+``&r``     ``cr``       Red
+``&g``     ``cg``       Green
+``&y``     ``cy``       Yellow / brown
+``&b``     ``cb``       Blue
+``&m``     ``cm``       Magenta
+``&c``     ``cc``       Cyan
+``&w``     ``cw``       White / light gray
+``&X``     ``cX``       Bright black (dark gray)
+``&R``     ``cR``       Bright red
+``&G``     ``cG``       Bright green
+``&Y``     ``cY``       Bright yellow
+``&B``     ``cB``       Bright blue
+``&M``     ``cM``       Bright magenta
+``&C``     ``cC``       Bright cyan
+``&W``     ``cW``       Bright white
+``&h``     ``ch``       Highlight / bold
+``&u``     ``cu``       Underline
+``&f``     ``cf``       Flash / blink
+``&i``     ``ci``       Italic / inverse
 =========  ===========  ===========================
 
 Architecture
@@ -105,13 +105,13 @@ def moo_colors_to_html(text: str) -> str:
 
     Examples::
 
-        moo_colors_to_html('%rHello%n world')
+        moo_colors_to_html('%rHello&n world')
         # '<span class="cr">Hello</span> world'
 
         moo_colors_to_html('100%%')
         # '100%'
 
-        moo_colors_to_html('%<#FF0000>red%n')
+        moo_colors_to_html('&<#FF0000>red&n')
         # '<span style="color:#FF0000">red</span>'
     """
     # Replace escaped %% with a null-byte placeholder before processing,
@@ -204,7 +204,7 @@ def moo_colors_to_html(text: str) -> str:
 
 def _extended_to_span(inner: str) -> str | None:
     """
-    Convert the content inside a ``%<...>`` extended color code to an
+    Convert the content inside a ``&<...>`` extended color code to an
     opening ``<span>`` tag.
 
     Supports three formats:
@@ -215,7 +215,7 @@ def _extended_to_span(inner: str) -> str | None:
       background-color variants of the above.
 
     Args:
-        inner: Content between ``%<`` and ``>``
+        inner: Content between ``&<`` and ``>``
                (e.g. ``"245"``, ``"#FF0000"``, ``"bg123"``).
 
     Returns:
@@ -328,4 +328,4 @@ def ansi_to_html(text: str) -> str:
     Returns:
         HTML string with all text content escaped.
     """
-    return moo_colors_to_html(text.replace('%', '%%'))
+    return moo_colors_to_html(text.replace('&', '&&'))

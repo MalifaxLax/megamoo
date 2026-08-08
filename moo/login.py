@@ -339,12 +339,12 @@ class LoginHandler:
         # object, which held 'beta 0.7.0' -- an engine version copied into
         # the database once and left to rot, so a 0.9 server introduced
         # itself as 0.7.  SERVER_VERSION cannot drift.
-        await send(f"%<245>({SERVER_VERSION})%n")
+        await send(f"&<245>({SERVER_VERSION})&n")
         await send("")
 
         for _ in range(max_attempts):
             # --- Username prompt ---
-            await send("Enter your username or %<245>NEW%n to create a new account: ",
+            await send("Enter your username or &<245>NEW&n to create a new account: ",
                        add_newline=False)
 
             name = await read_line()

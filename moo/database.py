@@ -426,7 +426,7 @@ class Database:
         # Create checkpoint directory
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now().strftime('&Y&m&d_&H&M&S')
         checkpoint_file = self.checkpoint_dir / f'checkpoint_{timestamp}.sqlite'
 
         # Use SQLite's built-in backup for a consistent snapshot

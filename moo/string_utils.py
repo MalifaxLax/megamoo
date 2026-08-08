@@ -6,11 +6,11 @@ throughout the MegaMOO server.  It handles three major areas:
 
 1. **Emit Substitution (esub)** -- Replaces placeholder tokens in message
    strings with object names.  This is the primary mechanism verbs use to
-   build contextual output, e.g. ``"%S attacks %d!"`` becomes
+   build contextual output, e.g. ``"&S attacks &d!"`` becomes
    ``"Gandalf attacks the orc!"``.
 
 2. **Pronoun Substitution (psub1 / psub2)** -- Resolves gendered pronoun
-   tokens (``%EPS``, ``%OPO``, etc.) against one or two game objects,
+   tokens (``&EPS``, ``&OPO``, etc.) against one or two game objects,
    allowing gender-correct prose like ``"He draws his sword"`` or
    ``"They ready their staff"``.
 
@@ -25,8 +25,8 @@ idiomatic way to access all utilities::
 
     from moo.string_utils import su
 
-    text = su.esub("You attack %d!", sub=player, dob=target)
-    text = su.psub1("%CN draws %EPP sword.", eobj=player)
+    text = su.esub("You attack &d!", sub=player, dob=target)
+    text = su.psub1("&CN draws &EPP sword.", eobj=player)
     english = su.listtoenglish(["a sword", "a shield", "a helm"])
 
 This mirrors the Evennia convention of providing a lightweight, stateless
@@ -36,21 +36,21 @@ issues.
 Token Reference
 ---------------
 Emit tokens (esub):
-    %s / %S   -- subject name / cname (capitalised display name)
-    %d / %D   -- direct-object name / cname
-    %i / %I   -- indirect-object name / cname
-    %u / %U   -- noun string (from uob) / capitalised noun
-    %ps/%po/%pp/%pa/%pr -- gender pronouns resolved from the subject
+    &s / &S   -- subject name / cname (capitalised display name)
+    &d / &D   -- direct-object name / cname
+    &i / &I   -- indirect-object name / cname
+    &u / &U   -- noun string (from uob) / capitalised noun
+    &ps/&po/&pp/&pa/&pr -- gender pronouns resolved from the subject
 
 Enactor pronoun tokens (psub1):
-    %N / %CN             -- enactor name / cname
-    %EPS / %EPO / %EPP / %EPR  -- enactor pronouns (subject/object/possessive/reflexive)
-    %CEPS / %CEPO / %CEPP / %CEPR  -- capitalised enactor pronouns
+    &N / &CN             -- enactor name / cname
+    &EPS / &EPO / &EPP / &EPR  -- enactor pronouns (subject/object/possessive/reflexive)
+    &CEPS / &CEPO / &CEPP / &CEPR  -- capitalised enactor pronouns
 
 Target pronoun tokens (psub2, in addition to psub1):
-    %T / %CT             -- target name / cname
-    %OPS / %OPO / %OPP / %OPR  -- target pronouns
-    %COPS / %COPO / %COPP / %COPR  -- capitalised target pronouns
+    &T / &CT             -- target name / cname
+    &OPS / &OPO / &OPP / &OPR  -- target pronouns
+    &COPS / &COPO / &COPP / &COPR  -- capitalised target pronouns
 
 Ported from the Evennia StringUtils module.
 
@@ -70,7 +70,7 @@ def _sub_token(text: str, letter: str, value: str) -> str:
     """
     Replace one token under every recognised sigil.
 
-    Each token used to be spelled out twice -- ``'%d'`` and ``'$d'`` -- so
+    Each token used to be spelled out twice -- ``'&d'`` and ``'$d'`` -- so
     adding a third sigil would have meant editing ten call sites and
     getting one of them wrong.  Driving it from ``SUBST_SIGILS`` means the
     set of prefixes is stated once, in globals.
@@ -92,7 +92,7 @@ def _has_token(text: str, letters: str) -> bool:
     """
     Whether *text* contains ``<sigil><letters>`` under any sigil.
 
-    The fast-path guards used to test for a literal ``'%E'``.  After the
+    The fast-path guards used to test for a literal ``'&E'``.  After the
     tokens moved to ``&`` those guards were false for every converted
     string, so the substitution block beneath each one was skipped
     silently -- the text came out with ``&EPP`` still in it.  A guard that
@@ -196,19 +196,19 @@ class StringUtils:
 
         This method is designed to be passed as the *repl* argument to
         ``re.sub`` (via a lambda).  It reads the matched token (e.g.
-        ``%ps``, ``%PO``), looks up the corresponding pronoun in the
+        ``&ps``, ``&PO``), looks up the corresponding pronoun in the
         source object's gender map, and returns the correctly-cased
         result.
 
         Capitalisation rule:
             If the *second* character of the token is uppercase (e.g.
-            ``%Ps`` or ``%PO``), the returned pronoun is capitalised.
+            ``&Ps`` or ``&PO``), the returned pronoun is capitalised.
             Otherwise it is returned in lowercase.
 
         Args:
             regex_match: A ``re.Match`` object from ``RE_GENDER_PRONOUN``.
                          The full match is expected to be a string like
-                         ``%ps``, ``%Po``, ``%PP``, etc.
+                         ``&ps``, ``&Po``, ``&PP``, etc.
             source:      The game object whose gender determines which
                          pronoun set to use.  If ``None``, the raw token
                          is returned unchanged.
@@ -238,35 +238,35 @@ class StringUtils:
         ``esub`` returns the final display text.
 
         Token replacement order:
-            0. ``%0`` / ``%1`` ... ``%N`` -- raw strings from *svals*
-               (each ``sN`` kwarg fills the matching ``%N`` token).
-            1. ``%u`` / ``%U`` -- noun from *uob* (if provided).
-            2. Gender pronouns (``%ps``, ``%po``, etc.) -- resolved from
+            0. ``&0`` / ``&1`` ... ``&N`` -- raw strings from *svals*
+               (each ``sN`` kwarg fills the matching ``&N`` token).
+            1. ``&u`` / ``&U`` -- noun from *uob* (if provided).
+            2. Gender pronouns (``&ps``, ``&po``, etc.) -- resolved from
                *sub*'s gender.
-            3. ``%s`` / ``%S`` -- subject name / cname from *sub*.
-            4. ``%d`` / ``%D`` -- direct-object name / cname from *dob*.
-            5. ``%i`` / ``%I`` -- indirect-object name / cname from *iob*.
+            3. ``&s`` / ``&S`` -- subject name / cname from *sub*.
+            4. ``&d`` / ``&D`` -- direct-object name / cname from *dob*.
+            5. ``&i`` / ``&I`` -- indirect-object name / cname from *iob*.
 
         The order matters: gender-pronoun tokens are processed *before*
-        ``%s``/``%S`` so that a ``%s`` inside a pronoun token does not
+        ``&s``/``&S`` so that a ``&s`` inside a pronoun token does not
         cause a premature replacement.
 
         Args:
             text (str): The template string containing tokens to replace.
                 If ``None`` or not a string, it is returned unchanged.
-            sub (MOOObject, optional):  Subject object. Used for ``%s``,
-                ``%S``, and all gender-pronoun tokens.
-            dob (MOOObject, optional):  Direct object. Used for ``%d``
-                and ``%D``.
-            iob (MOOObject, optional):  Indirect object. Used for ``%i``
-                and ``%I``.
-            uob (MOOObject, optional):  Noun object. ``%u`` and ``%U``
+            sub (MOOObject, optional):  Subject object. Used for ``&s``,
+                ``&S``, and all gender-pronoun tokens.
+            dob (MOOObject, optional):  Direct object. Used for ``&d``
+                and ``&D``.
+            iob (MOOObject, optional):  Indirect object. Used for ``&i``
+                and ``&I``.
+            uob (MOOObject, optional):  Noun object. ``&u`` and ``&U``
                 are replaced with its ``noun`` property.
             svals (dict, optional):  Raw-string slots keyed ``'s0'``,
-                ``'s1'``, ... -- each replaces the matching ``%N``/``$N``
+                ``'s1'``, ... -- each replaces the matching ``&N``/``$N``
                 token verbatim (no object lookup; the kwarg keeps its ``s``
-                prefix, the token drops it -- ``s1`` fills ``%1``).  Unlike
-                %d/%i, the value is used as-is, so this is the way to splice
+                prefix, the token drops it -- ``s1`` fills ``&1``).  Unlike
+                &d/&i, the value is used as-is, so this is the way to splice
                 plain strings.
 
         Returns:
@@ -275,14 +275,14 @@ class StringUtils:
 
         Examples::
 
-            su.esub("You attack %d!", sub=player, dob=orc)
+            su.esub("You attack &d!", sub=player, dob=orc)
             # => "You attack the orc!"
 
-            su.esub("%S picks up %d.", sub=player, dob=sword)
+            su.esub("&S picks up &d.", sub=player, dob=sword)
             # => "Gandalf picks up the sword."
 
-            su.esub("%S says '%1'.", sub=player, svals={'s1': 'Hi!'})
-            # => "Gandalf says 'Hi!'."  (s1 kwarg fills the %1 token)
+            su.esub("&S says '&1'.", sub=player, svals={'s1': 'Hi!'})
+            # => "Gandalf says 'Hi!'."  (s1 kwarg fills the &1 token)
         """
         if not text or not isinstance(text, str):
             return text
@@ -348,21 +348,21 @@ class StringUtils:
 
         Supported tokens::
 
-            %N   -> eobj.name          %CN  -> eobj.cname
-            %EPS -> he/she/they         %CEPS -> He/She/They
-            %EPO -> him/her/them        %CEPO -> Him/Her/Them
-            %EPP -> his/her/their       %CEPP -> His/Her/Their
-            %EPR -> himself/herself     %CEPR -> Himself/Herself
+            &N   -> eobj.name          &CN  -> eobj.cname
+            &EPS -> he/she/they         &CEPS -> He/She/They
+            &EPO -> him/her/them        &CEPO -> Him/Her/Them
+            &EPP -> his/her/their       &CEPP -> His/Her/Their
+            &EPR -> himself/herself     &CEPR -> Himself/Herself
 
-        The ``%E``-prefixed tokens use the enactor's gender to select the
+        The ``&E``-prefixed tokens use the enactor's gender to select the
         correct pronoun.  ``%CE``-prefixed tokens are the capitalised
         variants.
 
         Replacement order:
-            Reflexive (``%EPR``) is replaced before possessive (``%EPP``)
-            before objective (``%EPO``) before subjective (``%EPS``).
+            Reflexive (``&EPR``) is replaced before possessive (``&EPP``)
+            before objective (``&EPO``) before subjective (``&EPS``).
             This prevents shorter tokens from matching inside longer ones
-            (e.g. ``%EPS`` matching the start of ``%EPSOMETHING``).
+            (e.g. ``&EPS`` matching the start of ``&EPSOMETHING``).
 
         Args:
             tstr (str): Template string with pronoun tokens.
@@ -374,7 +374,7 @@ class StringUtils:
 
         Example::
 
-            su.psub1("%CN draws %EPP sword.", eobj=player)
+            su.psub1("&CN draws &EPP sword.", eobj=player)
             # Male:    "Aragorn draws his sword."
             # Female:  "Arwen draws her sword."
             # Neutral: "Golem draws its sword."
@@ -408,24 +408,24 @@ class StringUtils:
         """
         Single-enactor pronoun substitution with positional arguments.
 
-        Extends :meth:`psub1` by also replacing ``%1``, ``%2``, and
-        ``%3`` with the supplied string arguments.  This is useful for
+        Extends :meth:`psub1` by also replacing ``&1``, ``&2``, and
+        ``&3`` with the supplied string arguments.  This is useful for
         verbs that need to insert arbitrary text alongside pronoun-
         resolved output.
 
         Args:
             tstr (str): Template string.
             eobj (MOOObject, optional): The enactor object.
-            s1 (str): Replacement for ``%1``.
-            s2 (str): Replacement for ``%2``.
-            s3 (str): Replacement for ``%3``.
+            s1 (str): Replacement for ``&1``.
+            s2 (str): Replacement for ``&2``.
+            s3 (str): Replacement for ``&3``.
 
         Returns:
             str: Fully substituted text.
 
         Example::
 
-            su.psub1a("%CN says '%1' to %2.", eobj=player,
+            su.psub1a("&CN says '&1' to &2.", eobj=player,
                       s1="Hello!", s2="the crowd")
             # => "Gandalf says 'Hello!' to the crowd."
         """
@@ -451,14 +451,14 @@ class StringUtils:
 
         Additional target tokens::
 
-            %T   -> tobj.name          %CT  -> tobj.cname
-            %OPS -> he/she/they         %COPS -> He/She/They
-            %OPO -> him/her/them        %COPO -> Him/Her/Them
-            %OPP -> his/her/their       %COPP -> His/Her/Their
-            %OPR -> himself/herself     %COPR -> Himself/Herself
+            &T   -> tobj.name          &CT  -> tobj.cname
+            &OPS -> he/she/they         &COPS -> He/She/They
+            &OPO -> him/her/them        &COPO -> Him/Her/Them
+            &OPP -> his/her/their       &COPP -> His/Her/Their
+            &OPR -> himself/herself     &COPR -> Himself/Herself
 
-        The ``%O``-prefixed tokens use the **target's** gender, while
-        ``%E``-prefixed tokens (handled by psub1) use the **enactor's**
+        The ``&O``-prefixed tokens use the **target's** gender, while
+        ``&E``-prefixed tokens (handled by psub1) use the **enactor's**
         gender.
 
         Args:
@@ -472,7 +472,7 @@ class StringUtils:
 
         Example::
 
-            su.psub2("%CN attacks %T and hits %OPO!", eobj=player, tobj=orc)
+            su.psub2("&CN attacks &T and hits &OPO!", eobj=player, tobj=orc)
             # => "Gandalf attacks the orc and hits it!"
         """
         # First pass: resolve enactor tokens
@@ -505,23 +505,23 @@ class StringUtils:
         """
         Two-actor pronoun substitution with positional arguments.
 
-        Extends :meth:`psub2` by also replacing ``%1``, ``%2``, and
-        ``%3`` with the supplied string arguments.
+        Extends :meth:`psub2` by also replacing ``&1``, ``&2``, and
+        ``&3`` with the supplied string arguments.
 
         Args:
             tstr (str): Template string.
             eobj (MOOObject, optional): The enactor object.
             tobj (MOOObject, optional): The target object.
-            s1 (str): Replacement for ``%1``.
-            s2 (str): Replacement for ``%2``.
-            s3 (str): Replacement for ``%3``.
+            s1 (str): Replacement for ``&1``.
+            s2 (str): Replacement for ``&2``.
+            s3 (str): Replacement for ``&3``.
 
         Returns:
             str: Fully substituted text.
 
         Example::
 
-            su.psub2a("%CN gives %1 to %T.", eobj=player, tobj=npc,
+            su.psub2a("&CN gives &1 to &T.", eobj=player, tobj=npc,
                       s1="a golden ring")
             # => "Frodo gives a golden ring to Samwise."
         """

@@ -103,8 +103,36 @@ def test_program_writes_disk_before_the_database():
     from moo import builtins
 
     src = inspect.getsource(builtins.program_verb)
-    disk = src.index('os.fsync')
+    disk = src.index('write_verb_file(')
     saved = src.index('db.save_object(target)')
     assert disk < saved, 'the file must be written before the database'
     assert src.count('yield "Overwrite') + src.count('yield f"Overwrite') == 1, \
         'exactly one overwrite confirmation, covering both copies'
+
+
+def test_port_writes_disk_before_the_database_too():
+    """
+    @port follows the same rule as @program.
+
+    It used to write only the database, so a ported verb was live but had
+    no file in the tree git tracks -- present until the next time anyone
+    touched that path, and invisible to every file-based tool until then.
+    """
+    import inspect
+    from moo import builtins
+
+    src = inspect.getsource(builtins.port_verb)
+    assert 'write_verb_file(' in src, '@port must write the file'
+    assert src.index('write_verb_file(') < src.index('db.save_object(target)')
+
+
+def test_both_commands_share_one_disk_write():
+    """One implementation of the rule, not one per command."""
+    import inspect
+    from moo import builtins
+
+    for fn in (builtins.program_verb, builtins.port_verb):
+        src = inspect.getsource(fn)
+        assert 'os.fsync' not in src, (
+            f'{fn.__name__} has its own disk write; '
+            f'it should call write_verb_file()')

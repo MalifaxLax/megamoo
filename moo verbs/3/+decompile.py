@@ -95,7 +95,7 @@ for n in range(first, last + 1):
     line = lines[n - 1]
     # Escape % or the output goes through esub and %i turns into inverse
     # video -- the same trap that bit the raw-value display in @ex.
-    shown = line.replace('%', '%%')
+    shown = line.replace('&', '&&')
     if 'line' in switches:
         pobj.msg(f"&<245>{n:>{width}}&n {shown}")
     else:

@@ -297,7 +297,7 @@ elif prep == '=':
         value = [value]
     for entry in value:
         if not isinstance(entry, list) or len(entry) != 2:
-            pobj.msg("Each entry must be [pos, layer]. Bad entry: %s" % repr(entry).replace('%', '%%'))
+            pobj.msg("Each entry must be [pos, layer]. Bad entry: %s" % repr(entry).replace('&', '&&'))
             return
         if not valid_pos(entry[0]):
             pobj.msg("Unknown position: %d" % entry[0])
