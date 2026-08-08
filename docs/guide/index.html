@@ -57,7 +57,7 @@
     <p class="download">
         <a href="https://github.com/MalifaxLax/megamoo/releases">Download MegaMOO</a>
         <a class="secondary" href="https://github.com/MalifaxLax/megamoo">Source on GitHub</a>
-        <span class="meta">Engine and starter world · Python 3.10+ · nothing to install</span>
+        <span class="meta">Engine and starter world · Python 3.10+ · zero dependencies</span>
     </p>
 </header>
 
@@ -97,23 +97,25 @@ JavaScript. Telnet players and browser players share the same world.
 See <a href="web-client.html">The Web Client</a>.
 </p>
 
-<h3>A small footprint and nothing to install</h3>
+<h3>A small footprint</h3>
 
 <p>
-MegaMOO is one Python process and one database file. There is no web server to
-configure, no database server to administer, no package manager to satisfy, and
-no build step. The engine has <strong>zero third-party dependencies</strong> —
-it runs on a stock Python 3 install. Copy the folder to a machine, run one
-command, and the world is up. (The one vendored library anywhere in the
-project is the Lua interpreter the browser client's optional scripting host
-uses; it ships as a static file, so there is still nothing to install.)
+MegaMOO is one Python process and one database file. Installing it is
+<code>pip install megamoo</code>, and that is the whole of it: the engine
+has <strong>zero third-party dependencies</strong>, so there is nothing
+further to satisfy — no web server to configure, no database server to
+administer, no build step, nothing to compile. (The one vendored library
+anywhere in the project is the Lua interpreter the browser client's
+optional scripting host uses; it ships as a static file.)
 </p>
 
 <p>
 That matters more than it sounds. It means a world costs nothing to keep
-running, can live on a laptop or the cheapest VPS you can rent, and can be
-backed up by copying a single file. It also means you can run five worlds at
-once on one machine without them interfering with each other.
+running and can live on a laptop or the cheapest VPS you can rent. The
+running world is a single file you can copy; the source you write —
+<code>verbs/</code> and <code>game/</code> — is an ordinary directory that
+belongs in git. And you can run five worlds at once on one machine without
+them interfering with each other.
 </p>
 
 <h3>Built to be worked on with an AI assistant</h3>
