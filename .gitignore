@@ -39,3 +39,8 @@ imports/
 # into "moo verbs/" once it works.  Keeping it out of git is the point:
 # a scratch tree that gets committed is just a second real tree.
 test verbs/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/

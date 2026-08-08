@@ -4,7 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "megamoo"
-version = "0.9.0b0"
+# Keep in step with moo.globals.SERVER_VERSION; a test enforces it.
+# PEP 440 spelling here, human spelling there.
+version = "0.10.0b0"
 description = "A programmable, persistent, multiplayer text world engine — the LambdaMOO model, with verbs written in Python"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -44,7 +46,17 @@ megamoo = "moo.cli:main"
 packages = ["moo", "moo.web"]
 
 [tool.setuptools.package-data]
-"moo" = ["templates/starter/world.db", "templates/starter/verbs/*/*.py"]
+# The second verb pattern is not redundant: setuptools globs with
+# glob.glob, which does not match leading-dot filenames, and a verb may
+# legitimately be named `.` -- the repeat-last-command verb is stored as
+# `verbs/15/..py`.  Without this it is dropped from the wheel silently,
+# and a pip-installed `megamoo init` produces a game whose world knows
+# about a verb that has no file behind it.
+"moo" = [
+    "templates/starter/world.db",
+    "templates/starter/verbs/*/*.py",
+    "templates/starter/verbs/*/.*.py",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

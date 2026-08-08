@@ -80,3 +80,22 @@ def test_the_engine_imports_without_being_the_working_directory():
     )
     assert out.returncode == 0, out.stderr
     assert 'main' in out.stdout
+
+
+def test_the_two_version_strings_agree():
+    """
+    One release, one number.
+
+    The version is spelled twice -- PEP 440 in pyproject for the package
+    index, human-readable in globals for the login banner -- and two
+    places holding one fact drift.  This repository has already been
+    bitten by that exact shape: a world version written by hand into the
+    login art while the login screen printed a different one read from
+    an in-world object.
+    """
+    from moo.globals import SERVER_VERSION
+
+    packaged = _pyproject()['project']['version']          # 0.10.0b0
+    shown = SERVER_VERSION                                 # 0.10.0-beta
+    assert packaged.replace('b0', '') == shown.replace('-beta', ''), (
+        f'pyproject says {packaged}, globals says {shown}')
