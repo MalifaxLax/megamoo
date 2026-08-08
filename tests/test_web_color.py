@@ -12,7 +12,7 @@ from moo.web.color import moo_colors_to_html, ansi_to_html
 # ---------------------------------------------------------------------------
 
 def test_basic_code_becomes_span():
-    assert moo_colors_to_html('%r!alert%n done') == \
+    assert moo_colors_to_html('&r!alert&n done') == \
         '<span class="cr">!alert</span> done'
 
 
@@ -25,13 +25,26 @@ def test_letter_after_code_means_it_is_not_a_code():
 
 
 def test_xterm_256_and_hex():
-    assert moo_colors_to_html('%<245>dim%n') == '<span class="c245">dim</span>'
-    assert moo_colors_to_html('%<#FF0000>red%n') == \
+    assert moo_colors_to_html('&<245>dim&n') == '<span class="c245">dim</span>'
+    assert moo_colors_to_html('&<#FF0000>red&n') == \
         '<span style="color:#FF0000">red</span>'
 
 
-def test_escaped_percent_is_literal():
-    assert moo_colors_to_html('100%%') == '100%'
+def test_doubled_sigil_is_a_literal_sigil():
+    assert moo_colors_to_html('100&&') == '100&'
+
+
+def test_a_bare_percent_is_ordinary_text():
+    """
+    The reason the sigil moved off '%' at all.
+
+    While '%' introduced colour, a literal per-cent sign in game text had
+    to be escaped, and '"%<245>%s" % name' raised ValueError -- Python's
+    formatting operator colliding with the engine's display syntax.  It
+    must now survive untouched.
+    """
+    assert moo_colors_to_html('50% off') == '50% off'
+    assert moo_colors_to_html('100%') == '100%'
 
 
 def test_markup_in_game_text_is_escaped():
@@ -41,7 +54,7 @@ def test_markup_in_game_text_is_escaped():
 
 
 def test_unclosed_spans_are_closed_at_end():
-    assert moo_colors_to_html('%r!danger').endswith('</span>')
+    assert moo_colors_to_html('&r!danger').endswith('</span>')
 
 
 # ---------------------------------------------------------------------------
@@ -82,21 +95,21 @@ def test_ansi_embedded_in_moo_coded_text():
     handling resets it.  That escape reached the browser as invisible junk
     in the middle of the sentence.
     """
-    out = moo_colors_to_html('%<245>Obvious Exits: `south`\x1b[38;5;245m%n')
+    out = moo_colors_to_html('&<245>Obvious Exits: `south`\x1b[38;5;245m&n')
     assert '\x1b' not in out
     assert out.count('<span class="c245">') == 2
     assert 'Obvious Exits: `south`' in out
 
 
 def test_ansi_colour_before_a_letter_still_renders():
-    # "\x1b[31mred" cannot be routed through the MOO notation first: "%r"
+    # "\x1b[31mred" cannot be routed through the MOO notation first: "&r"
     # followed by a letter is deliberately not a code, so the colour would
     # silently vanish.
     assert moo_colors_to_html('\x1b[31mred') == '<span class="cr">red</span>'
 
 
 def test_ansi_reset_closes_moo_opened_spans():
-    out = moo_colors_to_html('%<245>dim\x1b[0mplain')
+    out = moo_colors_to_html('&<245>dim\x1b[0mplain')
     assert out == '<span class="c245">dim</span>plain'
 
 

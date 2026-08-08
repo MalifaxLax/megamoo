@@ -63,6 +63,8 @@ escape codes instead (handled by the telnet connection module).
 """
 
 import re
+
+from ..globals import SIGIL
 import html as _html
 
 
@@ -105,7 +107,7 @@ def moo_colors_to_html(text: str) -> str:
 
     Examples::
 
-        moo_colors_to_html('%rHello&n world')
+        moo_colors_to_html('&rHello&n world')
         # '<span class="cr">Hello</span> world'
 
         moo_colors_to_html('100%%')
@@ -117,7 +119,7 @@ def moo_colors_to_html(text: str) -> str:
     # Replace escaped %% with a null-byte placeholder before processing,
     # so we don't accidentally interpret it as a color code
     PLACEHOLDER = '\x00PCT\x00'
-    text = text.replace('%%', PLACEHOLDER)
+    text = text.replace(SIGIL + SIGIL, PLACEHOLDER)
 
     result = []
     open_spans = 0  # Track number of open <span> tags for proper closing
@@ -141,7 +143,7 @@ def moo_colors_to_html(text: str) -> str:
                 continue
 
         # --- Try extended code: %<...> ---
-        if text[pos] == '%' and pos + 1 < len(text) and text[pos + 1] == '<':
+        if text[pos] == SIGIL and pos + 1 < len(text) and text[pos + 1] == '<':
             close = text.find('>', pos + 2)
             if close != -1:
                 inner = text[pos + 2:close]
@@ -153,7 +155,7 @@ def moo_colors_to_html(text: str) -> str:
                     continue
 
         # --- Try basic code: %X (single letter) ---
-        if text[pos] == '%' and pos + 1 < len(text) and text[pos + 1].isalpha():
+        if text[pos] == SIGIL and pos + 1 < len(text) and text[pos + 1].isalpha():
             # Ensure this is a single-letter code, not a multi-letter word
             # (the next-next char must not be alphabetic)
             next_next = text[pos + 2] if pos + 2 < len(text) else ''
@@ -176,7 +178,7 @@ def moo_colors_to_html(text: str) -> str:
         ch = text[pos]
         if ch == PLACEHOLDER[0] and text[pos:pos + len(PLACEHOLDER)] == PLACEHOLDER:
             # Restore escaped %% as a literal %
-            result.append('%')
+            result.append(SIGIL)
             pos += len(PLACEHOLDER)
         elif ch == '&':
             result.append('&amp;')

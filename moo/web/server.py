@@ -175,7 +175,15 @@ class WebServer:
         if self._port != first:
             logger.warning(f"Web port {first} in use; "
                            f"auto-selected {self._port}")
+        # A host:port in a log line is not an invitation.  Print the URL
+        # somebody can actually click, using a host a browser will accept
+        # -- 0.0.0.0 means "every interface" to a listener and nothing at
+        # all to a browser.
+        shown = ('127.0.0.1' if self._host in ('0.0.0.0', '', None)
+                 else self._host)
         logger.info(f"Web client listening on {self._host}:{self._port}")
+        print(f"\n    Play in a browser:  http://{shown}:{self._port}/\n",
+              flush=True)
 
     @property
     def port(self) -> int:

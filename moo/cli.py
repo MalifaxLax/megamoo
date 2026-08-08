@@ -204,6 +204,17 @@ def _apply_dev_defaults(args):
         key = str(pathlib.Path(args.database).resolve()).replace('/', '_')
         os.environ['MEGAMOO_API_INFO_PATH'] = str(run_dir / f'{key}.api.json')
 
+    # The browser client, on, without being asked.
+    #
+    # It was behind a flag people had to know existed, which is a poor
+    # way to ship a first-party client -- especially the one a newcomer
+    # is most likely to want, since it needs no telnet client and no
+    # explaining.  Dev mode is local and single-developer, so there is no
+    # reason to make it opt-in here.  A public deployment still says
+    # --web deliberately, because serving it without --web-origins is a
+    # real exposure rather than a preference.
+    args.web = True
+
     os.environ.setdefault('MEGAMOO_DEV_AUTORELOAD_VERBS', 'true')
 
 
@@ -517,6 +528,19 @@ Examples:
             logger.info(f"Starting server on {args.host}:{args.port}")
             logger.info(f"Database: {args.database}")
             
+            # Serving the browser client on a public interface without
+            # naming the origins allowed to open a socket is the one way
+            # to get this badly wrong: the browser same-origin policy
+            # does not cover WebSockets, so any page a logged-in player
+            # visits could open an authenticated socket as them.
+            if (args.web and not args.web_origins
+                    and args.host not in (None, '127.0.0.1', 'localhost')):
+                logger.warning(
+                    'Web client is reachable on %s with no --web-origins '
+                    'set: any page a logged-in player visits can open a '
+                    'socket to this world in their name. Name the origins '
+                    'you serve from.', args.host)
+
             # run_server handles everything from here
             run_server(args.database, args.port, args.host,
                        config_path=args.config_file,
