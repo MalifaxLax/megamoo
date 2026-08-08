@@ -221,7 +221,7 @@ else:
         move(_u, goods)
         _in.append(_u.objnum)
         _wsum += _u.weight or 0
-        _vsum += _u.volume or 0
+        _vsum += getattr(_u, 'volume', None) or 0
     goods.in_contents = _in
     goods.current_weight_in = _wsum
     goods.current_vol = _vsum

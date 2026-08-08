@@ -40,7 +40,7 @@ if not dest or not dest.has_property('is_room', database=db):
 
 # Determine movement mode based on player position (standing, crawling, etc.)
 pos = player.position or 0
-walk = player.walk
+walk = getattr(player, 'walk', None)
 if walk and pos == 0:
     # Player has a custom walk style override
     mode, omode = walk[0], walk[1]

@@ -152,7 +152,7 @@ call_verb(pobj, 'move_to_hand', dobj=item)
 revlist = []
 seen_rev = set()
 nude_pos = item.nude_pos or []
-nudestr = pobj.nude_str or ['' for _ in range(47)]
+nudestr = getattr(pobj, 'nude_str', None) or ['' for _ in range(47)]
 
 for bodyloc in positions_to_remove:
     # If removed item had flex here, items underneath were already visible

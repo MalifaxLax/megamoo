@@ -49,7 +49,7 @@ move(item, pobj)
 call_verb(pobj, 'move_to_hand', dobj=item)
 
 # Update tracking
-item_area = item.area or 0
+item_area = getattr(item, 'area', None) or 0
 this.on_contents = [n for n in raw if n != item.objnum]
 this.on_area = max((this.on_area or 0) - item_area, 0)
 

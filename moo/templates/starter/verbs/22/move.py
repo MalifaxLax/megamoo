@@ -21,7 +21,7 @@ if this.closed:
         msg_all(player.location, su.psub1(ofail, player), exclude=[player])
     return
 locklist = this.locklist
-if locklist and not player.is_royal:
+if locklist and not getattr(player, 'is_royal', None):
     lockfunc = locklist[1] if len(locklist) > 1 else None
     if lockfunc:
         call_verb(this, lockfunc)

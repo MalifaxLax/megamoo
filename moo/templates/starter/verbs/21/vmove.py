@@ -61,7 +61,7 @@ odrop = edata[4] if len(edata) > 4 else ''
 # Determine movement mode based on player position and room settings
 # position 0 = standing (default), higher values = sitting, lying, etc.
 pos = player.position or 0
-walk = player.walk
+walk = getattr(player, 'walk', None)
 if walk and pos == 0:
     # Player has a custom walk style override
     mode, omode = walk[0], walk[1]

@@ -47,7 +47,7 @@ if cx and cy and (ix or iy or iz):
         return True
 
 # Check area
-item_area = item.area or 0
+item_area = getattr(item, 'area', None) or 0
 cur_area = this.on_area or 0
 if cur_area + item_area > max_area:
     pobj.msg("There's no room on &d to put that.", dob=this)

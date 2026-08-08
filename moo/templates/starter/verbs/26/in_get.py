@@ -46,7 +46,7 @@ if free_hands == 0 or (item_hands == 2 and free_hands < 2):
 # Check carry capacity
 item_weight = item.weight or 0
 cur_load = pobj.load or 0
-max_load = pobj.max_load or 0
+max_load = getattr(pobj, 'max_load', None) or 0
 if max_load and cur_load + item_weight > max_load:
     pobj.msg("You can't pick up anything else right now.")
     return
@@ -65,7 +65,7 @@ move(item, pobj)
 call_verb(pobj, 'move_to_hand', dobj=item)
 
 # Update container tracking
-item_vol = item.volume or 0
+item_vol = getattr(item, 'volume', None) or 0
 this.in_contents = [n for n in raw if n != item.objnum]
 this.current_vol = max((this.current_vol or 0) - item_vol, 0)
 this.current_weight_in = max((this.current_weight_in or 0) - item_weight, 0)

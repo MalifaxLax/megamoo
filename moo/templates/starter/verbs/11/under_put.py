@@ -30,7 +30,7 @@ if not max_vol:
     return True
 
 # Check volume
-item_vol = item.volume or 0
+item_vol = getattr(item, 'volume', None) or 0
 cur_vol = this.under_vol or 0
 if cur_vol + item_vol > max_vol:
     pobj.msg("There's no room to put &d under there.", dob=item)

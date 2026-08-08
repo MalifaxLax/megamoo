@@ -4,7 +4,7 @@
 # If this.key is set, validates iobj.key matches or is 'skeleton'.
 # Sets locked=True on this and reverse exit.
 
-if not this.lockable:
+if not getattr(this, 'lockable', None):
     player.msg("You can't lock that.")
     return
 

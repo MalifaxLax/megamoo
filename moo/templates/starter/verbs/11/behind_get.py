@@ -49,7 +49,7 @@ move(item, pobj)
 call_verb(pobj, 'move_to_hand', dobj=item)
 
 # Update tracking
-item_vol = item.volume or 0
+item_vol = getattr(item, 'volume', None) or 0
 this.behind_contents = [n for n in raw if n != item.objnum]
 this.behind_vol = max((this.behind_vol or 0) - item_vol, 0)
 

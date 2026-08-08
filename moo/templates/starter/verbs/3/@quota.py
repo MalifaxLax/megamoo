@@ -56,7 +56,7 @@ pobj.msg(f"  {exits:>5}  exit{'' if exits == 1 else 's'}")
 pobj.msg(f"  {things:>5}  other{'' if things == 1 else 's'}")
 pobj.msg("")
 
-quota = target.quota
+quota = getattr(target, 'quota', None)
 
 # A property set through the API arrives as a string, one set by @set as an
 # int.  Both mean the same thing to a person, so take either.

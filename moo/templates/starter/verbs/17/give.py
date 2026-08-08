@@ -69,7 +69,7 @@ except KeyError:
 # Check recipient can carry it
 item_weight = item.weight or 0
 recip_load = recipient.load or 0
-recip_max = recipient.max_load or 0
+recip_max = getattr(recipient, 'max_load', None) or 0
 if recip_max and recip_load + item_weight > recip_max:
     pobj.msg("&I can't carry anything else.", iob=recipient)
     return

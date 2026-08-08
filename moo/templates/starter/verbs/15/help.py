@@ -136,7 +136,7 @@ if topic.startswith('#'):
         return
     else:
         # help #obj — show object.help_text
-        help_text = obj.help_text
+        help_text = getattr(obj, 'help_text', None)
         if not help_text:
             pobj.msg("There's no help for that.")
             return

@@ -53,7 +53,7 @@ if cx and cy and cz and (ix or iy or iz):
         return True
 
 # Check volume
-item_vol = dobj.volume or 0
+item_vol = getattr(dobj, 'volume', None) or 0
 cur_vol = this.current_vol or 0
 max_vol = this.max_vol or 100
 if cur_vol + item_vol > max_vol:

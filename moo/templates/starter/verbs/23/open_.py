@@ -26,7 +26,7 @@ if this.locked:
 if this.latched:
     if this.latchable:
         # Inside (latching side) — always blocked
-        player.msg(this.olaopen or '&D is latched.', dob=this)
+        player.msg(getattr(this, 'olaopen', None) or '&D is latched.', dob=this)
         return True
     else:
         # Outside — check for online characters on the latched side
@@ -40,7 +40,7 @@ if this.latched:
                     _occupied = True
                     break
         if _occupied:
-            player.msg(this.olaopen or '&D is latched.', dob=this)
+            player.msg(getattr(this, 'olaopen', None) or '&D is latched.', dob=this)
             return True
         # No one online inside — silently unlatch both sides
         this.set_property('latched', False, db)

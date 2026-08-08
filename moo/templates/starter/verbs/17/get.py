@@ -81,7 +81,7 @@ if item_hands == 2 and free != 'both':
 # Check carry capacity
 item_weight = item.weight or 0
 cur_load = pobj.load or 0
-max_load = pobj.max_load or 0
+max_load = getattr(pobj, 'max_load', None) or 0
 if max_load and cur_load + item_weight > max_load:
     pobj.msg("You can't pick up anything else right now.")
     return
