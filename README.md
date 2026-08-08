@@ -11,7 +11,7 @@ Where classic MOO servers make you program in a purpose-built MOO language, Mega
 Requires Python 3.10+.
 
 ```bash
-pip install https://github.com/MalifaxLax/megamoo/releases/download/v0.10.0-beta/megamoo-0.10.0b0-py3-none-any.whl
+pip install megamoo
 megamoo init mygame
 cd mygame && megamoo --dev
 ```
@@ -19,10 +19,9 @@ cd mygame && megamoo --dev
 Then open the URL it prints, or `telnet localhost 6770`, and you are in a
 world you can build.
 
-MegaMOO is published on the [releases
-page](https://github.com/MalifaxLax/megamoo/releases). It is not on PyPI
-yet, so `pip install megamoo` will not find it; when it is, that will be
-the shorter way.
+Also on the [releases
+page](https://github.com/MalifaxLax/megamoo/releases) as a wheel, if you
+would rather pin a specific build than take whatever `pip` resolves.
 
 `megamoo --dev` picks the database in the current directory, reloads verbs
 as you edit them, and publishes a discovery file so external tooling can
