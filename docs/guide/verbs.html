@@ -178,10 +178,10 @@ except KeyError:
 
 <span class="c"># Default behaviour, varying by what was pulled.</span>
 if getattr(target, 'is_exit', False):
-    pobj.msg("You tug at %d, but it does not budge.", dob=target)
+    pobj.msg("You tug at &d, but it does not budge.", dob=target)
 else:
-    pobj.msg("You pull %d. Nothing happens.", dob=target)
-    pobj.location.msg_room("%S pulls %d.", exclude=[pobj], sub=pobj, dob=target)</code></div>
+    pobj.msg("You pull &d. Nothing happens.", dob=target)
+    pobj.location.msg_room("&S pulls &d.", exclude=[pobj], sub=pobj, dob=target)</code></div>
 
 <p>
 Now the exception. A marble statue in the library gets its own
@@ -198,7 +198,7 @@ if not getattr(bookcase, 'closed', 0):
     return True
 
 pobj.msg("The statue's arm swings down with a grinding of stone.")
-pobj.location.msg_room("%S pulls the statue's outstretched arm.",
+pobj.location.msg_room("&S pulls the statue's outstretched arm.",
                        exclude=[pobj], sub=pobj)
 call_verb(bookcase, 'open_')
 pobj.location.msg_room("The bookcase swings away from the wall, revealing a passage.")
@@ -524,7 +524,7 @@ passed as <code>tag</code>:
 
 <pre><code># npc_said, on the same object, some time later
 if not ok:
-    this.msg_room("%S looks momentarily vacant.", sub=this)
+    this.msg_room("&S looks momentarily vacant.", sub=this)
     return
 
 import json as _j
@@ -558,8 +558,8 @@ The in-game editor is fine for a few lines. For anything longer you will want
 your own editor, and verbs can live as ordinary files:
 </p>
 
-<div class="term"><code>moo verbs/17/pull.py          <span class="c"># the shared pull verb</span>
-moo verbs/204/pull_.py        <span class="c"># the statue's exception</span></code></div>
+<div class="term"><code>verbs/17/pull.py          <span class="c"># the shared pull verb</span>
+verbs/204/pull_.py        <span class="c"># the statue's exception</span></code></div>
 
 <p>
 The folder is named after the object's number, the file after the verb. When
@@ -619,7 +619,7 @@ Three things make it work in practice:
 
 <ul>
 <li><strong>Work on a scratch world.</strong> Start a copy with
-    <code>./mm scratch.db</code> and have the assistant confirm which world it
+    <code>megamoo --dev scratch.db</code> and have the assistant confirm which world it
     is on before it writes.</li>
 <li><strong>Name the object and the behaviour.</strong> "Add a
     <code>pull_</code> to <code>#204</code> that opens the bookcase and reveals

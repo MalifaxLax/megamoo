@@ -227,13 +227,13 @@ into sees you arrive. Set them with:
 </p>
 
 <div class="term"><code><span class="p">&gt;</span> @success gate = You slip through the gate.
-<span class="p">&gt;</span> @osuccess gate = %S slips through the gate.
-<span class="p">&gt;</span> @odrop gate = %S arrives, breathing hard.</code></div>
+<span class="p">&gt;</span> @osuccess gate = &S slips through the gate.
+<span class="p">&gt;</span> @odrop gate = &S arrives, breathing hard.</code></div>
 
 <p>
 <code>@success</code> and <code>@osuccess</code> shorten to <code>@succ</code>
 and <code>@osucc</code>; <code>@odrop</code> is already short. Give no message
-to clear one. <code>%S</code> stands in for whoever is moving, capitalised.
+to clear one. <code>&S</code> stands in for whoever is moving, capitalised.
 </p>
 
 <h3>The defaults</h3>
@@ -244,8 +244,8 @@ you gave it:
 </p>
 
 <div class="term"><code>success    You %MODE %1.               ->  "You walk north."
-osuccess   %S %OMODE %1.               ->  "Ana walks north."
-odrop      %S %OMODE in from the %1.   ->  "Ana walks in from the south."</code></div>
+osuccess   &S %OMODE %1.               ->  "Ana walks north."
+odrop      &S %OMODE in from the %1.   ->  "Ana walks in from the south."</code></div>
 
 <p>
 <code>%MODE</code> and <code>%OMODE</code> are filled in at the moment someone
@@ -265,8 +265,8 @@ virtual exit — there is no object to name. If you want your own wording
 <div class="term"><code><span class="p">&gt;</span> @open east to #204
 <span class="o">You created a new exit #207:east. Exit linked to: #204:The Old Library</span>
 <span class="p">&gt;</span> @succ east = You duck through the low arch.
-<span class="p">&gt;</span> @osucc east = %S ducks through the low arch.
-<span class="p">&gt;</span> @odrop east = %S ducks in, brushing off dust.
+<span class="p">&gt;</span> @osucc east = &S ducks through the low arch.
+<span class="p">&gt;</span> @odrop east = &S ducks in, brushing off dust.
 <span class="p">&gt;</span> @virtualize east
 <span class="o">Converted #207:an east (east) to virtual exit -&gt; #204:The Old Library.</span>
 <span class="o">Exit object #207 recycled.</span>

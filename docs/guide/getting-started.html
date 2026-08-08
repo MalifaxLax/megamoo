@@ -42,48 +42,53 @@
     </ol>
 </nav>
 
-<h2 id="copy">Copying and naming a world</h2>
+<h2 id="copy">Creating a world</h2>
 
 <p>
-A world is a single file. MegaMOO ships with <code>mm.db</code>, a starter world
-containing the base object library, an out-of-character lobby, a character
-generator, one in-character room, and a wizard account.
+Install the engine, then ask it for a game. What you get is a directory
+that belongs to you — the engine is a dependency, not something you copy
+and edit.
 </p>
+
+<div class="term"><code><span class="p">$</span> pip install megamoo
+<span class="p">$</span> megamoo init mygame
+<span class="o">Created /home/you/mygame</span>
+<span class="o">  212 verb files, a starter world, and an empty game/ package</span></code></div>
 
 <p>
-Do not build in <code>mm.db</code>. Copy it, and build in the copy — so you
-always have a clean starting world to go back to. Give
-<code>megamoo.py</code> two filenames: the world to copy from, and the name of
-the new world.
+Inside <code>mygame</code>:
 </p>
 
-<div class="term"><code><span class="p">$</span> python3 megamoo.py mm.db mygame.db
-<span class="o">Creating new database: mygame.db</span>
-<span class="o">Created database with 157 objects</span>
-<span class="o">Database created successfully at mygame.db</span></code></div>
+<div class="term"><code>world.db        <span class="c"># the live world — objects, properties, players</span>
+verbs/          <span class="c"># the world's code, one file per verb</span>
+game/           <span class="c"># your own Python, imported by verbs</span>
+megamoo.toml    <span class="c"># what to serve, and where</span></code></div>
 
 <p>
-This copies and then <strong>exits</strong>. It does not start the server —
-that is the next command.
+The starter world it copies in contains the base object library, an
+out-of-character lobby, a character generator, one in-character room, and
+a wizard account. Those 212 verb files are <em>yours</em> — edit them
+freely. The engine keeps no copy you have to merge against, so upgrading
+is <code>pip install --upgrade megamoo</code> and nothing you wrote is
+touched.
 </p>
 
-<div class="warn">
-    <span class="label">Three rules for the new name</span>
-    <p>The new name <strong>must end in <code>.db</code></strong>. A name
-       ending in anything else is read as a hostname, and no copy is made. A
-       name that is only digits is read as a port, so
-       <code>megamoo.py mm.db 7777</code> <em>runs</em> <code>mm.db</code>
-       instead of copying it. And if a file of that name already exists it is
-       overwritten without a prompt.</p>
+<div class="note">
+    <span class="label">What belongs in version control</span>
+    <p><code>verbs/</code> and <code>game/</code> are the source of your
+       world and belong in git. <code>world.db</code> is running state —
+       it holds player data and password hashes — and
+       <code>megamoo init</code> writes a <code>.gitignore</code> that
+       keeps it out for you.</p>
 </div>
 
 <h2 id="start">Starting a world</h2>
 
 <p>
-Use the <code>./mm</code> launcher and give it the world to run:
+From inside your game directory:
 </p>
 
-<div class="term"><code><span class="p">$</span> ./mm mygame.db
+<div class="term"><code><span class="p">$</span> megamoo --dev
 <span class="o">Server listening on 0.0.0.0:6770</span>
 <span class="o">API server listening on 127.0.0.1:7778</span></code></div>
 
@@ -94,13 +99,13 @@ assistant work inside the running world.
 </p>
 
 <p>
-You do not choose either number: the launcher takes the first free port from
+You do not choose either number: the server takes the first free port from
 6770 for the game and 7778 for the API, and tells you what it got. If you need
 a specific port — because you have told people where to connect — ask for it,
 and you will either get that port or a clear error:
 </p>
 
-<div class="term"><code><span class="p">$</span> ./mm mygame.db 6777</code></div>
+<div class="term"><code><span class="p">$</span> megamoo --dev --port 6777</code></div>
 
 <p>
 Stop a world with <kbd>Ctrl-C</kbd> in its terminal, or from inside the game
@@ -108,12 +113,15 @@ with <code>@shutdown</code>.
 </p>
 
 <div class="note">
-    <span class="label">What <code>./mm</code> adds</span>
-    <p>It switches on the tooling API, supplies its password from
-       <code>~/.megamoo/token</code>, and turns on verb auto-reload so edits to
-       command files land in the running game. For a public world with real
-       players, run <code>python3 megamoo.py mygame.db</code> instead — the same
-       server with none of those three.</p>
+    <span class="label">What <code>--dev</code> adds</span>
+    <p>It picks the database in the current directory, switches on the
+       tooling API with the shared token from
+       <code>~/.megamoo/token</code>, publishes a discovery file so
+       tooling can find the running world, and turns on verb auto-reload
+       so edits to command files land in the running game. For a public
+       world with real players, name the database instead —
+       <code>megamoo world.db</code> — the same server with none of those
+       four.</p>
 </div>
 
 <h2 id="login">Logging in</h2>
@@ -145,9 +153,9 @@ care about, a scratch copy for trying things that might go badly, and perhaps
 last week's backup for comparison.
 </p>
 
-<div class="term"><code><span class="p">$</span> ./mm mygame.db &amp;      <span class="c"># game 6770, API 7778</span>
-<span class="p">$</span> ./mm scratch.db &amp;     <span class="c"># game 6771, API 7779</span>
-<span class="p">$</span> ./mm backup.db &amp;      <span class="c"># game 6772, API 7780</span></code></div>
+<div class="term"><code><span class="p">$</span> megamoo --dev world.db &amp;      <span class="c"># game 6770, API 7778</span>
+<span class="p">$</span> megamoo --dev scratch.db &amp;    <span class="c"># game 6771, API 7779</span>
+<span class="p">$</span> megamoo --dev backup.db &amp;     <span class="c"># game 6772, API 7780</span></code></div>
 
 <p>
 The same command each time, with nothing to keep track of — each world takes
@@ -157,7 +165,7 @@ the next free ports and reports them. Connect to whichever you want by port:
 
 <p>
 This is what makes copying worlds useful in practice. Testing a risky change
-does not mean backing up and restoring. It means copying the file, running the
+does not mean backing up and restoring. It means copying <code>world.db</code>, running the
 copy alongside the original, breaking it freely, and deleting it when you are
 done.
 </p>
