@@ -1,6 +1,6 @@
 # MegaMOO
 
-A modern, from-scratch text world engine in Python 3, built on the [LambdaMOO](https://en.wikipedia.org/wiki/LambdaMOO) model — a persistent, multiplayer, fully programmable text world. Roughly 75,000 lines of Python built on `asyncio`, with **zero required third-party dependencies**: the core engine runs on the standard library alone.
+A modern, from-scratch text world engine in Python 3, built on the [LambdaMOO](https://en.wikipedia.org/wiki/LambdaMOO) model — a persistent, multiplayer, fully programmable text world. Around 38,000 lines of Python built on `asyncio`, with **zero third-party dependencies**: the engine runs on the standard library alone.
 
 Where classic MOO servers make you program in a purpose-built MOO language, MegaMOO's in-world programming language is **Python itself**. Every verb — from `look` to your own game systems — is a plain Python file with the full standard library available, executed live against a persistent object database.
 
@@ -38,19 +38,38 @@ underneath — are in the developer manual under [`docs/manual/`](docs/manual/).
 
 ## Quick start
 
-Requires Python 3.10+. No `pip install` needed for the core server.
+Requires Python 3.10+.
 
 ```
-python3 megamoo.py mm.db                  # default port 7777
-telnet localhost 7777
+pip install megamoo
+megamoo init mygame
+cd mygame && megamoo --dev
 ```
 
-Optional extras: `bcrypt` for stronger password hashing (salted SHA-256 fallback is built in), `websockets` for browser clients.
+Then `telnet localhost 6770`.
 
-`mm.db` ships with the repository: a starter world with the base object
-hierarchy, character generation, a full building suite of `@`-commands, and a
-starting room to build out from. Point the server at any other filename and it
-initializes a fresh schema instead.
+`megamoo init` gives you a directory that is *yours*:
+
+```
+mygame/
+    world.db        the live world -- objects, properties, players
+    verbs/          the world's code, one file per verb
+    game/           your own Python, imported by verbs
+    megamoo.toml    what to serve, and where
+```
+
+The engine is a dependency, not something you copy and edit. Upgrading is
+`pip install --upgrade megamoo`, and your game is untouched by it.
+
+`megamoo --dev` picks the database in the current directory, reloads verbs
+as you edit them, and publishes a discovery file so external tooling can
+find the running world.
+
+The starter world comes with the base object hierarchy, character
+generation, a building suite of `@`-commands, and a room to build out from.
+
+Optional extras: `bcrypt` for stronger password hashing (a salted SHA-256
+fallback is built in), `websockets` for browser clients.
 
 ## Architecture
 
@@ -68,11 +87,11 @@ initializes a fresh schema instead.
 | Permissions | `moo/permissions.py` | Wizard/programmer/owner hierarchy, quotas |
 | Builtins | `moo/builtins.py` | The function library injected into every verb's namespace |
 
-Game content lives in `moo verbs/<object-number>/<verb-name>.py` — 200+ verb files covering player commands, staff/building tools (66 `@`-commands), character generation, and the edibles/liquids and merchant systems.
+Game content lives in your game's `verbs/<object-number>/<verb-name>.py`. The starter world ships 200+ of them: player commands, staff and building tools (66 `@`-commands), character generation, and the edibles/liquids and merchant systems. They are copied into your game by `megamoo init`, so they are yours to edit — the engine keeps no copy you have to merge against.
 
 ## What a verb looks like
 
-`moo verbs/17/jump.py` — the `jump` command available in every IC room:
+`verbs/17/jump.py` — the `jump` command available in every IC room:
 
 ```python
 """
@@ -205,7 +224,7 @@ Claude Code ──stdio──> tools/megamoo_mcp.py ──TCP/JSON──> ApiSer
 
 ```bash
 pip install mcp
-python3 megamoo.py mm.db --api --api-token <token>        # enable the JSON API
+megamoo --dev                                              # API on, token reused
 claude mcp add megamoo -e MEGAMOO_API_TOKEN=<token> -- python3 ~/sfdev/tools/megamoo_mcp.py
 ```
 
@@ -241,7 +260,7 @@ claude mcp add megamoo -e MEGAMOO_API_TOKEN=<token> -- python3 ~/sfdev/tools/meg
 ### Notes
 
 - TestBot is auto-created on first `run_command` if no character named TestBot exists under `#5 ICharacter`. To use a specific character instead, set `testbot_objnum` in the API config section before starting the server.
-- The integration test suite (`python3 -m pytest tests/`) boots its own server on ports 7901/7902 against a scratch copy of `mm.db`, so it can run while a dev server is up. Two caveats: the test subprocess appends to the shared repo-root `megamoo.log`, and the `mm.db` snapshot is a plain file copy — if the live server is writing heavily at that moment, the copy could be torn. When in doubt, stop the server or run only the unit tests: `python3 -m pytest tests/ --ignore=tests/test_integration_api.py`.
+- The integration test suite (`python3 -m pytest tests/`) boots its own server on ports 7901/7902 against a scratch copy of the starter world, so it can run while a dev server is up. Two caveats: the test subprocess appends to the shared repo-root `megamoo.log`, and the snapshot is a plain file copy — if the live server is writing heavily at that moment, the copy could be torn. When in doubt, stop the server or run only the unit tests: `python3 -m pytest tests/ --ignore=tests/test_integration_api.py`.
 - Design spec: [docs/superpowers/specs/2026-06-12-mcp-server-design.md](docs/superpowers/specs/2026-06-12-mcp-server-design.md)
 
 ## Status
