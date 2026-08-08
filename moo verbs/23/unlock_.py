@@ -5,7 +5,7 @@
 # Sets locked=False on this and reverse exit.
 
 if not this.locked:
-    player.msg(this.culockf or '%D is not locked.', dob=this)
+    player.msg(this.culockf or '&D is not locked.', dob=this)
     return
 
 # Key validation
@@ -20,7 +20,7 @@ if _door_key:
         return
 
 this.set_property('locked', False, db)
-player.msg(this.ulock or 'You unlock %d.', dob=this, iob=iobj)
+player.msg(this.ulock or 'You unlock &d.', dob=this, iob=iobj)
 if not player.invis:
     omsg = this.oulock
     if omsg:

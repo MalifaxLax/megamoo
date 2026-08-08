@@ -23,7 +23,7 @@ if type(dobj) != str and dobj.is_exit:
     return
 
 if not this.open:
-    pobj.msg("%D is closed.", dob=this)
+    pobj.msg("&D is closed.", dob=this)
     return
 
 # Resolve in_contents objnums to objects
@@ -77,8 +77,8 @@ if get_msg and type(get_msg) == list and len(get_msg) >= 2:
     if not pobj.invis:
         location.msg_room(get_msg[1], exclude=[pobj], sub=pobj, dob=item, iob=this)
 else:
-    pobj.msg("You get %d from %i.", dob=item, iob=this)
+    pobj.msg("You get &d from &i.", dob=item, iob=this)
     if not pobj.invis:
-        location.msg_room("%S gets %d from %i.", exclude=[pobj], sub=pobj, dob=item, iob=this)
+        location.msg_room("&S gets &d from &i.", exclude=[pobj], sub=pobj, dob=item, iob=this)
 
 return True

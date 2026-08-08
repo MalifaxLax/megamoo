@@ -25,7 +25,7 @@ _sr = (player.settings or {}).get('screenreader', False)
 if _sr:
     player.msg(f"{_leader}Room: {room.name}")
 else:
-    player.msg(f"{_leader}%<245>{room.name}%n")
+    player.msg(f"{_leader}&<245>{room.name}&n")
 
 # Room description in default text color
 if desc:
@@ -168,6 +168,6 @@ elist += oelist
 elist = ou.order_exits(elist)
 if elist:
     exit_strs = [f"`{e}`\x1b[38;5;245m" for e in elist]
-    player.msg(f"%<245>Obvious Exits: {', '.join(exit_strs)}%n")
+    player.msg(f"&<245>Obvious Exits: {', '.join(exit_strs)}&n")
 else:
-    player.msg("%<245>Obvious Exits: none%n")
+    player.msg("&<245>Obvious Exits: none&n")

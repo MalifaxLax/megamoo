@@ -43,9 +43,9 @@ if not completed:
 
 # Display menu
 pobj.msg("")
-pobj.msg("%<245>=========%n")
+pobj.msg("&<245>=========&n")
 pobj.msg("Become...", sub=pobj, dob=dobj, iob=iobj)
-pobj.msg("%<245>=========%n")
+pobj.msg("&<245>=========&n")
 for i, c in enumerate(completed):
     pobj.msg(f"{i + 1}. {c.noun or c.name}", sub=pobj, dob=dobj, iob=iobj)
 

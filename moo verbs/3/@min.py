@@ -61,4 +61,4 @@ v = matches[0]
 v.min_lengths[verb_name] = min_len
 obj.invalidate_inheritance_cache()
 obj._mark_modified()
-pobj.msg(f"Set min length for %<245>{verb_name}%n on %<245>#{obj.objnum}:{obj.noun}%n to {min_len}.")
+pobj.msg(f"Set min length for &<245>{verb_name}&n on &<245>#{obj.objnum}:{obj.noun}&n to {min_len}.")

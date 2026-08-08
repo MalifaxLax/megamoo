@@ -193,14 +193,14 @@ revstr = (pre_str + ' ' + su.listtoenglish(revlist) + '.') if revlist else '.'
 # --- _doremoveemits() ---
 pname_str = str(item.pname) if item.pname else ''
 lor_label = (resolved_lor + ' ' + pname_str).strip() if resolved_lor else ''
-rem_template = item.remove or "You remove %d"
-orem_template = item.oremove or "%S takes off %d"
-rem_raw = rem_template.replace('%l', lor_label).rstrip('.')
-orem_raw = orem_template.replace('%l', lor_label).rstrip('.')
-if lor_label and '%l' not in rem_template:
+rem_template = item.remove or "You remove &d"
+orem_template = item.oremove or "&S takes off &d"
+rem_raw = rem_template.replace('&l', lor_label).rstrip('.')
+orem_raw = orem_template.replace('&l', lor_label).rstrip('.')
+if lor_label and '&l' not in rem_template:
     rem_raw = rem_raw + ' from your ' + lor_label
-if lor_label and '%l' not in orem_template:
-    orem_raw = orem_raw + ' from %pp ' + lor_label
+if lor_label and '&l' not in orem_template:
+    orem_raw = orem_raw + ' from &pp ' + lor_label
 rem_msg = rem_raw + revstr
 orem_msg = orem_raw + revstr
 pobj.msg(rem_msg, dob=item)

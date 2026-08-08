@@ -79,7 +79,7 @@ if db.valid(new_num):
         return
     existing_name = existing.name
     recycle(existing)
-    pobj.msg(f"Deleted %<245>#{new_num}:{existing_name}%n.")
+    pobj.msg(f"Deleted &<245>#{new_num}:{existing_name}&n.")
 # --- Perform the renumber ---
 from moo.objects import MOOObject
 # 1. Serialize old object and change its objnum
@@ -145,4 +145,4 @@ for obj in db.objects():
     if obj.owner == old_num:
         obj.owner = new_num
         db.save_object(obj)
-pobj.msg(f"Renumbered #{old_num} to %<245>#{new_num}:{new_obj.name}%n.")
+pobj.msg(f"Renumbered #{old_num} to &<245>#{new_num}:{new_obj.name}&n.")

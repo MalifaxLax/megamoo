@@ -60,7 +60,7 @@ if not dest:
 # Move the object
 old_loc = obj.location
 move(obj, dest)
-pobj.msg(f"Moved %<245>#{obj.objnum}:{obj.name}%n to %<245>#{dest.objnum}:{dest.name}%n.")
+pobj.msg(f"Moved &<245>#{obj.objnum}:{obj.name}&n to &<245>#{dest.objnum}:{dest.name}&n.")
 
 # Send arrival message to destination room
 if arrival_msg:

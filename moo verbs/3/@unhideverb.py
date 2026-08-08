@@ -64,4 +64,4 @@ if not found.hidden:
 
 found.hidden = False
 db.save_object(target)
-pobj.msg(f"Verb '{verb_name}' on %<245>#{target.objnum}:{target.name}%n is no longer hidden.")
+pobj.msg(f"Verb '{verb_name}' on &<245>#{target.objnum}:{target.name}&n is no longer hidden.")

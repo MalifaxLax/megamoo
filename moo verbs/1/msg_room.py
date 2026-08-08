@@ -18,7 +18,7 @@ Arguments:
     args    - The message text (with optional substitution tokens).
     exclude - List of objects to skip when broadcasting.
     sub/dob/iob/uob - Substitution objects for pronoun/name tokens.
-    s1/s2/.../sN    - Raw strings spliced verbatim into %s1/%s2/...%sN.
+    s1/s2/.../sN    - Raw strings spliced verbatim into &s1/&s2/...%sN.
 """
 # Forward the raw-string slots (sN kwargs) on to each recipient's msg().
 _sv = {k: v for k, v in (kwargs or {}).items()

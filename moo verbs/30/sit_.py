@@ -9,7 +9,7 @@ Called by the room-level sit verb: call_verb(furniture, 'sit_')
 
 Cleans stale sitters (characters no longer in the room) from the list.
 Uses sit/osit messages from the furniture, or builds defaults from
-the sit_prep property (e.g., "You sit on %d." / "You sit at %d.").
+the sit_prep property (e.g., "You sit on &d." / "You sit at &d.").
 
 Returns True to indicate the action was handled.
 """
@@ -37,8 +37,8 @@ if cur_table:
         if pobj.objnum in old_sitters:
             old_sitters = [s for s in old_sitters if s != pobj.objnum]
             old.sitters = old_sitters
-        stand_msg = (old.stand or 'You stand up from %d.')
-        ostand_msg = (old.ostand or '%S stands up from %d.')
+        stand_msg = (old.stand or 'You stand up from &d.')
+        ostand_msg = (old.ostand or '&S stands up from &d.')
         pobj.msg(stand_msg, dob=old)
         if not pobj.invis:
             pobj.location.msg_room(ostand_msg, exclude=[pobj], sub=pobj, dob=old)
@@ -59,8 +59,8 @@ pobj.table = item.objnum
 
 # Messages (build from sit_prep if no custom message set)
 prep = (item.sit_prep or 'on')
-sit_msg = item.sit or f'You sit {prep} %d.'
-osit_msg = item.osit or f'%S sits {prep} %d.'
+sit_msg = item.sit or f'You sit {prep} &d.'
+osit_msg = item.osit or f'&S sits {prep} &d.'
 pobj.msg(sit_msg, dob=item)
 if not pobj.invis:
     pobj.location.msg_room(osit_msg, exclude=[pobj], sub=pobj, dob=item)

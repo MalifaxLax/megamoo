@@ -28,7 +28,7 @@ if raw:
     names = [obj.name for obj in contents
              if not obj.invis and not obj.hidden]
     if names:
-        pobj.msg("Under %d you see " + su.listtoenglish(names) + ".", dob=this)
+        pobj.msg("Under &d you see " + su.listtoenglish(names) + ".", dob=this)
         return True
 
 pobj.msg("There's nothing under there.")

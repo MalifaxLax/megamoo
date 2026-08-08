@@ -54,6 +54,8 @@ License: MIT
 
 from typing import Dict, Optional, Tuple
 import re
+
+from .globals import SIGIL_CLASS
 from enum import IntEnum
 import logging
 
@@ -67,12 +69,12 @@ logger = logging.getLogger('megamoo.color')
 # corresponds to one colour-code dialect.
 
 # Matches extended MOO colour codes: %<123>, %<bg#FF0000>, etc.
-_RE_MOO_EXTENDED = re.compile(r'%<([^>]+)>')
+_RE_MOO_EXTENDED = re.compile(SIGIL_CLASS + r'<([^>]+)>')
 
 # Matches basic single-letter MOO colour codes: %r, %G, %n, etc.
 # The negative lookahead (?![a-zA-Z]) prevents matching the first letter
 # of a multi-letter sequence (e.g. "%red" should NOT match as %r + "ed").
-_RE_MOO_BASIC = re.compile(r'%([a-zA-Z])(?![a-zA-Z])')
+_RE_MOO_BASIC = re.compile(SIGIL_CLASS + r'([a-zA-Z])(?![a-zA-Z])')
 
 # Matches ANSI named colour tags: {red}, {bold}, {normal}, etc.
 _RE_ANSI_NAMED = re.compile(r'\{([a-zA-Z]+)\}')
@@ -82,8 +84,8 @@ _RE_MXP_COLOR = re.compile(r'<color\s+fore="([^"]+)">([^<]+)</color>', re.IGNORE
 
 # --- Stripping patterns (same dialects, but used to *remove* codes) ---
 
-_RE_STRIP_MOO_EXTENDED = re.compile(r'%<[^>]+>')
-_RE_STRIP_MOO_BASIC = re.compile(r'%[a-zA-Z](?![a-zA-Z])')
+_RE_STRIP_MOO_EXTENDED = re.compile(SIGIL_CLASS + r'<[^>]+>')
+_RE_STRIP_MOO_BASIC = re.compile(SIGIL_CLASS + r'[a-zA-Z](?![a-zA-Z])')
 _RE_STRIP_ANSI_NAMED = re.compile(r'\{[a-zA-Z]+\}')
 # Matches raw ANSI escape sequences already in the string (ESC[...m)
 _RE_STRIP_ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*m')

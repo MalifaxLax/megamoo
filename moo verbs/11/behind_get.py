@@ -64,6 +64,6 @@ if get_msg and type(get_msg) == list and len(get_msg) >= 2:
     if not pobj.invis:
         location.msg_room(get_msg[1], exclude=[pobj], sub=pobj, dob=item, iob=this)
 else:
-    pobj.msg("You get %d from behind %i.", dob=item, iob=this)
+    pobj.msg("You get &d from behind &i.", dob=item, iob=this)
     if not pobj.invis:
-        location.msg_room("%S gets %d from behind %i.", exclude=[pobj], sub=pobj, dob=item, iob=this)
+        location.msg_room("&S gets &d from behind &i.", exclude=[pobj], sub=pobj, dob=item, iob=this)

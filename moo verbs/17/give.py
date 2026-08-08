@@ -71,17 +71,17 @@ item_weight = item.weight or 0
 recip_load = recipient.load or 0
 recip_max = recipient.max_load or 0
 if recip_max and recip_load + item_weight > recip_max:
-    pobj.msg("%I can't carry anything else.", iob=recipient)
+    pobj.msg("&I can't carry anything else.", iob=recipient)
     return
 
 # Check recipient has a free hand
 recip_free = call_verb(recipient, 'hands_free')
 item_hands = (item.hands or 1)
 if not recip_free:
-    pobj.msg("%I doesn't have a free hand.", iob=recipient)
+    pobj.msg("&I doesn't have a free hand.", iob=recipient)
     return
 if item_hands == 2 and recip_free != 'both':
-    pobj.msg("%I doesn't have both hands free.", iob=recipient)
+    pobj.msg("&I doesn't have both hands free.", iob=recipient)
     return
 
 # Clear from giver's hand
@@ -101,7 +101,7 @@ call_verb(recipient, 'move_to_hand', dobj=item)
 recipient.load = recip_load + item_weight
 
 # Messages
-pobj.msg("You give %d to %i.", dob=item, iob=recipient)
-recipient.msg("%S gives you %d.", sub=pobj, dob=item)
+pobj.msg("You give &d to &i.", dob=item, iob=recipient)
+recipient.msg("&S gives you &d.", sub=pobj, dob=item)
 if not pobj.invis:
-    pobj.location.msg_room("%S gives %d to %i.", exclude=[pobj, recipient], sub=pobj, dob=item, iob=recipient)
+    pobj.location.msg_room("&S gives &d to &i.", exclude=[pobj, recipient], sub=pobj, dob=item, iob=recipient)

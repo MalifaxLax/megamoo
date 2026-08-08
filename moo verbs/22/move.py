@@ -31,6 +31,6 @@ if locklist and not player.is_royal:
         player.msg(lockfail)
         olockfail = this.olockfail
         if olockfail and not player.invis:
-            msg_all(player.location, su.psub1(olockfail.replace('%d', this.noun or this.name), player), exclude=[player])
+            msg_all(player.location, su.psub1(olockfail.replace('&d', this.noun or this.name), player), exclude=[player])
         return
 call_verb(this, 'gmove')

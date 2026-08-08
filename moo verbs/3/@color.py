@@ -7,8 +7,8 @@ Usage: @color
 
 Auth: gm1+ (auth_level 1)
 
-Note: Color codes use the %<N> format for xterm colors and %<#RRGGBB>
-for hex RGB. Background variants use 'bg' prefix (e.g. %<bg21>).
+Note: Color codes use the &<N> format for xterm colors and &<#RRGGBB>
+for hex RGB. Background variants use 'bg' prefix (e.g. &<bg21>).
 """
 if auth_level(pobj) < 1:
     pobj.msg("Do what?")

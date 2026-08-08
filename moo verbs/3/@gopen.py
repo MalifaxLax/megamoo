@@ -57,10 +57,10 @@ elif dest_str:
 parent = db.get_object(22)
 new_exit = ou.make_exit(parent, db, pobj, noun=name, room=room, dest=dest)
 
-pobj.msg(f"\nYou created a new exit %<245>#{new_exit.objnum}:{new_exit.name}%n.")
+pobj.msg(f"\nYou created a new exit &<245>#{new_exit.objnum}:{new_exit.name}&n.")
 
 if dest:
-    pobj.msg(f"Exit linked to: %<245>#{dest.objnum}:{dest.name}%n")
+    pobj.msg(f"Exit linked to: &<245>#{dest.objnum}:{dest.name}&n")
 
     # Create return exit unless /noret switch is set
     if 'noret' not in switches:
@@ -72,6 +72,6 @@ if dest:
         ret_exit.add_property('rexit', new_exit.objnum, perms='rc')
         new_exit._mark_modified()
 
-        pobj.msg(f"Return exit %<245>#{ret_exit.objnum}:{ret_exit.name}%n created at %<245>#{dest.objnum}:{dest.name}%n.")
+        pobj.msg(f"Return exit &<245>#{ret_exit.objnum}:{ret_exit.name}&n created at &<245>#{dest.objnum}:{dest.name}&n.")
 else:
     pobj.msg("Exit not linked.")

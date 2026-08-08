@@ -37,8 +37,8 @@ the vessel, pours the liquid (ltype + cuses), and retitles it via
 #28:_ctitle.
 
 Messages: npc speech renders via esub.  Objects go through dob/iob
-(%d/%D, %i/%I); raw strings (price, currency) go through %N.  cost_emit:
-%d = the goods (dob), %1 = asking price, %2 = currency.  The currency word
+(&d/&D, &i/&I); raw strings (price, currency) go through &N.  cost_emit:
+&d = the goods (dob), &1 = asking price, &2 = currency.  The currency word
 is derived from the merchant's coin model (ctypes[coin_type]), pluralized
 for the quoted price -- there is no separate merchant.currency property.
 The quote line ends with a how-to-buy prompt OUTSIDE the quotation marks,
@@ -76,7 +76,7 @@ if not dobj:
 
 def _say(text, suffix='', **subkw):
     """Speak a line as the npc.  Any s0=/s1=/... kwargs are raw-string
-    slots that esub splices into %0/%1/... in `text`.  `suffix` is
+    slots that esub splices into &0/&1/... in `text`.  `suffix` is
     unspoken narration appended to the same line, after the closing
     quote mark."""
     sp = (npc and npc.get('name')) or merchant.speaker \
@@ -257,7 +257,7 @@ currency = coin + ('s' if asking != 1 else '')
 # renders sell/o_sell itself, so nothing pre-rendered needs stashing here.
 cost_emit = (npc and npc.get('cost_emit')) \
     or merchant.buy_quote \
-    or 'Lessee eer, %d costs %1 %2. Ye want one?'
+    or 'Lessee eer, &d costs &1 &2. Ye want one?'
 
 pobj.pending_buy = {
     'merchant': merchant.objnum,
@@ -292,7 +292,7 @@ else:
     # == None, NOT `is None`: a missing MOO property reads as _null_attr,
     # which equals None but isn't it.  An explicit '' still suppresses.
     if help_line == None:  # noqa: E711
-        help_line = "If you would like to purchase %d make an 'offer'."
+        help_line = "If you would like to purchase &d make an 'offer'."
 if help_line:
     help_line = re.sub(r'[%$]D', desc[:1].upper() + desc[1:], help_line)
     help_line = re.sub(r'[%$]d', desc, help_line)

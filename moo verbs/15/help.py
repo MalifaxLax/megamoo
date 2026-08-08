@@ -76,12 +76,12 @@ if not args:
                         verb_topics.append(canon)
 
     pobj.msg("")
-    pobj.msg("%<245>Help Topics%n")
+    pobj.msg("&<245>Help Topics&n")
     if topics:
         pobj.msg(', '.join(sorted(topics)))
     if verb_topics:
         pobj.msg("")
-        pobj.msg("%<245>Command Help%n")
+        pobj.msg("&<245>Command Help&n")
         pobj.msg(', '.join(sorted(verb_topics)))
     if not topics and not verb_topics:
         pobj.msg("No help topics available.")
@@ -129,7 +129,7 @@ if topic.startswith('#'):
                 end = stripped.find(quote, len(quote))
                 if end > 0:
                     docstring = stripped[len(quote):end].strip()
-                    pobj.msg(f"\n%<245>#{obj_part}.{vdef.names[0]}%n")
+                    pobj.msg(f"\n&<245>#{obj_part}.{vdef.names[0]}&n")
                     pobj.msg(docstring)
                     return
         pobj.msg(f"No help available for '{verb_part}'.")
@@ -140,7 +140,7 @@ if topic.startswith('#'):
         if not help_text:
             pobj.msg("There's no help for that.")
             return
-        pobj.msg(f"\n%<245>#{obj_part} ({obj.name})%n")
+        pobj.msg(f"\n&<245>#{obj_part} ({obj.name})&n")
         pobj.msg(help_text)
         return
 
@@ -151,11 +151,11 @@ for name in help_obj.properties_list(include_inherited=False, database=db):
     if name.lower() == topic:
         val = getattr(help_obj, name, None)
         if isinstance(val, str):
-            pobj.msg(f"\n%<245>{name}%n")
+            pobj.msg(f"\n&<245>{name}&n")
             pobj.msg(val)
             return
         elif isinstance(val, dict):
-            pobj.msg(f"\n%<245>{name}%n")
+            pobj.msg(f"\n&<245>{name}&n")
             pobj.msg(', '.join(sorted(val.keys())))
             return
 
@@ -165,7 +165,7 @@ for name in help_obj.properties_list(include_inherited=False, database=db):
     if isinstance(val, dict):
         for key, text in val.items():
             if key.lower() == topic:
-                pobj.msg(f"\n%<245>{name} > {key}%n")
+                pobj.msg(f"\n&<245>{name} > {key}&n")
                 pobj.msg(text)
                 return
 
@@ -185,7 +185,7 @@ for obj in [pobj, pobj.location] + list(pobj.location.contents):
                 end = stripped.find(quote, len(quote))
                 if end > 0:
                     docstring = stripped[len(quote):end].strip()
-                    pobj.msg(f"\n%<245>{vdef.names[0]}%n")
+                    pobj.msg(f"\n&<245>{vdef.names[0]}&n")
                     pobj.msg(docstring)
                     return
         pobj.msg(f"No help available for '{topic}'.")

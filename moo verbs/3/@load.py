@@ -48,13 +48,13 @@ if 'list' in switches:
     if not files:
         pobj.msg(f"Nothing in {folder}.")
         return
-    pobj.msg(f"%<245>In {folder}:%n")
+    pobj.msg(f"&<245>In {folder}:&n")
     pobj.msg("")
     for name in files:
         size = os.path.getsize(os.path.join(folder, name))
-        pobj.msg(f"  {name}  %<245>({size} bytes)%n")
+        pobj.msg(f"  {name}  &<245>({size} bytes)&n")
     pobj.msg("")
-    pobj.msg(f"%<245>-- {len(files)} file{'' if len(files) == 1 else 's'}.%n")
+    pobj.msg(f"&<245>-- {len(files)} file{'' if len(files) == 1 else 's'}.&n")
     return
 
 spec = (args or '').strip()
@@ -120,7 +120,7 @@ for pname, pinfo in props.items():
 
 if 'dry' in switches:
     pobj.msg("")
-    pobj.msg(f"%<245>Would build from {spec}:%n")
+    pobj.msg(f"&<245>Would build from {spec}:&n")
     pobj.msg("")
     pobj.msg(f"  name    {record.get('name') or '?'}")
     pobj.msg(f"  parent  #{parent_num}:{parent.name if parent else 'none'}")
@@ -128,8 +128,8 @@ if 'dry' in switches:
     pobj.msg(f"  verbs   {len(verbs)}")
     if dangling:
         pobj.msg("")
-        pobj.msg(f"  %<245>{len(dangling)} reference(s) point at objects "
-                 f"that are not here:%n")
+        pobj.msg(f"  &<245>{len(dangling)} reference(s) point at objects "
+                 f"that are not here:&n")
         for item in dangling[:8]:
             pobj.msg(f"    {item}")
     return
@@ -184,19 +184,19 @@ db.save_object(new)
 
 pobj.msg("")
 pobj.msg(f"Loaded {spec} as #{new.objnum}:{new.name}")
-pobj.msg(f"  %<245>parent #{parent_num}:{parent.name if parent else 'none'}, "
+pobj.msg(f"  &<245>parent #{parent_num}:{parent.name if parent else 'none'}, "
          f"{made} propert{'y' if made == 1 else 'ies'}, "
-         f"{added} verb{'' if added == 1 else 's'}.%n")
+         f"{added} verb{'' if added == 1 else 's'}.&n")
 
 if dangling:
     pobj.msg("")
-    pobj.msg(f"  %<245>{len(dangling)} reference(s) point at objects that are "
-             f"not in this database; fix with @set:%n")
+    pobj.msg(f"  &<245>{len(dangling)} reference(s) point at objects that are "
+             f"not in this database; fix with @set:&n")
     for item in dangling[:8]:
         pobj.msg(f"    {item}")
 
 if failed:
     pobj.msg("")
-    pobj.msg(f"  %<245>{len(failed)} did not apply:%n")
+    pobj.msg(f"  &<245>{len(failed)} did not apply:&n")
     for item in failed[:8]:
         pobj.msg(f"    {item}")

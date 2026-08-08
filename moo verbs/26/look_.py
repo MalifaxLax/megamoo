@@ -21,7 +21,7 @@ else:
     pobj.msg(f"\n{this.name}")
 
 if not this.open:
-    pobj.msg("%D is closed.", dob=this)
+    pobj.msg("&D is closed.", dob=this)
     return
 
 # Check for interior string/object (in_string)
@@ -46,6 +46,6 @@ visible = [obj for obj in visible if not obj.invis and not obj.hidden]
 
 if visible:
     names = [obj.name for obj in visible]
-    pobj.msg("In %d you see " + su.listtoenglish(names) + ".", dob=this)
+    pobj.msg("In &d you see " + su.listtoenglish(names) + ".", dob=this)
 else:
-    pobj.msg("%D is empty.", dob=this)
+    pobj.msg("&D is empty.", dob=this)

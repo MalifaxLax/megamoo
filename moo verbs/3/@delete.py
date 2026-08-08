@@ -29,9 +29,9 @@ if target.objnum < 10:
     return
 name = target.name
 num = target.objnum
-answer = yield f"Are you sure you want to delete %<245>#{num}:{name}%n? [y/n] "
+answer = yield f"Are you sure you want to delete &<245>#{num}:{name}&n? [y/n] "
 if answer.strip().lower() not in ('y', 'ye', 'yes'):
     pobj.msg("Cancelled.")
     return
 recycle(target)
-pobj.msg(f"Deleted %<245>#{num}:{name}%n.")
+pobj.msg(f"Deleted &<245>#{num}:{name}&n.")

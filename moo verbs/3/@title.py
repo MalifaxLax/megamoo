@@ -19,4 +19,4 @@ else:
     old_name = target.name
     target._title()
     db.save_object(target)
-    pobj.msg(f"Title of %<245>#{target.objnum}%n updated: '{old_name}' -> '{target.name}'.")
+    pobj.msg(f"Title of &<245>#{target.objnum}&n updated: '{old_name}' -> '{target.name}'.")

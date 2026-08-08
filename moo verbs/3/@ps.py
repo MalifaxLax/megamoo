@@ -68,7 +68,7 @@ if not tasks:
 _order = {'running': 0, 'suspended': 1, 'pending': 2, 'done': 3}
 tasks.sort(key=lambda t: (_order.get(t['state'], 9), -t['age']))
 
-pobj.msg("%<245>   ID  STATE      PLAYER  VERB                 AGE    WAKES   TICKS%n")
+pobj.msg("&<245>   ID  STATE      PLAYER  VERB                 AGE    WAKES   TICKS&n")
 for t in tasks:
     player = f"#{t['player']}" if t['player'] else '-'
     verb = (t['verb'] or '-')[:20]
@@ -80,5 +80,5 @@ for t in tasks:
 pobj.msg("")
 running = sum(1 for t in tasks if t['state'] == 'running')
 susp = sum(1 for t in tasks if t['state'] == 'suspended')
-pobj.msg(f"%<245>-- {len(tasks)} task{'' if len(tasks) == 1 else 's'}: "
-         f"{running} running, {susp} suspended.  @kill <id> to stop one.%n")
+pobj.msg(f"&<245>-- {len(tasks)} task{'' if len(tasks) == 1 else 's'}: "
+         f"{running} running, {susp} suspended.  @kill <id> to stop one.&n")

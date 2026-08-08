@@ -94,10 +94,10 @@ shown = hits[:MAX_HITS]
 for obj in shown:
     loc = obj.location
     locstr = f"#{loc.objnum}:{loc.name}" if loc else 'nowhere'
-    pobj.msg(f"  %<245>#{obj.objnum}%n:{obj.name}  %<245>in {locstr}%n")
+    pobj.msg(f"  &<245>#{obj.objnum}&n:{obj.name}  &<245>in {locstr}&n")
 
 pobj.msg("")
 if len(hits) > MAX_HITS:
-    pobj.msg(f"%<245>-- showing {MAX_HITS} of {len(hits)}; narrow the search.%n")
+    pobj.msg(f"&<245>-- showing {MAX_HITS} of {len(hits)}; narrow the search.&n")
 else:
-    pobj.msg(f"%<245>-- {len(hits)} object{'' if len(hits) == 1 else 's'}.%n")
+    pobj.msg(f"&<245>-- {len(hits)} object{'' if len(hits) == 1 else 's'}.&n")

@@ -53,7 +53,7 @@ else:
                 target._title()
                 db.save_object(target)
                 desc = ' '.join(a for a in adjs if a)
-                pobj.msg(f"Adjectives of %<245>#{target.objnum}:{old_name}%n reset to '{desc}'.")
+                pobj.msg(f"Adjectives of &<245>#{target.objnum}:{old_name}&n reset to '{desc}'.")
                 pobj.msg(f"Object title: '{target.name}'.")
         else:
             nml[1] = ''
@@ -62,5 +62,5 @@ else:
             target.name_mod_list = nml
             target._title()
             db.save_object(target)
-            pobj.msg(f"Adjectives of %<245>#{target.objnum}:{old_name}%n cleared.")
+            pobj.msg(f"Adjectives of &<245>#{target.objnum}:{old_name}&n cleared.")
             pobj.msg(f"Object title: '{target.name}'.")

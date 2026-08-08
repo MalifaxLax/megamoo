@@ -65,7 +65,7 @@ if not target:
 # The property must already exist (locally OR inherited). A structural check
 # means a property whose value is None still counts as existing.
 if not target.has_property(prop_name, local_only=False, database=db):
-    pobj.msg(f"%<245>{prop_name}%n doesn't exist on %<245>#{target.objnum}%n.")
+    pobj.msg(f"&<245>{prop_name}&n doesn't exist on &<245>#{target.objnum}&n.")
     return
 
 # No value supplied — read mode: show the current value and stop.
@@ -80,7 +80,7 @@ if not val_str:
     # (it auto-resolves on normal attribute access), so show it resolved here
     # too rather than leaking the raw storage form.
     cur = target._resolve_objref(cur)
-    pobj.msg(f"%<245>#{target.objnum}:{target.name}%n.{prop_name} = {repr(cur).replace('%', '%%')}{origin}")
+    pobj.msg(f"&<245>#{target.objnum}:{target.name}&n.{prop_name} = {repr(cur).replace('%', '%%')}{origin}")
     return
 
 # Resolve object references the same way verb source does: rewrite each bare
@@ -133,4 +133,4 @@ pobj._set_undo = {
 }
 
 origin = "" if had_local else "  (overriding inherited)"
-pobj.msg(f"%<245>#{target.objnum}:{target.name}%n.{prop_name} = {repr(value).replace('%', '%%')}  (was {repr(old_resolved).replace('%', '%%')}){origin}")
+pobj.msg(f"&<245>#{target.objnum}:{target.name}&n.{prop_name} = {repr(value).replace('%', '%%')}  (was {repr(old_resolved).replace('%', '%%')}){origin}")

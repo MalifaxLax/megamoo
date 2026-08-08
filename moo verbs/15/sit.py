@@ -42,4 +42,4 @@ if not room.is_sittable:
 pobj.position = 6
 pobj.msg("You sit down.")
 if not pobj.invis:
-    pobj.location.msg_room("%S sits down.", exclude=[pobj], sub=pobj)
+    pobj.location.msg_room("&S sits down.", exclude=[pobj], sub=pobj)

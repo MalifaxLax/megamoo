@@ -45,7 +45,7 @@ if range_match:
             count += 1
         except Exception as e:
             errors += 1
-    pobj.msg(f"Reparented {count} object(s) to %<245>#{new_parent.objnum}:{new_parent.name}%n.")
+    pobj.msg(f"Reparented {count} object(s) to &<245>#{new_parent.objnum}:{new_parent.name}&n.")
     if errors:
         pobj.msg(f"  {errors} object(s) skipped (not found or error).")
 else:
@@ -56,4 +56,4 @@ else:
         return
     old_parent = target.parent
     chparent(target, new_parent.objnum)
-    pobj.msg(f"Parent of %<245>#{target.objnum}:{target.name}%n changed from #{old_parent} to %<245>#{new_parent.objnum}:{new_parent.name}%n.")
+    pobj.msg(f"Parent of &<245>#{target.objnum}:{target.name}&n changed from #{old_parent} to &<245>#{new_parent.objnum}:{new_parent.name}&n.")

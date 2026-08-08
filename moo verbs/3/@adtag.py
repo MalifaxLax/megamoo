@@ -54,8 +54,8 @@ if not tag and not category:
 
 target.tags.add(tag, category)
 if category and tag:
-    pobj.msg(f"Added tag '{tag}' in category '{category}' to %<245>#{target.objnum}:{target.name}%n.")
+    pobj.msg(f"Added tag '{tag}' in category '{category}' to &<245>#{target.objnum}:{target.name}&n.")
 elif category:
-    pobj.msg(f"Added category '{category}' to %<245>#{target.objnum}:{target.name}%n.")
+    pobj.msg(f"Added category '{category}' to &<245>#{target.objnum}:{target.name}&n.")
 else:
-    pobj.msg(f"Added tag '{tag}' to %<245>#{target.objnum}:{target.name}%n.")
+    pobj.msg(f"Added tag '{tag}' to &<245>#{target.objnum}:{target.name}&n.")

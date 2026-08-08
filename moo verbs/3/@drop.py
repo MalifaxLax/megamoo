@@ -28,8 +28,8 @@ if not target:
 if iobj:
     target.drop = iobj
     db.save_object(target)
-    pobj.msg(f"Drop of %<245>#{target.objnum}:{target.name}%n set.")
+    pobj.msg(f"Drop of &<245>#{target.objnum}:{target.name}&n set.")
 else:
     target.drop = ''
     db.save_object(target)
-    pobj.msg(f"Drop of %<245>#{target.objnum}:{target.name}%n cleared.")
+    pobj.msg(f"Drop of &<245>#{target.objnum}:{target.name}&n cleared.")

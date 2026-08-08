@@ -98,7 +98,7 @@ if 'count' in switches:
              f"{'' if rooms == 1 else 's'}, {homeless} nowhere.")
     return
 
-pobj.msg(f"%<245>Owned by {target.name}:%n")
+pobj.msg(f"&<245>Owned by {target.name}:&n")
 
 # Rooms have no location, so grouping them by one says nothing.  List flat.
 if 'rooms' in switches:
@@ -106,7 +106,7 @@ if 'rooms' in switches:
     for obj in owned[:MAX_HITS]:
         pobj.msg(f"  #{obj.objnum}:{obj.name}")
     pobj.msg("")
-    pobj.msg(f"%<245>-- {len(owned)} room{'' if len(owned) == 1 else 's'}.%n")
+    pobj.msg(f"&<245>-- {len(owned)} room{'' if len(owned) == 1 else 's'}.&n")
     return
 
 # Group by location. A builder's things cluster where they were built, and
@@ -119,12 +119,12 @@ for obj in owned[:MAX_HITS]:
 
 for key in sorted(groups, key=lambda k: (k == 'nowhere', k)):
     pobj.msg("")
-    pobj.msg(f"  %<245>{key}%n")
+    pobj.msg(f"  &<245>{key}&n")
     for obj in groups[key]:
         pobj.msg(f"    #{obj.objnum}:{obj.name}")
 
 pobj.msg("")
 if len(owned) > MAX_HITS:
-    pobj.msg(f"%<245>-- showing {MAX_HITS} of {len(owned)}; /count for totals.%n")
+    pobj.msg(f"&<245>-- showing {MAX_HITS} of {len(owned)}; /count for totals.&n")
 else:
-    pobj.msg(f"%<245>-- {len(owned)} object{'' if len(owned) == 1 else 's'}.%n")
+    pobj.msg(f"&<245>-- {len(owned)} object{'' if len(owned) == 1 else 's'}.&n")

@@ -58,7 +58,7 @@ while obj is not None and obj.objnum not in seen:
         obj = None
 
 if not is_direxit:
-    pobj.msg(f"%<245>#{target.objnum}:{target.name}%n is not a directional exit.")
+    pobj.msg(f"&<245>#{target.objnum}:{target.name}&n is not a directional exit.")
     return
 
 # Find the direction index by matching the exit's noun against DNAMES
@@ -72,7 +72,7 @@ except ValueError:
 # Gather exit properties
 dest = target.destination
 if not dest:
-    pobj.msg(f"%<245>#{target.objnum}:{target.name}%n has no destination set.")
+    pobj.msg(f"&<245>#{target.objnum}:{target.name}&n has no destination set.")
     return
 
 dest_num = dest if type(dest) == int else dest.objnum if hasattr(dest, 'objnum') else dest
@@ -121,5 +121,5 @@ try:
 except:
     dest_str = f"#{dest_num}"
 
-pobj.msg(f"Converted %<245>#{exit_num}:{exit_name}%n ({DNAMES[enum]}) to virtual exit -> %<245>{dest_str}%n.")
+pobj.msg(f"Converted &<245>#{exit_num}:{exit_name}&n ({DNAMES[enum]}) to virtual exit -> &<245>{dest_str}&n.")
 pobj.msg(f"Exit object #{exit_num} recycled.")

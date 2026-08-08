@@ -55,4 +55,4 @@ if cur_table:
 pobj.position = 8
 pobj.msg("You lie down.")
 if not pobj.invis:
-    pobj.location.msg_room("%S lies down.", exclude=[pobj], sub=pobj)
+    pobj.location.msg_room("&S lies down.", exclude=[pobj], sub=pobj)

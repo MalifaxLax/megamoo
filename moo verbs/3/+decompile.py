@@ -54,12 +54,12 @@ for v in target.verbs:
         found = v
         break
 if not found:
-    pobj.msg(f"Verb '{verb_name}' not found on %<245>#{target.objnum}:{target.name}%n.")
+    pobj.msg(f"Verb '{verb_name}' not found on &<245>#{target.objnum}:{target.name}&n.")
     return
 
 # Display verb header (names and permissions) and source code
 names = ", ".join(found.names)
-pobj.msg(f"%W#{target.objnum}:{target.name}.{names}%n  perms={found.perms}")
+pobj.msg(f"&W#{target.objnum}:{target.name}.{names}&n  perms={found.perms}")
 code = found.code
 if not code or not code.strip():
     pobj.msg("  (empty)")
@@ -97,6 +97,6 @@ for n in range(first, last + 1):
     # video -- the same trap that bit the raw-value display in @ex.
     shown = line.replace('%', '%%')
     if 'line' in switches:
-        pobj.msg(f"%<245>{n:>{width}}%n {shown}")
+        pobj.msg(f"&<245>{n:>{width}}&n {shown}")
     else:
         pobj.msg(shown)

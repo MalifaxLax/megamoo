@@ -29,7 +29,7 @@ if not target:
     pobj.msg(f"I don't see '{spec}' here.")
     return
 
-pobj.msg(f"%<245>--- #{target.objnum}: {target.noun} ---")
+pobj.msg(f"&<245>--- #{target.objnum}: {target.noun} ---")
 pobj.msg(f"  Parent: #{target.parent}")
 pobj.msg(f"  Owner: #{target.owner}")
 pobj.msg(f"  Location: #{target.location.objnum if hasattr(target.location, 'objnum') else target.location}")
@@ -42,7 +42,7 @@ if target.contents:
         cn = c.objnum if hasattr(c, 'objnum') else c
         clist.append(f'#{cn}')
     pobj.msg(f"  Contents: {', '.join(clist)}")
-pobj.msg(f"%<245>--- Properties ---")
+pobj.msg(f"&<245>--- Properties ---")
 
 # Show only local properties (defined or overridden on this object)
 for prop_name in sorted(target.properties.keys()):
@@ -59,7 +59,7 @@ for prop_name in sorted(target.properties.keys()):
     pobj.msg(f"  .{prop_name} = {val_str.replace('%', '%%')}")
 
 if target.verbs:
-    pobj.msg(f"%<245>--- Verbs ({len(target.verbs)}) ---")
+    pobj.msg(f"&<245>--- Verbs ({len(target.verbs)}) ---")
     for v in target.verbs:
         names = ', '.join(v.names)
         lines = len(v.code.strip().splitlines()) if v.code else 0

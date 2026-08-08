@@ -17,11 +17,27 @@ def test_queue_message_captures_text():
 
 def test_queue_message_strips_color_tags():
     conn = make_conn()
-    conn.queue_message("%<245>dim chrome%n normal")
+    conn.queue_message("&<245>dim chrome&n normal")
     out = conn.drain()
-    assert "%<245>" not in out
-    assert "%n" not in out
+    assert "&<245>" not in out
+    assert "&n" not in out
     assert "dim chrome" in out and "normal" in out
+
+
+def test_the_old_percent_sigil_is_no_longer_a_colour_tag():
+    """
+    After the move to '&', a per-cent sign is ordinary text.
+
+    That is the whole point of the change: '%' is Python's formatting
+    operator, so while it doubled as the colour sigil, "%<245>%s" % name
+    raised ValueError and any literal per-cent in game text had to be
+    escaped.  It must now pass through untouched.
+    """
+    conn = make_conn()
+    conn.queue_message("50% off, honestly 100%")
+    out = conn.drain()
+    assert "50% off" in out
+    assert "100%" in out
 
 
 def test_queue_message_strips_raw_ansi():

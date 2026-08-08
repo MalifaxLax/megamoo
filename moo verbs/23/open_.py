@@ -14,10 +14,10 @@ Returns True to indicate the open action was handled.
 """
 
 if not this.closed:
-    player.msg(this.aopen or '%D is already open.', dob=this)
+    player.msg(this.aopen or '&D is already open.', dob=this)
     return True
 if this.locked:
-    player.msg(this.olopen or '%D is locked.', dob=this)
+    player.msg(this.olopen or '&D is locked.', dob=this)
     if not player.invis:
         omsg = this.oolopen
         if omsg:
@@ -26,7 +26,7 @@ if this.locked:
 if this.latched:
     if this.latchable:
         # Inside (latching side) — always blocked
-        player.msg(this.olaopen or '%D is latched.', dob=this)
+        player.msg(this.olaopen or '&D is latched.', dob=this)
         return True
     else:
         # Outside — check for online characters on the latched side
@@ -40,7 +40,7 @@ if this.latched:
                     _occupied = True
                     break
         if _occupied:
-            player.msg(this.olaopen or '%D is latched.', dob=this)
+            player.msg(this.olaopen or '&D is latched.', dob=this)
             return True
         # No one online inside — silently unlatch both sides
         this.set_property('latched', False, db)
@@ -50,7 +50,7 @@ if this.latched:
         if _rev:
             _rev.set_property('latched', False, db)
 this.set_property('closed', 0, db)
-player.msg(this.open or 'You open %D.', dob=this)
+player.msg(this.open or 'You open &D.', dob=this)
 if not player.invis:
     omsg = this.oopen
     if omsg:

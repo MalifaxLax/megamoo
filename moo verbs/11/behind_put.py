@@ -33,7 +33,7 @@ if not max_vol:
 item_vol = item.volume or 0
 cur_vol = this.behind_vol or 0
 if cur_vol + item_vol > max_vol:
-    pobj.msg("There's no room to put %d behind there.", dob=item)
+    pobj.msg("There's no room to put &d behind there.", dob=item)
     return True
 
 # Check for put override
@@ -64,8 +64,8 @@ if put_msg and type(put_msg) == list and len(put_msg) >= 2:
     if not pobj.invis:
         location.msg_room(put_msg[1], exclude=[pobj], sub=pobj, dob=item, iob=this)
 else:
-    pobj.msg("You put %d behind %i.", dob=item, iob=this)
+    pobj.msg("You put &d behind &i.", dob=item, iob=this)
     if not pobj.invis:
-        location.msg_room("%S puts %d behind %i.", exclude=[pobj], sub=pobj, dob=item, iob=this)
+        location.msg_room("&S puts &d behind &i.", exclude=[pobj], sub=pobj, dob=item, iob=this)
 
 return True

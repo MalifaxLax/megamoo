@@ -104,9 +104,9 @@ for _ in range(count):
 where = 'here' if 'drop' in switches else 'in your inventory'
 if len(made) == 1:
     c = made[0]
-    pobj.msg(f"Copied %<245>#{source.objnum}:{source.name}%n to "
-             f"%<245>#{c.objnum}:{c.name}%n, {where}.")
+    pobj.msg(f"Copied &<245>#{source.objnum}:{source.name}&n to "
+             f"&<245>#{c.objnum}:{c.name}&n, {where}.")
 else:
     first, last = made[0], made[-1]
-    pobj.msg(f"Made {len(made)} copies of %<245>#{source.objnum}:{source.name}%n, "
-             f"%<245>#{first.objnum}%n-%<245>#{last.objnum}%n, {where}.")
+    pobj.msg(f"Made {len(made)} copies of &<245>#{source.objnum}:{source.name}&n, "
+             f"&<245>#{first.objnum}&n-&<245>#{last.objnum}&n, {where}.")

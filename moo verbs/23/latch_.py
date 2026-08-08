@@ -8,15 +8,15 @@ if not this.latchable:
     return
 
 if not this.closed:
-    player.msg(this.clatchf or 'You need to close %d before you can latch it!', dob=this)
+    player.msg(this.clatchf or 'You need to close &d before you can latch it!', dob=this)
     return
 
 if this.latched:
-    player.msg(this.llatch or '%D is already latched!', dob=this)
+    player.msg(this.llatch or '&D is already latched!', dob=this)
     return
 
 this.set_property('latched', True, db)
-player.msg(this.latch or 'You latch %d.', dob=this)
+player.msg(this.latch or 'You latch &d.', dob=this)
 if not player.invis:
     omsg = this.olatch
     if omsg:

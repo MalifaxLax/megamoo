@@ -5,7 +5,7 @@ Defined on #20 (BaseExit). Called programmatically via:
     call_verb(exit, 'gmove')
 
 Moves the player through an exit to its destination room. Handles
-movement mode substitution (%MODE/%OMODE), success/drop messages,
+movement mode substitution (&MODE/&OMODE), success/drop messages,
 invisibility/hidden checks, and room announcements.
 
 Context variables:
@@ -58,10 +58,10 @@ drop = this.drop or ''
 odrop = this.odrop or ''
 
 # Replace %MODE/%OMODE with movement verbs, %d with exit name
-succ = succ.replace('%MODE', mode).replace('%d', this.name or this.noun)
-osucc = osucc.replace('%OMODE', omode).replace('%d', this.name or this.noun)
-drop = drop.replace('%MODE', mode)
-odrop = odrop.replace('%OMODE', omode)
+succ = succ.replace('&MODE', mode).replace('&d', this.name or this.noun)
+osucc = osucc.replace('&OMODE', omode).replace('&d', this.name or this.noun)
+drop = drop.replace('&MODE', mode)
+odrop = odrop.replace('&OMODE', omode)
 
 # Check visibility flags
 invis = player.invis

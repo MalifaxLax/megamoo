@@ -50,9 +50,9 @@ new_obj = ou.make_object(parent, db, pobj, noun=new_name, owner=owner)
 # Place the object: in room (/drop) or in inventory (default)
 if 'drop' in switches:
     new_obj.move_to(pobj.location, db)
-    pobj.msg(f"Created %<245>#{new_obj.objnum}:{new_obj.name}%n, dropped here.")
+    pobj.msg(f"Created &<245>#{new_obj.objnum}:{new_obj.name}&n, dropped here.")
 else:
     new_obj.move_to(pobj, db)
-    pobj.msg(f"Created %<245>#{new_obj.objnum}:{new_obj.name}%n, added to inventory.")
+    pobj.msg(f"Created &<245>#{new_obj.objnum}:{new_obj.name}&n, added to inventory.")
 
 db.save_object(new_obj)

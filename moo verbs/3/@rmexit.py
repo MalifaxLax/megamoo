@@ -52,7 +52,7 @@ if type(exit) == int:
         pobj.msg(f"No virtual exit at index {enum} ({dname}).")
         return
 
-    answer = yield f"Remove virtual exit %<245>{dname}%n? [y/n] "
+    answer = yield f"Remove virtual exit &<245>{dname}&n? [y/n] "
     if answer.strip().lower() not in ('y', 'ye', 'yes'):
         pobj.msg("Cancelled.")
         return
@@ -71,16 +71,16 @@ if type(exit) == int:
     if dest:
         try:
             dest_obj = db.get_object(dest)
-            dest_str = f" -> %<245>#{dest}:{dest_obj.name}%n"
+            dest_str = f" -> &<245>#{dest}:{dest_obj.name}&n"
         except Exception:
             dest_str = f" -> #{dest}"
 
-    pobj.msg(f"Removed virtual exit %<245>{dname}%n{dest_str}.")
+    pobj.msg(f"Removed virtual exit &<245>{dname}&n{dest_str}.")
 else:
     # Object exit — move to #9 and remove from exits/obvexits
     target = exit
 
-    answer = yield f"Remove exit %<245>#{target.objnum}:{target.name}%n? [y/n] "
+    answer = yield f"Remove exit &<245>#{target.objnum}:{target.name}&n? [y/n] "
     if answer.strip().lower() not in ('y', 'ye', 'yes'):
         pobj.msg("Cancelled.")
         return
@@ -99,7 +99,7 @@ else:
 
     move(target, trash)
     room._mark_modified()
-    pobj.msg(f"Removed exit %<245>#{target.objnum}:{target.name}%n from room.")
+    pobj.msg(f"Removed exit &<245>#{target.objnum}:{target.name}&n from room.")
 
     # Check for return/reverse exit and remove it too
     ret_num = target.rexit or target.rxexit or target.reverse
@@ -120,6 +120,6 @@ else:
                     ret_room.obvexits = ret_obv
                 ret_room._mark_modified()
             move(ret_exit, trash)
-            pobj.msg(f"Removed return exit %<245>#{ret_exit.objnum}:{ret_exit.name}%n from %<245>#{ret_room.objnum}:{ret_room.name}%n.")
+            pobj.msg(f"Removed return exit &<245>#{ret_exit.objnum}:{ret_exit.name}&n from &<245>#{ret_room.objnum}:{ret_room.name}&n.")
         except Exception:
             pass

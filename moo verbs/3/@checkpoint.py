@@ -81,14 +81,14 @@ before = _checkpoints(directory)
 
 if 'list' in switches:
     if not before:
-        pobj.msg('%<245>No checkpoints yet.%n')
+        pobj.msg('&<245>No checkpoints yet.&n')
         return
-    pobj.msg(f'%<245>{len(before)} checkpoint(s) in {directory}:%n')
+    pobj.msg(f'&<245>{len(before)} checkpoint(s) in {directory}:&n')
     for name, size in before:
-        pobj.msg(f'  {name}  %<245>{_size(size)}%n')
+        pobj.msg(f'  {name}  &<245>{_size(size)}&n')
     return
 
-pobj.msg('%<245>Saving and taking a snapshot -- the game pauses briefly.%n')
+pobj.msg('&<245>Saving and taking a snapshot -- the game pauses briefly.&n')
 
 started = time.time()
 try:
@@ -105,13 +105,13 @@ after = _checkpoints(directory)
 fresh = [c for c in after if c not in before]
 
 if not fresh:
-    pobj.msg('%<245>Nothing was written.  The database may be open '
-             'read-only.%n')
+    pobj.msg('&<245>Nothing was written.  The database may be open '
+             'read-only.&n')
     return
 
 name, size = fresh[-1]
-pobj.msg(f'  {name}  %<245>{_size(size)} in {elapsed:.1f}s%n')
+pobj.msg(f'  {name}  &<245>{_size(size)} in {elapsed:.1f}s&n')
 
 pruned = len(before) + len(fresh) - len(after)
 if pruned > 0:
-    pobj.msg(f'  %<245>{pruned} old checkpoint(s) pruned; {len(after)} kept.%n')
+    pobj.msg(f'  &<245>{pruned} old checkpoint(s) pruned; {len(after)} kept.&n')

@@ -44,7 +44,7 @@ except Exception:
 account_name = account.name or account.noun or f"#{objnum}"
 
 # Confirmation prompt — send colored text via msg, then yield plain prompt
-pobj.msg(f"%WThis action is irrevocable.%n It will erase the account forever.  Are you sure you want to delete %W{account_name}%n? Any response other than YES will abort.")
+pobj.msg(f"%WThis action is irrevocable.&n It will erase the account forever.  Are you sure you want to delete &W{account_name}&n? Any response other than YES will abort.")
 answer = yield ""
 if answer.strip() != 'YES':
     pobj.msg("Aborted.")
@@ -77,7 +77,7 @@ for c in list(chars):
     except Exception:
         pass
 
-    pobj.msg(f"  Moved IC character %<245>#{ichar.objnum}:{ichar.name}%n to storage.")
+    pobj.msg(f"  Moved IC character &<245>#{ichar.objnum}:{ichar.name}&n to storage.")
 
 # Clear all local properties from the account object
 local_props = list(account.properties.keys())
@@ -96,4 +96,4 @@ pool = db.get_object(2)
 move(account, pool)
 db.save_object(account)
 
-pobj.msg(f"Account %<245>#{objnum}:{account_name}%n deleted. {len(chars)} character(s) moved to storage, {len(local_props)} properties cleared.")
+pobj.msg(f"Account &<245>#{objnum}:{account_name}&n deleted. {len(chars)} character(s) moved to storage, {len(local_props)} properties cleared.")

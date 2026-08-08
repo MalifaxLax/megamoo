@@ -69,4 +69,4 @@ if pobj.auth:
     rest = [obj for obj in pobj.contents if obj.objnum not in exclude]
     if rest:
         names = [f"#{obj.objnum}:{obj.name}" for obj in rest]
-        pobj.msg(f"%<245>Contents: {su.listtoenglish(names)}%n")
+        pobj.msg(f"&<245>Contents: {su.listtoenglish(names)}&n")

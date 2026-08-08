@@ -85,3 +85,26 @@ def test_verbs_on_lists_only_locally_defined_verbs(w):
     # #16 defines the OOC room's movement commands; #1 does not.
     assert 'go' in w.verbs_on(16)
     assert 'go' not in w.verbs_on(1)
+
+
+# --- write-through: disk is the source of truth ----------------------------
+
+def test_program_writes_disk_before_the_database():
+    """
+    @program must not be able to leave the two copies disagreeing.
+
+    It used to ask twice -- once for the verb, once for the file -- so
+    answering yes then no left new code live with the old code still on
+    disk, which is the exact divergence the disk-authoritative rule exists
+    to prevent.  The file is now written first: if that fails, nothing is
+    saved at all.
+    """
+    import inspect
+    from moo import builtins
+
+    src = inspect.getsource(builtins.program_verb)
+    disk = src.index('os.fsync')
+    saved = src.index('db.save_object(target)')
+    assert disk < saved, 'the file must be written before the database'
+    assert src.count('yield "Overwrite') + src.count('yield f"Overwrite') == 1, \
+        'exactly one overwrite confirmation, covering both copies'

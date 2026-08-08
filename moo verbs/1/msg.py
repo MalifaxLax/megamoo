@@ -9,8 +9,8 @@ Called as: player.msg("text", sub=X, dob=Y, iob=Z, s1="raw", s2="raw")
 Arguments:
     argstr  - The message text (with optional substitution tokens).
     sub/dob/iob/uob - Substitution objects for pronoun/name tokens
-                       (%S, %d, %i, %u, %Ps, %pp, etc.).
-    s1/s2/.../sN    - Raw strings spliced verbatim into %s1/%s2/...%sN.
+                       (&S, &d, &i, &u, &Ps, &pp, etc.).
+    s1/s2/.../sN    - Raw strings spliced verbatim into &s1/&s2/...%sN.
 
 Note: Overridable on child objects to intercept or filter messages
 (e.g., for deaf/muted states).

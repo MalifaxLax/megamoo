@@ -43,14 +43,14 @@ if cx and cy and (ix or iy or iz):
     imax = max(ix, iy, iz)
     cmax = max(cx, cy)
     if hyp < imax and imax > cmax:
-        pobj.msg("%D is too big to put on there.", dob=item)
+        pobj.msg("&D is too big to put on there.", dob=item)
         return True
 
 # Check area
 item_area = item.area or 0
 cur_area = this.on_area or 0
 if cur_area + item_area > max_area:
-    pobj.msg("There's no room on %d to put that.", dob=this)
+    pobj.msg("There's no room on &d to put that.", dob=this)
     return True
 
 # Check item count
@@ -65,7 +65,7 @@ item_weight = item.weight or 0
 cur_weight = this.weight_on or 0
 max_weight = this.max_weight_on or 0
 if max_weight and cur_weight + item_weight > max_weight:
-    pobj.msg("%D is too heavy to put on that.", dob=item)
+    pobj.msg("&D is too heavy to put on that.", dob=item)
     return True
 
 # Check for put override
@@ -96,8 +96,8 @@ if put_msg and type(put_msg) == list and len(put_msg) >= 2:
     if not pobj.invis:
         location.msg_room(put_msg[1], exclude=[pobj], sub=pobj, dob=item, iob=this)
 else:
-    pobj.msg("You put %d on %i.", dob=item, iob=this)
+    pobj.msg("You put &d on &i.", dob=item, iob=this)
     if not pobj.invis:
-        location.msg_room("%S puts %d on %i.", exclude=[pobj], sub=pobj, dob=item, iob=this)
+        location.msg_room("&S puts &d on &i.", exclude=[pobj], sub=pobj, dob=item, iob=this)
 
 return True

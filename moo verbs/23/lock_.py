@@ -9,11 +9,11 @@ if not this.lockable:
     return
 
 if this.locked:
-    player.msg(this.llock or '%D is already locked!', dob=this)
+    player.msg(this.llock or '&D is already locked!', dob=this)
     return
 
 if not this.closed:
-    player.msg(this.clockf or 'You need to close %d before you can lock it!', dob=this)
+    player.msg(this.clockf or 'You need to close &d before you can lock it!', dob=this)
     return
 
 # Key validation
@@ -24,11 +24,11 @@ if _door_key:
         return
     _key_str = iobj.key
     if _key_str != _door_key and _key_str != 'skeleton':
-        player.msg(this.lockf or "%D doesn't seem to fit the lock.", dob=this)
+        player.msg(this.lockf or "&D doesn't seem to fit the lock.", dob=this)
         return
 
 this.set_property('locked', True, db)
-player.msg(this.lock or 'You lock %d.', dob=this)
+player.msg(this.lock or 'You lock &d.', dob=this)
 if not player.invis:
     omsg = this.olock
     if omsg:

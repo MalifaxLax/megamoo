@@ -15,11 +15,11 @@ Context variables (injected by _tick):
 """
 
 if tick == 1:
-    pobj.msg("%<208>A warm, dizzy feeling washes over you.%n")
+    pobj.msg("&<208>A warm, dizzy feeling washes over you.&n")
     pobj.location.msg_room(f"{pobj.name} sways unsteadily.", exclude=[pobj])
 
-pobj.msg("%<208>The world spins around you...%n")
+pobj.msg("&<208>The world spins around you...&n")
 
 if remaining == 0:
-    pobj.msg("%<208>Your head begins to clear.%n")
+    pobj.msg("&<208>Your head begins to clear.&n")
     pobj.location.msg_room(f"{pobj.name} seems to regain their composure.", exclude=[pobj])

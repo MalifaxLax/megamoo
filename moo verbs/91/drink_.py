@@ -51,8 +51,8 @@ if uses > 0:
             rmsg = rmsgs[_random.randint(0, len(rmsgs) - 1)]
             pobj.location.msg_room(rmsg, exclude=[pobj], sub=pobj, dob=this)
     else:
-        pobj.msg("You drink %d.", dob=this)
-        pobj.location.msg_room("%S drinks %d.", exclude=[pobj], sub=pobj, dob=this)
+        pobj.msg("You drink &d.", dob=this)
+        pobj.location.msg_room("&S drinks &d.", exclude=[pobj], sub=pobj, dob=this)
 
 # Apply round time (before potential recycle)
 rt_dice = this.rt_dice or [1, 7, 0]
@@ -62,8 +62,8 @@ call_verb(pobj, '_rt', amount=rt)
 if uses == 1:
     pobj.msg("It's almost all gone!")
 elif uses < 1:
-    finish = this.finish or "You drink the last drop of %d."
-    ofinish = this.ofinish or "%S drinks the last drop of %d."
+    finish = this.finish or "You drink the last drop of &d."
+    ofinish = this.ofinish or "&S drinks the last drop of &d."
     pobj.msg(finish, sub=pobj, dob=this)
     pobj.location.msg_room(ofinish, exclude=[pobj], sub=pobj, dob=this)
     call_verb(pobj, 'clear_hand', dobj=this)

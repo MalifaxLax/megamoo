@@ -42,7 +42,7 @@ if difficulty > 0:
     roll = random.randint(1, 100)
     if roll > skill_val + (100 - difficulty):
         # Failed the climb
-        player.msg(this.fail or 'You try to climb %D but fail.', dob=this)
+        player.msg(this.fail or 'You try to climb &D but fail.', dob=this)
         if not player.invis:
             omsg = this.ofail
             if omsg:

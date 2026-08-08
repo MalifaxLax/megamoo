@@ -44,12 +44,12 @@ else:
             target.name_mod_list = nml
             target._title()
             db.save_object(target)
-            pobj.msg(f"Article of %<245>#{target.objnum}:{old_name}%n reset to '{iobj}'.")
+            pobj.msg(f"Article of &<245>#{target.objnum}:{old_name}&n reset to '{iobj}'.")
             pobj.msg(f"Object title: '{target.name}'.")
         else:
             nml[0] = ''
             target.name_mod_list = nml
             target._title()
             db.save_object(target)
-            pobj.msg(f"Article of %<245>#{target.objnum}:{old_name}%n cleared.")
+            pobj.msg(f"Article of &<245>#{target.objnum}:{old_name}&n cleared.")
             pobj.msg(f"Object title: '{target.name}'.")

@@ -70,7 +70,7 @@ existing = dexits[enum]
 if existing and existing[0]:
     if existing[0] == dest.objnum:
         # Same destination — already exists
-        pobj.msg(f"{name} to %<245>#{dest.objnum}:{dest.name}%n already exists.")
+        pobj.msg(f"{name} to &<245>#{dest.objnum}:{dest.name}&n already exists.")
         return
     else:
         # Different destination — overwrite it
@@ -84,15 +84,15 @@ if existing and existing[0]:
             old_str = f"#{old_dest}:{old_obj.name}"
         except:
             old_str = f"#{old_dest}"
-        pobj.msg(f"%<245>{name}%n destination changed from %<245>{old_str}%n to %<245>#{dest.objnum}:{dest.name}%n.")
+        pobj.msg(f"&<245>{name}&n destination changed from &<245>{old_str}&n to &<245>#{dest.objnum}:{dest.name}&n.")
         return
 
 # Build default exit messages with direction names substituted
 fname = FDNAMES[enum]
 rfname = RFDNAMES[enum]
-succ = ESUCC.replace('%1', fname)
-osucc = EOSUCC.replace('%1', fname)
-odrop = EODROP.replace('%1', rfname)
+succ = ESUCC.replace('&1', fname)
+osucc = EOSUCC.replace('&1', fname)
+odrop = EODROP.replace('&1', rfname)
 
 # Store virtual exit data: [dest, succ, osucc, drop, odrop, rtval]
 dexits[enum] = [dest.objnum, succ, osucc, '', odrop, 0]
@@ -108,4 +108,4 @@ if enum not in obvexits:
     room.obvexits = obvexits
 
 room._mark_modified()
-pobj.msg(f"\nYou created a new virtual %<245>{name}%n exit to %<245>#{dest.objnum}:{dest.name}%n.")
+pobj.msg(f"\nYou created a new virtual &<245>{name}&n exit to &<245>#{dest.objnum}:{dest.name}&n.")

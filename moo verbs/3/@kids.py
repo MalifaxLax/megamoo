@@ -80,7 +80,7 @@ if 'count' in switches:
              f"descendant{'' if len(family) == 1 else 's'}.")
     return
 
-pobj.msg(f"%<245>Children of #{target.objnum}:{target.name}%n")
+pobj.msg(f"&<245>Children of #{target.objnum}:{target.name}&n")
 pobj.msg("")
 
 shown = 0
@@ -101,13 +101,13 @@ if 'all' in switches:
 else:
     for obj in direct[:MAX_HITS]:
         own = len(by_parent.get(obj.objnum, []))
-        tail = f"  %<245>({own} of its own)%n" if own else ''
+        tail = f"  &<245>({own} of its own)&n" if own else ''
         pobj.msg(f"  #{obj.objnum}:{obj.name}{tail}")
         shown += 1
     total = len(direct)
 
 pobj.msg("")
 if total > MAX_HITS:
-    pobj.msg(f"%<245>-- showing {MAX_HITS} of {total}; /count for totals.%n")
+    pobj.msg(f"&<245>-- showing {MAX_HITS} of {total}; /count for totals.&n")
 else:
-    pobj.msg(f"%<245>-- {total} object{'' if total == 1 else 's'}.%n")
+    pobj.msg(f"&<245>-- {total} object{'' if total == 1 else 's'}.&n")

@@ -17,7 +17,7 @@ if pobj.do_wait():
 
 if not dobj:
     pobj.msg("You tap your foot impatiently.")
-    pobj.location.msg_room("%S taps %ps foot impatiently.", exclude=[pobj], sub=pobj)
+    pobj.location.msg_room("&S taps &ps foot impatiently.", exclude=[pobj], sub=pobj)
     return
 
 # Match in hands, wearing, room
@@ -32,16 +32,16 @@ tobj = pmatch(dobj, pobj, slist)
 
 if not tobj:
     pobj.msg("You tap your foot impatiently.")
-    pobj.location.msg_room("%S taps %ps foot impatiently.", exclude=[pobj], sub=pobj)
+    pobj.location.msg_room("&S taps &ps foot impatiently.", exclude=[pobj], sub=pobj)
     return
 
 if tobj.objnum == pobj.objnum:
     pobj.msg("You tap your head all smart-like.")
-    pobj.location.msg_room("%S taps %ps head all smart-like.", exclude=[pobj], sub=pobj)
+    pobj.location.msg_room("&S taps &ps head all smart-like.", exclude=[pobj], sub=pobj)
 elif tobj.is_char:
-    pobj.msg("You tap %d on the shoulder.", dob=tobj)
-    tobj.msg("%S taps you on the shoulder.", sub=pobj)
-    pobj.location.msg_room("%S taps %d on the shoulder.", exclude=[pobj, tobj], sub=pobj, dob=tobj)
+    pobj.msg("You tap &d on the shoulder.", dob=tobj)
+    tobj.msg("&S taps you on the shoulder.", sub=pobj)
+    pobj.location.msg_room("&S taps &d on the shoulder.", exclude=[pobj, tobj], sub=pobj, dob=tobj)
 else:
-    pobj.msg("You tap %d.", dob=tobj)
-    pobj.location.msg_room("%S taps %d.", exclude=[pobj], sub=pobj, dob=tobj)
+    pobj.msg("You tap &d.", dob=tobj)
+    pobj.location.msg_room("&S taps &d.", exclude=[pobj], sub=pobj, dob=tobj)

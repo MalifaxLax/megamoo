@@ -48,7 +48,7 @@ exits = sum(1 for o in owned if o.is_exit)
 things = len(owned) - rooms - exits
 
 pobj.msg("")
-pobj.msg(f"%<245>{target.name} has built:%n")
+pobj.msg(f"&<245>{target.name} has built:&n")
 pobj.msg("")
 pobj.msg(f"  {len(owned):>5}  object{'' if len(owned) == 1 else 's'} in total")
 pobj.msg(f"  {rooms:>5}  room{'' if rooms == 1 else 's'}")
@@ -64,14 +64,14 @@ if isinstance(quota, str) and quota.strip().lstrip('-').isdigit():
     quota = int(quota.strip())
 
 if quota == None:
-    pobj.msg("%<245>-- no quota set; MegaMOO does not enforce one.%n")
+    pobj.msg("&<245>-- no quota set; MegaMOO does not enforce one.&n")
 elif not isinstance(quota, int):
-    pobj.msg(f"%<245>-- quota property is {quota!r}, which is not a number.%n")
+    pobj.msg(f"&<245>-- quota property is {quota!r}, which is not a number.&n")
 else:
     left = quota - len(owned)
     if left >= 0:
-        pobj.msg(f"%<245>-- {left} of {quota} remaining (advisory; "
-                 f"nothing enforces it).%n")
+        pobj.msg(f"&<245>-- {left} of {quota} remaining (advisory; "
+                 f"nothing enforces it).&n")
     else:
-        pobj.msg(f"%<245>-- {-left} over a quota of {quota} (advisory; "
-                 f"nothing enforces it).%n")
+        pobj.msg(f"&<245>-- {-left} over a quota of {quota} (advisory; "
+                 f"nothing enforces it).&n")

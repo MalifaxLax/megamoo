@@ -54,7 +54,7 @@ except:
     return
 
 if not dest.is_room:
-    pobj.msg(f"%<245>{dest_str}%n is not a valid destination.")
+    pobj.msg(f"&<245>{dest_str}&n is not a valid destination.")
     return
 
 # Create the exit via make_exit
@@ -63,11 +63,11 @@ new_exit = ou.make_exit(parent, db, pobj, noun=name, room=room, dest=dest)
 
 # Closable-exit-specific properties
 new_exit.add_property('closed', 1, perms='rc')
-new_exit.add_property('ropen', 'The %D opens.', perms='rc')
-new_exit.add_property('rclose', 'The %D closes.', perms='rc')
+new_exit.add_property('ropen', 'The &D opens.', perms='rc')
+new_exit.add_property('rclose', 'The &D closes.', perms='rc')
 
-pobj.msg(f"\nYou created a new closable exit %<245>#{new_exit.objnum}:{new_exit.name}%n.")
-pobj.msg(f"Exit linked to: %<245>#{dest.objnum}:{dest.name}%n")
+pobj.msg(f"\nYou created a new closable exit &<245>#{new_exit.objnum}:{new_exit.name}&n.")
+pobj.msg(f"Exit linked to: &<245>#{dest.objnum}:{dest.name}&n")
 
 # Create return exit unless /noret switch is set
 if 'noret' not in switches:
@@ -76,8 +76,8 @@ if 'noret' not in switches:
 
     # Closable-exit-specific properties on return exit
     ret_exit.add_property('closed', 1, perms='rc')
-    ret_exit.add_property('ropen', 'The %D opens.', perms='rc')
-    ret_exit.add_property('rclose', 'The %D closes.', perms='rc')
+    ret_exit.add_property('ropen', 'The &D opens.', perms='rc')
+    ret_exit.add_property('rclose', 'The &D closes.', perms='rc')
 
     # Cross-link exits via reverse property (open/close/lock syncs both sides)
     new_exit.add_property('reverse', ret_exit, perms='rc')
@@ -88,5 +88,5 @@ if 'noret' not in switches:
     ret_exit.add_property('rexit', new_exit, perms='rc')
     new_exit._mark_modified()
 
-    pobj.msg(f"Return exit %<245>#{ret_exit.objnum}:{ret_exit.name}%n created at %<245>#{dest.objnum}:{dest.name}%n.")
+    pobj.msg(f"Return exit &<245>#{ret_exit.objnum}:{ret_exit.name}&n created at &<245>#{dest.objnum}:{dest.name}&n.")
     pobj.msg("Both exits start closed.")

@@ -36,16 +36,16 @@ if clear_all:
         return
     local_props = list(target.properties.keys())
     if not local_props:
-        pobj.msg(f"No local properties on %<245>#{target.objnum}:{target.name}%n.")
+        pobj.msg(f"No local properties on &<245>#{target.objnum}:{target.name}&n.")
         return
-    answer = yield f"Clear %W{len(local_props)}%n local properties from %<245>#{target.objnum}:{target.name}%n? [y/n] "
+    answer = yield f"Clear &W{len(local_props)}&n local properties from &<245>#{target.objnum}:{target.name}&n? [y/n] "
     if answer.strip().lower() not in ('y', 'ye', 'yes'):
         pobj.msg("Cancelled.")
         return
     for p in local_props:
         target.delete_property(p)
     db.save_object(target)
-    pobj.msg(f"Cleared {len(local_props)} local properties from %<245>#{target.objnum}:{target.name}%n.")
+    pobj.msg(f"Cleared {len(local_props)} local properties from &<245>#{target.objnum}:{target.name}&n.")
     return
 
 if not spec or '.' not in spec:
@@ -70,7 +70,7 @@ if not target:
 if name in target.properties:
     target.delete_property(name)
     db.save_object(target)
-    pobj.msg(f"Cleared property '{name}' from %<245>#{target.objnum}:{target.name}%n.")
+    pobj.msg(f"Cleared property '{name}' from &<245>#{target.objnum}:{target.name}&n.")
 else:
     found = None
     for v in target.verbs:
@@ -79,6 +79,6 @@ else:
             break
     if found:
         target.delete_verb(name)
-        pobj.msg(f"Cleared verb '{name}' from %<245>#{target.objnum}:{target.name}%n.")
+        pobj.msg(f"Cleared verb '{name}' from &<245>#{target.objnum}:{target.name}&n.")
     else:
-        pobj.msg(f"No local property or verb '{name}' found on %<245>#{target.objnum}:{target.name}%n.")
+        pobj.msg(f"No local property or verb '{name}' found on &<245>#{target.objnum}:{target.name}&n.")

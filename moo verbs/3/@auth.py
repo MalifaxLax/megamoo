@@ -36,9 +36,9 @@ action = parts[0].lower()
 if action == 'list':
     auth = target.auth or []
     if auth:
-        pobj.msg(f"Auth for %<245>#{target.objnum}:{target.name}%n: {', '.join(auth)}")
+        pobj.msg(f"Auth for &<245>#{target.objnum}:{target.name}&n: {', '.join(auth)}")
     else:
-        pobj.msg(f"%<245>#{target.objnum}:{target.name}%n has no auth.")
+        pobj.msg(f"&<245>#{target.objnum}:{target.name}&n has no auth.")
     return
 
 if len(parts) < 2:
@@ -55,22 +55,22 @@ auth = list(target.auth or [])
 
 if action == 'add':
     if level in auth:
-        pobj.msg(f"%<245>#{target.objnum}:{target.name}%n already has {level}.")
+        pobj.msg(f"&<245>#{target.objnum}:{target.name}&n already has {level}.")
         return
     auth.append(level)
     target.auth = auth
     sync_auth_flags(target)
-    pobj.msg(f"Added {level} to %<245>#{target.objnum}:{target.name}%n.")
+    pobj.msg(f"Added {level} to &<245>#{target.objnum}:{target.name}&n.")
     pobj.msg(f"Auth: {', '.join(auth)}")
 
 elif action == 'remove':
     if level not in auth:
-        pobj.msg(f"%<245>#{target.objnum}:{target.name}%n doesn't have {level}.")
+        pobj.msg(f"&<245>#{target.objnum}:{target.name}&n doesn't have {level}.")
         return
     auth.remove(level)
     target.auth = auth
     sync_auth_flags(target)
-    pobj.msg(f"Removed {level} from %<245>#{target.objnum}:{target.name}%n.")
+    pobj.msg(f"Removed {level} from &<245>#{target.objnum}:{target.name}&n.")
     if auth:
         pobj.msg(f"Auth: {', '.join(auth)}")
     else:

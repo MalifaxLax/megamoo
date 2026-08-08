@@ -16,12 +16,12 @@ merchant's own coin; the explicit form haggles a stated amount:
     1. coin  -- the offered coin must be the one this merchant deals in;
        merchant.coin_type indexes merchant.ctypes.  The buyer's coin word
        need only *start with* a ctypes entry ("plats" -> "plat").  Wrong
-       coin -> npc 'coin_fail' (%1 = the coin we DO take, a string).
+       coin -> npc 'coin_fail' (&1 = the coin we DO take, a string).
     2. price -- cost = item.value * pending vmult * exchange[coin_type]
        * pending qty (vmult is the vessel price multiplier for
        poured-to-order liquids, 1 otherwise; qty is 12 for a case, 6
        for a half-case, else 1).  offered < cost -> npc 'offer_fail'
-       (%D = item via dob, %1 = cost phrase string).
+       (&D = item via dob, &1 = cost phrase string).
     3. funds -- the buyer must actually hold what they offered;
        cash[coin_type] < offered -> npc 'cash_fail'.
     4. hands -- a free hand is needed (both for a two-handed item).
@@ -40,12 +40,12 @@ merchant's own coin; the explicit form haggles a stated amount:
        the BOX -- titled bare, "a case" / "a half-case" -- is what
        goes into the buyer's hand.
 
-Messages: objects render through esub dob/iob (%d/%D, %i/%I); raw strings
-(coin name, cost phrase) render through %N.
-    coin_fail  -> %1 = the accepted coin (string)
-    offer_fail -> %D  = the item (dob), %1 = cost phrase (string)
-    sell       -> %d  = the goods (dob), spoken to the buyer
-    o_sell     -> %d  = the buyer (dob), %i = the goods (iob), to the room
+Messages: objects render through esub dob/iob (&d/&D, &i/&I); raw strings
+(coin name, cost phrase) render through &N.
+    coin_fail  -> &1 = the accepted coin (string)
+    offer_fail -> &D  = the item (dob), &1 = cost phrase (string)
+    sell       -> &d  = the goods (dob), spoken to the buyer
+    o_sell     -> &d  = the buyer (dob), &i = the goods (iob), to the room
 Fall back to the merchant/#92 default for the *_fail trio.
 sell/o_sell render the minted goods by their OWN name -- the serve line
 says "serves you a shot glass"; the full order description ("a shot
@@ -78,7 +78,7 @@ npc = npcs.get(pb.get('npc')) or next(iter(npcs.values()), None)
 
 def _say(text, **subkw):
     """Speak a line as the npc.  Any s0=/s1=/... kwargs are raw-string
-    slots that esub splices into %0/%1/... in `text`."""
+    slots that esub splices into &0/&1/... in `text`."""
     if not text:
         return
     sp = (npc and npc.get('name')) or merchant.speaker \

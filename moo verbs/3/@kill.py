@@ -55,7 +55,7 @@ if target.lower() == 'all':
     else:
         pobj.msg("Nothing to stop.")
     if failed:
-        pobj.msg(f"%<245>{len(failed)} had already finished.%n")
+        pobj.msg(f"&<245>{len(failed)} had already finished.&n")
     return
 
 if not target.isdigit():

@@ -42,10 +42,10 @@ else:
     omode = omodes[pos] if pos < len(omodes) else 'walks'
 
 # Substitute movement mode placeholders and apply pronoun substitution
-succ = su.psub1(succ.replace('%MODE', mode), player)
-osucc = su.psub1(osucc.replace('%OMODE', omode), player)
-drop = su.psub1(drop.replace('%MODE', mode), player)
-odrop = su.psub1(odrop.replace('%OMODE', omode), player)
+succ = su.psub1(succ.replace('&MODE', mode), player)
+osucc = su.psub1(osucc.replace('&OMODE', omode), player)
+drop = su.psub1(drop.replace('&MODE', mode), player)
+odrop = su.psub1(odrop.replace('&OMODE', omode), player)
 
 # Check visibility flags
 invis = player.invis

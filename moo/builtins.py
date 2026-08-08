@@ -1893,10 +1893,41 @@ def program_verb(pobj, spec: str, db, file_path=None):
             return
 
         # --- Confirm overwrite if existing code ---
+        #
+        # One question, covering both copies.  There used to be a second
+        # prompt for the file, and answering yes to the verb and no to the
+        # file left new code in the database and old code on disk -- the
+        # tool creating exactly the divergence it exists to avoid.
         if existing_verb and existing_verb.code.strip():
             answer = yield "Overwrite existing code? [y/n] "
             if not answer or answer.strip().lower() not in ('y', 'yes'):
                 notify(pobj,"Cancelled — existing code unchanged.")
+                return
+
+        # --- Write disk first, then the database ---
+        #
+        # Disk is authoritative: it is what git tracks and what an editor
+        # opens.  Writing it first means a failure there leaves *nothing*
+        # changed, rather than a live verb with no file behind it.
+        from .object_utils import system_ref
+        verb_path_prop = system_ref(db, 'moo_verb_path') or getattr(
+            system_ref(db, 'config', fallback_objnum=8), 'moo_verb_path', None)
+        save_path = None
+        if verb_path_prop:
+            from .verb_loader import expand_verb_path
+            base_path = expand_verb_path(verb_path_prop)
+            save_path = file_path or os.path.join(
+                base_path, str(target.objnum), verb_name + '.py')
+            try:
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                with open(save_path, 'w') as f:
+                    f.write(code + '\n')
+                    f.flush()
+                    os.fsync(f.fileno())
+            except Exception as e:
+                notify(pobj, f"Could not write {save_path}: {e}")
+                notify(pobj, "Verb NOT saved — the file is the source of "
+                             "truth, so nothing was changed.")
                 return
 
         # --- Save to verb ---
@@ -1915,30 +1946,9 @@ def program_verb(pobj, spec: str, db, file_path=None):
         db.save_object(target)
         notify(pobj,f"Verb '{verb_name}' saved on {target.name} (#{target.objnum}).  "
                   f"{len(lines)} lines.")
+        if save_path:
+            notify(pobj, f"%<245>{save_path}%n".replace('%', '&'))
 
-        # --- Save to file on disk ---
-        # Resolve base verb path from #8.moo_verb_path
-        from .object_utils import system_ref
-        verb_path_prop = system_ref(db, 'moo_verb_path') or getattr(
-            system_ref(db, 'config', fallback_objnum=8), 'moo_verb_path', None)
-        if verb_path_prop:
-            from .verb_loader import expand_verb_path
-            base_path = expand_verb_path(verb_path_prop)
-            save_path = file_path or os.path.join(base_path, str(target.objnum), verb_name + '.py')
-            try:
-                if os.path.isfile(save_path):
-                    answer = yield f"Overwrite {save_path}? [y/n] "
-                    if not answer or answer.strip().lower() not in ('y', 'yes'):
-                        notify(pobj, "File not overwritten.")
-                        return
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                with open(save_path, 'w') as f:
-                    f.write(code + '\n')
-                    f.flush()
-                    os.fsync(f.fileno())
-                notify(pobj, f"Code written to {save_path}")
-            except Exception as e:
-                notify(pobj, f"Error writing file: {e}")
 
     _editor(pobj)
 

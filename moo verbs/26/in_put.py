@@ -27,7 +27,7 @@ if dobj.worn:
     return True
 
 if not this.open:
-    pobj.msg("%D is closed.", dob=this)
+    pobj.msg("&D is closed.", dob=this)
     return True
 
 # Gate check: max_vol of 0 means nothing can go in
@@ -49,7 +49,7 @@ if cx and cy and cz and (ix or iy or iz):
     item_max = max(ix, iy, iz)
     container_max = max(cx, cy, cz)
     if opening_diag < item_max and item_max > container_max:
-        pobj.msg("%D is too big to put in there.", dob=dobj)
+        pobj.msg("&D is too big to put in there.", dob=dobj)
         return True
 
 # Check volume
@@ -57,7 +57,7 @@ item_vol = dobj.volume or 0
 cur_vol = this.current_vol or 0
 max_vol = this.max_vol or 100
 if cur_vol + item_vol > max_vol:
-    pobj.msg("There's no room in %d for that.", dob=this)
+    pobj.msg("There's no room in &d for that.", dob=this)
     return True
 
 # Check item count
@@ -71,7 +71,7 @@ if item_count >= max_items:
 item_weight = dobj.weight or 0
 max_weight = this.max_weight_in or 16
 if item_weight > max_weight:
-    pobj.msg("%D is too heavy to put in there.", dob=dobj)
+    pobj.msg("&D is too heavy to put in there.", dob=dobj)
     return True
 
 # Check pass_locks
@@ -85,7 +85,7 @@ if pass_locks:
             allowed = True
             break
     if not allowed:
-        pobj.msg("You can't put that in %d.", dob=this)
+        pobj.msg("You can't put that in &d.", dob=this)
         return True
 
 # Check for put override on the item
@@ -115,8 +115,8 @@ if put_msg and type(put_msg) == list and len(put_msg) >= 2:
     if not pobj.invis:
         location.msg_room(put_msg[1], exclude=[pobj], sub=pobj, dob=dobj, iob=this)
 else:
-    pobj.msg("You put %d in %i.", dob=dobj, iob=this)
+    pobj.msg("You put &d in &i.", dob=dobj, iob=this)
     if not pobj.invis:
-        location.msg_room("%S puts %d in %i.", exclude=[pobj], sub=pobj, dob=dobj, iob=this)
+        location.msg_room("&S puts &d in &i.", exclude=[pobj], sub=pobj, dob=dobj, iob=this)
 
 return True

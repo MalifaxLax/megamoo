@@ -54,6 +54,6 @@ item_weight = item.weight or 0
 pobj.load = max((pobj.load or 0) - item_weight, 0)
 
 # Messages
-pobj.msg("You drop %d.", dob=item)
+pobj.msg("You drop &d.", dob=item)
 if not pobj.invis:
-    pobj.location.msg_room("%S drops %d.", exclude=[pobj], sub=pobj, dob=item)
+    pobj.location.msg_room("&S drops &d.", exclude=[pobj], sub=pobj, dob=item)

@@ -60,7 +60,7 @@ if on_top:
 
 # Check cursed
 if item.cursed:
-    pobj.msg("%D won't come off!", dob=item)
+    pobj.msg("&D won't come off!", dob=item)
     return
 
 # Pass iobj as lorstr (e.g., "l wrist" from "remove bracelet from l wrist")

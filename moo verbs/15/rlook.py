@@ -29,7 +29,7 @@ _sr = (player.settings or {}).get('screenreader', False)
 if _sr:
     player.msg(f"\nRoom: #{room.objnum}:{room.name}")
 else:
-    player.msg(f"\n%<245>#{room.objnum}:{room.name}%n")
+    player.msg(f"\n&<245>#{room.objnum}:{room.name}&n")
 
 # Description
 if desc:
@@ -193,15 +193,15 @@ if parts:
 
 # Staff debug sections
 if dlist:
-    player.msg(f"%<245>Dark Objects: {su.listtoenglish(dlist)}%n")
+    player.msg(f"&<245>Dark Objects: {su.listtoenglish(dlist)}&n")
 
 if exlist:
-    player.msg(f"%<245>Non-existent Objects: {su.listtoenglish(exlist)}%n")
+    player.msg(f"&<245>Non-existent Objects: {su.listtoenglish(exlist)}&n")
 
 if estr:
-    player.msg(f"%<245>Obvious Exits: {estr}%n")
+    player.msg(f"&<245>Obvious Exits: {estr}&n")
 else:
-    player.msg("%<245>Obvious Exits: none%n")
+    player.msg("&<245>Obvious Exits: none&n")
 
 if delist:
-    player.msg(f"%<245>Dark Exits: {su.listtoenglish(delist)}%n")
+    player.msg(f"&<245>Dark Exits: {su.listtoenglish(delist)}&n")

@@ -63,4 +63,4 @@ pobj._set_undo = {
     'old': cur_local,
 }
 
-pobj.msg(f"%<245>#{target.objnum}:{target.name}%n.{prop} {result}")
+pobj.msg(f"&<245>#{target.objnum}:{target.name}&n.{prop} {result}")

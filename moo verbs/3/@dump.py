@@ -67,7 +67,7 @@ for key in ('location', 'contents', 'children', 'created', 'last_move'):
 
 record = {
     'megamoo_dump': 1,
-    'dumped': time.strftime('%Y-%m-%dT%H:%M:%S'),
+    'dumped': time.strftime('&Y-&m-%dT&H:&M:&S'),
     'objnum': target.objnum,
     'name': str(target.name or ''),
     'object': raw,
@@ -127,7 +127,7 @@ nverbs = len(record['object'].get('verbs') or [])
 
 pobj.msg("")
 pobj.msg(f"Dumped #{target.objnum}:{target.name} to")
-pobj.msg(f"  %<245>{path}%n")
-pobj.msg(f"  %<245>{nprops} propert{'y' if nprops == 1 else 'ies'}, "
+pobj.msg(f"  &<245>{path}&n")
+pobj.msg(f"  &<245>{nprops} propert{'y' if nprops == 1 else 'ies'}, "
          f"{nverbs} verb{'' if nverbs == 1 else 's'}"
-         f"{'' if 'verbs' in switches else ' (use /verbs for code)'}.%n")
+         f"{'' if 'verbs' in switches else ' (use /verbs for code)'}.&n")

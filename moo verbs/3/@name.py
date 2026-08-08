@@ -38,5 +38,5 @@ else:
             target.name_mod_list = ['a', '', '', '', '']
         target._title()
         db.save_object(target)
-        pobj.msg(f"Name of %<245>#{target.objnum}:{old_name}%n reset to '{new_noun}'.")
+        pobj.msg(f"Name of &<245>#{target.objnum}:{old_name}&n reset to '{new_noun}'.")
         pobj.msg(f"Object title: '{target.name}'.")

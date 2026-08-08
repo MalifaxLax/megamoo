@@ -83,6 +83,6 @@ if not found:
 if setting:
     found.auth = auth_val
     db.save_object(found_on)
-    pobj.msg(f"Verb '{verb_name}' on %<245>#{found_on.objnum}:{found_on.name}%n auth set to {auth_val}.")
+    pobj.msg(f"Verb '{verb_name}' on &<245>#{found_on.objnum}:{found_on.name}&n auth set to {auth_val}.")
 else:
-    pobj.msg(f"Verb '{verb_name}' on %<245>#{found_on.objnum}:{found_on.name}%n auth = {found.auth}")
+    pobj.msg(f"Verb '{verb_name}' on &<245>#{found_on.objnum}:{found_on.name}&n auth = {found.auth}")

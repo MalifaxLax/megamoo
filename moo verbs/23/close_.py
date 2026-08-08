@@ -11,10 +11,10 @@ Called programmatically: call_verb(exit, 'close_')
 Returns True to indicate the close action was handled.
 """
 if this.closed:
-    player.msg(this.aclose or '%D is already closed.', dob=this)
+    player.msg(this.aclose or '&D is already closed.', dob=this)
     return True
 this.set_property('closed', 1, db)
-player.msg(this.close or 'You close %D.', dob=this)
+player.msg(this.close or 'You close &D.', dob=this)
 if not player.invis:
     omsg = this.oclose
     if omsg:

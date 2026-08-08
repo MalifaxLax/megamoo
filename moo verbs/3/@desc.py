@@ -27,8 +27,8 @@ if not target:
 if iobj:
     target.description = iobj
     db.save_object(target)
-    pobj.msg(f"Description of %<245>#{target.objnum}:{target.name}%n set.")
+    pobj.msg(f"Description of &<245>#{target.objnum}:{target.name}&n set.")
 else:
     target.description = ''
     db.save_object(target)
-    pobj.msg(f"Description of %<245>#{target.objnum}:{target.name}%n cleared.")
+    pobj.msg(f"Description of &<245>#{target.objnum}:{target.name}&n cleared.")

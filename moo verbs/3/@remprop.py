@@ -32,6 +32,6 @@ if not target:
 # Delete the property from the target object
 try:
     delete_property(target, prop_name)
-    pobj.msg(f"Property '{prop_name}' removed from %<245>#{target.objnum}:{target.name}%n.")
+    pobj.msg(f"Property '{prop_name}' removed from &<245>#{target.objnum}:{target.name}&n.")
 except KeyError as e:
     pobj.msg(str(e))

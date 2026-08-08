@@ -39,14 +39,14 @@ for v in target.verbs:
         found = v
         break
 if not found:
-    pobj.msg(f"Verb '{verb_name}' not found on %<245>#{target.objnum}:{target.name}%n.")
+    pobj.msg(f"Verb '{verb_name}' not found on &<245>#{target.objnum}:{target.name}&n.")
     return
-answer = yield f"Are you sure you want to remove %W{verb_name}%n from %<245>#{target.objnum}:{target.name}%n? [y/n] "
+answer = yield f"Are you sure you want to remove &W{verb_name}&n from &<245>#{target.objnum}:{target.name}&n? [y/n] "
 if answer.strip().lower() not in ('y', 'ye', 'yes'):
     pobj.msg("Cancelled.")
     return
 try:
     target.delete_verb(verb_name)
-    pobj.msg(f"Verb '{verb_name}' removed from %<245>#{target.objnum}:{target.name}%n.")
+    pobj.msg(f"Verb '{verb_name}' removed from &<245>#{target.objnum}:{target.name}&n.")
 except KeyError as e:
     pobj.msg(str(e))

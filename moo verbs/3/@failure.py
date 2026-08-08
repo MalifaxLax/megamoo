@@ -28,8 +28,8 @@ if not target:
 if iobj:
     target.failure = iobj
     db.save_object(target)
-    pobj.msg(f"Failure of %<245>#{target.objnum}:{target.name}%n set.")
+    pobj.msg(f"Failure of &<245>#{target.objnum}:{target.name}&n set.")
 else:
     target.failure = ''
     db.save_object(target)
-    pobj.msg(f"Failure of %<245>#{target.objnum}:{target.name}%n cleared.")
+    pobj.msg(f"Failure of &<245>#{target.objnum}:{target.name}&n cleared.")

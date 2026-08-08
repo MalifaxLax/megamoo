@@ -54,7 +54,7 @@ if not parent.is_room:
 
 # Create the new room via object_utils
 new_room = make_room(parent, db, pobj, name=rname)
-pobj.msg(f"\nYou create a new room %<245>#{new_room.objnum}:{new_room.name}%n of type {rtype.upper()}.")
+pobj.msg(f"\nYou create a new room &<245>#{new_room.objnum}:{new_room.name}&n of type {rtype.upper()}.")
 
 # /tel switch: move the builder into the newly created room
 if 'tel' in switches:

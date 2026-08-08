@@ -137,4 +137,4 @@ else:
             if auth_val:
                 extras.append(f'auth={auth_val}')
             tag = f" ({' '.join(extras)})" if extras else ''
-            pobj.msg(f"Verb [{desc}] added to %<245>#{target.objnum}:{target.name}%n perms={perms}{tag}")
+            pobj.msg(f"Verb [{desc}] added to &<245>#{target.objnum}:{target.name}&n perms={perms}{tag}")

@@ -133,7 +133,7 @@ if 'flex' in switches:
         state = f'on at {toggled_on}'
     else:
         state = f'off at {toggled_off}'
-    pobj.msg(f"Toggled %<245>#{target.objnum}:{target.name}%n's layer_flex {state} position(s).")
+    pobj.msg(f"Toggled &<245>#{target.objnum}:{target.name}&n's layer_flex {state} position(s).")
     for ps in wear_pos:
         p = ps[0]
         if p >= 100:
@@ -146,7 +146,7 @@ if 'flex' in switches:
                 name = positions.get(rp, '???')
                 line = '  %3d  %-20s  layer %d%s' % (rp, name, ps[1], flex_str)
                 if changed:
-                    pobj.msg(f'%<245>{line}%n')
+                    pobj.msg(f'&<245>{line}&n')
                 else:
                     pobj.msg(line)
         else:
@@ -154,7 +154,7 @@ if 'flex' in switches:
             flex_str = ' [flex]' if flex else ''
             line = '  %3d  %-20s  layer %d%s' % (p, pos_label(p), ps[1], flex_str)
             if p in changed_entries:
-                pobj.msg(f'%<245>{line}%n')
+                pobj.msg(f'&<245>{line}&n')
             else:
                 pobj.msg(line)
     return
@@ -213,11 +213,11 @@ if 'layer' in switches:
             changed_positions.add(entry[0])
     target.wear_pos = wear_pos
     target._mark_modified()
-    pobj.msg(f'Updated {len(changed_positions)} position(s) on %<245>#{target.objnum}:{target.name}%n:')
+    pobj.msg(f'Updated {len(changed_positions)} position(s) on &<245>#{target.objnum}:{target.name}&n:')
     for ps in wear_pos:
         line = '  %3d  %-20s  layer %d' % (ps[0], pos_label(ps[0]), ps[1])
         if ps[0] in changed_positions:
-            pobj.msg(f'%<245>{line}%n')
+            pobj.msg(f'&<245>{line}&n')
         else:
             pobj.msg(line)
     return
@@ -252,7 +252,7 @@ if 'rem' in switches:
         return
     target.wear_pos = kept
     target._mark_modified()
-    pobj.msg(f'Removed from %<245>#{target.objnum}:{target.name}%n:')
+    pobj.msg(f'Removed from &<245>#{target.objnum}:{target.name}&n:')
     for ps in removed:
         pobj.msg('  %3d  %-20s  layer %d' % (ps[0], pos_label(ps[0]), ps[1]))
     if kept:
@@ -303,7 +303,7 @@ elif prep == '=':
             pobj.msg("Unknown position: %d" % entry[0])
             return
     target.wear_pos = value
-    pobj.msg(f'Set wear_pos on %<245>#{target.objnum}:{target.name}%n:')
+    pobj.msg(f'Set wear_pos on &<245>#{target.objnum}:{target.name}&n:')
     for ps in value:
         pos, layer = ps[0], ps[1]
         pobj.msg('  %3d  %-20s  layer %d' % (pos, pos_label(pos), layer))
@@ -321,7 +321,7 @@ else:
     layer_flex = target.layer_flex or {}
     if isinstance(layer_flex, dict):
         layer_flex = {int(k): v for k, v in layer_flex.items()}
-    pobj.msg(f'Wear positions on %<245>#{target.objnum}:{target.name}%n:')
+    pobj.msg(f'Wear positions on &<245>#{target.objnum}:{target.name}&n:')
     for ps in wear_pos:
         pos, layer = ps[0], ps[1]
         if pos >= 100:

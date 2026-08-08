@@ -65,7 +65,7 @@ if item.is_exit:
 
 # Can't get characters
 if item.is_char:
-    pobj.msg("%D probably wouldn't appreciate that.", dob=item)
+    pobj.msg("&D probably wouldn't appreciate that.", dob=item)
     return
 
 # Check hands
@@ -103,6 +103,6 @@ call_verb(pobj, 'move_to_hand', dobj=item)
 pobj.load = cur_load + item_weight
 
 # Messages
-pobj.msg("You pick up %d.", dob=item)
+pobj.msg("You pick up &d.", dob=item)
 if not pobj.invis:
-    pobj.location.msg_room("%S picks up %d.", exclude=[pobj], sub=pobj, dob=item)
+    pobj.location.msg_room("&S picks up &d.", exclude=[pobj], sub=pobj, dob=item)

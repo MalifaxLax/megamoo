@@ -31,16 +31,16 @@ Returns True to indicate the action was handled.
 import random as _random
 
 if not this.open:
-    pobj.msg("%D is closed.", dob=this)
+    pobj.msg("&D is closed.", dob=this)
     return True
 
 ltype = this.ltype
 if not ltype or not hasattr(ltype, 'objnum'):
-    pobj.msg("%D is empty.", dob=this)
+    pobj.msg("&D is empty.", dob=this)
     return True
 
 if not ltype.edible:
-    pobj.msg("You'll have to drink %d.", dob=ltype)
+    pobj.msg("You'll have to drink &d.", dob=ltype)
     return True
 
 # Apply effects from liquid type
@@ -68,8 +68,8 @@ if emits and len(emits) >= 4:
         rmsg = rmsgs[_random.randint(0, len(rmsgs) - 1)]
         pobj.location.msg_room(rmsg, exclude=[pobj], sub=pobj, dob=ltype, iob=this)
 else:
-    pobj.msg("You eat some of %d from %i.", dob=ltype, iob=this)
-    pobj.location.msg_room("%S eats some of %d from %i.", exclude=[pobj], sub=pobj, dob=ltype, iob=this)
+    pobj.msg("You eat some of &d from &i.", dob=ltype, iob=this)
+    pobj.location.msg_room("&S eats some of &d from &i.", exclude=[pobj], sub=pobj, dob=ltype, iob=this)
 
 # Apply round time
 rt_dice = ltype.rt_dice or [1, 7, 0]
@@ -83,8 +83,8 @@ this.cuses = cuses
 if cuses == 1:
     pobj.msg("It's almost all gone!")
 elif cuses < 1:
-    finish = ltype.finish or "You finish the last of %d from %i."
-    ofinish = ltype.ofinish or "%S finishes the last of %d from %i."
+    finish = ltype.finish or "You finish the last of &d from &i."
+    ofinish = ltype.ofinish or "&S finishes the last of &d from &i."
     pobj.msg(finish, sub=pobj, dob=ltype, iob=this)
     pobj.location.msg_room(ofinish, exclude=[pobj], sub=pobj, dob=ltype, iob=this)
     this.ltype = None

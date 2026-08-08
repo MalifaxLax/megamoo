@@ -9,7 +9,7 @@ Called programmatically: call_verb(char, 'postring') or
     call_verb(char, 'postring', args='first') for first-person form.
 
 Arguments:
-    args - If 'first', substitutes '%pp' with 'your' for first-person
+    args - If 'first', substitutes '&pp' with 'your' for first-person
            perspective. Otherwise returns third-person form.
 
 Returns:
@@ -18,5 +18,5 @@ Returns:
 
 pstring = this.position_strings[this.position]
 if args == 'first':
-    pstring = pstring.replace('%pp', 'your')
+    pstring = pstring.replace('&pp', 'your')
 return pstring

@@ -7,7 +7,7 @@ Usage: @odrop <object> = <message>
 
 Arguments:
     object   - The target object (matched in room and inventory).
-    message  - The odrop message text (supports %S substitution). Omit to clear.
+    message  - The odrop message text (supports &S substitution). Omit to clear.
 
 Auth: gm2+ (auth_level 2)
 """
@@ -28,8 +28,8 @@ if not target:
 if iobj:
     target.odrop = iobj
     db.save_object(target)
-    pobj.msg(f"Odrop of %<245>#{target.objnum}:{target.name}%n set.")
+    pobj.msg(f"Odrop of &<245>#{target.objnum}:{target.name}&n set.")
 else:
     target.odrop = ''
     db.save_object(target)
-    pobj.msg(f"Odrop of %<245>#{target.objnum}:{target.name}%n cleared.")
+    pobj.msg(f"Odrop of &<245>#{target.objnum}:{target.name}&n cleared.")

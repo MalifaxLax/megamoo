@@ -13,7 +13,7 @@ Overrides the BaseContainer in_look to handle liquid display.
 """
 
 if not this.open:
-    pobj.msg("%D is closed.", dob=this)
+    pobj.msg("&D is closed.", dob=this)
     return True
 
 ltype = this.ltype
@@ -27,7 +27,7 @@ visible = [obj for obj in visible if not obj.invis and not obj.hidden]
 if visible and has_ltype:
     # Items soaking in liquid
     names = [obj.name for obj in visible]
-    pobj.msg("In %d you see " + su.listtoenglish(names) + " soaking in %i.", dob=this, iob=ltype)
+    pobj.msg("In &d you see " + su.listtoenglish(names) + " soaking in &i.", dob=this, iob=ltype)
 elif has_ltype:
     # Show fill level from flist
     uses = (this.uses or 1)
@@ -38,11 +38,11 @@ elif has_ltype:
         idx = max(0, min(idx, len(flist) - 1))
         pobj.msg(flist[idx], dob=this, iob=ltype)
     else:
-        pobj.msg("%D contains some %i.", dob=this, iob=ltype)
+        pobj.msg("&D contains some &i.", dob=this, iob=ltype)
 elif visible:
     names = [obj.name for obj in visible]
-    pobj.msg("In %d you see " + su.listtoenglish(names) + ".", dob=this)
+    pobj.msg("In &d you see " + su.listtoenglish(names) + ".", dob=this)
 else:
-    pobj.msg("%D is empty.", dob=this)
+    pobj.msg("&D is empty.", dob=this)
 
 return True

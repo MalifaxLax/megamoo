@@ -51,8 +51,8 @@ if uses > 0:
             rmsg = rmsgs[_random.randint(0, len(rmsgs) - 1)]
             pobj.location.msg_room(rmsg, exclude=[pobj], sub=pobj, dob=this)
     else:
-        pobj.msg("You eat some of %d.", dob=this)
-        pobj.location.msg_room("%S eats some of %d.", exclude=[pobj], sub=pobj, dob=this)
+        pobj.msg("You eat some of &d.", dob=this)
+        pobj.location.msg_room("&S eats some of &d.", exclude=[pobj], sub=pobj, dob=this)
 
 # Apply round time (before potential recycle)
 rtdice = this.rtdice or [1, 5, 1]
@@ -62,8 +62,8 @@ call_verb(pobj, '_rt', amount=rt)
 if uses == 1:
     pobj.msg("It's almost all gone!")
 elif uses < 1:
-    finish = this.finish or "You eat the last bite of %d."
-    ofinish = this.ofinish or "%S eats the last bite of %d."
+    finish = this.finish or "You eat the last bite of &d."
+    ofinish = this.ofinish or "&S eats the last bite of &d."
     pobj.msg(finish, sub=pobj, dob=this)
     pobj.location.msg_room(ofinish, exclude=[pobj], sub=pobj, dob=this)
     call_verb(pobj, 'clear_hand', dobj=this)

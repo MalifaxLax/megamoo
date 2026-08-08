@@ -69,14 +69,14 @@ mh_valid = mh and hasattr(mh, 'objnum')
 oh_valid = oh and hasattr(oh, 'objnum')
 
 if mh_valid and oh_valid and mh.objnum == oh.objnum:
-    viewer.msg(su.esub("%Ps is holding %d.", sub=char, dob=mh))
+    viewer.msg(su.esub("&Ps is holding &d.", sub=char, dob=mh))
 elif mh_valid and oh_valid:
-    viewer.msg(su.esub("%Ps is holding %d and %i.", sub=char, dob=mh, iob=oh))
+    viewer.msg(su.esub("&Ps is holding &d and &i.", sub=char, dob=mh, iob=oh))
 elif mh_valid:
-    viewer.msg(su.esub("%Ps is holding %d.", sub=char, dob=mh))
+    viewer.msg(su.esub("&Ps is holding &d.", sub=char, dob=mh))
 elif oh_valid:
-    viewer.msg(su.esub("%Ps is holding %d.", sub=char, dob=oh))
+    viewer.msg(su.esub("&Ps is holding &d.", sub=char, dob=oh))
 else:
-    viewer.msg(su.esub("%Pp hands are empty.", sub=char))
+    viewer.msg(su.esub("&Pp hands are empty.", sub=char))
 
 return True

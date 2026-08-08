@@ -139,14 +139,14 @@ for pslist in wear_pos:
 pname_str = str(item.pname) if item.pname else ''
 lor_label = (resolved_lor + ' ' + pname_str).strip() if resolved_lor else ''
 
-wear_template = item.wear or "You put on %d."
-owear_template = item.owear or "%S puts on %d."
-wear_msg = wear_template.replace('%l', lor_label)
-owear_msg = owear_template.replace('%l', lor_label)
-if lor_label and '%l' not in wear_template:
+wear_template = item.wear or "You put on &d."
+owear_template = item.owear or "&S puts on &d."
+wear_msg = wear_template.replace('&l', lor_label)
+owear_msg = owear_template.replace('&l', lor_label)
+if lor_label and '&l' not in wear_template:
     wear_msg = wear_msg.rstrip('.') + ' on your ' + lor_label + '.'
-if lor_label and '%l' not in owear_template:
-    owear_msg = owear_msg.rstrip('.') + ' on %pp ' + lor_label + '.'
+if lor_label and '&l' not in owear_template:
+    owear_msg = owear_msg.rstrip('.') + ' on &pp ' + lor_label + '.'
 pobj.msg(wear_msg, dob=item)
 if not pobj.invis:
     location.msg_room(owear_msg, exclude=[pobj], sub=pobj, dob=item)

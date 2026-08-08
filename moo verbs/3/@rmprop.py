@@ -31,12 +31,12 @@ target = bmatch(obj_part.strip(), pobj, candidates, db)
 if not target:
     pobj.msg(f"Object '{obj_part}' not found.")
     return
-answer = yield f"Are you sure you want to remove %W{prop_name}%n from %<245>#{target.objnum}:{target.name}%n? [y/n] "
+answer = yield f"Are you sure you want to remove &W{prop_name}&n from &<245>#{target.objnum}:{target.name}&n? [y/n] "
 if answer.strip().lower() not in ('y', 'ye', 'yes'):
     pobj.msg("Cancelled.")
     return
 try:
     target.delete_property(prop_name)
-    pobj.msg(f"Property '{prop_name}' removed from %<245>#{target.objnum}:{target.name}%n.")
+    pobj.msg(f"Property '{prop_name}' removed from &<245>#{target.objnum}:{target.name}&n.")
 except KeyError as e:
     pobj.msg(str(e))

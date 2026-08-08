@@ -55,23 +55,23 @@ all_tags = target.tags.all()
 cat = category or 'general'
 if cat not in all_tags:
     if category:
-        pobj.msg(f"Category '{category}' not found on %<245>#{target.objnum}:{target.name}%n.")
+        pobj.msg(f"Category '{category}' not found on &<245>#{target.objnum}:{target.name}&n.")
     else:
-        pobj.msg(f"Tag '{tag}' not found on %<245>#{target.objnum}:{target.name}%n.")
+        pobj.msg(f"Tag '{tag}' not found on &<245>#{target.objnum}:{target.name}&n.")
     return
 
 if tag and tag not in all_tags.get(cat, []):
     if category:
-        pobj.msg(f"Tag '{tag}' not found in category '{category}' on %<245>#{target.objnum}:{target.name}%n.")
+        pobj.msg(f"Tag '{tag}' not found in category '{category}' on &<245>#{target.objnum}:{target.name}&n.")
     else:
-        pobj.msg(f"Tag '{tag}' not found on %<245>#{target.objnum}:{target.name}%n.")
+        pobj.msg(f"Tag '{tag}' not found on &<245>#{target.objnum}:{target.name}&n.")
     return
 
 target.tags.remove(tag, category)
 if category:
     if tag:
-        pobj.msg(f"Removed tag '{tag}' from category '{category}' on %<245>#{target.objnum}:{target.name}%n.")
+        pobj.msg(f"Removed tag '{tag}' from category '{category}' on &<245>#{target.objnum}:{target.name}&n.")
     else:
-        pobj.msg(f"Removed category '{category}' from %<245>#{target.objnum}:{target.name}%n.")
+        pobj.msg(f"Removed category '{category}' from &<245>#{target.objnum}:{target.name}&n.")
 else:
-    pobj.msg(f"Removed tag '{tag}' from %<245>#{target.objnum}:{target.name}%n.")
+    pobj.msg(f"Removed tag '{tag}' from &<245>#{target.objnum}:{target.name}&n.")

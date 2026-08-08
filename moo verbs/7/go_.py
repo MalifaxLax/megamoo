@@ -34,9 +34,9 @@ class _Quit(Exception):
 
 def _header(text):
     border = "=" * len(text)
-    pobj.msg(f"%<245>{border}%n")
+    pobj.msg(f"&<245>{border}&n")
     pobj.msg(text)
-    pobj.msg(f"%<245>{border}%n")
+    pobj.msg(f"&<245>{border}&n")
 
 def _input(prompt):
     """Yield for input. Raises _Quit if player types 'quit'."""
@@ -51,7 +51,7 @@ def _pick(prompt, options, allow_back=True, redisplay=None):
     Returns (index, value) or None if 'back'.
     redisplay is an optional callable that re-shows the header and menu."""
     while True:
-        choice = yield from _input("%<255>>%n ")
+        choice = yield from _input("&<255>>&n ")
         choice = choice.strip().lower()
         if not choice:
             continue
@@ -71,7 +71,7 @@ def _pick(prompt, options, allow_back=True, redisplay=None):
             if len(matches) == 1:
                 return matches[0]
         pobj.msg("")
-        pobj.msg("%<245>Try again...%n")
+        pobj.msg("&<245>Try again...&n")
         pobj.msg("")
         if redisplay:
             redisplay()
@@ -136,11 +136,11 @@ def _run_chargen():
                     try:
                         c = db.get_object(cnum)
                         display_name = c.noun or (c.name or '<unnamed>').split()[0]
-                        pobj.msg(f"%<245>{i:>2}:%n {display_name}")
+                        pobj.msg(f"&<245>{i:>2}:&n {display_name}")
                     except Exception:
-                        pobj.msg(f"%<245>{i:>2}:%n <invalid>")
+                        pobj.msg(f"&<245>{i:>2}:&n <invalid>")
                 else:
-                    pobj.msg(f"%<245>{i:>2}:%n <unused>")
+                    pobj.msg(f"&<245>{i:>2}:&n <unused>")
 
             result = yield from _pick("", slots, allow_back=False)
             if result is None:
@@ -167,7 +167,7 @@ def _run_chargen():
                     _header("[R]esume or [S]tart over?")
                     chose_resume = False
                     while True:
-                        ans = yield from _input("%<255>>%n ")
+                        ans = yield from _input("&<255>>&n ")
                         ans = ans.strip().lower()
                         if not ans:
                             continue
@@ -177,7 +177,7 @@ def _run_chargen():
                         if 'start'.startswith(ans):
                             break
                         pobj.msg("")
-                        pobj.msg("%<245>Try again...%n")
+                        pobj.msg("&<245>Try again...&n")
                         pobj.msg("")
                         _header("[R]esume or [S]tart over?")
 
@@ -198,16 +198,16 @@ def _run_chargen():
                 # Destroy confirmation (finished character or start-over)
                 warn = "DESTROYING YOUR CHARACTER IS IRREVOCABLE!"
                 border = "=" * len(warn)
-                pobj.msg(f"%<245>{border}%n")
-                pobj.msg(f"%<245>DESTROYING YOUR CHARACTER IS %<196>IRREVOCABLE!%n")
-                pobj.msg(f"%<245>{border}%n")
+                pobj.msg(f"&<245>{border}&n")
+                pobj.msg(f"&<245>DESTROYING YOUR CHARACTER IS &<196>IRREVOCABLE!&n")
+                pobj.msg(f"&<245>{border}&n")
                 confirm_str = f"DESTROY {char_name.upper()}"
-                pobj.msg(f"Enter %<196>{confirm_str}%n to erase {char_name}. Anything else to abort.")
-                ans = yield from _input("%<255>>%n ")
+                pobj.msg(f"Enter &<196>{confirm_str}&n to erase {char_name}. Anything else to abort.")
+                ans = yield from _input("&<255>>&n ")
                 if ans.strip().upper() == confirm_str:
                     pobj.msg("")
-                    pobj.msg(f"  Are you sure you want to destroy {char_name}? %<255>(y/n)%n")
-                    ans2 = yield from _input("%<255>>%n ")
+                    pobj.msg(f"  Are you sure you want to destroy {char_name}? &<255>(y/n)&n")
+                    ans2 = yield from _input("&<255>>&n ")
                     if not ans2.strip().lower().startswith('y'):
                         pobj.msg("")
                         pobj.msg("  Aborted.")
@@ -224,7 +224,7 @@ def _run_chargen():
                         _set(this, 'character_names', taken_names)
                     recycle(ichar)
                     pobj.msg("")
-                    pobj.msg(f"  %<245>A moment of silence for {char_name}...%n")
+                    pobj.msg(f"  &<245>A moment of silence for {char_name}...&n")
                     yield 2
                     pobj.msg("")
                 ichar = None
@@ -262,7 +262,7 @@ def _run_chargen():
     while step == 'first_name':
         _header("What is your first name?")
         while True:
-            name = yield from _input("%<255>>%n ")
+            name = yield from _input("&<255>>&n ")
             name = name.strip()
             if not name:
                 continue
@@ -289,7 +289,7 @@ def _run_chargen():
     while step == 'last_name':
         _header("And what shall your last name be?")
         while True:
-            name = yield from _input("%<255>>%n ")
+            name = yield from _input("&<255>>&n ")
             name = name.strip()
             if name.lower() == 'back':
                 step = 'first_name'
@@ -313,7 +313,7 @@ def _run_chargen():
     while step == 'gender':
         _header("[M]ale or [F]emale? (Contact a GM if you'd like other gender pronouns.)")
         while True:
-            ans = yield from _input("%<255>>%n ")
+            ans = yield from _input("&<255>>&n ")
             ans = ans.strip().lower()
             if not ans:
                 continue
@@ -327,7 +327,7 @@ def _run_chargen():
                 gender = 'female'
             else:
                 pobj.msg("")
-                pobj.msg("%<245>Try again...%n")
+                pobj.msg("&<245>Try again...&n")
                 pobj.msg("")
                 _header("[M]ale or [F]emale? (Contact a GM if you'd like other gender pronouns.)")
                 continue

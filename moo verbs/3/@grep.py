@@ -108,7 +108,7 @@ for objnum in objnums:
         if by_name:
             if any(hit(n) for n in names):
                 verbs_hit += 1
-                lines.append(f"%<245>#{objnum}.{label}%n  {' '.join(names)}")
+                lines.append(f"&<245>#{objnum}.{label}&n  {' '.join(names)}")
                 if len(lines) >= MAX_HITS:
                     truncated = True
                     break
@@ -121,7 +121,7 @@ for objnum in objnums:
 
         if count_only:
             n = sum(1 for ln in code.split('\n') if hit(ln))
-            lines.append(f"%<245>#{objnum}.{label}%n  {n} line{'' if n == 1 else 's'}")
+            lines.append(f"&<245>#{objnum}.{label}&n  {n} line{'' if n == 1 else 's'}")
             if len(lines) >= MAX_HITS:
                 truncated = True
                 break
@@ -129,7 +129,7 @@ for objnum in objnums:
 
         for i, ln in enumerate(code.split('\n'), 1):
             if hit(ln):
-                lines.append(f"%<245>#{objnum}.{label}:{i}%n  {ln.strip()}")
+                lines.append(f"&<245>#{objnum}.{label}:{i}&n  {ln.strip()}")
                 if len(lines) >= MAX_HITS:
                     truncated = True
                     break
@@ -150,6 +150,6 @@ for ln in lines:
 pobj.msg("")
 summary = f"{verbs_hit} verb{'' if verbs_hit == 1 else 's'}"
 if truncated:
-    pobj.msg(f"%<245>-- stopped at {MAX_HITS} lines ({summary} so far); narrow the search.%n")
+    pobj.msg(f"&<245>-- stopped at {MAX_HITS} lines ({summary} so far); narrow the search.&n")
 else:
-    pobj.msg(f"%<245>-- {len(lines)} line{'' if len(lines) == 1 else 's'} in {summary}.%n")
+    pobj.msg(f"&<245>-- {len(lines)} line{'' if len(lines) == 1 else 's'} in {summary}.&n")

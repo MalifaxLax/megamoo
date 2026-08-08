@@ -59,12 +59,54 @@ License: MIT
 """
 
 from textwrap import fill as wfill
-from .globals import GENDER_PRONOUN_MAP, RE_GENDER_PRONOUN
+from .globals import GENDER_PRONOUN_MAP, RE_GENDER_PRONOUN, SUBST_SIGILS
 
 
 # ============================================================================
 # HELPER FUNCTIONS -- safe property access and pronoun lookup
 # ============================================================================
+
+def _sub_token(text: str, letter: str, value: str) -> str:
+    """
+    Replace one token under every recognised sigil.
+
+    Each token used to be spelled out twice -- ``'%d'`` and ``'$d'`` -- so
+    adding a third sigil would have meant editing ten call sites and
+    getting one of them wrong.  Driving it from ``SUBST_SIGILS`` means the
+    set of prefixes is stated once, in globals.
+
+    Args:
+        text: The template.
+        letter: The token letter, without a sigil (``'d'``, ``'S'``, ...).
+        value: What to put in its place.
+
+    Returns:
+        str: The text with every ``<sigil><letter>`` replaced.
+    """
+    for sigil in SUBST_SIGILS:
+        text = text.replace(sigil + letter, value)
+    return text
+
+
+def _has_token(text: str, letters: str) -> bool:
+    """
+    Whether *text* contains ``<sigil><letters>`` under any sigil.
+
+    The fast-path guards used to test for a literal ``'%E'``.  After the
+    tokens moved to ``&`` those guards were false for every converted
+    string, so the substitution block beneath each one was skipped
+    silently -- the text came out with ``&EPP`` still in it.  A guard that
+    knows about one sigil is worse than no guard at all.
+
+    Args:
+        text: The template being substituted.
+        letters: Token prefix to look for, without a sigil.
+
+    Returns:
+        bool: True if any recognised sigil is followed by *letters*.
+    """
+    return any(sigil + letters in text for sigil in SUBST_SIGILS)
+
 
 def _getprop(obj, name, default=None):
     """
@@ -256,14 +298,15 @@ class StringUtils:
                              reverse=True):
                 _idx = _k[1:]                 # 's3' -> '3'
                 _rep = '' if svals[_k] is None else str(svals[_k])
-                text = text.replace('%' + _idx, _rep).replace('$' + _idx, _rep)
+                for _g in SUBST_SIGILS:
+                    text = text.replace(_g + _idx, _rep)
 
         # --- Noun object (uob) tokens: %u / %U / $u / $U ---
         if uob is not None:
             noun = _getprop(uob, 'noun', '')
             cap_noun = noun[:1].upper() + noun[1:] if noun else ''
-            text = text.replace('%U', cap_noun).replace('$U', cap_noun)
-            text = text.replace('%u', noun).replace('$u', noun)
+            text = _sub_token(text, 'U', cap_noun)
+            text = _sub_token(text, 'u', noun)
 
         # --- Subject tokens: gender pronouns first, then %s / %S / $s / $S ---
         if sub is not None:
@@ -273,22 +316,22 @@ class StringUtils:
             )
             sname = _getprop(sub, 'name', '')
             scname = _getprop(sub, 'cname', sname)
-            text = text.replace('%s', sname).replace('$s', sname)
-            text = text.replace('%S', scname).replace('$S', scname)
+            text = _sub_token(text, 's', sname)
+            text = _sub_token(text, 'S', scname)
 
         # --- Direct object tokens: %d / %D / $d / $D ---
         if dob is not None:
             dname = _getprop(dob, 'name', '')
             dcname = _getprop(dob, 'cname', dname)
-            text = text.replace('%d', dname).replace('$d', dname)
-            text = text.replace('%D', dcname).replace('$D', dcname)
+            text = _sub_token(text, 'd', dname)
+            text = _sub_token(text, 'D', dcname)
 
         # --- Indirect object tokens: %i / %I / $i / $I ---
         if iob is not None:
             iname = _getprop(iob, 'name', '')
             icname = _getprop(iob, 'cname', iname)
-            text = text.replace('%i', iname).replace('$i', iname)
-            text = text.replace('%I', icname).replace('$I', icname)
+            text = _sub_token(text, 'i', iname)
+            text = _sub_token(text, 'I', icname)
 
         return text
 
@@ -341,24 +384,24 @@ class StringUtils:
         pmap = _pronoun_map(eobj)
 
         # Replace name tokens
-        pstr = tstr.replace('%N', _getprop(eobj, 'name', ''))
-        pstr = pstr.replace('%CN', _getprop(eobj, 'cname', _getprop(eobj, 'name', '')))
+        pstr = _sub_token(tstr, 'N', _getprop(eobj, 'name', ''))
+        pstr = _sub_token(pstr, 'CN', _getprop(eobj, 'cname', _getprop(eobj, 'name', '')))
 
         # Replace lowercase enactor pronouns (%EPS, %EPO, %EPP, %EPR)
         # Only scan if '%E' is present (fast-path optimisation)
-        if '%E' in pstr:
+        if _has_token(pstr, 'E'):
             # Order: longest tokens first to prevent partial matches
-            pstr = pstr.replace('%EPR', pmap.get('pr', 'itself'))
-            pstr = pstr.replace('%EPP', pmap.get('pp', 'its'))
-            pstr = pstr.replace('%EPO', pmap.get('po', 'it'))
-            pstr = pstr.replace('%EPS', pmap.get('ps', 'it'))
+            pstr = _sub_token(pstr, 'EPR', pmap.get('pr', 'itself'))
+            pstr = _sub_token(pstr, 'EPP', pmap.get('pp', 'its'))
+            pstr = _sub_token(pstr, 'EPO', pmap.get('po', 'it'))
+            pstr = _sub_token(pstr, 'EPS', pmap.get('ps', 'it'))
 
         # Replace capitalised enactor pronouns (%CEPS, %CEPO, %CEPP, %CEPR)
-        if '%CE' in pstr:
-            pstr = pstr.replace('%CEPR', pmap.get('pr', 'itself').capitalize())
-            pstr = pstr.replace('%CEPP', pmap.get('pp', 'its').capitalize())
-            pstr = pstr.replace('%CEPO', pmap.get('po', 'it').capitalize())
-            pstr = pstr.replace('%CEPS', pmap.get('ps', 'it').capitalize())
+        if _has_token(pstr, 'CE'):
+            pstr = _sub_token(pstr, 'CEPR', pmap.get('pr', 'itself').capitalize())
+            pstr = _sub_token(pstr, 'CEPP', pmap.get('pp', 'its').capitalize())
+            pstr = _sub_token(pstr, 'CEPO', pmap.get('po', 'it').capitalize())
+            pstr = _sub_token(pstr, 'CEPS', pmap.get('ps', 'it').capitalize())
         return pstr
 
     def psub1a(self, tstr, eobj=None, s1='', s2='', s3=''):
@@ -388,11 +431,11 @@ class StringUtils:
         """
         pstr = self.psub1(tstr, eobj)
         if s1:
-            pstr = pstr.replace('%1', s1)
+            pstr = _sub_token(pstr, '1', s1)
         if s2:
-            pstr = pstr.replace('%2', s2)
+            pstr = _sub_token(pstr, '2', s2)
         if s3:
-            pstr = pstr.replace('%3', s3)
+            pstr = _sub_token(pstr, '3', s3)
         return pstr
 
     # ----------------------------------------------------------------
@@ -440,22 +483,22 @@ class StringUtils:
         tmap = _pronoun_map(tobj)
 
         # Replace target name tokens
-        pstr = pstr.replace('%T', _getprop(tobj, 'name', ''))
-        pstr = pstr.replace('%CT', _getprop(tobj, 'cname', _getprop(tobj, 'name', '')))
+        pstr = _sub_token(pstr, 'T', _getprop(tobj, 'name', ''))
+        pstr = _sub_token(pstr, 'CT', _getprop(tobj, 'cname', _getprop(tobj, 'name', '')))
 
         # Replace lowercase target pronouns (%OPS, %OPO, %OPP, %OPR)
-        if '%O' in pstr:
-            pstr = pstr.replace('%OPR', tmap.get('pr', 'itself'))
-            pstr = pstr.replace('%OPP', tmap.get('pp', 'its'))
-            pstr = pstr.replace('%OPO', tmap.get('po', 'it'))
-            pstr = pstr.replace('%OPS', tmap.get('ps', 'it'))
+        if _has_token(pstr, 'O'):
+            pstr = _sub_token(pstr, 'OPR', tmap.get('pr', 'itself'))
+            pstr = _sub_token(pstr, 'OPP', tmap.get('pp', 'its'))
+            pstr = _sub_token(pstr, 'OPO', tmap.get('po', 'it'))
+            pstr = _sub_token(pstr, 'OPS', tmap.get('ps', 'it'))
 
         # Replace capitalised target pronouns (%COPS, %COPO, %COPP, %COPR)
-        if '%CO' in pstr:
-            pstr = pstr.replace('%COPR', tmap.get('pr', 'itself').capitalize())
-            pstr = pstr.replace('%COPP', tmap.get('pp', 'its').capitalize())
-            pstr = pstr.replace('%COPO', tmap.get('po', 'it').capitalize())
-            pstr = pstr.replace('%COPS', tmap.get('ps', 'it').capitalize())
+        if _has_token(pstr, 'CO'):
+            pstr = _sub_token(pstr, 'COPR', tmap.get('pr', 'itself').capitalize())
+            pstr = _sub_token(pstr, 'COPP', tmap.get('pp', 'its').capitalize())
+            pstr = _sub_token(pstr, 'COPO', tmap.get('po', 'it').capitalize())
+            pstr = _sub_token(pstr, 'COPS', tmap.get('ps', 'it').capitalize())
         return pstr
 
     def psub2a(self, tstr, eobj=None, tobj=None, s1='', s2='', s3=''):
@@ -484,11 +527,11 @@ class StringUtils:
         """
         pstr = self.psub2(tstr, eobj, tobj)
         if s1:
-            pstr = pstr.replace('%1', s1)
+            pstr = _sub_token(pstr, '1', s1)
         if s2:
-            pstr = pstr.replace('%2', s2)
+            pstr = _sub_token(pstr, '2', s2)
         if s3:
-            pstr = pstr.replace('%3', s3)
+            pstr = _sub_token(pstr, '3', s3)
         return pstr
 
     # ----------------------------------------------------------------

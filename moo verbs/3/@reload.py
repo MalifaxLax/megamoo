@@ -58,7 +58,7 @@ if args.strip().lower() == 'all':
         try:
             obj = db.get_object(objnum)
         except Exception:
-            pobj.msg(f"%<196>Object #{objnum} not found in database — skipping.%n")
+            pobj.msg(f"&<196>Object #{objnum} not found in database — skipping.&n")
             errors += 1
             continue
         for fname in sorted(os.listdir(obj_dir)):
@@ -69,7 +69,7 @@ if args.strip().lower() == 'all':
             try:
                 code = open(filepath).read()
             except Exception as e:
-                pobj.msg(f"%<196>Error reading {filepath}: {e}%n")
+                pobj.msg(f"&<196>Error reading {filepath}: {e}&n")
                 errors += 1
                 continue
             # Skip empty/comment-only files
@@ -86,7 +86,7 @@ if args.strip().lower() == 'all':
                     v.compile()
                     updated += 1
                 except Exception as e:
-                    pobj.msg(f"%<196>Compile error: #{objnum}.{verb_name}: {e}%n")
+                    pobj.msg(f"&<196>Compile error: #{objnum}.{verb_name}: {e}&n")
                     errors += 1
                     continue
             else:
@@ -96,11 +96,11 @@ if args.strip().lower() == 'all':
                     obj.add_verb(vd)
                     created += 1
                 except Exception as e:
-                    pobj.msg(f"%<196>Error creating #{objnum}.{verb_name}: {e}%n")
+                    pobj.msg(f"&<196>Error creating #{objnum}.{verb_name}: {e}&n")
                     errors += 1
                     continue
         obj._mark_modified()
-    pobj.msg(f"Reload all: %<245>{updated}%n updated, %<245>{created}%n created, %<196>{errors}%n errors.")
+    pobj.msg(f"Reload all: &<245>{updated}&n updated, &<245>{created}&n created, &<196>{errors}&n errors.")
     return
 
 # --- Reload all verbs on one object: @reload #N ---
@@ -133,7 +133,7 @@ if dot < 0:
         try:
             code = open(filepath).read()
         except Exception as e:
-            pobj.msg(f"%<196>Error reading {filepath}: {e}%n")
+            pobj.msg(f"&<196>Error reading {filepath}: {e}&n")
             errors += 1
             continue
         stripped = '\n'.join(l for l in code.splitlines() if l.strip() and not l.strip().startswith('#'))
@@ -148,7 +148,7 @@ if dot < 0:
                 v.compile()
                 updated += 1
             except Exception as e:
-                pobj.msg(f"%<196>Compile error: #{obj.objnum}.{verb_name}: {e}%n")
+                pobj.msg(f"&<196>Compile error: #{obj.objnum}.{verb_name}: {e}&n")
                 errors += 1
                 continue
         else:
@@ -157,11 +157,11 @@ if dot < 0:
                 obj.add_verb(vd)
                 created += 1
             except Exception as e:
-                pobj.msg(f"%<196>Error creating #{obj.objnum}.{verb_name}: {e}%n")
+                pobj.msg(f"&<196>Error creating #{obj.objnum}.{verb_name}: {e}&n")
                 errors += 1
                 continue
     obj._mark_modified()
-    pobj.msg(f"Reload #{obj.objnum}: %<245>{updated}%n updated, %<245>{created}%n created, %<196>{errors}%n errors.")
+    pobj.msg(f"Reload #{obj.objnum}: &<245>{updated}&n updated, &<245>{created}&n created, &<196>{errors}&n errors.")
     return
 
 # --- Single verb reload ---
@@ -211,7 +211,7 @@ else:
                 except Exception:
                     pass
         if exported:
-            pobj.msg(f"Created %<245>{obj_dir}%n — exported {exported} verb(s).")
+            pobj.msg(f"Created &<245>{obj_dir}&n — exported {exported} verb(s).")
 
     # Primary: per-object directory
     filepath = os.path.join(obj_dir, verb_name + '.py')
@@ -241,8 +241,8 @@ if matches:
     v.compiled_code = None
     v.compile()
     obj._mark_modified()
-    pobj.msg(f"Reloaded %<245>{verb_name}%n on %<245>#{obj.objnum}:{obj.noun}%n from {filepath}")
+    pobj.msg(f"Reloaded &<245>{verb_name}&n on &<245>#{obj.objnum}:{obj.noun}&n from {filepath}")
 else:
     vd = VerbDef(names=[verb_name], code=code, owner=obj.owner, perms='rx')
     obj.add_verb(vd)
-    pobj.msg(f"Created %<245>{verb_name}%n on %<245>#{obj.objnum}:{obj.noun}%n from {filepath}")
+    pobj.msg(f"Created &<245>{verb_name}&n on &<245>#{obj.objnum}:{obj.noun}&n from {filepath}")
