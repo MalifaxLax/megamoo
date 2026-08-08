@@ -153,25 +153,30 @@ def check_password(plain: str, hashed: str) -> bool:
 # =========================================================================
 
 DEFAULT_SCREEN = r"""
-    \ \        /      |
-     \ \  \   /  _ \  |   __|   _ \   __ `__ \    _ \
-      \ \  \ /   __/  |  (     (   |  |   |   |   __/
-       \_/\_/  \___|__|_\|__| \___/  _|  _|  _| \___|
-                       |   _ \
-                       |  (   |
-   ___|   |           _| \__|/                   _|         |  |
- \___ \   __ \    _` |   _` |   _ \ \ \  \   /  |     _` |  |  |
-       |  | | |  (   |  (   |  (   | \ \  \ /   __|  (   |  |  |
- _____/  _| |_| \__,_| \__,_| \___/   \_/\_/   _|   \__,_| _| _|
+\ \        /    |                              |
+ \ \  \   / _ \ |  __|  _ \  __ `__ \   _ \    __|  _ \
+  \ \  \ /  __/ | (    (   | |   |   |  __/    |   (   |
+   \_/\_/ \___|_|\___|\___/ _|  _|  _|\___|   \__|\___/
+
+  \  |                   \  |  _ \   _ \
+ |\/ |  _ \  _` |  _` | |\/ | |   | |   |
+ |   |  __/ (   | (   | |   | |   | |   |
+_|  _|\___|\__, |\__,_|_|  _|\___/ \___/
+           |___/
 """
 # No version in the art: the number that used to be here was a database
 # version for a world this does not ship, and it had gone stale anyway.
 #
-# Note also that this fallback banner reads "Welcome to Shadowfall", the
-# development world it came from.  It is only reached when neither
-# config.display_screen nor display_screen.txt is present, and the shipped
-# display_screen.txt does say MegaMOO -- but it is the wrong name to fall
-# back to.
+# This art used to read "Welcome to Shadowfall" -- the development world
+# the engine was carved out of.  Every `megamoo init` world reached it,
+# because a fresh game had no display_screen.txt of its own, so the first
+# thing a new builder saw was somebody else's game announcing itself.  A
+# fallback has to name the thing that is actually running.
+#
+# `megamoo init` now also writes this text out as display_screen.txt, so
+# the ordinary way to change it is editing a file in your own world
+# rather than editing the engine.  This constant is what worlds created
+# before that, or with their file deleted, fall back to.
 
 
 def load_display_screen(config: 'ServerConfig') -> str:

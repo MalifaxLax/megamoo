@@ -13,10 +13,11 @@ five separate changes hand-carried between them in a single day.
 What ``init`` produces is a directory the builder owns::
 
     mygame/
-        megamoo.toml     what to serve, and on which ports
-        world.db         a copy of the starter world
-        verbs/           the verb tree -- the builder's, in the builder's git
-        game/            game-specific Python, importable from verbs
+        megamoo.toml         what to serve, and on which ports
+        world.db             a copy of the starter world
+        display_screen.txt   the splash shown before the login prompt
+        verbs/               the verb tree -- the builder's, in the builder's git
+        game/                game-specific Python, importable from verbs
             __init__.py
 
 Nothing in it belongs to the engine, and the engine is never edited to
@@ -77,6 +78,7 @@ A MegaMOO world.
 | `verbs/` | the world's code, one file per verb, `verbs/<objnum>/<name>.py` |
 | `game/` | game-specific Python, imported by verbs as `from game.x import y` |
 | `world.db` | the live world -- objects, properties, players |
+| `display_screen.txt` | the splash players see before the login prompt |
 
 `world.db` is not in version control.  It is the running state; `verbs/`
 and `game/` are the source.  Edit a verb in your editor and the running
@@ -175,6 +177,14 @@ def init_game(destination, name=None, port=6770, template=None) -> pathlib.Path:
     (dest / 'megamoo.toml').write_text(CONFIG.format(name=name, port=port))
     (dest / '.gitignore').write_text(GITIGNORE)
     (dest / 'README.md').write_text(README.format(name=name))
+
+    # The splash shown before the login prompt.  Written out as a file the
+    # builder owns, rather than left to the engine's built-in, because the
+    # first thing anyone wants to change about a new world is its name on
+    # the way in -- and that should mean editing your own world, not the
+    # engine.  The server reads it from the working directory.
+    from moo.login import DEFAULT_SCREEN
+    (dest / 'display_screen.txt').write_text(DEFAULT_SCREEN.lstrip('\n'))
 
     print(f'Created {dest}')
     print(f'  {copied} verb files, a starter world, and an empty game/ package')

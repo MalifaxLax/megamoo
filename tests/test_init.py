@@ -27,8 +27,27 @@ def game(tmp_path):
 
 def test_it_creates_the_expected_layout(game):
     for item in ('world.db', 'verbs', 'game/__init__.py',
-                 'megamoo.toml', '.gitignore', 'README.md'):
+                 'megamoo.toml', '.gitignore', 'README.md',
+                 'display_screen.txt'):
         assert (game / item).exists(), item
+
+
+def test_a_new_world_does_not_greet_players_as_somebody_elses_game(game):
+    """
+    The splash is the first thing anyone sees, before they have logged in.
+
+    It used to say "Welcome to Shadowfall" -- the development world the
+    engine was carved out of -- because a fresh game shipped no
+    display_screen.txt and fell through to a built-in that had never been
+    renamed.  Both halves are checked: the file the builder can edit
+    exists, and the fallback behind it does not name the wrong game.
+    """
+    from moo.login import DEFAULT_SCREEN
+
+    assert 'Shadowfall' not in DEFAULT_SCREEN
+    screen = (game / 'display_screen.txt').read_text()
+    assert screen.strip(), 'the splash is empty'
+    assert 'Shadowfall' not in screen
 
 
 def test_the_new_world_reads_its_own_verbs(game):
