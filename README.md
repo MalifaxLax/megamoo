@@ -6,36 +6,6 @@ Where classic MOO servers make you program in a purpose-built MOO language, Mega
 
 > **This reimplements MOO's model, not its language.** You get objects carrying their own properties and verbs, single-parent inheritance, live in-world programming, and a wizard/programmer/owner permission model. You do not get a MOO-language interpreter — existing MOO code does not run unmodified and has to be ported to Python. That port is largely mechanical; see [Porting from LambdaMOO](#porting-from-lambdamoo).
 
-## Documentation
-
-**[Read the guide →](https://malifaxlax.github.io/megamoo/)**
-
-| | |
-|---|---|
-| [What MegaMOO Is](https://malifaxlax.github.io/megamoo/) | Start here |
-| [Getting Started](https://malifaxlax.github.io/megamoo/getting-started.html) | Your first room, object and verb |
-| [Building Worlds](https://malifaxlax.github.io/megamoo/rooms.html) | Rooms, exits, objects, shops |
-| [Writing Verbs](https://malifaxlax.github.io/megamoo/verbs.html) | The programming model |
-| [Command Reference](https://malifaxlax.github.io/megamoo/commands.html) | All 74 staff commands |
-| **[Coming from LambdaMOO](https://malifaxlax.github.io/megamoo/moo-compat.html)** | **Importing an old database, and porting its verbs** |
-| [The Web Client](https://malifaxlax.github.io/megamoo/web-client.html) | Playing in a browser |
-
-The engine's internals — object model, parser, verb types, the systems
-underneath — are in the developer manual under [`docs/manual/`](docs/manual/).
-
-## Highlights
-
-- **Async-first network core** — `asyncio` event loop serving Telnet and WebSocket simultaneously, with classic MUD protocol negotiation (MXP clickable links, GMCP, MSDP, MSSP) and ANSI-aware word wrapping that measures *visible* width, not byte width.
-- **Python as the MOO language** — verbs are Python source with a lightweight preprocessor: `#42` resolves to object 42, `$utils` to a system object. Full stdlib, native dicts/lists in properties, no DSL to learn.
-- **Live programming** — create and edit verbs from inside the game (`@adverb`, in-game eval) or as files on disk; a JSON-over-TCP API (off by default, localhost-only) supports external editors and tooling.
-- **SQLite persistence** — WAL-mode journal for crash recovery, normalized schema, lazy LRU object cache with automatic fallback, periodic checkpointing, ACID transactions.
-- **Hierarchical object model** — LambdaMOO-style single-parent inheritance with a flattened ancestor cache and cascading invalidation, so property lookups stay O(1) even in deep trees.
-- **A real command parser** — articles, ordinals (`get 2nd sword`), adjective–noun matching, possessives, prepositions, and switch syntax (`look/brief`), with separate matching modes for players and staff.
-- **Timed effects system** — tick-driven buffs, debuffs, damage-over-time and status conditions, persisted with the database and surviving restarts.
-- **Task scheduling** — every verb runs inside a managed task with time limits, suspension (`suspend(5)` resumes automatically), and fork-bomb protection.
-- **Emit substitution engine** — gender-aware message tokens (`%S jumps over %d`) render correctly for every observer: actor, target, and room each see properly conjugated, properly pronouned text.
-- **Accessibility as a first-class concern** — a per-player screenreader mode strips ANSI color and decoration from all output; server-side wrapping can be disabled for clients that reflow text themselves. See [Accessibility](#accessibility).
-
 ## Quick start
 
 Requires Python 3.10+.
@@ -46,48 +16,14 @@ megamoo init mygame
 cd mygame && megamoo --dev
 ```
 
-Then `telnet localhost 6770`.
-
-`megamoo init` gives you a directory that is *yours*:
-
-```
-mygame/
-    world.db        the live world -- objects, properties, players
-    verbs/          the world's code, one file per verb
-    game/           your own Python, imported by verbs
-    megamoo.toml    what to serve, and where
-```
-
-The engine is a dependency, not something you copy and edit. Upgrading is
-`pip install --upgrade megamoo`, and your game is untouched by it.
+Then `telnet localhost 6770` and you are in a world you can build.
 
 `megamoo --dev` picks the database in the current directory, reloads verbs
 as you edit them, and publishes a discovery file so external tooling can
-find the running world.
-
-The starter world comes with the base object hierarchy, character
-generation, a building suite of `@`-commands, and a room to build out from.
+find the running world. What `init` created is [yours](#your-game-is-yours).
 
 Optional extras: `bcrypt` for stronger password hashing (a salted SHA-256
 fallback is built in), `websockets` for browser clients.
-
-## Architecture
-
-| Subsystem | Module | What it does |
-|---|---|---|
-| Server core | `moo/server.py` | Event loop, serialised verb execution (one verb at a time, via the baton in `moo/verb_baton.py`), context propagation, graceful shutdown/restart |
-| Networking | `moo/network.py` | Telnet/WebSocket connections, protocol negotiation, color and wrapping |
-| Database | `moo/database.py` | SQLite persistence, object cache, checkpointing |
-| Object model | `moo/objects.py` | Inheritance, properties as native Python attributes, flags, tags |
-| Parser | `moo/parser.py` | Command → verb/direct-object/preposition/indirect-object resolution |
-| Verbs | `moo/verbs.py` | Verb compilation, preprocessing, caching, dispatch |
-| Matching | `moo/match_utils.py` | `pmatch`/`bmatch` natural-language object matching |
-| Tasks | `moo/tasks.py` | Time-limited execution, suspend/fork, scheduling |
-| Effects | `moo/effects.py` | Tick-driven buffs/debuffs with persistence |
-| Permissions | `moo/permissions.py` | Wizard/programmer/owner hierarchy, quotas |
-| Builtins | `moo/builtins.py` | The function library injected into every verb's namespace |
-
-Game content lives in your game's `verbs/<object-number>/<verb-name>.py`. The starter world ships 200+ of them: player commands, staff and building tools (66 `@`-commands), character generation, and the edibles/liquids and merchant systems. They are copied into your game by `megamoo init`, so they are yours to edit — the engine keeps no copy you have to merge against.
 
 ## What a verb looks like
 
@@ -129,6 +65,107 @@ else:
 ```
 
 No imports, no boilerplate: the verb namespace arrives pre-loaded with the acting player (`pobj`), parsed arguments (`args`, `dobj`, `iobj`), object matching (`pmatch`), cross-object calls (`call_verb`), and the rest of the builtin library. Objects are matched the way a player thinks — `jump gap`, `jump 2nd rope` — and the verb reads top to bottom like the action it performs.
+
+## Your game is yours
+
+```
+mygame/
+    world.db        the live world -- objects, properties, players
+    verbs/          the world's code, one file per verb
+    game/           your own Python, imported by verbs
+    megamoo.toml    what to serve, and where
+```
+
+`verbs/` and `game/` are the source, and belong in your version control.
+`world.db` is the running state — it holds player data and password
+hashes, and `megamoo init` gitignores it for you.
+
+Game-specific Python goes in `game/` and a verb imports it the ordinary
+way:
+
+```python
+from game.combat import swing
+```
+
+which is the same spelling verbs already use for `moo.objects`. That is
+the whole extension mechanism — no plugin registry, no hooks, nothing
+new to learn.
+
+The starter world comes with 200+ verbs: player commands, staff and
+building tools (66 `@`-commands), character generation, and the
+edibles/liquids and merchant systems. They are copied into your game, so
+they are yours to edit — the engine keeps no copy you have to merge
+against.
+
+## What makes it different
+
+**You change the world while people are standing in it.** Edit a verb in
+your editor and the running server picks it up; edit one from inside the
+game with `@program` and the file is written for you. No build, no
+restart, no deploy step, no players disconnected. The file on disk is the
+source of truth and the running world follows it — in both directions.
+
+**The in-world language is Python itself.** Not a MOO-like language, not a
+scripting subset: verb bodies are Python source with the whole standard
+library available. `#42` resolves to object 42 and `$utils` to a system
+object; that is the entire preprocessor.
+
+**Your game is a directory the engine never touches.** `megamoo init`
+gives you `verbs/`, `game/` and a world file that are yours. Upgrading is
+`pip install --upgrade megamoo` — there is no fork to merge, because you
+never had a copy of the engine to begin with.
+
+**Nothing to install but Python.** Zero third-party dependencies. The
+engine runs on the standard library, so a world deploys anywhere Python
+runs, with no build toolchain and nothing to compile.
+
+Underneath: an `asyncio` core serving Telnet and WebSocket at once with
+classic MUD protocol negotiation (MXP, GMCP, MSDP, MSSP); SQLite
+persistence in WAL mode with a lazy object cache and periodic
+checkpointing; LambdaMOO-style single-parent inheritance with a flattened
+ancestor cache; a parser that handles articles, ordinals (`get 2nd
+sword`), adjective–noun matching and prepositions; tick-driven timed
+effects that survive restarts; managed tasks with time limits,
+`suspend(5)`, and fork-bomb protection; and a gender-aware emit
+substitution engine so actor, target and room each read correct prose.
+
+**Accessibility is part of the engine's job**, not a plugin — per-player
+screenreader mode, ANSI-aware wrapping that measures visible width, and
+the option to turn server-side wrapping off entirely. See
+[Accessibility](#accessibility).
+
+## Documentation
+
+**[Read the guide →](https://malifaxlax.github.io/megamoo/)**
+
+| | |
+|---|---|
+| [What MegaMOO Is](https://malifaxlax.github.io/megamoo/) | Start here |
+| [Getting Started](https://malifaxlax.github.io/megamoo/getting-started.html) | Your first room, object and verb |
+| [Building Worlds](https://malifaxlax.github.io/megamoo/rooms.html) | Rooms, exits, objects, shops |
+| [Writing Verbs](https://malifaxlax.github.io/megamoo/verbs.html) | The programming model |
+| [Command Reference](https://malifaxlax.github.io/megamoo/commands.html) | All 74 staff commands |
+| **[Coming from LambdaMOO](https://malifaxlax.github.io/megamoo/moo-compat.html)** | **Importing an old database, and porting its verbs** |
+| [The Web Client](https://malifaxlax.github.io/megamoo/web-client.html) | Playing in a browser |
+
+The engine's internals — object model, parser, verb types, the systems
+underneath — are in the developer manual under [`docs/manual/`](docs/manual/).
+
+## Inside the engine
+
+| Subsystem | Module | What it does |
+|---|---|---|
+| Server core | `moo/server.py` | Event loop, serialised verb execution (one verb at a time, via the baton in `moo/verb_baton.py`), context propagation, graceful shutdown/restart |
+| Networking | `moo/network.py` | Telnet/WebSocket connections, protocol negotiation, color and wrapping |
+| Database | `moo/database.py` | SQLite persistence, object cache, checkpointing |
+| Object model | `moo/objects.py` | Inheritance, properties as native Python attributes, flags, tags |
+| Parser | `moo/parser.py` | Command → verb/direct-object/preposition/indirect-object resolution |
+| Verbs | `moo/verbs.py` | Verb compilation, preprocessing, caching, dispatch |
+| Matching | `moo/match_utils.py` | `pmatch`/`bmatch` natural-language object matching |
+| Tasks | `moo/tasks.py` | Time-limited execution, suspend/fork, scheduling |
+| Effects | `moo/effects.py` | Tick-driven buffs/debuffs with persistence |
+| Permissions | `moo/permissions.py` | Wizard/programmer/owner hierarchy, quotas |
+| Builtins | `moo/builtins.py` | The function library injected into every verb's namespace |
 
 ## Porting from LambdaMOO
 
@@ -225,7 +262,7 @@ Claude Code ──stdio──> tools/megamoo_mcp.py ──TCP/JSON──> ApiSer
 ```bash
 pip install mcp
 megamoo --dev                                              # API on, token reused
-claude mcp add megamoo -e MEGAMOO_API_TOKEN=<token> -- python3 ~/sfdev/tools/megamoo_mcp.py
+claude mcp add megamoo -e MEGAMOO_API_TOKEN=<token> -- python3 tools/megamoo_mcp.py
 ```
 
 ### Tools (17 total)
