@@ -72,7 +72,7 @@ works too.
 <tr><td><code>+verbs</code></td><td><code>gm3</code></td><td>List the commands attached to an object.</td></tr>
 <tr><td><code>+decompile</code> <span class="c">(+dec)</span></td><td><code>gm3</code></td><td>Print a verb's code exactly as stored — the ground truth for what is running.</td></tr>
 <tr><td><code>@list</code></td><td><code>gm3</code></td><td>List objects in a range of numbers.</td></tr>
-<tr><td><code>+pron</code></td><td><code>gm2</code></td><td>Show the substitution tokens for messages (%S, %d and the rest).</td></tr>
+<tr><td><code>+pron</code></td><td><code>gm2</code></td><td>Show the substitution tokens for messages (&S, &d and the rest).</td></tr>
 <tr><td><code>@find <span class="c">&lt;text&gt;</span></code></td><td><code>gm2</code></td><td>Find objects anywhere in the database by name. <code>in &lt;room&gt;</code> and <code>isa &lt;parent&gt;</code> narrow the search; <code>/exact</code> and <code>/count</code> change what comes back.</td></tr>
 <tr><td><code>@audit <span class="c">[player]</span></code></td><td><code>gm2</code></td><td>Everything a player owns, grouped by location. <code>/rooms</code>, <code>/nowhere</code> to find orphans, <code>/count</code> for totals.</td></tr>
 <tr><td><code>@kids <span class="c">&lt;object&gt;</span></code></td><td><code>gm2</code></td><td>What inherits from an object, each with a count of its own children. <code>/all</code> draws the whole descendant tree.</td></tr>
@@ -220,7 +220,6 @@ works too.
 <tr><td><code>@kill <span class="c">&lt;task&gt;</span></code></td><td><code>gm3</code></td><td>Stop a running task.</td></tr>
 <tr><td><code>@dump <span class="c">&lt;object&gt;</span></code></td><td><code>gm3</code></td><td>Write an object out as text into <code>dumps/</code>. <code>/verbs</code> includes its code, <code>/screen</code> prints it.</td></tr>
 <tr><td><code>@load <span class="c">&lt;file&gt;</span></code></td><td><code>gm3</code></td><td>Build a new object from a dump. <code>/dry</code> reports without building, <code>/list</code> shows what is available.</td></tr>
-<tr><td><code>@import <span class="c">&lt;file&gt;</span></code></td><td><code>gm3</code></td><td>Import a LambdaMOO database. Always <code>/dry</code> first — see <a href="moo-compat.html">Coming from LambdaMOO</a>.</td></tr>
 </tbody>
 </table>
 </div>

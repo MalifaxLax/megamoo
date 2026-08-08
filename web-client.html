@@ -55,7 +55,7 @@ server serves it itself — there is no web server to install and no build
 step. Add <code>--web</code> when you start a world:
 </p>
 
-<pre><code>python megamoo.py mm.db --web</code></pre>
+<pre><code>megamoo --dev --web</code></pre>
 
 <p>
 The client takes the first free port from 8888 up, and the startup log tells
@@ -186,7 +186,7 @@ a config file instead:
 
 <p>
 The static files are served from the <code>web/</code> folder next to
-<code>megamoo.py</code>. Moving or renaming that folder is the one thing
+<code>megamoo</code> serves it from inside the package. Moving or renaming that folder is the one thing
 that will break the client, since the path is resolved relative to the
 engine.
 </p>
@@ -277,7 +277,7 @@ And from the client:
 
 <p>
 <code>text</code> arrives as HTML because <code>moo/web/color.py</code> has
-already converted the world's <code>%</code> colour codes — and any ANSI a
+already converted the world's <code>&amp;</code> colour codes — and any ANSI a
 verb emitted — into spans, escaping everything else. That module is the only
 thing in the system that produces markup, which is what keeps a player who
 names themselves <code>&lt;script&gt;</code> from being a problem.
@@ -495,7 +495,7 @@ Two things change when the client is reachable from outside your machine.
 First, name the origins allowed to open a socket:
 </p>
 
-<pre><code>python megamoo.py mm.db --web --web-origins https://play.example.com</code></pre>
+<pre><code>megamoo --dev --web --web-origins https://play.example.com</code></pre>
 
 <p>
 Without that, any page a logged-in player happens to visit can open an

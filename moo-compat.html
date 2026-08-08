@@ -59,35 +59,27 @@ can read it, and port it verb by verb.
 <h2>Importing a database</h2>
 
 <p>
-<code>@import</code> reads a classic LambdaMOO database file — LambdaCore,
-JHCore, or your own — and creates MegaMOO objects from what is in it. Put
-the <code>.db</code> in an <code>imports/</code> directory beside the
-server, then look before you leap:
+Importing a whole LambdaMOO database is not part of the engine. It lives in
+a separate tool, <code>mooport</code>, and that is deliberate: reading a
+1994 textdump and deciding what its verbs mean is a different job from
+running a game, and MegaMOO is meant to stay a lean Python world-building
+platform rather than become a MOO compatibility layer.
 </p>
 
-<pre><code>@import/dry JHCore-DEV-2
-</code></pre>
-
 <p>
-The dry run reads the whole file and reports exactly what it would create
-without creating any of it. Do that first, every time. The real import does
-not merge and does not undo, so take a copy of your database before running
-it without <code>/dry</code>.
+It is also, usually, the wrong thing to want. Measured against stock
+LambdaCore, <strong>seven verbs in ten are redundant before translation
+starts</strong> — the utility objects, the editors, both quota systems,
+login, the help databases, the option packages. MegaMOO does all of that in
+engine code, and a world carrying its own copy would be carrying a second
+implementation of its host. What is worth reclaiming from an old MOO is the
+<em>world</em>: the rooms, the things, the characters, the behaviour
+somebody wrote by hand.
 </p>
 
-<div class="tablewrap">
-<table>
-<thead><tr><th>Command</th><th>Level</th><th>Does</th></tr></thead>
-<tbody>
-<tr><td><code>@import <span class="c">&lt;file&gt;</span></code></td><td><code>gm3</code></td><td>Import a LambdaMOO database from <code>imports/</code>.</td></tr>
-<tr><td><code>@import/dry <span class="c">&lt;file&gt;</span></code></td><td><code>gm3</code></td><td>Report what would be imported. Creates nothing.</td></tr>
-<tr><td><code>@import/players <span class="c">&lt;file&gt;</span></code></td><td><code>gm3</code></td><td>Include player objects, which are skipped by default.</td></tr>
-</tbody>
-</table>
-</div>
-
 <p>
-Format versions 1 through 4 are read, which covers LambdaMOO up to 1.8.
+See <code>mooport/docs/PORTING_NOTES.md</code> for the measurements and what
+the tool does with them.
 </p>
 
 <h3>What happens to object numbers</h3>
