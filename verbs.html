@@ -43,6 +43,7 @@
         <li><a href="#adding">Adding a verb</a></li>
         <li><a href="#waiting">Waiting, and talking to the outside</a></li>
         <li><a href="#disk">Editing verbs on disk</a></li>
+          <li><a href="#game">Your own Python: the <code>game/</code> package</a></li>
         <li><a href="#ai">Writing verbs with an AI assistant</a></li>
     </ol>
 </nav>
@@ -592,15 +593,78 @@ has already done it.
 </p>
 
 <div class="note">
-    <span class="label">The database is the original</span>
-    <p>The files are a convenient copy; what actually runs lives in your world
-       file. That is why a syntax error cannot take the game down — the broken
-       file is refused and the previous working version keeps serving. It is
-       also why the path matters: the world remembers where its verb folder is
-       (<code>#8.moo_verb_path</code>, <code>megamoo.moo verbs</code> by
-       default). Copy a world into a differently-named folder and your disk
-       edits quietly stop landing, because the world is still watching the old
-       one.</p>
+    <span class="label">The file is the source of truth</span>
+    <p>Two copies of a verb exist — the file and the one loaded in the
+       running world — and the rule is that the file wins. It is what
+       your editor opens and what git tracks, so it is the one that has
+       to be authoritative for anything else to make sense.</p>
+    <p>Everything follows from that. <code>@program</code> and
+       <code>@port</code> write the file <em>before</em> the database, so
+       a failed write leaves nothing changed rather than a live verb with
+       no file behind it, and they ask once rather than twice — answering
+       yes to the verb and no to the file used to leave the two
+       disagreeing. At startup the server reads the tree and reconciles:
+       a file with no verb behind it becomes one, and a file that changed
+       while the server was down replaces what the database is holding.
+       Edit verbs with the world stopped, <code>git checkout</code> a
+       branch, rename something in bulk — it all lands.</p>
+    <p>A syntax error still cannot take the game down: the broken file is
+       refused and the previous working version keeps serving until you
+       fix it.</p>
+</div>
+
+<div class="warn">
+    <span class="label">Where the world looks</span>
+    <p>Each world remembers its own verb folder in
+       <code>#8.moo_verb_path</code>, and <code>megamoo init</code> points
+       it at the <code>verbs/</code> directory beside your world file.
+       Move a world to a differently-named folder without updating that
+       and your edits quietly stop landing, because the world is still
+       watching the old path.</p>
+</div>
+
+<h2 id="game">Your own Python: the <code>game/</code> package</h2>
+
+<p>
+Verbs are the world's behaviour. Some things are not behaviour — combat
+tables, chargen rules, price lists, anything that is data or shared
+helpers — and those do not want to be a verb on an object. They go in
+<code>game/</code>, the Python package <code>megamoo init</code> creates
+beside your world:
+</p>
+
+<div class="term"><code>mygame/
+    world.db
+    verbs/
+    game/
+        __init__.py
+        combat.py        <span class="c"># yours</span></code></div>
+
+<p>
+A verb imports from it the ordinary way:
+</p>
+
+<div class="term"><code><span class="k">from</span> game.combat <span class="k">import</span> swing
+
+pobj.msg(swing(<span class="s">"axe"</span>))</code></div>
+
+<p>
+That is the same spelling verbs already use for engine modules like
+<code>moo.objects</code>. There is no plugin registry, no hook to
+register, nothing new to learn — the engine puts your game directory on
+<code>sys.path</code> when it finds a <code>game</code> package beside the
+world file, and normal Python does the rest.
+</p>
+
+<div class="note">
+    <span class="label">Why this exists</span>
+    <p>Before there was a <code>game/</code>, the only place to put such
+       code was inside the engine — and that is how an engine gets forked.
+       The development world this guide was written alongside grew four
+       modules under <code>moo/</code>, with nine verbs importing them,
+       and could no longer run on a stock MegaMOO at all. Putting your
+       code in <code>game/</code> is what keeps
+       <code>pip install --upgrade megamoo</code> from being a merge.</p>
 </div>
 
 <h2 id="ai">Writing verbs with an AI assistant</h2>

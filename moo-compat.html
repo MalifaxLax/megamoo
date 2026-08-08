@@ -78,8 +78,11 @@ somebody wrote by hand.
 </p>
 
 <p>
-See <code>mooport/docs/PORTING_NOTES.md</code> for the measurements and what
-the tool does with them.
+<code>mooport</code> is not published yet — it is being written alongside
+the engine, and the measurements above come from running it against stock
+LambdaCore and a sixteen-year-old Inferno database. If you have a world
+you want to bring across, say so: knowing there is somebody waiting is
+the thing most likely to get it released.
 </p>
 
 <h3>What happens to object numbers</h3>
@@ -230,6 +233,64 @@ A few things are worth knowing beyond the table:
     falsiness.</li>
 </ul>
 
+
+<h2>Translating a verb in place: <code>@port</code></h2>
+
+<p>
+The table above is what you do by hand. For a whole verb,
+<code>@port</code> does the mechanical part for you: paste MOO source,
+read the Python it produces, and save it only if you agree.
+</p>
+
+<div class="term"><code>&gt; @port #92.buy
+<span class="o">Porting MOO code into 'buy' on a merchant (#92).</span>
+<span class="o">Paste MOO source.  '.' alone to finish, '@abort' to cancel.</span>
+<span class="o">-----</span>
+player:tell("That costs ", price, " coins.");
+return 1;
+.
+<span class="o">-- translated --</span>
+<span class="o">  tell(pobj, f"That costs {price} coins.")</span>
+<span class="o">  return 1</span>
+<span class="o">Save this to buy on #92? [y/N]</span></code></div>
+
+<p>
+Nothing is saved without a yes. Anything the translator would not guess
+at is left in the code as a <code>&#35; PORT:</code> line naming what
+needs a person, and a verb saved with marks still in it is stored
+hidden, so a half-ported command cannot be reached by a player typing
+its name.
+</p>
+
+<div class="note">
+    <span class="label">The MOO original is kept</span>
+    <p>What <code>@port</code> saves is the translation with the source
+       commented underneath it. That matters more than it sounds. A
+       translation that <em>runs</em> but means the wrong thing is the
+       expensive failure — it does not raise, it just quietly does
+       something else — and the only way to see it is to read the
+       original beside the Python.</p>
+    <p>It is also what <code>@port/again</code> reads. The translator
+       improves; when it learns something, a verb that still carries its
+       source can simply be redone rather than dug out of the textdump
+       again:</p>
+    <div class="term"><code>&gt; @port/again #92.buy
+<span class="o">Re-translating 'buy' on a merchant (#92) from its kept source (2 lines).</span></code></div>
+    <p>It shows the result and asks, exactly as pasting does — it is the
+       same code path. A verb with no kept source says so and stops,
+       rather than opening an empty editor.</p>
+</div>
+
+<div class="warn">
+    <span class="label">Clean is not the same as correct</span>
+    <p>"Translated clean" means the translator recognised everything, not
+       that the verb does what it did. Where MOO and MegaMOO differ
+       quietly — <code>this</code> binds differently, <code>verbs()</code>
+       includes inherited names here, <code>verb_info()</code> returns a
+       dict rather than a 1-based list — the output compiles, runs, and
+       is wrong. Marked lines are the ones the translator knows about.
+       The rest is on you, and the way to check is to run the verb.</p>
+</div>
 
 <h2>Commands you already know</h2>
 
