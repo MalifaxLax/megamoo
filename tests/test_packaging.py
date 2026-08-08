@@ -92,10 +92,16 @@ def test_the_two_version_strings_agree():
     bitten by that exact shape: a world version written by hand into the
     login art while the login screen printed a different one read from
     an in-world object.
+
+    The two spellings are one mechanical transform, 'b' -> '-beta', so
+    the beta number is always written out -- 0.11.0b0 pairs with
+    0.11.0-beta0, not 0.10.0-beta.  This used to compare by stripping
+    'b0', which passed for exactly one release and would have failed the
+    first bump; leaving the number off is what made that necessary.
     """
     from moo.globals import SERVER_VERSION
 
-    packaged = _pyproject()['project']['version']          # 0.10.0b0
-    shown = SERVER_VERSION                                 # 0.10.0-beta
-    assert packaged.replace('b0', '') == shown.replace('-beta', ''), (
+    packaged = _pyproject()['project']['version']          # 0.10.0b1
+    shown = SERVER_VERSION                                 # 0.10.0-beta1
+    assert packaged.replace('b', '-beta') == shown, (
         f'pyproject says {packaged}, globals says {shown}')
