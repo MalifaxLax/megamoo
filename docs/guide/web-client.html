@@ -52,10 +52,10 @@
 <p>
 MegaMOO ships a browser client in the <code>web/</code> folder. The game
 server serves it itself — there is no web server to install and no build
-step. Add <code>--web</code> when you start a world:
+step. In development it is already on — <code>megamoo --dev</code> starts it and prints the address. To serve it from a world you are not running in dev mode, ask for it:
 </p>
 
-<pre><code>megamoo --dev --web</code></pre>
+<pre><code>megamoo world.db --web</code></pre>
 
 <p>
 The client takes the first free port from 8888 up, and the startup log tells
