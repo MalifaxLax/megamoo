@@ -664,13 +664,40 @@ class MegaMOOServer:
         logger.info(
             f"Verb auto-reload watching {base_path} (every {interval}s)")
 
-        # Seed mtimes without reloading -- only react to edits from here on.
+        # Seed mtimes without reloading -- the database already holds the
+        # current source for verbs it knows about, so re-reading them here
+        # would be wasted work.
+        #
+        # A file with *no* verb behind it is different, and must be loaded.
+        # Disk is the source of truth: a verb file that exists is a verb
+        # that exists.  Seeding those silently was a real bug with a
+        # confusing shape -- the file sits there in plain sight, the
+        # command answers "Do what?", and nothing anywhere says why.  It
+        # is also what a freshly created game is made of: every one of its
+        # verb files predates its first startup.
         mtimes: Dict[str, float] = {}
-        for _objnum, _name, filepath in verb_loader.scan_verb_files(base_path):
+        adopted = 0
+        for objnum, verb_name, filepath in verb_loader.scan_verb_files(base_path):
             try:
                 mtimes[filepath] = os.path.getmtime(filepath)
             except OSError:
-                pass
+                continue
+            try:
+                obj = self.database.get_object(objnum)
+                if obj is None or any(verb_name in v.names for v in obj.verbs):
+                    continue
+                with open(filepath) as f:
+                    code = f.read()
+                if verb_loader.reload_verb_code(
+                        obj, verb_name, code, create=True) == 'created':
+                    adopted += 1
+            except Exception as exc:
+                logger.warning(
+                    f'[autoreload] could not adopt {filepath}: {exc}')
+        if adopted:
+            logger.info(
+                f'[autoreload] adopted {adopted} verb file(s) with no verb '
+                f'in the database')
 
         while self.state.running:
             try:

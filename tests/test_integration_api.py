@@ -3,7 +3,7 @@ End-to-end test: boot a real server on a scratch DB copy, drive the
 JSON API over TCP, and verify run_command returns TestBot's output.
 
 This is the regression test for the whole MCP dev loop.
-Skipped automatically if mm.db is missing.
+Skipped automatically if the starter world is missing.
 """
 import json
 import shutil
@@ -57,9 +57,11 @@ class ApiSocket:
 
 @pytest.fixture(scope='module')
 def server(tmp_path_factory):
-    src = REPO / 'mm.db'
+    # The shipped world moved into the package as the `megamoo init`
+    # template; the engine repo no longer carries a game of its own.
+    src = REPO / 'moo' / 'templates' / 'starter' / 'world.db'
     if not src.exists():
-        pytest.skip('mm.db not present')
+        pytest.skip('starter world not present')
     scratch = tmp_path_factory.mktemp('db') / 'scratch.db'
     shutil.copy(src, scratch)
     # Copy WAL sidecars if present so recent writes aren't lost

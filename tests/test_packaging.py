@@ -44,6 +44,18 @@ def test_the_engine_ships_without_a_game_attached():
     packages = _pyproject()['tool']['setuptools']['packages']
     assert packages == ['moo', 'moo.web']
     assert not any(p.startswith('moo verbs') for p in packages)
+    # The engine repo must not carry a game of its own any more.
+    assert not (ROOT / 'moo verbs').exists()
+    assert not (ROOT / 'mm.db').exists()
+
+
+def test_the_starter_template_ships():
+    """`megamoo init` has to work for someone who only ran pip install."""
+    data = _pyproject()['tool']['setuptools']['package-data']['moo']
+    assert 'templates/starter/world.db' in data
+    starter = ROOT / 'moo' / 'templates' / 'starter'
+    assert (starter / 'world.db').is_file()
+    assert list((starter / 'verbs').glob('*/*.py'))
 
 
 def test_no_third_party_dependencies():

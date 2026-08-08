@@ -68,6 +68,8 @@ Based on:
 import sys
 import os
 import argparse
+import pathlib
+import secrets
 import logging
 import logging.handlers
 import signal
@@ -91,6 +93,118 @@ from moo.database import Database
 from moo.server import MegaMOOServer, run_server
 from moo.config import ServerConfig
 from moo.globals import SERVER_VERSION
+
+
+def _add_game_package_to_path(database):
+    """
+    Make a game's own Python importable from its verbs.
+
+    A game directory may carry a ``game/`` package beside its world --
+    combat tables, chargen data, economy rules; everything that is about
+    *this* world rather than about running any world.  Putting the game
+    directory on sys.path means a verb reaches it with an ordinary
+    import::
+
+        from game.combat import swing
+
+    which is the same spelling verbs already use for ``moo.objects``.
+    Without this the only place such code could live was inside the
+    engine, which is how an engine gets forked: sfdev grew combat_data,
+    chargen_data, moo_files and grid/ under moo/, and nine of its verbs
+    import from them, so its game cannot run on the shipped engine.
+
+    Args:
+        database: Path to the world being served.
+    """
+    if not database:
+        return
+    root = pathlib.Path(database).expanduser().resolve().parent
+    if (root / 'game' / '__init__.py').is_file():
+        entry = str(root)
+        if entry not in sys.path:
+            sys.path.insert(0, entry)
+            logger.info(f'Game package: {root / "game"}')
+
+
+def _state_dir() -> pathlib.Path:
+    """Where cross-world state lives: the shared API token, run files."""
+    return pathlib.Path(
+        os.environ.get('MEGAMOO_STATE_DIR', pathlib.Path.home() / '.megamoo'))
+
+
+def _shared_api_token() -> str:
+    """
+    Read the shared API token, creating one the first time.
+
+    One token for every world on the machine, so a tool configured once
+    keeps working when you start a different database.  Written 0600 and
+    never logged.
+    """
+    token_file = pathlib.Path(
+        os.environ.get('MEGAMOO_TOKEN_FILE', _state_dir() / 'token'))
+    if token_file.is_file() and token_file.stat().st_size:
+        return token_file.read_text().strip()
+    token_file.parent.mkdir(parents=True, exist_ok=True)
+    token = secrets.token_hex(16)
+    token_file.write_text(token + '\n')
+    token_file.chmod(0o600)
+    print(f'megamoo: generated a new API token in {token_file}')
+    return token
+
+
+def _only_database_here():
+    """
+    The single ``.db`` in the working directory, or None.
+
+    Convenience with a hard edge: if there are two, say so rather than
+    picking one, because guessing which world to serve is the kind of
+    help that costs an afternoon.
+    """
+    found = sorted(pathlib.Path('.').glob('*.db'))
+    if len(found) == 1:
+        return str(found[0])
+    if not found:
+        print('megamoo: no .db here; name one: megamoo <database>',
+              file=sys.stderr)
+    else:
+        names = ', '.join(p.name for p in found)
+        print(f'megamoo: several databases here ({names}); '
+              f'name one: megamoo <database>', file=sys.stderr)
+    raise SystemExit(2)
+
+
+def _apply_dev_defaults(args):
+    """
+    Everything the old ``./mm`` script did, minus its two fatal habits.
+
+    That script cd'd into the engine checkout, so it could only ever run
+    a database living inside the engine -- the same directory conflation
+    the packaging exists to end -- and it hardcoded one machine's Python.
+    What it did well was the part worth keeping: a shared token, a
+    discovery file so tooling can find the world, autoreload, and picking
+    the obvious database.  None of that should have been a shell script
+    only its author had.
+
+    Args:
+        args: Parsed arguments, modified in place.
+    """
+    if not args.database:
+        args.database = _only_database_here()
+
+    args.api = True
+    if not args.api_token:
+        args.api_token = _shared_api_token()
+
+    # Publish where this world is listening.  Without it, tooling has to
+    # be told the port by hand every time -- and silently loses the world
+    # when it changes.
+    if not os.environ.get('MEGAMOO_API_INFO_PATH'):
+        run_dir = _state_dir() / 'run'
+        run_dir.mkdir(parents=True, exist_ok=True)
+        key = str(pathlib.Path(args.database).resolve()).replace('/', '_')
+        os.environ['MEGAMOO_API_INFO_PATH'] = str(run_dir / f'{key}.api.json')
+
+    os.environ.setdefault('MEGAMOO_DEV_AUTORELOAD_VERBS', 'true')
 
 
 class MegaMOO:
@@ -234,12 +348,22 @@ Examples:
             help='Logging level (default: INFO)'
         )
         parser.add_argument(
+            '--dev',
+            action='store_true',
+            help='development mode: pick the lone .db here, reuse the '
+                 'shared API token, publish a discovery file so tooling '
+                 'can find this world, and hot-reload verbs from disk'
+        )
+        parser.add_argument(
             '--version', '-v',
             action='version',
             version=f'MegaMOO {SERVER_VERSION}'
         )
         
         args = parser.parse_args()
+
+        if args.dev:
+            _apply_dev_defaults(args)
         
         # Smart resolution of positional arguments
         # Patterns:
@@ -286,7 +410,10 @@ Examples:
         # Validate
         if not args.database:
             parser.error('Database file is required')
-            
+
+        # A game's own Python has to be importable before any verb runs.
+        _add_game_package_to_path(args.database)
+
         return args
         
     def initialize_database(self, db_path, new_db_path=None):
@@ -432,10 +559,19 @@ Examples:
 def main():
     """
     Application entry point.
-    
+
+    ``init`` is intercepted before argparse sees anything rather than
+    being made a real subcommand.  Reshaping the whole CLI would change
+    how every existing invocation is spelled -- ``megamoo world.db 6770``
+    is in scripts and in muscle memory -- for no gain beyond tidiness.
+
     Returns:
         int: Exit code
     """
+    if len(sys.argv) > 1 and sys.argv[1] == 'init':
+        from .init import main as init_main
+        return init_main(sys.argv[2:])
+
     app = MegaMOO()
     return app.run()
 

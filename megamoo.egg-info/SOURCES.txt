@@ -17,6 +17,7 @@ moo/database.py
 moo/effects.py
 moo/globals.py
 moo/hooks.py
+moo/init.py
 moo/login.py
 moo/match.py
 moo/match_utils.py
@@ -56,6 +57,7 @@ tests/test_async_io.py
 tests/test_integration_api.py
 tests/test_mcp_bridge.py
 tests/test_moo_libs.py
+tests/test_packaging.py
 tests/test_roommap.py
 tests/test_server_port_selection.py
 tests/test_testing_harness.py

@@ -36,12 +36,15 @@ Source = "https://github.com/MalifaxLax/megamoo"
 megamoo = "moo.cli:main"
 
 [tool.setuptools]
-# Only the engine is a package.  `moo verbs/`, `mm.db` and `web/` are a
-# *game*, not part of the library -- shipping them as package data is
-# what makes the engine and the world the same directory, which is the
-# problem this is meant to solve.  They become templates for
-# `megamoo init` instead.
+# Only the engine is a package.  The starter world ships as *template
+# data* under moo/templates/starter -- copied out by `megamoo init` into
+# a directory the builder owns, never edited in place.  That distinction
+# is the whole point: an engine that contains a game is an engine every
+# user has to fork.
 packages = ["moo", "moo.web"]
+
+[tool.setuptools.package-data]
+"moo" = ["templates/starter/world.db", "templates/starter/verbs/*/*.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
