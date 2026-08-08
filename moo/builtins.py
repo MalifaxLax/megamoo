@@ -361,6 +361,22 @@ def connection_host(who) -> str:
     return str(getattr(conn, 'host', '') or '') if conn is not None else ''
 
 
+def get_database():
+    """
+    The live database, or None before one is loaded.
+
+    Game code needs a supported way to reach the database.  Until the
+    engine and the game were separated, anything needing it simply read
+    the module global ``_database`` from inside builtins.py -- which is
+    only possible for code that *is* builtins.py, and is therefore one
+    more reason a game ended up living inside the engine.
+
+    Returns:
+        Database or None.
+    """
+    return _database
+
+
 def auth_level(obj: Union[int, MOOObject]) -> int:
     """
     Return the highest gmN authorization level from an object's ``auth`` list.

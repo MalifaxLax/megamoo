@@ -676,7 +676,7 @@ class MegaMOOServer:
         # is also what a freshly created game is made of: every one of its
         # verb files predates its first startup.
         mtimes: Dict[str, float] = {}
-        adopted = 0
+        adopted = refreshed = 0
         for objnum, verb_name, filepath in verb_loader.scan_verb_files(base_path):
             try:
                 mtimes[filepath] = os.path.getmtime(filepath)
@@ -684,20 +684,31 @@ class MegaMOOServer:
                 continue
             try:
                 obj = self.database.get_object(objnum)
-                if obj is None or any(verb_name in v.names for v in obj.verbs):
+                if obj is None:
                     continue
                 with open(filepath) as f:
                     code = f.read()
-                if verb_loader.reload_verb_code(
-                        obj, verb_name, code, create=True) == 'created':
+                match = next((v for v in obj.verbs if verb_name in v.names),
+                             None)
+                if match is not None and (match.code or '') == code:
+                    continue
+                status = verb_loader.reload_verb_code(
+                    obj, verb_name, code, create=True)
+                if status == 'created':
                     adopted += 1
+                elif status == 'updated':
+                    refreshed += 1
             except Exception as exc:
                 logger.warning(
-                    f'[autoreload] could not adopt {filepath}: {exc}')
+                    f'[autoreload] could not load {filepath}: {exc}')
         if adopted:
             logger.info(
                 f'[autoreload] adopted {adopted} verb file(s) with no verb '
                 f'in the database')
+        if refreshed:
+            logger.info(
+                f'[autoreload] refreshed {refreshed} verb(s) whose file had '
+                f'changed while the server was down')
 
         while self.state.running:
             try:
