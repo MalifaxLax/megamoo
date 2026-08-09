@@ -2517,6 +2517,40 @@ def _build_eval_globals(context: dict) -> dict:
     return ns
 
 
+def _eval_name_candidates(player) -> list:
+    """
+    Objects a bare name in ``eval`` / ``exec`` is allowed to refer to.
+
+    The room the character is standing in, then what they are carrying --
+    room first so that ordinals ("2 door") count the way they do in every
+    other command.
+
+    The inventory is not conditional on the room.  It used to be: both
+    callers built the list as ``if loc: candidates = loc.contents +
+    player.contents``, so a character with no location could not name a
+    thing in their own hands.  That is not a hypothetical -- chargen and
+    the isolation container put a character exactly there, and eval is the
+    tool you reach for when something has gone wrong enough to strand one.
+
+    Failures are contained per source: if ``contents`` raises on one side,
+    the other is still returned.  The callers wrap this in a bare
+    ``except: pass``, so letting an exception out here would silently
+    disable *all* name resolution rather than lose half of it.
+    """
+    candidates = []
+    loc = getattr(player, 'location', None)
+    if loc:
+        try:
+            candidates.extend(loc.contents)
+        except Exception:
+            pass
+    try:
+        candidates.extend(player.contents)
+    except Exception:
+        pass
+    return candidates
+
+
 def eval_python(code: str, context: dict) -> Any:
     """
     Evaluate a Python expression or execute statements (wizard only).
@@ -2582,10 +2616,7 @@ def eval_python(code: str, context: dict) -> Any:
     if db and player:
         import keyword, tokenize, io
         try:
-            loc = player.location if hasattr(player, 'location') and player.location else None
-            candidates = []
-            if loc:
-                candidates = list(loc.contents) + list(player.contents)
+            candidates = _eval_name_candidates(player)
             from .match_utils import bmatch
 
             # Phase 1: Try multi-word prefix before first dot.
@@ -2676,10 +2707,7 @@ def exec_python(code: str, context: dict) -> None:
     if db and player:
         import keyword, tokenize, io
         try:
-            loc = player.location if hasattr(player, 'location') and player.location else None
-            candidates = []
-            if loc:
-                candidates = list(loc.contents) + list(player.contents)
+            candidates = _eval_name_candidates(player)
             tokens = list(tokenize.generate_tokens(io.StringIO(processed_code).readline))
             names = {t.string for t in tokens if t.type == tokenize.NAME}
             for name in names:
