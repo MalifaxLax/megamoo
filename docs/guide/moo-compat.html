@@ -225,12 +225,14 @@ A few things are worth knowing beyond the table:
 <li><b>Errors are values.</b> <code>E_PERM</code> and the rest can be
     returned, stored in a property and compared with <code>==</code>, as
     well as raised — the same as in MOO.</li>
-<li><b>Missing properties do not raise.</b> Reading a property that is not
-    set gives back something falsy that compares equal to
-    <code>None</code>, so <code>if this.rt &gt; 0</code> is safe on an
-    object that has no <code>rt</code>. Note that this means
-    <code>is None</code> is always false — use <code>== None</code> or plain
-    falsiness.</li>
+<li><b>Missing properties raise.</b> Reading a property that is declared
+    nowhere raises <code>E_PROPNF</code> — a <code>PropertyNotFound</code>,
+    which is also an <code>AttributeError</code> — so
+    <code>if this.rt &gt; 0</code> fails on an object with no
+    <code>rt</code>. Because it is an <code>AttributeError</code>,
+    <code>getattr(this, 'rt', 0)</code> and <code>hasattr</code> both behave
+    as you would expect; use those, or declare the property with
+    <code>@adprop</code>.</li>
 </ul>
 
 

@@ -1,5 +1,5 @@
 """
-Usage: @adverb[/hidden] <object>.<name[(min)][,...]> [with <perms> [base] [min=N] [auth=N]]
+Usage: @adverb[/hidden] <object>.<name[(min)][,...]> [with <perms> [base]]
 
 Adds a new verb to an object. Verb names can include minimum abbreviation
 lengths in parentheses. Multiple aliases are separated by commas.
@@ -11,16 +11,25 @@ Switches:
 Options (after 'with'):
     <perms>  - Permission string (default: 'rx'). Common values: rx, rwx, x.
     base     - Use BaseVerb parent type instead of MasterVerb.
-    min=N    - Set a global minimum abbreviation length for all names.
-    auth=N   - Set minimum auth level required (1-5, default: 0).
+
+An option cannot contain '='.  '=' is a preposition, so the parser splits
+the command there before this verb ever sees it, and `with rx auth=3`
+creates a verb whose *name* is "rx auth=3" -- without complaint, and it
+shows up in @verbs looking like a real verb.  Set both afterwards, with
+the commands that exist for them:
+
+    @min #2.examine = 3
+    @verbauth #3.@telq = 3
+
+A per-name minimum does work here, in the parentheses: `examine(3)` sets
+one for that name alone.
 
 Examples:
     @adverb #7.look,l
     @adverb #2.examine(3),look(1),l
-    @adverb #2.examine,x with rx min=3
+    @adverb #2.examine,x with rx
     @adverb #15.reset with rwx base
     @adverb/hidden #5.at_post_move
-    @adverb #3.@telq with rx auth=3
 """
 if auth_level(pobj) < 3:
     pobj.msg("Do what?")

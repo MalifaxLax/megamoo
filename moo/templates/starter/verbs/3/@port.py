@@ -50,4 +50,8 @@ if not args:
     pobj.msg("Paste MOO source into the editor; '.' alone to finish.")
     return
 
-port_verb(pobj, args, db)
+# switches, not just args.  port_verb implements /again -- re-translate
+# from the MOO source kept on the verb -- and without them the switch was
+# accepted, silently ignored, and answered with the ordinary paste
+# editor, which looks exactly like the command working.
+port_verb(pobj, args, db, switches)
