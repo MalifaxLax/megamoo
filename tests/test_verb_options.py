@@ -64,3 +64,64 @@ def test_every_example_in_the_docstring_would_parse():
         argstr = ex.split(None, 1)[1] if ' ' in ex else ''
         spec = argstr.partition(' with ')[0].strip()
         assert '.' in spec, f'example would be rejected: {ex}'
+
+
+def test_a_property_shadowing_a_verb_is_reported():
+    """
+    __getattr__ resolves properties before verbs, so a property named
+    like a verb makes the verb unreachable through attribute access.
+    Nothing fails at that point -- the failure is later, as
+    `TypeError: 'str' object is not callable` at the call site, which
+    names neither the property nor the verb.
+
+    Reported at debug rather than warning on purpose: the shipped world
+    collides five times deliberately, storing a verb's message in a
+    property named after the verb.  This is here for the hour you would
+    otherwise spend guessing which name was taken.
+    """
+    import io
+    import logging
+    import sqlite3
+
+    from moo.database import Database
+    from moo.objects import clear_shadow_reports
+
+    world = (pathlib.Path(__file__).resolve().parent.parent
+             / 'moo' / 'templates' / 'starter' / 'world.db')
+    if not world.is_file():
+        pytest.skip('starter world not present')
+
+    import shutil, tempfile
+    tmp = pathlib.Path(tempfile.mkdtemp()) / 'w.db'
+    shutil.copy(world, tmp)
+    db = Database(str(tmp), mode='readwrite')
+    db.load()
+
+    buf = io.StringIO()
+    handler = logging.StreamHandler(buf)
+    handler.setLevel(logging.DEBUG)
+    log = logging.getLogger('megamoo.objects')
+    log.addHandler(handler)
+    old_level = log.level
+    log.setLevel(logging.DEBUG)
+    try:
+        clear_shadow_reports()
+        room = db.get_object(17)
+        victim = next(v.names[0] for v in room.verbs if v.names)
+        room.add_property(victim, 'not callable')
+        room.invalidate_inheritance_cache(db)
+        room._build_inheritance_cache(db)
+        out = buf.getvalue()
+        assert f'#17.{victim} is both a property' in out, out[:200]
+
+        # ...and does not repeat on every rebuild.  The cache is rebuilt
+        # whenever an ancestor changes, and a world can hold 60,000
+        # objects; a message nobody can read is not a message.
+        buf.truncate(0); buf.seek(0)
+        room.invalidate_inheritance_cache(db)
+        room._build_inheritance_cache(db)
+        assert 'is both a property' not in buf.getvalue()
+    finally:
+        log.removeHandler(handler)
+        log.setLevel(old_level)
+        clear_shadow_reports()

@@ -55,6 +55,19 @@ import time
 
 logger = logging.getLogger('megamoo.objects')
 
+# (objnum, name) pairs already reported as a property shadowing a verb.
+# The inheritance cache is rebuilt whenever anything in an ancestor
+# changes, and a world can hold tens of thousands of objects -- without
+# this the same collision is announced on every rebuild, and a warning
+# nobody can read is not a warning.  Cleared by clear_shadow_reports()
+# so a builder who fixes one can be told if it comes back.
+_reported_shadowed_verbs = set()
+
+
+def clear_shadow_reports():
+    """Forget which property/verb collisions have already been logged."""
+    _reported_shadowed_verbs.clear()
+
 
 # ===========================================================================
 # OBJECT FLAGS
@@ -1220,6 +1233,42 @@ class MOOObject:
                 for vname in verb.matchable_names():
                     resolved_verbs[vname] = (verb, ancestor.objnum)
         
+        # --- Names that mean two things -------------------------------
+        #
+        # __getattr__ resolves properties before verbs, so a property
+        # named like a verb wins and the verb becomes unreachable through
+        # attribute access.  Nothing fails at that point.  The failure is
+        # later and somewhere else, as `TypeError: 'str' object is not
+        # callable` at the call site, which says nothing about the name
+        # having been taken.  Say it here, where both definitions are in
+        # hand and we know which object each came from.
+        #
+        # Canonical verb names only.  matchable_names() expands
+        # abbreviations, so intersecting against those would report a
+        # property called `exam` as shadowing `examine` -- true, and not
+        # worth anybody's attention.
+        for _vname, (_verb, _vfrom) in resolved_verbs.items():
+            if _vname not in resolved_props or _vname not in _verb.names:
+                continue
+            _key = (self.objnum, _vname)
+            if _key in _reported_shadowed_verbs:
+                continue
+            _reported_shadowed_verbs.add(_key)
+            # debug, not warning.  The shipped world does this on purpose
+            # and five times over: a verb's message lives in a property
+            # named after the verb -- #22.open is "You open &d." beside
+            # the open verb, and #15.x is a map coordinate beside the x
+            # verb.  Warning on every boot about the engine's own
+            # convention is crying wolf.  What this is for is the hour
+            # you spend on `TypeError: 'str' object is not callable`
+            # with no idea which name was taken: turn on debug logging
+            # and the answer is already written down.
+            logger.debug(
+                "#%s.%s is both a property (from #%s) and a verb (from #%s); "
+                "the property wins, so the verb is reachable only as "
+                "call_verb(obj, %r)",
+                self.objnum, _vname, resolved_props[_vname][1], _vfrom, _vname)
+
         self._resolved_properties = resolved_props
         self._resolved_verbs = resolved_verbs
         self._inheritance_cache_valid = True
