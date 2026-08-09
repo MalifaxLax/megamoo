@@ -21,9 +21,11 @@ if table_num:
     this.table = None
 
 # Remove from room plist
+# Objnums, and every occurrence -- see on_puppet.  This compared a
+# MOOObject against a list of ints too, so logging out never removed
+# anything and the room kept counting you after you had gone.
 _room = this.location
 if _room and this.is_char:
-    _plist = _room.plist or []
-    if this in _plist:
-        _plist.remove(this)
-        _room.set_property('plist', _plist, db)
+    _plist = [getattr(p, 'objnum', p) for p in (_room.plist or [])]
+    if this.objnum in _plist:
+        _room.set_property('plist', [p for p in _plist if p != this.objnum], db)
