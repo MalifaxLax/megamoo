@@ -179,6 +179,26 @@ _|  _|\___|\__, |\__,_|_|  _|\___/ \___/
 # before that, or with their file deleted, fall back to.
 
 
+def _world_version(database) -> str:
+    """
+    The version this *world* declares, or '' if it declares none.
+
+    ``$version`` -- a string on #0, reachable from verb code as
+    ``sysobj('version')`` like any other $reference.  #0 exists in every
+    world by definition, so there is one place to look and nothing to
+    configure.  A world that never sets it shows the engine's version,
+    which is right for a starter world nobody has made into a game yet.
+
+    Never raises: the splash has to render even if the database is odd.
+    """
+    try:
+        sysobj = database.get_object(0)
+        value = getattr(sysobj, 'version', None)
+        return str(value).strip() if value else ''
+    except Exception:
+        return ''
+
+
 def load_display_screen(config: 'ServerConfig') -> str:
     """
     Load the splash text shown before the login prompt.
@@ -353,11 +373,21 @@ class LoginHandler:
         # so its ASCII art survives untouched, which also means colour codes
         # in it would print literally.  This line needs the dim grey.
         #
-        # It used to read a version property off the in-world Globals
-        # object, which held 'beta 0.7.0' -- an engine version copied into
-        # the database once and left to rot, so a 0.9 server introduced
-        # itself as 0.7.  SERVER_VERSION cannot drift.
-        await send(f"&<245>({SERVER_VERSION})&n")
+        # $version if the world declares one, otherwise the engine's.
+        #
+        # A player arriving at your game cares which *game* this is, not
+        # which server it runs on -- and a world under development has a
+        # version of its own that moves independently.  $version is where
+        # a world says so; leave it unset and the engine's version is
+        # shown, which is the right answer for a starter world that has
+        # not been made into anything yet.
+        #
+        # This is not the old arrangement coming back.  That read an
+        # *engine* version copied into the database once and left to rot,
+        # so a 0.9 server introduced itself as 0.7.  A world version
+        # cannot rot in that way, because nothing else is entitled to
+        # write it.
+        await send(f"&<245>({_world_version(self.database) or SERVER_VERSION})&n")
         await send("")
 
         for _ in range(max_attempts):

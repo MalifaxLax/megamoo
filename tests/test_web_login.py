@@ -132,3 +132,44 @@ def test_normal_login_still_moves_to_the_login_room(db, server, monkeypatch):
 
     assert player._location_id == LOGIN_ROOM
     assert getattr(player, 'last_location') == LOGIN_ROOM
+
+
+def test_the_splash_shows_the_world_version_when_there_is_one():
+    """
+    A player arriving at your game cares which game it is, not which
+    server it runs on -- and a world under development moves at its own
+    pace.  #0.version is where a world says so.
+
+    Not the old arrangement returning.  That read an *engine* version
+    copied into the database once and left to rot, so a 0.9 server
+    introduced itself as 0.7.  A world version cannot rot that way,
+    because nothing but the world is entitled to write it.
+    """
+    from moo.login import _world_version
+
+    class Sysobj:
+        version = '0.0.5-alpha'
+
+    class DB:
+        def __init__(self, obj): self._o = obj
+        def get_object(self, n): return self._o
+
+    assert _world_version(DB(Sysobj())) == '0.0.5-alpha'
+
+
+def test_a_world_with_no_version_falls_back_to_the_engine():
+    """A starter world nobody has made into a game shows the engine."""
+    from moo.login import _world_version
+
+    class Bare:
+        pass
+
+    class Raises:
+        def get_object(self, n): raise KeyError(n)
+
+    class DB:
+        def __init__(self, obj): self._o = obj
+        def get_object(self, n): return self._o
+
+    assert _world_version(DB(Bare())) == ''
+    assert _world_version(Raises()) == ''      # the splash must still render
