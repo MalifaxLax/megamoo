@@ -2551,6 +2551,82 @@ def _eval_name_candidates(player) -> list:
     return candidates
 
 
+def _resolve_bare_names(code: str, ns: dict, player, db) -> str:
+    """
+    Bind bare object names in *code* to the objects around *player*.
+
+    ``/ sword.name`` works because a name in an eval expression is matched
+    against the room and the caller's inventory before Python sees it.
+    Returns the code to evaluate, which may have been rewritten where a
+    name could not simply be bound to a variable of the same spelling.
+
+    Three passes, in order:
+
+    1. A multi-word reference before the first dot -- ``2 door.latchable``
+       -- which is not a Python name at all, so the matched object is
+       bound to a generated variable and spliced in.
+
+    2. A leading token Python cannot parse.  This is the ``/ or`` case:
+       an object whose shortest unambiguous prefix happens to be a Python
+       keyword.  Pass 3 skips keywords deliberately -- otherwise
+       ``x if y else z`` would try to match ``if`` -- so a verb named for
+       one could never be reached, and ``compile('or')`` merely reported a
+       syntax error.  Only a token that fails to compile on its own is
+       considered, which leaves ``None``, ``True`` and ``False`` alone:
+       they are keywords but they are also perfectly good expressions, and
+       ``/ True`` should stay True even if something in the room answers
+       to it.
+
+    3. Every remaining single-word name, bound under its own spelling.
+
+    Never raises: name resolution is a convenience, and a failure here
+    must leave the expression to Python rather than break eval outright.
+    """
+    if not (db and player):
+        return code
+    import keyword, tokenize, io
+    try:
+        from .match_utils import bmatch
+        candidates = _eval_name_candidates(player)
+
+        def _bind(obj):
+            name = f'_eval_obj_{id(obj)}'
+            ns[name] = obj
+            return name
+
+        # 1. Multi-word prefix before the first dot.
+        dot = code.find('.')
+        if dot > 0:
+            prefix = code[:dot].strip()
+            if ' ' in prefix:
+                obj = bmatch(prefix, player, candidates, db)
+                if obj:
+                    code = _bind(obj) + code[dot:]
+
+        # 2. A head token that is not a legal expression by itself.
+        head, sep, rest = code.partition('.')
+        token = head.strip()
+        if token and ' ' not in token:
+            try:
+                compile(token, '<probe>', 'eval')
+            except SyntaxError:
+                obj = bmatch(token, player, candidates, db)
+                if obj:
+                    code = _bind(obj) + sep + rest
+
+        # 3. Remaining single-word names.
+        tokens = list(tokenize.generate_tokens(io.StringIO(code).readline))
+        for name in {t.string for t in tokens if t.type == tokenize.NAME}:
+            if name in ns or keyword.iskeyword(name):
+                continue
+            obj = bmatch(name, player, candidates, db)
+            if obj:
+                ns[name] = obj
+    except Exception:
+        pass
+    return code
+
+
 def eval_python(code: str, context: dict) -> Any:
     """
     Evaluate a Python expression or execute statements (wizard only).
@@ -2607,43 +2683,8 @@ def eval_python(code: str, context: dict) -> Any:
     # Build globals with all MOO builtins available
     eval_globals = _build_eval_globals(context)
 
-    # Resolve bare object names in the current room via bmatch.
-    # Supports multi-word references (ordinals/adjectives) before a dot:
-    #   "2 door.latchable"  -> bmatch("2 door") + ".latchable"
-    #   "eb doo.latched"    -> bmatch("eb doo") + ".latched"
-    #   "door.latched"      -> bmatch("door")   + ".latched"
     db = context.get('db') or context.get('_db') or _database
-    if db and player:
-        import keyword, tokenize, io
-        try:
-            candidates = _eval_name_candidates(player)
-            from .match_utils import bmatch
-
-            # Phase 1: Try multi-word prefix before first dot.
-            # e.g. "2 door.latchable=True" -> prefix="2 door", rest=".latchable=True"
-            _dot_idx = processed_code.find('.')
-            if _dot_idx > 0:
-                _prefix = processed_code[:_dot_idx].strip()
-                # Only try if prefix contains a space (multi-word) and
-                # isn't already a known name or keyword
-                if ' ' in _prefix:
-                    _obj = bmatch(_prefix, player, candidates, db)
-                    if _obj:
-                        _varname = f'_eval_obj_{id(_obj)}'
-                        eval_globals[_varname] = _obj
-                        processed_code = _varname + processed_code[_dot_idx:]
-
-            # Phase 2: Resolve remaining single-word bare names via bmatch
-            tokens = list(tokenize.generate_tokens(io.StringIO(processed_code).readline))
-            names = {t.string for t in tokens if t.type == tokenize.NAME}
-            for name in names:
-                if name in eval_globals or keyword.iskeyword(name):
-                    continue
-                obj = bmatch(name, player, candidates, db)
-                if obj:
-                    eval_globals[name] = obj
-        except Exception:
-            pass
+    processed_code = _resolve_bare_names(processed_code, eval_globals, player, db)
 
     # Set verb context so method-style verb calls work
     if not db:
@@ -2702,23 +2743,8 @@ def exec_python(code: str, context: dict) -> None:
     # Build globals with all MOO builtins available
     eval_globals = _build_eval_globals(context)
 
-    # Resolve bare object names via bmatch
     db = context.get('db') or context.get('_db') or _database
-    if db and player:
-        import keyword, tokenize, io
-        try:
-            candidates = _eval_name_candidates(player)
-            tokens = list(tokenize.generate_tokens(io.StringIO(processed_code).readline))
-            names = {t.string for t in tokens if t.type == tokenize.NAME}
-            for name in names:
-                if name in eval_globals or keyword.iskeyword(name):
-                    continue
-                from .match_utils import bmatch
-                obj = bmatch(name, player, candidates, db)
-                if obj:
-                    eval_globals[name] = obj
-        except Exception:
-            pass
+    processed_code = _resolve_bare_names(processed_code, eval_globals, player, db)
 
     token = set_verb_context(player, db, depth=0)
     try:

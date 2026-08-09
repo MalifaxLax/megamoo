@@ -12,6 +12,8 @@ inventory went missing without anything noticing.
 """
 from types import SimpleNamespace
 
+import pytest
+
 from moo.builtins import _eval_name_candidates
 
 
@@ -82,3 +84,96 @@ def test_character_without_a_location_attribute():
     thing = SimpleNamespace(contents=[])
 
     assert _eval_name_candidates(thing) == []
+
+
+# ------------------------------------------------------------------
+# Names Python cannot parse
+# ------------------------------------------------------------------
+#
+# `/ or` reported a syntax error while the object it named sat in the
+# caller's hands. Bare names are skipped when they are Python keywords --
+# otherwise `x if y else z` would try to match `if` -- so an object whose
+# shortest unambiguous prefix happens to be a keyword could not be named
+# at all.
+
+import moo.builtins as _b
+
+
+def _world(monkeypatch, obj_name='OrbWarsRegistry'):
+    """A player carrying one object, with bmatch matching by prefix."""
+    from types import SimpleNamespace
+    obj = SimpleNamespace(name=obj_name, objnum=5040)
+    player = SimpleNamespace(contents=[obj], location=None)
+
+    def _bmatch(text, who, candidates, db):
+        text = (text or '').strip().lower()
+        if not text:
+            return None
+        return next((c for c in candidates if c.name.lower().startswith(text)), None)
+
+    monkeypatch.setattr('moo.match_utils.bmatch', _bmatch)
+    return obj, player
+
+
+def test_a_keyword_naming_an_object_resolves(monkeypatch):
+    obj, player = _world(monkeypatch)
+    ns = {}
+
+    code = _b._resolve_bare_names('or', ns, player, db=object())
+
+    assert code != 'or'
+    assert ns[code] is obj
+
+
+def test_a_keyword_head_before_a_dot_resolves(monkeypatch):
+    obj, player = _world(monkeypatch)
+    ns = {}
+
+    code = _b._resolve_bare_names('or.name', ns, player, db=object())
+
+    assert code.endswith('.name') and not code.startswith('or.')
+    assert ns[code.split('.')[0]] is obj
+
+
+@pytest.mark.parametrize('expr', ['True', 'False', 'None'])
+def test_keywords_that_are_real_expressions_are_left_alone(monkeypatch, expr):
+    """`/ True` stays True even if something present answers to it.
+
+    These are keywords, but they are also perfectly good expressions --
+    which is why the test is "does this token compile on its own" rather
+    than "is this token a keyword".
+    """
+    _, player = _world(monkeypatch, obj_name=expr)
+    ns = {}
+
+    # A real player and db, or the resolver short-circuits and this proves
+    # nothing: the point is that the probe runs and declines to rewrite.
+    assert _b._resolve_bare_names(expr, ns, player, db=object()) == expr
+
+
+def test_an_operator_in_the_middle_is_not_rewritten(monkeypatch):
+    """Only a leading token is considered.
+
+    In `a or b` the word is the operator, and there is no way to tell it
+    from a name by looking. Rewriting it would change what the expression
+    means, so the boundary is deliberate: `or.name` resolves, `x = or.name`
+    does not.
+    """
+    _, player = _world(monkeypatch)
+    ns = {}
+    code = 'x = or.name'
+
+    assert _b._resolve_bare_names(code, ns, player, db=object()) == code
+
+
+def test_resolution_failure_leaves_the_expression_alone(monkeypatch):
+    """Matching is a convenience; it must never break eval outright."""
+    _, player = _world(monkeypatch)
+
+    def _explode(*a, **k):
+        raise RuntimeError('matcher is down')
+
+    # Patched after _world, which installs a working bmatch of its own.
+    monkeypatch.setattr('moo.match_utils.bmatch', _explode)
+
+    assert _b._resolve_bare_names('or', {}, player, db=object()) == 'or'
