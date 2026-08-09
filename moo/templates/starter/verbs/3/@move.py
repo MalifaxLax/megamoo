@@ -28,21 +28,16 @@ if not dobj:
     pobj.msg("Move what?")
     return
 
-# Parse argstr, the full unsplit argument string, rather than the
-# parser's dobj/iobj.
+# The parser splits on both prepositions, so take the second slot.
 #
-# 'with' is a preposition.  The parser splits on it before this verb
-# runs, so the message never arrived: iobj held only the destination and
-# `if ' with ' in iobj_str` was never true.  The documented
-# `@move ball to #13 with A ball comes flying in!` moved the ball in
-# silence, and had done since it was written.  Same trap as @adverb's
-# options; same answer.
-raw = (argstr or '').strip()
-head, _sep, _tail = raw.partition(' with ')
-arrival_msg = _tail.strip() if _sep else ''
-obj_part, _sep2, dest_part = head.partition(' to ')
-obj_part = obj_part.strip()
-dest_part = dest_part.strip()
+# `@move ball to #13 with A ball comes flying in!` arrives as
+# dobj='ball', prep='to', iobj='#13', prep2='with', dobj2='A ball comes
+# flying in!'.  This verb looked for ' with ' inside iobj, which holds
+# only the destination, so the condition was never true and the
+# documented message was silently dropped -- since the verb was written.
+obj_part = (dobj or '').strip()
+dest_part = (iobj or '').strip()
+arrival_msg = (dobj2 or '').strip() if prep2 == 'with' else ''
 
 # Match the object in room contents + inventory
 candidates = list(pobj.location.contents) + list(pobj.contents)
