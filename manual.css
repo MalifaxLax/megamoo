@@ -423,3 +423,14 @@ td code { white-space: nowrap; }
     font-size: .88rem;
     color: var(--ink-faint);
 }
+
+/* Community links under the masthead.  Two of them, with the division
+   stated in the text rather than assumed: the indexed place for answers,
+   the chat for everything else. */
+.community {
+    margin: 1.1rem 0 0;
+    font-size: 0.94rem;
+    line-height: 1.75;
+    opacity: 0.92;
+}
+.community strong { font-weight: 600; }

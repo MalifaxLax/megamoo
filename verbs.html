@@ -280,6 +280,7 @@ MasterVerb splits the line at the first preposition it finds:
 <tr><td><code>dobj</code></td><td>The direct object — what the command acts on.</td></tr>
 <tr><td><code>prep</code></td><td>The preposition found: <em>in</em>, <em>from</em>, <em>to</em>, <em>on</em>…</td></tr>
 <tr><td><code>iobj</code></td><td>The indirect object — what follows the preposition.</td></tr>
+<tr><td><code>prep2</code> / <code>dobj2</code></td><td>A <em>second</em> preposition and everything after it. This is how <code>@move ball to #13 with A ball flies in!</code> keeps its message.</td></tr>
 <tr><td><code>lhs</code> / <code>rhs</code></td><td>Everything left and right of the preposition.</td></tr>
 <tr><td><code>args</code></td><td>The whole line after the command word.</td></tr>
 <tr><td><code>switches</code></td><td>Options typed as <code>look/brief</code>.</td></tr>
@@ -299,6 +300,28 @@ Single-character prepositions work without spaces, which is why
 <code>@desc #14=A room</code> parses the same as
 <code>@desc #14 = A room</code>.
 </p>
+
+<div class="warn">
+    <span class="label">&#61; is matched anywhere, including inside a word</span>
+    <p>That convenience has a consequence worth knowing before it surprises
+       you: because <code>=</code> needs no surrounding spaces, it is found
+       <em>inside</em> tokens too, and it wins over a later word preposition.
+       <code>@adverb #3.mycmd with rx auth=3</code> does not parse as you would
+       read it aloud — the split happens at the <code>=</code>:</p>
+    <div class="term"><code>dobj = <span class="o">'#3.mycmd with rx auth'</span>
+prep = <span class="o">'='</span>
+iobj = <span class="o">'3'</span></code></div>
+    <p>This is deliberate and it is not going to change: it is what makes
+       <code>@name #10=Sword</code> work. What it means for you is that a verb
+       whose arguments may contain <code>=</code> — free text, or options
+       written as <code>key=value</code> — should read <code>argstr</code>, the
+       whole unsplit argument string, and split it itself. Everything else
+       should use <code>dobj</code>/<code>prep</code>/<code>iobj</code>, which
+       are right for the grammar they model and save you the work.</p>
+    <p>The rule of thumb: if your usage line contains a literal
+       <code>=</code>, or free text a player might type an <code>=</code> into,
+       parse <code>argstr</code>. Otherwise trust the slots.</p>
+</div>
 
 <h3>When you need a custom type</h3>
 
