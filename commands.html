@@ -33,7 +33,7 @@
 <p class="tagline">Every staff command, grouped by what it is for.</p>
 
 <p>
-The 74 commands below are attached to <code>#3</code>, so every character
+The 75 commands below are attached to <code>#3</code>, so every character
 inherits them. What you may actually use depends on your
 <a href="verbs.html#auth">level</a> — the middle column. Without it, a command
 answers <code>Do what?</code>, exactly as if it did not exist.
@@ -203,6 +203,8 @@ works too.
 <tr><td><code>unhold</code> <span class="c">(unh)</span></td><td><code>gm1</code></td><td>Stop holding it.</td></tr>
 <tr><td><code>@color</code></td><td><code>gm1</code></td><td>Show the colour palette.</td></tr>
 <tr><td><code>@wearpos</code> <span class="c">(@wearp)</span></td><td><code>gm2</code></td><td>Show the wearable positions.</td></tr>
+<tr><td><code>@checkpoint</code></td><td><code>gm4</code></td><td>Take a database snapshot now. <code>/list</code> shows the ones you have. Worth running before you copy the database file — SQLite keeps recent writes in a sidecar until a checkpoint folds them in, so a copy taken without one can be short of the last few minutes.</td></tr>
+<tr><td><code>@port <span class="c">&lt;object&gt;.&lt;verb&gt;</span></code></td><td><code>gm3</code></td><td>Paste LambdaMOO source and have it translated into Python for review before it is saved. Needs the separate <code>mooport</code> package; without it the command says so and does nothing.</td></tr>
 <tr><td><code>@quota <span class="c">[player]</span></code></td><td><code>gm2</code></td><td>How much of the database someone has built, split into rooms, exits and everything else. Reports only — MegaMOO does not enforce a quota.</td></tr>
 </tbody>
 </table>

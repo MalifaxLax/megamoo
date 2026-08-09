@@ -39,6 +39,7 @@
         <li><a href="#start">Starting a world</a></li>
         <li><a href="#login">Logging in</a></li>
         <li><a href="#several">Running several worlds at once</a></li>
+        <li><a href="#tls">Encrypting connections</a></li>
     </ol>
 </nav>
 
@@ -69,10 +70,13 @@ and edit.
 Inside <code>mygame</code>:
 </p>
 
-<div class="term"><code>world.db        <span class="c"># the live world — objects, properties, players</span>
-verbs/          <span class="c"># the world's code, one file per verb</span>
-game/           <span class="c"># your own Python, imported by verbs</span>
-megamoo.toml    <span class="c"># what to serve, and where</span></code></div>
+<div class="term"><code>world.db             <span class="c"># the live world — objects, properties, players</span>
+verbs/               <span class="c"># the world's code, one file per verb</span>
+game/                <span class="c"># your own Python, imported by verbs</span>
+megamoo.toml         <span class="c"># what to serve, and where</span>
+display_screen.txt   <span class="c"># the splash players see before the login prompt</span>
+README.md            <span class="c"># a reminder of the layout</span>
+.gitignore           <span class="c"># keeps world.db and logs out of git</span></code></div>
 
 <p>
 The starter world it copies in contains the base object library, an
@@ -165,6 +169,64 @@ in the lobby with full authority over the world.
     <p>Every copy of the starter world has the same wizard password, and it is
        printed in this guide. Use <code>setpass</code> before your world is
        reachable by anyone else.</p>
+</div>
+
+<h2 id="tls">Encrypting connections</h2>
+
+<p>
+Logging in sends a username and then a password, each as an ordinary line of
+text. On your own machine that does not matter. Once a world is reachable from
+anywhere else it does: anyone able to watch the traffic reads the password, and
+people reuse passwords.
+</p>
+
+<p>
+Give the world a second, encrypted port:
+</p>
+
+<div class="term"><code><span class="p">$</span> megamoo world.db --tls-port 6771 --tls-cert cert.pem --tls-key key.pem
+<span class="o">Server listening on 0.0.0.0:6770</span>
+<span class="o">TLS listening on 0.0.0.0:6771</span></code></div>
+
+<p>
+Both ports serve the same world. Which one a player is on changes nothing about
+the game — TLS sits underneath the connection, and everything above it is
+identical.
+</p>
+
+<div class="note">
+    <span class="label">Why a second port and not the first</span>
+    <p><code>telnet</code> cannot speak TLS, and <code>telnet localhost 6770</code>
+       is how most people first reach a world — it is the command on this page.
+       Encrypting the main port would break that for everyone in order to help
+       the people who already have a client that supports TLS. So the plain
+       port stays, and the encrypted one is additional. Tell players which to
+       use; MUD clients that support TLS have a checkbox for it.</p>
+</div>
+
+<p>
+A misconfiguration stops the server rather than quietly falling back to
+plaintext. A port with no certificate, a certificate with no port, a file that
+is not there, or a TLS port equal to the plain one — each of them refuses to
+start and says which it was. That is deliberate: the one outcome worth ruling
+out is a world that looks encrypted and is not.
+</p>
+
+<p>
+For a certificate, <a href="https://certbot.eff.org/">certbot</a> issues free
+ones from Let's Encrypt and renews them. They expire every ninety days, so
+renewal wants to be automatic; the server reads the files at startup, so a
+renewal takes effect on the next restart.
+</p>
+
+<div class="note">
+    <span class="label">The browser client is a separate question</span>
+    <p>The web client is served over plain HTTP. If you publish it, put a
+       TLS-terminating proxy in front — Caddy obtains and renews certificates
+       on its own. It matters more than it looks: a browser will not open a
+       <code>ws://</code> socket from an <code>https://</code> page, so serving
+       the page over HTTPS without also terminating TLS for the socket leaves
+       you with a client that loads and cannot connect.</p>
 </div>
 
 <h2 id="several">Running several worlds at once</h2>

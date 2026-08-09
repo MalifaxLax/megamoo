@@ -108,8 +108,9 @@ objects, and every tool that walks the world stays fast and readable.
     <p>You must give it a room that already exists:
        <code>@vopen north to #412</code>. Dig the destination first, note its
        number, then connect. If a virtual exit already exists in that
-       direction, MegaMOO tells you — and if it points somewhere else, it asks
-       before overwriting.</p>
+       direction and points at the same room, MegaMOO says so and does nothing.
+       If it points somewhere else, the destination is changed and you are
+       told what it was.</p>
 </div>
 
 <h3>@open — a real exit object</h3>
@@ -139,7 +140,7 @@ number, because it is a thing lying there:
 <div class="term"><code><span class="p">&gt;</span> @vopen north to #205
 <span class="p">&gt;</span> @open south to #205
 <span class="p">&gt;</span> look
-<span class="o">Obvious Exits: `north`(v) -&gt; #205, #206:`a south` -&gt; #205</span>
+<span class="o">Obvious Exits: north(v) -&gt; #205, #206:a south -&gt; #205</span>
                      <span class="c">^ no object          ^ an object in the room</span></code></div>
 
 <div class="tablewrap">
@@ -243,12 +244,12 @@ Every exit starts with sensible messages already filled in, using the direction
 you gave it:
 </p>
 
-<div class="term"><code>success    You %MODE %1.               ->  "You walk north."
-osuccess   &S %OMODE %1.               ->  "Ana walks north."
-odrop      &S %OMODE in from the %1.   ->  "Ana walks in from the south."</code></div>
+<div class="term"><code>success    You &MODE &1.               ->  "You walk north."
+osuccess   &S &OMODE &1.               ->  "Ana walks north."
+odrop      &S &OMODE in from the &1.   ->  "Ana walks in from the south."</code></div>
 
 <p>
-<code>%MODE</code> and <code>%OMODE</code> are filled in at the moment someone
+<code>&MODE</code> and <code>&OMODE</code> are filled in at the moment someone
 moves, with how they are moving — walk, walks; fly, flies. Notice that
 <code>odrop</code> uses the <em>reverse</em> direction, because to the room being
 entered the traveller comes in from the opposite side.
@@ -271,7 +272,7 @@ virtual exit — there is no object to name. If you want your own wording
 <span class="o">Converted #207:an east (east) to virtual exit -&gt; #204:The Old Library.</span>
 <span class="o">Exit object #207 recycled.</span>
 <span class="p">&gt;</span> look
-<span class="o">Obvious Exits: `east`(v) -&gt; #204</span></code></div>
+<span class="o">Obvious Exits: east(v) -&gt; #204</span></code></div>
 
 <p>
 <code>@virtualize</code> moves the destination and all three messages into the

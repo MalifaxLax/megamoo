@@ -79,7 +79,7 @@ IC room in your world has it. Put it on one room, and only that room does.
 <h2 id="auth">Staff verbs and the auth system</h2>
 
 <p>
-Staff commands are the exception. All 63 of them live on <code>#3</code>, the
+Staff commands are the exception. All 75 of them live on <code>#3</code>, the
 base character object, so every character inherits them — and they are kept in
 check by an authority level rather than by where you are standing. They are
 listed in full in the <a href="commands.html">Command Reference</a>.
@@ -118,7 +118,7 @@ Your own verbs can require a level too. Set it when you create the verb and the
 engine refuses the command before your code runs:
 </p>
 
-<div class="term"><code><span class="p">&gt;</span> @adverb #3.@mycmd with auth=3
+<div class="term"><code><span class="p">&gt;</span> @adverb #3.@mycmd with rx auth=3
 <span class="p">&gt;</span> @verbauth #3.@mycmd = 3     <span class="c"># or afterwards</span></code></div>
 
 <div class="warn">
