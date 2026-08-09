@@ -102,14 +102,25 @@ the listener(s), restores tickers, and starts its background tasks
 The shipped database includes **#100**, the default owner/wizard account — the
 first character in the game. It has full authority (`gm5`, plus the `WIZARD` and
 `PROGRAMMER` flags), so it can create players, build rooms, write verbs, and
-administer the server. Log in with the default credentials:
+administer the server. `megamoo init` generates a password for this account
+and prints it once, when it creates the game:
 
-- **Username:** `Wizard`
-- **Password:** `wizard`
+```
+  Wizard login:  Wizard  /  winter-timber-7382
+  Shown once, and unique to this world -- write it down.
+```
+
+Every world gets its own. There is no default password to look up, and none
+in the released package -- a shipped hash is a shipped secret, and this one
+was recoverable from the wheel in under a second.
+
+If you have lost it, there is no recovery path from outside the game; create
+a fresh world, or set the property directly against the database with the
+server stopped.
 
 Two things to do on first login, before anything else:
 
-1. **Change the password.** The default is public knowledge. Use `password`
+1. **Change the password.** Use `password`
    (interactive) or `setpass <newpassword>` from the OOC lobby. **Do this
    immediately** in any environment reachable by others — it is the first item on
    the [security checklist](#security-checklist).
@@ -508,8 +519,9 @@ edit.
 
 Before exposing a server beyond your own machine:
 
-1. **Change the default wizard password.** Log in as `Wizard` / `wizard` and
-   change it immediately (see [First login](#first-login-the-ownerwizard-account-100)).
+1. **Change the wizard password** from the one `megamoo init` generated, or at
+   least confirm you still have it (see
+   [First login](#first-login-the-ownerwizard-account-100)).
 2. **Keep the JSON API local.** Leave `api.host` at `127.0.0.1` and set a strong
    `api.auth_token`; only widen it deliberately.
 3. **Enable TLS** (`tls_port` with `tls_cert`/`tls_key`, or the

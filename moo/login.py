@@ -50,6 +50,7 @@ License: MIT
 from __future__ import annotations
 
 import hashlib
+import hmac
 import logging
 import secrets
 from pathlib import Path
@@ -86,6 +87,11 @@ except ImportError:
 #   Password utilities
 # =========================================================================
 
+#: PBKDF2 iterations.  OWASP's 2023 floor for PBKDF2-HMAC-SHA256 is
+#: 600,000; the cost is a few hundred milliseconds once per login.
+PBKDF2_ROUNDS = 600_000
+
+
 def hash_password(plain: str) -> str:
     """Hash a plaintext password for storage.
 
@@ -107,10 +113,19 @@ def hash_password(plain: str) -> str:
     """
     if _HAS_BCRYPT:
         return _bcrypt.hashpw(plain.encode(), _bcrypt.gensalt()).decode()
-    # Fallback: salted SHA-256
+    # PBKDF2-HMAC-SHA256, stdlib, no dependency.  This is not a fallback
+    # in practice -- it is the shipping configuration.  megamoo declares
+    # no dependencies, so `pip install megamoo` never brings bcrypt, and
+    # every real deployment stores passwords with whatever this returns.
+    #
+    # It used to return one unstretched SHA-256, which a GPU tries at
+    # billions of guesses a second; the wizard password shipped in the
+    # PyPI wheel was recovered from its hash in under a second with a
+    # 28-word list.  Stretching is the whole defence when the hash leaks.
     salt = secrets.token_hex(16)
-    digest = hashlib.sha256((salt + plain).encode()).hexdigest()
-    return f"$sha256${salt}${digest}"
+    digest = hashlib.pbkdf2_hmac(
+        'sha256', plain.encode(), salt.encode(), PBKDF2_ROUNDS).hex()
+    return f"$pbkdf2${PBKDF2_ROUNDS}${salt}${digest}"
 
 
 def check_password(plain: str, hashed: str) -> bool:
@@ -140,10 +155,21 @@ def check_password(plain: str, hashed: str) -> bool:
     if _HAS_BCRYPT and hashed.startswith('$2'):
         # bcrypt hash (starts with $2a$, $2b$, or $2y$)
         return _bcrypt.checkpw(plain.encode(), hashed.encode())
+    if hashed.startswith('$pbkdf2$'):
+        try:
+            _, _, rounds, salt, digest = hashed.split('$', 4)
+            computed = hashlib.pbkdf2_hmac(
+                'sha256', plain.encode(), salt.encode(), int(rounds)).hex()
+        except (ValueError, TypeError):
+            return False
+        return hmac.compare_digest(computed, digest)
     if hashed.startswith('$sha256$'):
-        # Fallback SHA-256 hash
+        # Legacy, from before the stretch.  Still verified so worlds
+        # created earlier keep working; hash_password never produces it
+        # again, so these convert as players change their passwords.
         _, _, salt, digest = hashed.split('$', 3)
-        return hashlib.sha256((salt + plain).encode()).hexdigest() == digest
+        computed = hashlib.sha256((salt + plain).encode()).hexdigest()
+        return hmac.compare_digest(computed, digest)
     # Unrecognised format — deny access rather than guessing
     return False
 

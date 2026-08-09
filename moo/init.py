@@ -30,6 +30,7 @@ hooks, nothing new to learn.
 import json
 import pathlib
 import shutil
+import secrets
 import sqlite3
 import sys
 
@@ -135,6 +136,47 @@ def _point_at_own_verbs(db_path: pathlib.Path, verbs_dir: pathlib.Path):
         con.close()
 
 
+#: Words for the generated wizard password.  Short, unambiguous, and easy
+#: to retype off a terminal -- this gets copied by hand exactly once.
+_WORDS = (
+    'amber anchor beacon bramble cedar cinder copper crimson dagger ember '
+    'falcon garnet granite harbor hollow indigo ivory kestrel lantern marble '
+    'meadow onyx orchard pewter quarry raven river saffron silver sparrow '
+    'thistle thunder timber velvet willow winter'
+).split()
+
+
+def _new_wizard_password() -> str:
+    """
+    A fresh password for #100, as ``word-word-NNNN``.
+
+    Every world used to ship the starter template's hash unchanged, so
+    every MegaMOO install on earth had the same wizard password -- and
+    the hash was inside the PyPI wheel, where it took under a second to
+    recover with a short word list.  A world's first secret cannot come
+    from the package that makes the world.
+
+    Two words and four digits is about 51 bits with this list, which is
+    far past anything reachable against a stretched hash, and still
+    short enough to read off a screen and type.
+    """
+    return '%s-%s-%d' % (secrets.choice(_WORDS), secrets.choice(_WORDS),
+                         secrets.randbelow(9000) + 1000)
+
+
+def _set_wizard_password(db_path, password):
+    """Store *password* on #100, hashed the way the login path expects."""
+    from .login import hash_password
+    con = sqlite3.connect(str(db_path))
+    try:
+        con.execute(
+            "update properties set value=? where objnum=100 and name='password'",
+            (json.dumps(hash_password(password)),))
+        con.commit()
+    finally:
+        con.close()
+
+
 def init_game(destination, name=None, port=6770, template=None) -> pathlib.Path:
     """
     Create a new game directory.
@@ -181,6 +223,9 @@ def init_game(destination, name=None, port=6770, template=None) -> pathlib.Path:
         f'rules.  Putting it here instead of in the engine is what keeps\n'
         f'the engine upgradeable.\n"""\n')
 
+    wizard_password = _new_wizard_password()
+    _set_wizard_password(dest / 'world.db', wizard_password)
+
     (dest / 'megamoo.toml').write_text(CONFIG.format(name=name, port=port))
     (dest / '.gitignore').write_text(GITIGNORE)
     (dest / 'README.md').write_text(README.format(name=name))
@@ -198,6 +243,9 @@ def init_game(destination, name=None, port=6770, template=None) -> pathlib.Path:
     print()
     print(f'  cd {dest}')
     print(f'  megamoo --dev')
+    print()
+    print(f'  Wizard login:  Wizard  /  {wizard_password}')
+    print('  Shown once, and unique to this world -- write it down.')
     return dest
 
 
