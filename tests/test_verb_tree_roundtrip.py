@@ -129,11 +129,10 @@ def test_auth_is_not_taken_from_metadata():
 def test_a_blank_file_is_skipped_and_keeps_its_metadata():
     """A blank file means no opinion, not an empty verb.
 
-    #199's `_buy` and `_cost` are deliberate empty overrides shadowing
-    real implementations on #17 and #92, and #3's `_allow` is the same
-    shape. The loader has always skipped these, so their hidden flag
-    survives -- but it survives because nothing on disk describes them,
-    which is exactly why a rebuild from a blank file cannot restore it.
+    The loader has always skipped these, so a live verb's flags survive a
+    blank file -- but they survive because nothing on disk describes
+    them, which is exactly why a rebuild from a blank file cannot restore
+    them. The fix is to give the verb a docstring, not to change this.
     """
     obj = _Obj([VerbDef(names=['_allow'], code='\n', owner=0, hidden=True)])
 
