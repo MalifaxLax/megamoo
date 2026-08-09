@@ -56,6 +56,13 @@ packages = ["moo", "moo.web"]
     "templates/starter/world.db",
     "templates/starter/verbs/*/*.py",
     "templates/starter/verbs/*/.*.py",
+    # The browser client.  Listed explicitly by depth rather than with a
+    # recursive glob, because a missing pattern here does not fail the
+    # build -- it produces a wheel that starts, reports the web client
+    # listening, and answers 404.  That shipped in b0, b1 and b2.
+    "web/client/*",
+    "web/client/hosts/*",
+    "web/client/vendor/wasmoon/*",
 ]
 
 [tool.pytest.ini_options]

@@ -357,7 +357,12 @@ class MegaMOOServer:
         # browser experience.
         if self.config.network.websocket_enabled:
             from .web.server import WebServer
-            static_dir = Path(__file__).parent.parent / 'web'
+            # Inside the package, not beside it.  This was
+            # `parent.parent / 'web'`, which resolves to the repo root
+            # from a checkout and to a non-existent site-packages/web
+            # from an install -- so the browser client worked for anyone
+            # running from source and 404'd for everyone who installed.
+            static_dir = Path(__file__).parent / 'web' / 'client'
             self._web_server = WebServer(
                 self, self.config.network.host,
                 self.config.network.websocket_port,

@@ -105,3 +105,44 @@ def test_the_two_version_strings_agree():
     shown = SERVER_VERSION                                 # 0.10.0-beta1
     assert packaged.replace('b', '-beta') == shown, (
         f'pyproject says {packaged}, globals says {shown}')
+
+
+def test_the_browser_client_is_inside_the_package():
+    """
+    The client has to live under moo/, not beside it.
+
+    server.py resolves the static directory relative to its own file.
+    While that was `parent.parent / 'web'` it meant the repo root from a
+    checkout and site-packages/web from an install -- a directory no
+    wheel ever contained.  So the browser client worked perfectly for
+    everyone running from source and answered 404 for everyone who ran
+    `pip install megamoo`, which is the harder failure to notice: the
+    server starts, reports the web client listening, and lies.
+
+    Shipped that way in 0.10.0b0, b1 and b2.
+    """
+    import moo
+    client = pathlib.Path(moo.__file__).parent / 'web' / 'client'
+    assert client.is_dir(), f'no browser client at {client}'
+    for f in ('index.html', 'client.js', 'client.css', 'automap.js'):
+        assert (client / f).is_file(), f'missing {f}'
+    assert (client / 'vendor' / 'wasmoon' / 'glue.wasm').is_file()
+
+
+def test_every_client_file_is_declared_as_package_data():
+    """
+    A missing package-data pattern does not fail the build.
+
+    It produces a wheel that is short a file, and the first anyone knows
+    is a browser console error.  So compare what is on disk against what
+    the patterns claim, rather than trusting the patterns.
+    """
+    import fnmatch, moo
+    root = pathlib.Path(moo.__file__).parent
+    patterns = _pyproject()['tool']['setuptools']['package-data']['moo']
+    for f in sorted((root / 'web' / 'client').rglob('*')):
+        if not f.is_file() or '__pycache__' in f.parts:
+            continue
+        rel = str(f.relative_to(root))
+        assert any(fnmatch.fnmatch(rel, p) for p in patterns), (
+            f'{rel} is in the tree but no package-data pattern ships it')
