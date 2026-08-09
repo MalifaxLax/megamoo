@@ -28,28 +28,32 @@ if not dobj:
     pobj.msg("Move what?")
     return
 
+# Parse argstr, the full unsplit argument string, rather than the
+# parser's dobj/iobj.
+#
+# 'with' is a preposition.  The parser splits on it before this verb
+# runs, so the message never arrived: iobj held only the destination and
+# `if ' with ' in iobj_str` was never true.  The documented
+# `@move ball to #13 with A ball comes flying in!` moved the ball in
+# silence, and had done since it was written.  Same trap as @adverb's
+# options; same answer.
+raw = (argstr or '').strip()
+head, _sep, _tail = raw.partition(' with ')
+arrival_msg = _tail.strip() if _sep else ''
+obj_part, _sep2, dest_part = head.partition(' to ')
+obj_part = obj_part.strip()
+dest_part = dest_part.strip()
+
 # Match the object in room contents + inventory
 candidates = list(pobj.location.contents) + list(pobj.contents)
-obj = bmatch(dobj, pobj, candidates, db)
+obj = bmatch(obj_part, pobj, candidates, db)
 if not obj:
     pobj.msg("Invalid object.")
     return
 
-# Parse destination and optional message from iobj
-# iobj could be "#13 with A ball flies in!" or just "#13"
-iobj_str = iobj.strip() if iobj else ''
-if not iobj_str:
+if not dest_part:
     pobj.msg("Move it where? Use: @move <object> to <destination>")
     return
-
-# Split on ' with ' to separate destination from message
-arrival_msg = ''
-if ' with ' in iobj_str:
-    dest_part, arrival_msg = iobj_str.split(' with ', 1)
-    dest_part = dest_part.strip()
-    arrival_msg = arrival_msg.strip()
-else:
-    dest_part = iobj_str
 
 # Resolve destination
 dest = bmatch(dest_part, pobj, candidates, db)
@@ -62,6 +66,11 @@ old_loc = obj.location
 move(obj, dest)
 pobj.msg(f"Moved &<245>#{obj.objnum}:{obj.name}&n to &<245>#{dest.objnum}:{dest.name}&n.")
 
-# Send arrival message to destination room
+# Send arrival message to destination room.
+#
+# sub and dob so a builder's message can use the tokens the rest of the
+# game uses -- "&D lands with a thud." -- rather than only literal text,
+# and exclude so an object being moved is not told about its own arrival
+# when that object is a player.
 if arrival_msg:
-    dest.msg_room(arrival_msg)
+    dest.msg_room(arrival_msg, exclude=[obj], sub=pobj, dob=obj)

@@ -2140,6 +2140,17 @@ def msg_room(location: Union[int, MOOObject], message: str,
     loc_obj = location if isinstance(location, MOOObject) else _database.get_object(location)
 
     sub = kwargs.get('sub')
+    if sub is None:
+        # Same default as MOOObject.msg_room: the actor.  See the
+        # comment there for why forgetting sub= is worth defending
+        # against rather than just documenting.
+        try:
+            from .verb_context import verb_ctx
+            _ctx = verb_ctx.get(None)
+            if _ctx:
+                sub = _ctx[0]
+        except Exception:
+            pass
     dob = kwargs.get('dob')
     iob = kwargs.get('iob')
     uob = kwargs.get('uob')

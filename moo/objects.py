@@ -793,6 +793,26 @@ class MOOObject:
             exclude_nums.add(obj.objnum if hasattr(obj, 'objnum') else obj)
 
         sub = kwargs.get('sub')
+        if sub is None:
+            # Default the subject to whoever is acting.
+            #
+            # A room broadcast is nearly always about the actor, and
+            # forgetting sub= fails silently: &S renders as nothing, and
+            # the room is told that somebody did something.  @tel shipped
+            # that way for as long as it had existed, and the workaround
+            # in the world was to hardcode a name into the message, which
+            # then went stale the moment the character was renamed.
+            #
+            # 80 of the 87 msg_room calls in the shipped verbs already
+            # pass sub= explicitly, so this fills a gap rather than
+            # changing a convention; naming a different subject still wins.
+            try:
+                from .verb_context import verb_ctx
+                _ctx = verb_ctx.get(None)
+                if _ctx:
+                    sub = _ctx[0]
+            except Exception:
+                pass
         dob = kwargs.get('dob')
         iob = kwargs.get('iob')
         uob = kwargs.get('uob')
