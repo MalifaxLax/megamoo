@@ -1,5 +1,5 @@
 """
-Usage: @adverb[/hidden] <object>.<name[(min)][,...]> [with <perms> [base]]
+Usage: @adverb[/hidden] <object>.<name[(min)][,...]> [with <perms> [base] [min=N] [auth=N]]
 
 Adds a new verb to an object. Verb names can include minimum abbreviation
 lengths in parentheses. Multiple aliases are separated by commas.
@@ -11,25 +11,21 @@ Switches:
 Options (after 'with'):
     <perms>  - Permission string (default: 'rx'). Common values: rx, rwx, x.
     base     - Use BaseVerb parent type instead of MasterVerb.
+    min=N    - Minimum abbreviation length for every name.
+    auth=N   - Minimum auth level required (1-5, default: 0).
 
-An option cannot contain '='.  '=' is a preposition, so the parser splits
-the command there before this verb ever sees it, and `with rx auth=3`
-creates a verb whose *name* is "rx auth=3" -- without complaint, and it
-shows up in @verbs looking like a real verb.  Set both afterwards, with
-the commands that exist for them:
+A per-name minimum also works, in parentheses: `examine(3)` sets one for
+that name alone, and overrides min=N.
 
-    @min #2.examine = 3
-    @verbauth #3.@telq = 3
-
-A per-name minimum does work here, in the parentheses: `examine(3)` sets
-one for that name alone.
+@min and @verbauth set the same two things on a verb that already exists.
 
 Examples:
     @adverb #7.look,l
     @adverb #2.examine(3),look(1),l
-    @adverb #2.examine,x with rx
+    @adverb #2.examine,x with rx min=3
     @adverb #15.reset with rwx base
     @adverb/hidden #5.at_post_move
+    @adverb #3.@telq with rx auth=3
 """
 if auth_level(pobj) < 3:
     pobj.msg("Do what?")
@@ -37,21 +33,25 @@ if auth_level(pobj) < 3:
 
 import re
 
-# When prep is 'with', dobj has the spec and iobj has options
-# Otherwise use args for the full spec (parser may split on dots)
-if prep == 'with':
-    spec = dobj.strip() if dobj else ''
-    opts = iobj.strip() if iobj else ''
-else:
-    spec = args.strip() if args else ''
-    opts = ''
+# Parse argstr, the full unsplit argument string, rather than the
+# parser's dobj/prep/iobj.
+#
+# '=' is a preposition, so `@adverb #3.x with rx auth=3` was split at the
+# '=' before this verb ran: prep was '=', never 'with', and the whole
+# remainder arrived as one blob that became the verb's *name*.  It
+# created `x with rx auth=3` and reported success.  Reading argstr sees
+# what was typed, so options containing '=' work as documented.
+raw = (argstr or '').strip()
+head, sep, tail = raw.partition(' with ')
+spec = head.strip()
+opts = tail.strip() if sep else ''
 
 # Validate input: must contain a dot to separate object from verb name(s)
 if not spec or '.' not in spec:
-    pobj.msg('Usage: @adverb <object>.<name[(min)][,...]> [with <perms> [base]]')
+    pobj.msg('Usage: @adverb <object>.<name[(min)][,...]> [with <perms> [base] [min=N] [auth=N]]')
     pobj.msg('Example: @adverb #7.look,l')
     pobj.msg('Example: @adverb #2.examine(3),look(1),l')
-    pobj.msg('Example: @adverb #2.examine,x with rx')
+    pobj.msg('Example: @adverb #2.examine,x with rx min=3')
 else:
     # Split object reference from verb name(s) at the last dot
     obj_part, name_part = spec.rsplit('.', 1)
