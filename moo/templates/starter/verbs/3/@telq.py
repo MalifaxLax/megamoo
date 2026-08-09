@@ -86,6 +86,18 @@ if not dest:
     pobj.msg("Invalid destination.")
     return
 
+# A room, before asking a room's questions.
+#
+# is_icroom and is_ocroom are declared on #15 BaseRoom, so anything
+# outside that tree -- a character, an item, an exit -- has no answer and
+# the read raised E_PROPNF.  `@tel #201` at a player therefore reported
+# an engine error rather than "that is not a room", which is both less
+# useful and alarming.  is_room is declared false on #1 and true on #15,
+# so every object can be asked.
+if not dest.is_room:
+    pobj.msg(f"#{dest.objnum}:{dest.name} is not a room.")
+    return
+
 # Check IC/OOC boundary
 src_ic = pobj.location.is_icroom
 src_oc = pobj.location.is_ocroom
@@ -100,15 +112,22 @@ if (src_ic and dst_oc) or (src_oc and dst_ic):
 # Determine if silent (@telq) or messaged (@tel)
 silent = (verb == '@telq')
 
+# sub=pobj on all three, and exclude the traveller from the departure.
+#
+# Neither was passed before.  Without sub, &S never substituted, which is
+# why the stock wizard's message hardcoded the name -- there was no other
+# way to get one in, and it went stale the moment anybody renamed the
+# character.  And without exclude, the person teleporting was told about
+# their own departure by the room they were leaving.
 if not silent:
-    tel_msg = pobj.tel
+    tel_msg = getattr(pobj, 'tel', None)
     if tel_msg:
-        pobj.location.msg_room(tel_msg)
+        pobj.location.msg_room(tel_msg, exclude=[pobj], sub=pobj)
 
 move(pobj, dest)
 
 if not silent:
-    otel_msg = pobj.otel
+    otel_msg = getattr(pobj, 'otel', None)
     if otel_msg:
-        pobj.msg(otel_msg)
-        dest.msg_room(otel_msg, exclude=[pobj])
+        pobj.msg(otel_msg, sub=pobj)
+        dest.msg_room(otel_msg, exclude=[pobj], sub=pobj)
