@@ -30,7 +30,8 @@ first.  It does hold the verb baton while it runs, though, so the game
 pauses for as long as the write takes -- a second or two on a small world,
 longer on a large one.
 
-Old checkpoints are pruned automatically; the most recent ten are kept.
+Old checkpoints are pruned automatically; the number kept is
+database.max_checkpoints, ten by default.
 """
 
 import os

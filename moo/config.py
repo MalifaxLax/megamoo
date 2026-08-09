@@ -379,9 +379,6 @@ class ServerConfig:
                                    as an anti-spam / anti-abuse measure.
         enable_color (bool):       Whether ANSI colour codes are processed
                                    and sent to clients.
-        wizard_password (str):     A bootstrap password that grants wizard
-                                   status during initial setup.  Should be
-                                   cleared after the first wizard is created.
         debug_mode (bool):         Enables verbose logging and developer-
                                    facing error messages.
         log_level (str):           Python logging level name (e.g. ``'INFO'``,
@@ -401,7 +398,6 @@ class ServerConfig:
     max_command_length: int = 1000
     max_object_moves_per_second: int = 10
     enable_color: bool = True
-    wizard_password: str = ''
     debug_mode: bool = False
     log_level: str = 'INFO'
 
@@ -535,7 +531,6 @@ class ServerConfig:
             'max_command_length': self.max_command_length,
             'max_object_moves_per_second': self.max_object_moves_per_second,
             'enable_color': self.enable_color,
-            'wizard_password': self.wizard_password,
             'debug_mode': self.debug_mode,
             'log_level': self.log_level,
         }

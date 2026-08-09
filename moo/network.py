@@ -394,7 +394,12 @@ class PlayerConnection:
         # compressor has to live as long as the connection does.
         self._compressor = None
         self.color_enabled = True
-        self.color_processor = ColorProcessor(enable_color=True)
+        # From the config, not hardcoded True.  enable_color is documented
+        # as "whether ANSI colour codes are processed and sent to clients"
+        # and turning it off did nothing whatsoever.
+        self.color_processor = ColorProcessor(
+            enable_color=getattr(
+                getattr(server, 'config', None), 'enable_color', True))
         # Default terminal width — overridden by NAWS if the client
         # supports it.
         from .globals import WRAP_WIDTH

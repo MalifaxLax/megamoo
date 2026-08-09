@@ -11,8 +11,9 @@ west, ne, nw, se, sw, u, d, o, in (or full names).
 DESTINATION must be a room ID in form #N.
 
 If the direction already has a virtual exit to the same room,
-the verb reports it already exists. If it points to a different
-room, you are asked whether to overwrite it.
+the verb reports it already exists. If it points somewhere else,
+the destination is changed and you are told what it used to be --
+you are not asked first.
 
 Examples:
     @vopen north to #42

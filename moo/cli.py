@@ -152,6 +152,53 @@ def _shared_api_token() -> str:
     return token
 
 
+def _read_game_toml(directory='.'):
+    """
+    Read ``megamoo.toml`` from *directory*, or return {} if there is none.
+
+    ``megamoo init`` writes this file with a comment saying it is "what
+    to serve, and where", and nothing read it.  The database was picked
+    by globbing the directory instead, and ``[server] port`` did nothing
+    at all -- edit it, restart, and the server came up on 6770 anyway.
+
+    Returns a flat dict with the keys this function knows about, so a
+    caller never has to reach into the file's shape:
+    ``{'database': str, 'port': int, 'verbs': str, 'name': str}``.
+    """
+    path = pathlib.Path(directory) / 'megamoo.toml'
+    if not path.is_file():
+        return {}
+    try:
+        import tomllib
+    except ImportError:
+        # tomllib arrived in 3.11 and this package supports 3.10.  Rather
+        # than take a dependency for one small file, read the two keys
+        # that matter.  A 3.10 user who wants the full grammar can
+        # upgrade; what they must not get is silence.
+        out = {}
+        section = ''
+        for line in path.read_text().splitlines():
+            line = line.split('#', 1)[0].strip()
+            if line.startswith('['):
+                section = line.strip('[]')
+            elif '=' in line:
+                k, _, v = line.partition('=')
+                v = v.strip().strip('"').strip("'")
+                k = k.strip()
+                if section == 'game' and k in ('database', 'verbs', 'name'):
+                    out[k] = v
+                elif section == 'server' and k == 'port' and v.isdigit():
+                    out['port'] = int(v)
+        return out
+    data = tomllib.loads(path.read_text())
+    game = data.get('game', {}) or {}
+    server = data.get('server', {}) or {}
+    out = {k: game[k] for k in ('database', 'verbs', 'name') if k in game}
+    if isinstance(server.get('port'), int):
+        out['port'] = server['port']
+    return out
+
+
 def _only_database_here():
     """
     The single ``.db`` in the working directory, or None.
@@ -188,8 +235,15 @@ def _apply_dev_defaults(args):
     Args:
         args: Parsed arguments, modified in place.
     """
+    # megamoo.toml first, then the lone .db here.  The file is the
+    # world's own statement of what it is, and globbing the directory is
+    # the fallback for a game that has not got one.
+    game = _read_game_toml()
     if not args.database:
-        args.database = _only_database_here()
+        args.database = game.get('database') or _only_database_here()
+    if args.port is None and game.get('port'):
+        # A flag still wins -- it is the more specific instruction.
+        args.port = game['port']
 
     args.api = True
     if not args.api_token:

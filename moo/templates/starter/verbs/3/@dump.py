@@ -16,7 +16,8 @@ Switches:
 
 Auth: gm3+ (auth_level 3)
 
-Writes to dumps/#<objnum>-<name>.json under the server directory.
+Writes to dumps/<objnum>-<name>.json, relative to the directory the
+server was started in.
 
 What is written is what makes an object *itself*: parent, owner, flags,
 noun, aliases, properties, and optionally verbs.  What is deliberately

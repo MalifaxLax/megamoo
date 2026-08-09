@@ -48,10 +48,10 @@ else:
 
 # Validate input: must contain a dot to separate object from verb name(s)
 if not spec or '.' not in spec:
-    pobj.msg('Usage: @adverb <object>.<name[(min)][,...]> [with <perms> [base] [min=N]]')
+    pobj.msg('Usage: @adverb <object>.<name[(min)][,...]> [with <perms> [base]]')
     pobj.msg('Example: @adverb #7.look,l')
     pobj.msg('Example: @adverb #2.examine(3),look(1),l')
-    pobj.msg('Example: @adverb #2.examine,x with rx min=3')
+    pobj.msg('Example: @adverb #2.examine,x with rx')
 else:
     # Split object reference from verb name(s) at the last dot
     obj_part, name_part = spec.rsplit('.', 1)
