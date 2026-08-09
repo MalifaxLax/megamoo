@@ -97,3 +97,76 @@ def test_the_dead_ssl_settings_are_gone():
     net = ServerConfig().network
     for dead in ('ssl_enabled', 'ssl_cert', 'ssl_key'):
         assert not hasattr(net, dead), f'{dead} is back'
+
+
+# ------------------------------------------------------------------
+# HTTPS for the browser client
+# ------------------------------------------------------------------
+#
+# The game's TLS is a second listener because telnet cannot speak TLS.
+# The browser client's is a flag on the port it already has: a browser is
+# not telnet, so nothing there has to keep speaking plaintext. It is also
+# the only way the client uses an encrypted socket at all -- client.js
+# picks ws:// or wss:// from location.protocol, so over HTTP it can only
+# ever open an unencrypted one, whatever the game listener is doing.
+
+def test_no_web_tls_by_default():
+    assert ServerConfig().network.web_tls is False
+
+
+def test_web_tls_without_a_certificate_refuses(tmp_path):
+    with pytest.raises(ValueError, match='web_tls is set'):
+        _cfg(web_tls=True).validate()
+
+
+def test_web_tls_with_a_missing_certificate_file_refuses(tmp_path):
+    key = tmp_path / 'k.pem'; key.write_text('x')
+    with pytest.raises(ValueError, match='certificate not found'):
+        _cfg(web_tls=True, tls_cert=str(tmp_path / 'nope.pem'),
+             tls_key=str(key)).validate()
+
+
+def test_web_tls_needs_no_game_tls_port(tmp_path):
+    """Serving the client over HTTPS is a reason to hold a certificate.
+
+    The "cert with no listener" rule predates this and refused it, since
+    tls_port was the only thing that could serve one.
+    """
+    cert = tmp_path / 'c.pem'; cert.write_text('x')
+    key = tmp_path / 'k.pem'; key.write_text('x')
+
+    _cfg(web_tls=True, tls_cert=str(cert), tls_key=str(key)).validate()
+
+
+def test_a_valid_game_tls_config_is_accepted(tmp_path):
+    """The combination nothing covered, which is how a regression got in.
+
+    Rearranging this block once left the "cert without a port" branch
+    hanging off web_tls, so a correct tls_port + cert setup raised
+    "given without tls_port". Every refusal was tested; the acceptance
+    was not.
+    """
+    cert = tmp_path / 'c.pem'; cert.write_text('x')
+    key = tmp_path / 'k.pem'; key.write_text('x')
+
+    _cfg(tls_port=7778, tls_cert=str(cert), tls_key=str(key)).validate()
+
+
+def test_both_listeners_together(tmp_path):
+    cert = tmp_path / 'c.pem'; cert.write_text('x')
+    key = tmp_path / 'k.pem'; key.write_text('x')
+
+    _cfg(tls_port=7778, web_tls=True,
+         tls_cert=str(cert), tls_key=str(key)).validate()
+
+
+def test_the_context_is_built_in_one_place():
+    """Both listeners share it, so they cannot disagree about the floor."""
+    from moo.server import build_tls_context
+    import inspect
+
+    src = inspect.getsource(build_tls_context)
+    assert 'TLSv1_2' in src
+
+    import moo.server as srv
+    assert inspect.getsource(srv).count('SSLContext(') == 1

@@ -113,7 +113,8 @@ class WebServer:
     """
 
     def __init__(self, server: 'MegaMOOServer', host: str, port: int,
-                 static_dir: str, allowed_origins=None, scan_limit: int = 1):
+                 static_dir: str, allowed_origins=None, scan_limit: int = 1,
+                 ssl_context=None):
         """
         Initialise the web server.
 
@@ -132,11 +133,22 @@ class WebServer:
                         delivers).  Empty/``None`` allows any origin.
             scan_limit: How many consecutive ports to try.  ``1`` pins
                         ``port`` exactly, so a conflict raises.
+            ssl_context: An ``ssl.SSLContext`` to serve HTTPS with, or
+                        ``None`` for plain HTTP.  This is a flag on the
+                        one port rather than a second listener the way
+                        the game's TLS is: a browser is not telnet, so
+                        nothing here has to keep speaking plaintext.
+                        It is also what lets the client use ``wss:`` --
+                        client.js picks the socket scheme from
+                        ``location.protocol``, so over HTTP it can only
+                        ever open an unencrypted socket, whatever the
+                        game listener is doing.
         """
         self._server = server
         self._host = host
         self._port = port
         self._scan_limit = scan_limit
+        self._ssl_context = ssl_context
         self._static_dir = Path(static_dir)
         self._tcp_server = None
         self._connections: set = set()
@@ -170,7 +182,8 @@ class WebServer:
 
         first = self._port
         self._tcp_server, self._port = await listen_walking_ports(
-            self._handle_request, self._host, first, self._scan_limit
+            self._handle_request, self._host, first, self._scan_limit,
+            ssl=self._ssl_context
         )
         if self._port != first:
             logger.warning(f"Web port {first} in use; "
@@ -181,8 +194,10 @@ class WebServer:
         # all to a browser.
         shown = ('127.0.0.1' if self._host in ('0.0.0.0', '', None)
                  else self._host)
-        logger.info(f"Web client listening on {self._host}:{self._port}")
-        print(f"\n    Play in a browser:  http://{shown}:{self._port}/\n",
+        scheme = 'https' if self._ssl_context else 'http'
+        logger.info(f"Web client listening on {self._host}:{self._port} "
+                    f"({scheme})")
+        print(f"\n    Play in a browser:  {scheme}://{shown}:{self._port}/\n",
               flush=True)
 
     @property

@@ -179,6 +179,21 @@ async def listen_walking_ports(handler, host: str, first_port: int,
 # ============================================================
 
 
+def build_tls_context(cert: str, key: str):
+    """
+    A server SSL context for *cert* / *key*, floored at TLS 1.2.
+
+    Shared by the game's TLS listener and the browser client's, so the two
+    cannot drift into disagreeing about the minimum version -- the second
+    copy of a security decision is where the weaker one hides.
+    """
+    import ssl
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(cert, key)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    return ctx
+
+
 def _verb_matches_file(verb_def, code: str, verb_name: str) -> bool:
     """
     Whether a live verb already agrees with its file, metadata included.
@@ -384,11 +399,8 @@ class MegaMOOServer:
         # about and pointed a certificate at, so a conflict is an error to
         # report rather than something to route around.
         if self.config.network.tls_port:
-            import ssl as _ssl
-            ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_SERVER)
-            ctx.load_cert_chain(self.config.network.tls_cert,
-                                self.config.network.tls_key)
-            ctx.minimum_version = _ssl.TLSVersion.TLSv1_2
+            ctx = build_tls_context(self.config.network.tls_cert,
+                                    self.config.network.tls_key)
             self._tls_server, tls_port = await listen_walking_ports(
                 self._handle_connection, host, self.config.network.tls_port,
                 1, ssl=ctx, limit=MAX_COMMAND_LENGTH * 2
@@ -423,6 +435,10 @@ class MegaMOOServer:
                 allowed_origins=self.config.network.websocket_allowed_origins,
                 scan_limit=(self.config.network.port_scan_limit
                             if self.config.network.websocket_auto_port else 1),
+                ssl_context=(
+                    build_tls_context(self.config.network.tls_cert,
+                                      self.config.network.tls_key)
+                    if self.config.network.web_tls else None),
             )
             await self._web_server.start()
             self.web_port = self._web_server.port
@@ -1244,7 +1260,8 @@ def run_server(database_path: str, port: Optional[int] = None,
                web_origins: Optional[str] = None,
                tls_port: Optional[int] = None,
                tls_cert: Optional[str] = None,
-               tls_key: Optional[str] = None):
+               tls_key: Optional[str] = None,
+               web_tls: bool = False):
     """
     Build and run a MegaMOO server from scratch.
 
@@ -1322,6 +1339,8 @@ def run_server(database_path: str, port: Optional[int] = None,
             o.strip() for o in web_origins.split(',') if o.strip()
         ]
 
+    if web_tls:
+        config.network.web_tls = True
     if tls_port is not None:
         config.network.tls_port = tls_port
     if tls_cert is not None:

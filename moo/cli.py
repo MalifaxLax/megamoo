@@ -422,6 +422,15 @@ Examples:
                  '--tls-cert and --tls-key'
         )
         parser.add_argument(
+            '--web-tls',
+            action='store_true',
+            help='Serve the browser client over HTTPS using --tls-cert and '
+                 '--tls-key. A flag on the web port rather than a second '
+                 'one -- and the only way the client uses an encrypted '
+                 'socket, since it picks ws:// or wss:// from the page it '
+                 'was served over'
+        )
+        parser.add_argument(
             '--tls-cert',
             default=None,
             help='PEM certificate for --tls-port, including any intermediates'
@@ -630,6 +639,7 @@ Examples:
                        web_port=args.web_port,
                        web_origins=args.web_origins,
                        tls_port=args.tls_port,
+                       web_tls=args.web_tls,
                        tls_cert=args.tls_cert,
                        tls_key=args.tls_key)
             

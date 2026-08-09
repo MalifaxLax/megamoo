@@ -103,6 +103,14 @@ class NetworkConfig:
             including any intermediates.  Required when ``tls_port`` is set.
         tls_key (str): Filesystem path to the PEM-encoded private key.
             Required when ``tls_port`` is set.
+        web_tls (bool): Serve the browser client over HTTPS, using
+            ``tls_cert`` / ``tls_key``.  Unlike the game listener this is
+            a flag on the existing port rather than a second one: a
+            browser is not telnet, nothing has to keep speaking plaintext
+            to it, and one URL is less to explain than two.  It is also
+            what makes the client's own ``wss:`` path reachable -- it
+            chooses the socket scheme from ``location.protocol``, so
+            without HTTPS the page can only ever open ``ws://``.
         websocket_enabled (bool): Whether to start a WebSocket listener in
             addition to the telnet listener.  This listener also serves the
             browser client's static files.
@@ -126,6 +134,7 @@ class NetworkConfig:
     port_scan_limit: int = 50
     max_connections: int = 100
     tls_port: int = 0  # 0 = no TLS listener
+    web_tls: bool = False
     tls_cert: str = ''
     tls_key: str = ''
     websocket_enabled: bool = False
@@ -413,7 +422,24 @@ class ServerConfig:
                                 ('key', self.network.tls_key)):
                 if not os.path.exists(path):
                     raise ValueError(f"TLS {label} not found: {path}")
-        elif self.network.tls_cert or self.network.tls_key:
+
+        # Same rule for the browser client, and for the same reason: the
+        # failure this feature exists to prevent is quietly serving
+        # plaintext to somebody who asked for TLS.
+        if self.network.web_tls:
+            if not self.network.tls_cert or not self.network.tls_key:
+                raise ValueError(
+                    "web_tls is set but tls_cert/tls_key are not")
+            for label, path in (('certificate', self.network.tls_cert),
+                                ('key', self.network.tls_key)):
+                if not os.path.exists(path):
+                    raise ValueError(f"TLS {label} not found: {path}")
+
+        # A certificate with nothing to serve it.  Either listener counts:
+        # web_tls alone is a perfectly good reason to hold a cert, and this
+        # check must not read that as a misconfiguration.
+        if ((self.network.tls_cert or self.network.tls_key)
+                and not (self.network.tls_port or self.network.web_tls)):
             raise ValueError(
                 "tls_cert/tls_key given without tls_port, so no TLS "
                 "listener would start; set tls_port to serve them")
