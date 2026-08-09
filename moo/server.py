@@ -179,6 +179,27 @@ async def listen_walking_ports(handler, host: str, first_port: int,
 # ============================================================
 
 
+def _verb_matches_file(verb_def, code: str, verb_name: str) -> bool:
+    """
+    Whether a live verb already agrees with its file, metadata included.
+
+    The seed scan skips verbs that are already current, and used to decide
+    that on the code alone.  Since a file now also declares its aliases,
+    abbreviations, hidden flag and permissions, a change to any of those
+    leaves the code identical and would have been skipped -- so an alias
+    added on disk while the server was down would not arrive until
+    somebody touched the body as well.
+    """
+    from .verb_meta import parse_verb_meta
+    if (verb_def.code or '') != code:
+        return False
+    meta = parse_verb_meta(code, verb_name)
+    return (list(verb_def.names) == list(meta['names'])
+            and dict(verb_def.min_lengths or {}) == meta['min_lengths']
+            and bool(verb_def.hidden) == meta['hidden']
+            and (verb_def.perms or 'rx') == meta['perms'])
+
+
 class MegaMOOServer:
     """
     The central MegaMOO server object.
@@ -747,7 +768,8 @@ class MegaMOOServer:
                     code = f.read()
                 match = next((v for v in obj.verbs if verb_name in v.names),
                              None)
-                if match is not None and (match.code or '') == code:
+                if match is not None and _verb_matches_file(match, code,
+                                                            verb_name):
                     continue
                 status = verb_loader.reload_verb_code(
                     obj, verb_name, code, create=True)

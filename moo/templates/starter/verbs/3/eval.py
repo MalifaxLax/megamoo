@@ -9,6 +9,7 @@ Usage: eval <expression>
 Arguments:
     expression  - Any valid Python expression to evaluate.
 
+Aliases: /
 Auth: gm3+ (auth_level 3)
 
 Note: The expression runs in a context with: player, pobj (me), here,

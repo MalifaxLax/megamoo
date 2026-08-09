@@ -8,6 +8,8 @@ Examples:
     close chest     - Close a chest
 
 Ported from Evennia CmdClose.
+
+Abbrev:  close=4
 """
 
 # Can the character act? do_wait covers roundtime as well as the

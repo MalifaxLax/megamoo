@@ -5,6 +5,7 @@ number to the database index's reserved_objects set.
 
 Usage: @freeoff
 
+Aliases: @foff
 Auth: gm3+ (auth_level 3)
 
 Note: Requires a free_obj range to be set first via @freeon/set. Only

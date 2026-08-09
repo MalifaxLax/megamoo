@@ -1,8 +1,12 @@
-# _tick_down — generic decrement-to-zero ticker callback
-# Names: _td_rt, _td_unconscious, _td_sleeping, _td_stunned, _td_paralyzed,
-#        _td_intoxicated, _td_immobilized, _td_entangled, _td_imprisoned,
-#        _td_webbed, _td_bound, _td_no_parry, _td_must_parry, _td_blind
-# Called by ticker_add() — no args, uses `verb` to identify which timer.
+"""
+_tick_down — generic decrement-to-zero ticker callback
+Names: _td_rt, _td_unconscious, _td_sleeping, _td_stunned, _td_paralyzed,
+_td_intoxicated, _td_immobilized, _td_entangled, _td_imprisoned,
+_td_webbed, _td_bound, _td_no_parry, _td_must_parry, _td_blind
+Called by ticker_add() — no args, uses `verb` to identify which timer.
+
+Aliases: _tick_down
+"""
 
 # Config: verb_name -> (property, dict_key_or_None, step)
 _TD = {

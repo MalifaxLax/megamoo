@@ -10,6 +10,7 @@ Arguments:
     object   - The target object (matched in room and inventory).
     message  - The ofailure message text (supports &S substitution). Omit to clear.
 
+Abbrev:  @ofailure=6
 Auth: gm2+ (auth_level 2)
 """
 if auth_level(pobj) < 2:

@@ -16,6 +16,8 @@ Examples:
     @restart
     @restart Applying a hotfix, back in a moment.
     @restart noapi Restarting without the external API.
+
+Abbrev:  @restart=8
 """
 
 # Check wizard permission (gm5 required)

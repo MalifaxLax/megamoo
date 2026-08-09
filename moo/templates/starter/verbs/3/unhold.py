@@ -8,6 +8,7 @@ Usage: unhold <object>
 Arguments:
     object  - An item currently being held to put away.
 
+Abbrev:  unhold=3
 Auth: gm1+ (auth_level 1)
 
 Note: Fails if the player is not currently holding the specified item.

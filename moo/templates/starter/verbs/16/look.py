@@ -6,6 +6,9 @@ Usage: look [object]
 Examples:
     look            - Look at the room
     look board      - Look at something in the room
+
+Aliases: l
+Abbrev:  look=1
 """
 
 loc = pobj.location

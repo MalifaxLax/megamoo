@@ -8,6 +8,8 @@ Examples:
     @parent #100 = #4
     @parent sword = #30
     @parent #500 to #520 = #1
+
+Abbrev:  @parent=4
 """
 
 if auth_level(pobj) < 3:

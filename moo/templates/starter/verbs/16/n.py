@@ -15,6 +15,8 @@ hook on #3 (Player_Character), not here.
 
 Goes on #16 (OCRoom) and #17 (ICRoom) so all rooms inherit it.
 Verb names are set from the room's directions property.
+
+Aliases: s, e, w, ne, nw, se, sw, u, d, o, in, north, south, east, west, northeast, northwest, southeast, southwest, up, down, out, in
 """
 
 room = pobj.location

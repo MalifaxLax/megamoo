@@ -10,6 +10,8 @@ Examples:
 
 You need a free hand to remove items, and outer layers must be
 taken off first.
+
+Abbrev:  remove=3
 """
 
 if not args:

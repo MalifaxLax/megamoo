@@ -8,6 +8,8 @@ Examples:
     drop bag        - Drop a bag
 
 You must remove worn items before you can drop them.
+
+Abbrev:  drop=3
 """
 
 if not args:

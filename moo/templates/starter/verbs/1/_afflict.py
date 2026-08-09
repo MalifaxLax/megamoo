@@ -1,9 +1,13 @@
-# _afflict — apply a status/condition effect and start tick-down
-# Names: _immobilize, _entangle, _imprison, _web, _bind,
-#        _unconscious, _sleep, _stun, _paralyze, _intoxicate,
-#        _no_parry, _must_parry, _blind
-# Called: call_verb(pobj, '_stun', duration=5)  OR  pobj._stun(5)
-# Kwarg: duration (int) — seconds of effect (stacks with existing)
+"""
+_afflict — apply a status/condition effect and start tick-down
+Names: _immobilize, _entangle, _imprison, _web, _bind,
+_unconscious, _sleep, _stun, _paralyze, _intoxicate,
+_no_parry, _must_parry, _blind
+Called: call_verb(pobj, '_stun', duration=5)  OR  pobj._stun(5)
+Kwarg: duration (int) — seconds of effect (stacks with existing)
+
+Aliases: _immobilize, _entangle, _imprison, _web, _bind, _unconscious, _sleep, _stun, _paralyze, _intoxicate, _no_parry, _must_parry, _blind
+"""
 
 # Read the injected kwarg into a NEW name -- reassigning `duration` itself would
 # make it verb-local, so `try: duration` would raise UnboundLocalError and clobber

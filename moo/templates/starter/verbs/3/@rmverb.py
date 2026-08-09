@@ -7,6 +7,7 @@ Arguments:
     object     - The target object (matched in room and inventory).
     verb_name  - Name of the verb to remove.
 
+Abbrev:  @rmverb=4
 Auth: gm3+ (auth_level 3)
 
 Note: Prompts with a y/n confirmation before deleting. Only removes

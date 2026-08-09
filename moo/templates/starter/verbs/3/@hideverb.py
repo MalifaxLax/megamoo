@@ -9,6 +9,7 @@ Arguments:
     object     - The target object (matched in room and inventory).
     verb_name  - Name of the verb to hide.
 
+Abbrev:  @hideverb=6
 Auth: gm3+ (auth_level 3)
 
 Note: Searches local verbs first, then walks the inheritance chain.

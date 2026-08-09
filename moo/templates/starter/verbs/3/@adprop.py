@@ -9,6 +9,7 @@ Arguments:
     property  - Name of the property to add.
     value     - Optional initial value (Python literal or string).
 
+Abbrev:  @adprop=4
 Auth: gm3+ (auth_level 3)
 
 Note: The value is evaluated as a Python expression first; if that fails,

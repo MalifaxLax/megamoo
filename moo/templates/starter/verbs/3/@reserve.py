@@ -5,6 +5,8 @@ Usage: @reserve #<start> to #<end>
 
 Reserve a block of object numbers so create() skips them.
 Use /free to unreserve. Use /list to show reserved blocks.
+
+Abbrev:  @reserve=4
 """
 
 if auth_level(pobj) < 5:

@@ -9,6 +9,8 @@ Examples:
     wear ring on left hand      - Wear a ring on a specific hand
 
 You must be holding the item to wear it.
+
+Abbrev:  wear=3
 """
 
 if not args:

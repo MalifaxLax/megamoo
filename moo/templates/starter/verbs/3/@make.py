@@ -19,6 +19,7 @@ Arguments:
 Switches:
     /drop  - Place the new object in the current room instead of inventory.
 
+Aliases: @create
 Auth: gm3+ (auth_level 3)
 
 Note: The new object's title is auto-generated from its noun. By default

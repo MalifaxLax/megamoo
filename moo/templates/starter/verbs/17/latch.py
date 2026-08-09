@@ -1,5 +1,9 @@
-# latch on #17 (ICRoom)
-# Usage: latch <object>
+"""
+latch on #17 (ICRoom)
+Usage: latch <object>
+
+Abbrev:  latch=3
+"""
 
 if call_verb(pobj, 'do_wait'):
     return

@@ -9,6 +9,8 @@ Moves the player through a named exit or direction. Supports
 prepositions for spatial sub-exits (in_exit, on_exit, etc.).
 
 Ported from Evennia CmdGo.
+
+Abbrev:  go=1
 """
 
 room = pobj.location

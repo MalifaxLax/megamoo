@@ -1,5 +1,9 @@
-# lock on #17 (ICRoom)
-# Usage: lock <object> [with <key>]
+"""
+lock on #17 (ICRoom)
+Usage: lock <object> [with <key>]
+
+Abbrev:  lock=3
+"""
 
 if call_verb(pobj, 'do_wait'):
     return

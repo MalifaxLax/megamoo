@@ -13,6 +13,7 @@ Switches:
     /list   - Show all reserved unused object numbers grouped into ranges.
     /clear  - Remove the stored free_obj range.
 
+Aliases: @fon
 Auth: gm3+ (auth_level 3)
 
 Note: Without switches, unreserves all unused numbers in the configured

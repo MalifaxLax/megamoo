@@ -2,6 +2,8 @@
 See what you are wearing and holding.
 
 Usage: inventory  |  i
+
+Abbrev:  inventory=3
 """
 
 # Can the character act? do_wait covers roundtime as well as the

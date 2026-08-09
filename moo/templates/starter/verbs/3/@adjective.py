@@ -9,6 +9,7 @@ Arguments:
     object  - The target object (matched in room and inventory).
     adj1-3  - Up to three adjectives to apply. Omit to clear.
 
+Abbrev:  @adjective=4
 Auth: gm2+ (auth_level 2)
 
 Note: Adjectives are stored in name_mod_list slots 1-3. The object's

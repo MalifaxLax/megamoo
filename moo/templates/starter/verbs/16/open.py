@@ -8,6 +8,8 @@ Examples:
     open chest      - Open a chest
 
 Ported from Evennia CmdOpen.
+
+Abbrev:  open=2
 """
 
 if not dobj:

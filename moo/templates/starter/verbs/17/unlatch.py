@@ -1,5 +1,9 @@
-# unlatch on #17 (ICRoom)
-# Usage: unlatch <object>
+"""
+unlatch on #17 (ICRoom)
+Usage: unlatch <object>
+
+Abbrev:  unlatch=5
+"""
 
 if call_verb(pobj, 'do_wait'):
     return

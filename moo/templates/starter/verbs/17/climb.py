@@ -8,6 +8,8 @@ Examples:
     climb ladder    - Climb a ladder
 
 You must be standing to climb.
+
+Abbrev:  climb=3
 """
 
 if not args:

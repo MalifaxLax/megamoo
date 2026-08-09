@@ -1,5 +1,9 @@
-# unlatch on #16 (OCRoom)
-# Usage: unlatch <object>
+"""
+unlatch on #16 (OCRoom)
+Usage: unlatch <object>
+
+Abbrev:  unlatch=5
+"""
 
 if not dobj:
     pobj.msg("Unlatch what?")

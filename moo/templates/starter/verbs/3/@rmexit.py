@@ -8,6 +8,7 @@ Usage: @rmexit <exit>
 Arguments:
     exit  - Direction name (for virtual exits) or object name (for object exits).
 
+Abbrev:  @rmexit=4
 Auth: gm2+ (auth_level 2)
 
 Note: For virtual exits, clears the dexits slot and removes from obvexits.

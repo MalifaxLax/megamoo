@@ -9,6 +9,7 @@ Arguments:
     object   - The target object (matched in room and inventory).
     message  - The failure message text. Omit to clear.
 
+Abbrev:  @failure=5
 Auth: gm2+ (auth_level 2)
 """
 if auth_level(pobj) < 2:

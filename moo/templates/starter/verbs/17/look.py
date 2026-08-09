@@ -11,6 +11,8 @@ Examples:
     look in chest       - Look inside a chest
     look under rug      - Look under a rug
     look north          - Peer in a direction
+
+Abbrev:  look=1
 """
 
 loc = pobj.location

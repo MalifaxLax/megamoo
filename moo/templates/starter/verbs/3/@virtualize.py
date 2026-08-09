@@ -8,6 +8,7 @@ Usage: @virtualize <exit>
 Arguments:
     exit  - The directional exit to virtualize (matched in room contents).
 
+Abbrev:  @virtualize=5
 Auth: gm2+ (auth_level 2)
 
 Note: The exit must be a directional exit (descended from #21) located in

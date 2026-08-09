@@ -6,6 +6,9 @@ Usage: drink <item>  |  sip <item>
 Examples:
     drink water     - Drink some water
     sip tea         - Sip from a cup of tea
+
+Aliases: sip
+Abbrev:  drink=3, sip=3
 """
 
 if not args:

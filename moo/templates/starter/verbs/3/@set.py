@@ -6,7 +6,6 @@ The property must already exist on the object (locally or inherited); use
 @adprop to create a new one. A property that exists with the value None is
 fine — it is set as normal.
 
-Aliases: @set, @val
 
 Usage: @set <object>.<property> = <value>   set the value
        @set <object>.<property>             show the current value
@@ -18,6 +17,8 @@ Arguments:
                 fails, it is stored as a raw string. Omit the "= <value>"
                 to read the property instead of setting it.
 
+Aliases: @val
+Abbrev:  @set=2, @val=2
 Auth: gm3+ (auth_level 3)
 
 Examples:

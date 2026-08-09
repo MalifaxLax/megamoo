@@ -6,6 +6,7 @@ Usage: unmark <number>
 Arguments:
     number - The mark number from mark/list to remove.
 
+Abbrev:  unmark=3
 Auth: none
 """
 

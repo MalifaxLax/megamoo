@@ -26,6 +26,8 @@ Examples:
     @adverb #15.reset with rwx base
     @adverb/hidden #5.at_post_move
     @adverb #3.@telq with rx auth=3
+
+Abbrev:  @adverb=4
 """
 if auth_level(pobj) < 3:
     pobj.msg("Do what?")

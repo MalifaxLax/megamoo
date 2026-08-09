@@ -11,6 +11,9 @@ then puppets the player into their OOC account character. Includes a
 1-second yield delay before the puppet switch.
 
 Note: Also defined on #17 (ICRoom) as a duplicate for IC room context.
+
+Aliases: x
+Abbrev:  exit=2
 """
 
 ochar_num = pobj.account

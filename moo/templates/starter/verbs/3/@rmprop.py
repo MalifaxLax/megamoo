@@ -8,6 +8,7 @@ Arguments:
     object    - The target object (matched in room and inventory).
     property  - Name of the property to remove.
 
+Abbrev:  @rmprop=4
 Auth: gm3+ (auth_level 3)
 """
 if auth_level(pobj) < 3:

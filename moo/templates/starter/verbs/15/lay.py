@@ -7,6 +7,8 @@ Examples:
     lay             - Lie down on the floor
     lay couch       - Lie down on a couch
     lie bed         - Lie down on a bed
+
+Aliases: lie
 """
 
 pos = pobj.position or 0

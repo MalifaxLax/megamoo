@@ -10,6 +10,7 @@ Arguments:
     object        - The target object (matched in room and inventory).
     trailer text  - Text appended after the noun. Omit to clear.
 
+Abbrev:  @trailer=5
 Auth: gm2+ (auth_level 2)
 
 Note: The trailer is stored in name_mod_list slot 4. The object's

@@ -8,6 +8,7 @@ Arguments:
     object     - The target object (matched in room and inventory).
     verb_name  - Name of the verb to unhide.
 
+Abbrev:  @unhideverb=8
 Auth: gm3+ (auth_level 3)
 
 Note: Searches local verbs first, then walks the inheritance chain.

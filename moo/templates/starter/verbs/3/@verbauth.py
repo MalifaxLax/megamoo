@@ -11,6 +11,7 @@ Arguments:
     verb_name   - Name of the verb to view/modify.
     auth_level  - Auth level 0-5 to set (0 = no restriction).
 
+Abbrev:  @verbauth=6
 Auth: gm3+ (auth_level 3)
 
 Note: Searches local verbs first, then walks the inheritance chain.

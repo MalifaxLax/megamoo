@@ -9,6 +9,7 @@ Arguments:
     object   - The target object (matched in room and inventory).
     article  - A valid article string (validated against GOOD_ARTICLES). Omit to clear.
 
+Abbrev:  @article=4
 Auth: gm2+ (auth_level 2)
 
 Note: The article is stored in name_mod_list slot 0. The object's

@@ -29,6 +29,7 @@ import re
 from typing import Optional, List, Tuple
 
 from moo.verbs import VerbDef
+from moo.verb_meta import parse_verb_meta
 
 logger = logging.getLogger('megamoo.verb_loader')
 
@@ -199,7 +200,16 @@ def reload_verb_code(obj, verb_name: str, code: str, *, create: bool = True) -> 
             untouched in this case.
     """
     if is_blank_verb_file(code):
+        # A blank file is not an empty verb, it is no opinion at all -- so
+        # its metadata is not read either and the database keeps what it
+        # holds.
         return 'skipped'
+
+    # What the file says about itself.  Disk is authoritative here for the
+    # same reason it is for the code: the tree is what git tracks, and a
+    # tree that cannot describe an alias is one a world cannot be rebuilt
+    # from.  See moo.verb_meta.
+    meta = parse_verb_meta(code, verb_name)
 
     matches = [v for v in obj.verbs if verb_name in v.names]
     if matches:
@@ -207,19 +217,33 @@ def reload_verb_code(obj, verb_name: str, code: str, *, create: bool = True) -> 
         # Compile the candidate before touching the live verb so a syntax
         # error can never replace a working compiled body.
         candidate = VerbDef(
-            names=list(existing.names),
+            names=list(meta['names']),
             code=code,
             owner=existing.owner,
-            perms=existing.perms,
+            perms=meta['perms'],
             parent_type=existing.parent_type,
-            min_lengths=dict(existing.min_lengths),
-            hidden=existing.hidden,
+            min_lengths=dict(meta['min_lengths']),
+            hidden=meta['hidden'],
             auth=existing.auth,
         )
         candidate.compile()  # raises CompileError -> caller logs, verb untouched
+        renamed = list(existing.names) != list(meta['names'])
         existing.code = code
         existing.compiled_code = candidate.compiled_code
+        existing.names = list(meta['names'])
+        existing.min_lengths = dict(meta['min_lengths'])
+        existing.hidden = meta['hidden']
+        existing.perms = meta['perms']
         obj._mark_modified()
+        if renamed:
+            # A name cached under the old set would go on answering, or
+            # stop answering, until something else happened to invalidate
+            # it.  Verb lookup is cached per object and inherited by every
+            # descendant, so this has to propagate.
+            try:
+                obj.invalidate_inheritance_cache()
+            except Exception:      # pragma: no cover - best effort
+                pass
         return 'updated'
 
     if not create:
@@ -230,8 +254,9 @@ def reload_verb_code(obj, verb_name: str, code: str, *, create: bool = True) -> 
     # and it answers "Do what?" when they try.  Existing verbs keep whatever
     # auth they already have -- that is handled above, and may have been set
     # deliberately with @verbauth.
-    new_verb = VerbDef(names=[verb_name], code=code, owner=obj.owner,
-                       perms='rx', auth=auth_level_required(code))
+    new_verb = VerbDef(names=list(meta['names']), code=code, owner=obj.owner,
+                       perms=meta['perms'], min_lengths=dict(meta['min_lengths']),
+                       hidden=meta['hidden'], auth=auth_level_required(code))
     new_verb.compile()  # validate before attaching; raises on syntax error
     obj.add_verb(new_verb)
     return 'created'

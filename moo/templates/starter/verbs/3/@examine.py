@@ -8,6 +8,7 @@ Usage: @examine <object>
 Arguments:
     object  - The target object (matched in room and inventory).
 
+Abbrev:  @examine=3
 Auth: gm3+ (auth_level 3)
 
 Note: Only shows local properties (defined or overridden on the object

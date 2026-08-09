@@ -12,6 +12,7 @@ Arguments:
 Switches:
     /all  - Show properties from the entire inheritance chain.
 
+Abbrev:  +props=5
 Auth: gm3+ (auth_level 3)
 
 Note: Properties are displayed in a multi-column layout sorted

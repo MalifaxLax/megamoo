@@ -1,5 +1,9 @@
-# latch on #16 (OCRoom)
-# Usage: latch <object>
+"""
+latch on #16 (OCRoom)
+Usage: latch <object>
+
+Abbrev:  latch=3
+"""
 
 if not dobj:
     pobj.msg("Latch what?")

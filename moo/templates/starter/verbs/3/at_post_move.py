@@ -10,6 +10,8 @@ Context variables:
     player - the player who triggered the move
     this   - the character that just moved
     args   - string containing the old location's objnum
+
+Perms:   rxd
 """
 
 loc = this.location

@@ -9,6 +9,8 @@ Sets the clock property to 1 and also locks the reverse exit if defined.
 
 Messages: lock/olock for success, llock if already locked, clockf if
 not closed, lockf if wrong key.
+
+Abbrev:  lock=3
 """
 if this.clock:
     player.msg((this.llock or '&d is already locked!').replace('&d', this.noun or this.name))

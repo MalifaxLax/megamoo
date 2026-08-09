@@ -8,6 +8,8 @@ Examples:
     jump stream     - Jump over a stream
 
 You must be standing to jump.
+
+Abbrev:  jump=2
 """
 
 if not args:

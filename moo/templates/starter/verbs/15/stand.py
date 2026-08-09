@@ -2,6 +2,9 @@
 Stand up from a sitting or lying position.
 
 Usage: stand
+
+Aliases: sta
+Abbrev:  stand=3
 """
 
 pos = pobj.position or 0

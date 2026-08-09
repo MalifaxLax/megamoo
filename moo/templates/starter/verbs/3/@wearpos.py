@@ -11,6 +11,7 @@ Arguments:
     item      - A wearable object (matched in room and inventory).
     pos_list  - A list of [position, layer] pairs (Python list syntax).
 
+Abbrev:  @wearpos=6
 Auth: gm2+ (auth_level 2)
 
 Note: Each wear entry is [pos, layer]. Positions >= 100 are L/R pairs:

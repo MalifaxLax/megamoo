@@ -16,6 +16,8 @@ Verb names: n, s, e, w, ne, nw, se, sw, u, d, o, in,
 
 Goes on #15 (BaseRoom) so all rooms inherit it.
 Verb names are set from the room's directions property.
+
+Aliases: s, e, w, ne, nw, se, sw, u, d, o, in, north, south, east, west, northeast, northwest, southeast, southwest, up, down, out, in
 """
 
 room = pobj.location

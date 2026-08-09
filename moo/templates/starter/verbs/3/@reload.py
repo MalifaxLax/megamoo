@@ -25,6 +25,8 @@ Examples:
     @reload #7.go_
     @reload #3.@move
     @reload all
+
+Abbrev:  @reload=4
 """
 import os
 from moo.verbs import VerbDef

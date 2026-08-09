@@ -1,5 +1,9 @@
-# unlock on #17 (ICRoom)
-# Usage: unlock <object> with <key>
+"""
+unlock on #17 (ICRoom)
+Usage: unlock <object> with <key>
+
+Abbrev:  unlock=5
+"""
 
 if call_verb(pobj, 'do_wait'):
     return

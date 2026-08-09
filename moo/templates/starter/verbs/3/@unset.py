@@ -5,6 +5,7 @@ before).
 
 Usage: @unset
 
+Abbrev:  @unset=2
 Auth: gm3+ (auth_level 3)
 
 Note: Single-level, in-memory undo. It reverts only your last @set, and

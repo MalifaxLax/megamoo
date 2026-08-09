@@ -6,6 +6,7 @@ Usage: @delete <object>
 Arguments:
     object  - The target object to delete (matched in room and inventory).
 
+Abbrev:  @delete=4
 Auth: gm2+ (auth_level 2)
 
 Note: Core objects (objnum < 10) cannot be deleted. The object is

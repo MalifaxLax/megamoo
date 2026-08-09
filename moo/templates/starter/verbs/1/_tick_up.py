@@ -1,7 +1,11 @@
-# _tick_up — generic regen-to-max ticker callback
-# Names: _tu_hits, _tu_stamina, _tu_mana, _tu_focus, _tu_adrenalin, _tu_fabric
-# Called by ticker_add() — no args, uses `verb` to identify which timer.
-# Per-tick regen rate is stored in regen_<prop> by the _resource drain.
+"""
+_tick_up — generic regen-to-max ticker callback
+Names: _tu_hits, _tu_stamina, _tu_mana, _tu_focus, _tu_adrenalin, _tu_fabric
+Called by ticker_add() — no args, uses `verb` to identify which timer.
+Per-tick regen rate is stored in regen_<prop> by the _resource drain.
+
+Aliases: _tu_hits, _tu_stamina, _tu_mana, _tu_focus, _tu_adrenalin, _tu_fabric
+"""
 
 # verb -> (property, max_property, regen_rate_property)  -- @initchar names
 _TU = {

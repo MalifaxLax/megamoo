@@ -2,6 +2,9 @@
 Leave the game world and return to the lobby.
 
 Usage: exit  |  x
+
+Aliases: x
+Abbrev:  exit=2
 """
 
 ochar_num = pobj.account

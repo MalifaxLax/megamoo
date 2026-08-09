@@ -8,6 +8,8 @@ Examples:
     close chest     - Close a chest
 
 Ported from Evennia CmdClose.
+
+Abbrev:  close=4
 """
 
 if not dobj:

@@ -10,6 +10,7 @@ Usage: @tel  <room# | mark | character_name | home>
 Arguments:
     destination  - A room number (#N or N), 'home', 'mark', or a player name.
 
+Aliases: @tel
 Auth: gm1+ (auth_level 1)
 
 Note: Prevents teleporting across IC/OOC boundaries. The player's 'tel'

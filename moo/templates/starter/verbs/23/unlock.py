@@ -9,6 +9,8 @@ and also unlocks the reverse exit if defined.
 
 Messages: unlock/ounlock for success, culockf if not locked, ulockf
 if wrong key.
+
+Abbrev:  unlock=5
 """
 if not this.clock:
     player.msg((this.culockf or '&d is not locked.').replace('&d', this.noun or this.name))

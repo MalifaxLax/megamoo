@@ -12,6 +12,7 @@ Switches:
             you are looking -- and numbering stays absolute, so a note
             citing line 17 still means line 17.
 
+Abbrev:  +decompile=4
 Auth: gm3+ (auth_level 3)
 
 Examples:

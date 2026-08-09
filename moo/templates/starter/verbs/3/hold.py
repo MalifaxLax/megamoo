@@ -7,6 +7,7 @@ Usage: hold <object>
 Arguments:
     object  - An item in the player's inventory to hold.
 
+Abbrev:  hold=3
 Auth: gm1+ (auth_level 1)
 
 Note: Fails if the item is not in inventory, is already held, or
