@@ -91,3 +91,52 @@ def test_the_config_flags_are_actually_read():
     src = inspect.getsource(network)
     assert 'enable_mccp' in src, 'enable_mccp is set by nobody and read by nobody'
     assert 'enable_mssp' in src, 'enable_mssp is set by nobody and read by nobody'
+
+
+def test_the_negotiation_drain_keeps_what_was_typed():
+    """
+    The opening drain reads the client's replies before the login prompt
+    goes up, so MXP and compression can be switched on knowing what the
+    client supports.  It used to read and *discard*, which meant anything
+    typed in that half second went with it.
+
+    Invisible to a person, reliably fatal to a script: a bot sends its
+    first line immediately and then waits forever for a prompt that has
+    already answered it.
+    """
+    src = inspect.getsource(network.PlayerConnection._negotiate_protocols)
+    assert 'strip_telnet' in src, 'the drain still discards non-telnet bytes'
+    assert 'feed_data' in src, 'typed input is never given back to the reader'
+
+
+def test_compression_can_start_after_the_opening_negotiation():
+    """
+    Some clients answer DO COMPRESS2 only once the player has typed
+    something.  Before this, a late acceptance set the protocol flag and
+    nothing acted on it, so the client waited for a zlib stream that
+    never began.
+    """
+    src = inspect.getsource(network.PlayerConnection.read_line)
+    assert '_start_compression' in src, (
+        'read_line never acts on a late DO COMPRESS2')
+
+
+def test_one_iac_state_machine_not_two():
+    """
+    read_line and the drain had separate copies of the telnet filter, and
+    the drain's copy threw everything away.  Two implementations of
+    "where does a subnegotiation end" is one too many.
+    """
+    src = inspect.getsource(network)
+    assert src.count('def strip_telnet') == 1
+    # The old inline machine is recognisable by this comparison.
+    assert src.count('if line[i] == 255:') == 0, 'inline IAC filter is back'
+
+
+def test_strip_telnet_keeps_input_and_drops_sequences():
+    IAC, SB, SE, DO, WILL = b'\xff', b'\xfa', b'\xf0', b'\xfd', b'\xfb'
+    assert network.strip_telnet(b'hello\n') == b'hello\n'
+    assert network.strip_telnet(IAC + DO + b'\x56' + b'wizard\n') == b'wizard\n'
+    assert network.strip_telnet(b'a' + IAC + SB + b'\x46xy' + IAC + SE + b'b') == b'ab'
+    assert network.strip_telnet(b'trail' + IAC) == b'trail'          # lone IAC
+    assert network.strip_telnet(b'x' + IAC + SB + b'\x46unter') == b'x'  # unterminated

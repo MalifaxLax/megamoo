@@ -67,6 +67,44 @@ _ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
 _CLICKABLE_RE = re.compile(r'`([^`\n]+)`')
 
 
+def strip_telnet(data: bytes) -> bytes:
+    """
+    Remove telnet IAC sequences, returning only what the player typed.
+
+    Shared by the negotiation drain and by ``read_line`` so the two
+    cannot disagree about where a subnegotiation ends -- they had
+    separate copies of this state machine, and the drain's copy simply
+    threw everything away, typed input included.
+
+    Handles ``IAC WILL/WONT/DO/DONT <opt>`` (three bytes), ``IAC SB ...
+    IAC SE`` (variable), and any other two-byte IAC command.
+    """
+    out = bytearray()
+    i = 0
+    while i < len(data):
+        if data[i] != 255:                      # not IAC
+            out.append(data[i]); i += 1
+            continue
+        if i + 1 >= len(data):                  # lone IAC at the end
+            i += 1
+            continue
+        cmd = data[i + 1]
+        if 251 <= cmd <= 254:                   # WILL WONT DO DONT
+            i += 3
+        elif cmd == 250:                        # SB ... IAC SE
+            i += 2
+            while i < len(data) - 1:
+                if data[i] == 255 and data[i + 1] == 240:
+                    i += 2
+                    break
+                i += 1
+            else:
+                i = len(data)
+        else:
+            i += 2
+    return bytes(out)
+
+
 def _visible_len(text: str) -> int:
     """Return the visible (printed) length of *text*, ignoring ANSI escapes.
 
@@ -518,9 +556,18 @@ class PlayerConnection:
         # Request terminal size — most modern clients support NAWS
         await self._send_telnet(DO + NAWS)
 
-        # Drain any protocol response bytes from the client so they
-        # don't contaminate the first read_line() during login.
-        # Parse NAWS and other subnegotiations from the drained data.
+        # Read the client's negotiation replies before putting up the
+        # login prompt, so MXP, MSSP and compression can be switched on
+        # knowing what it supports.
+        #
+        # This used to read and *discard*.  Anything typed in the half
+        # second after connecting went with it -- invisible to a person,
+        # reliably fatal to a script or a bot, which sends its first line
+        # immediately and then waits forever for a prompt that already
+        # answered it.  Now the telnet bytes are consumed and whatever
+        # else arrived is handed back to the reader, where read_line will
+        # find it.
+        typed = bytearray()
         try:
             while True:
                 data = await asyncio.wait_for(self.reader.read(4096), timeout=0.5)
@@ -528,10 +575,15 @@ class PlayerConnection:
                     break
                 self._extract_naws(data)
                 self._extract_protocols(data)
+                typed += strip_telnet(data)
         except asyncio.TimeoutError:
             pass  # Expected: client finished responding
         except Exception:
             pass  # Tolerate any socket hiccup during negotiation
+
+        if typed:
+            # Back onto the stream, in order, for read_line to pick up.
+            self.reader.feed_data(bytes(typed))
 
         # Answer MSSP before compression starts.  Listing crawlers connect,
         # read the table and hang up; many never negotiate MCCP at all, and
@@ -1185,36 +1237,20 @@ class PlayerConnection:
                 if len(line) > MAX_COMMAND_LENGTH:
                     line = line[:MAX_COMMAND_LENGTH]
 
-                # Filter out telnet IAC sequences.
-                # IAC is byte 255; we skip IAC and the following 1-2
-                # bytes depending on the command type.
-                # Extract NAWS data and protocol responses from telnet bytes.
+                # Extract NAWS data and protocol responses from telnet
+                # bytes, then filter the sequences out.
                 self._extract_naws(line)
                 self._extract_protocols(line)
-                cleaned = bytearray()
-                i = 0
-                while i < len(line):
-                    if line[i] == 255:  # IAC
-                        # Skip IAC and next 1-2 bytes depending on command
-                        if i + 1 < len(line):
-                            cmd = line[i + 1]
-                            if cmd >= 251 and cmd <= 254:  # WILL, WONT, DO, DONT
-                                i += 3  # Skip IAC + command + option byte
-                            elif cmd == 250:  # SB (subnegotiation begin)
-                                # Skip forward until we find IAC SE (255, 240)
-                                i += 2
-                                while i < len(line) - 1:
-                                    if line[i] == 255 and line[i + 1] == 240:
-                                        i += 2  # Skip IAC SE
-                                        break
-                                    i += 1
-                            else:
-                                i += 2  # Other IAC commands are 2 bytes
-                        else:
-                            i += 1  # Lone IAC at end of buffer — skip it
-                    else:
-                        cleaned.append(line[i])
-                        i += 1
+
+                # A client may accept compression later than the opening
+                # negotiation -- some answer only once the player has
+                # typed something.  Before this, a late DO COMPRESS2 set
+                # the flag and nothing acted on it, so the client sat
+                # waiting for a zlib stream that never began.
+                if 'mccp2' in self.protocols and self._compressor is None:
+                    await self._start_compression()
+
+                cleaned = bytearray(strip_telnet(line))
 
                 # A password line has been read, so give echo back.  The
                 # terminal did not show the player's Enter either, so emit
