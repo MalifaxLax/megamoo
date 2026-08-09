@@ -1,5 +1,5 @@
 """
-time_ok verb on #5 (ICharacter).
+time_ok verb on #3 (Base_Character).
 
 Checks whether the character is currently in round time (action cooldown).
 If round time is active, notifies the player of the remaining wait and
