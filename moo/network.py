@@ -252,6 +252,11 @@ GMCP = bytes([201])     # Generic MUD Communication Protocol (Aardwolf ext.)
 MSDP = bytes([69])      # MUD Server Data Protocol
 MSSP = bytes([70])      # MUD Server Status Protocol
 MXP = bytes([91])       # MUD eXtension Protocol (Zuggsoft)
+COMPRESS2 = bytes([86])  # MCCP2 — zlib compression, server to client
+
+# MSSP subnegotiation payload markers (MSSP spec)
+MSSP_VAR = bytes([1])
+MSSP_VAL = bytes([2])
 
 
 def resolve_repeat(player_obj, command: str) -> Optional[str]:
@@ -383,6 +388,11 @@ class PlayerConnection:
         self.echo = True
         self.buffer = b''
         self.protocols: Set[str] = set()
+        # MCCP2.  None until the client answers DO COMPRESS2; from the
+        # moment the subnegotiation is sent, every byte out of this
+        # connection is part of one continuous zlib stream, so the
+        # compressor has to live as long as the connection does.
+        self._compressor = None
         self.color_enabled = True
         self.color_processor = ColorProcessor(enable_color=True)
         # Default terminal width — overridden by NAWS if the client
@@ -492,6 +502,14 @@ class PlayerConnection:
         if self.server.config.protocol.enable_msdp:
             await self._send_telnet(WILL + MSDP)
 
+        if self.server.config.protocol.enable_mssp:
+            await self._send_telnet(WILL + MSSP)
+
+        # MCCP2 last of the offers, so the negotiation above is over
+        # before the stream can turn into zlib underneath it.
+        if self.server.config.protocol.enable_mccp:
+            await self._send_telnet(WILL + COMPRESS2)
+
         # Request terminal size — most modern clients support NAWS
         await self._send_telnet(DO + NAWS)
 
@@ -510,14 +528,29 @@ class PlayerConnection:
         except Exception:
             pass  # Tolerate any socket hiccup during negotiation
 
+        # Answer MSSP before compression starts.  Listing crawlers connect,
+        # read the table and hang up; many never negotiate MCCP at all, and
+        # sending the table in the clear costs nothing.
+        if 'mssp' in self.protocols:
+            try:
+                await self._send_mssp()
+            except Exception:
+                pass
+
         # Activate MXP if the client accepted it
         if 'mxp' in self.protocols:
             try:
                 # ESC[3z activates MXP open mode — client will process MXP tags
-                self.writer.write(b'\x1b[3z')
+                self._write(b'\x1b[3z')
                 await self.writer.drain()
             except Exception:
                 pass
+
+        # Compression last.  Everything above is negotiation, and from the
+        # moment this returns the stream is zlib -- so anything that wants
+        # to write plain bytes has to have done it by now.
+        if 'mccp2' in self.protocols:
+            await self._start_compression()
 
     # -------------------------------------------------------------------
     #   Login
@@ -978,9 +1011,9 @@ class PlayerConnection:
         # Write to socket
         try:
             if suppress_echo:
-                self.writer.write(IAC + WILL + ECHO)
+                self._write(IAC + WILL + ECHO)
                 self._echo_suppressed = True
-            self.writer.write(message.encode('utf-8'))
+            self._write(message.encode('utf-8'))
             await self.writer.drain()
         except (BrokenPipeError, ConnectionResetError, OSError):
             self._disconnected = True
@@ -1185,8 +1218,8 @@ class PlayerConnection:
                 if getattr(self, '_echo_suppressed', False):
                     self._echo_suppressed = False
                     try:
-                        self.writer.write(IAC + WONT + ECHO)
-                        self.writer.write(b'\r\n')
+                        self._write(IAC + WONT + ECHO)
+                        self._write(b'\r\n')
                         await self.writer.drain()
                     except (BrokenPipeError, ConnectionResetError, OSError):
                         self._disconnected = True
@@ -1244,7 +1277,8 @@ class PlayerConnection:
         populates ``self.protocols`` accordingly.  Maps option codes
         to protocol names: GMCP (201), MXP (91), MSDP (69), MSSP (70).
         """
-        OPT_NAMES = {201: 'gmcp', 91: 'mxp', 69: 'msdp', 70: 'mssp'}
+        OPT_NAMES = {201: 'gmcp', 91: 'mxp', 69: 'msdp', 70: 'mssp',
+                     86: 'mccp2'}
         i = 0
         while i < len(data) - 2:
             if data[i] == 255:  # IAC
@@ -1304,6 +1338,96 @@ class PlayerConnection:
             )
         return _CLICKABLE_RE.sub(rf'{dim}\1{reset}', text)
 
+    async def _send_mssp(self):
+        """
+        Send the MSSP status table.
+
+        MSSP is how MUD listing sites poll a server: they connect, read
+        this, and hang up without logging in.  The option was declared
+        here for a long time -- ``MSSP = bytes([70])`` and an
+        ``enable_mssp`` setting defaulting to True -- with no payload
+        behind either, so a crawler was offered a protocol the server
+        then never spoke.
+
+        Values are strings by definition; UPTIME is a unix timestamp of
+        when the server started, not a duration, which is the part of the
+        spec most implementations get backwards.
+        """
+        from .globals import SERVER_VERSION
+        srv = self.server
+        try:
+            players = len(getattr(srv, 'connection_manager').connections)
+        except Exception:
+            players = 0
+        started = getattr(getattr(srv, 'state', None), 'start_time', None)
+        import time
+        fields = [
+            ('NAME', srv.config.server_name),
+            ('PLAYERS', str(players)),
+            ('UPTIME', str(int(time.time() - (time.monotonic() - started))
+                          if started else int(time.time()))),
+            ('CODEBASE', f'MegaMOO {SERVER_VERSION}'),
+            ('FAMILY', 'Custom'),
+            ('PORT', str(srv.port or '')),
+        ]
+        # SSL is the spec's name for the TLS port.  It is the reason this
+        # exists at all: a client that supports encryption can find the
+        # encrypted port without being told about it out of band.
+        if getattr(srv, 'tls_port', None):
+            fields.append(('SSL', str(srv.tls_port)))
+
+        payload = b''
+        for var, val in fields:
+            payload += (MSSP_VAR + str(var).encode('utf-8')
+                        + MSSP_VAL + str(val).encode('utf-8'))
+        self._write(IAC + SB + MSSP + payload + IAC + SE)
+        await self.writer.drain()
+
+    def _write(self, data: bytes):
+        """
+        The one place bytes reach the socket.
+
+        Everything outbound goes through here so that MCCP2 needs exactly
+        one branch.  Once compression is negotiated the connection is a
+        single continuous zlib stream -- a write that bypassed this would
+        put raw bytes in the middle of it and desynchronise the client
+        permanently, which is why there are no direct ``writer.write``
+        calls left in this file.
+
+        Z_SYNC_FLUSH after every write is what makes the stream usable
+        interactively: without it zlib buffers until it has enough to
+        compress well, and a prompt would sit unsent until the next
+        screenful arrived.
+        """
+        if self._compressor is not None:
+            import zlib
+            data = (self._compressor.compress(data)
+                    + self._compressor.flush(zlib.Z_SYNC_FLUSH))
+        self.writer.write(data)
+
+    async def _start_compression(self):
+        """
+        Turn on MCCP2, in the order the spec requires.
+
+        The subnegotiation that announces compression must itself be sent
+        *uncompressed*, and everything after it compressed.  So the
+        sequence is: write IAC SB COMPRESS2 IAC SE in the clear, drain it,
+        and only then create the compressor.  Creating it first would
+        compress the very bytes that tell the client to start decompressing.
+        """
+        if self._compressor is not None:
+            return
+        try:
+            self.writer.write(IAC + SB + COMPRESS2 + IAC + SE)
+            await self.writer.drain()
+        except Exception:
+            self._disconnected = True
+            return
+        import zlib
+        self._compressor = zlib.compressobj(6)
+        self.protocols.add('mccp2')
+        logger.debug("MCCP2 enabled for %s", getattr(self, 'peer', '?'))
+
     async def _send_telnet(self, data: bytes):
         """
         Send a raw telnet protocol command.
@@ -1325,7 +1449,7 @@ class PlayerConnection:
         if getattr(self, '_disconnected', False):
             return
         try:
-            self.writer.write(IAC + data)
+            self._write(IAC + data)
             await self.writer.drain()
         except (BrokenPipeError, ConnectionResetError, OSError):
             self._disconnected = True
