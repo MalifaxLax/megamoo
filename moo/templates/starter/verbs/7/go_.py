@@ -278,6 +278,15 @@ def _run_chargen():
             first_name = name.capitalize()
             ichar.noun = first_name
             _set(ichar, 'name', first_name)
+            # cname too, and this is not decoration.  Emit substitution
+            # prefers cname for the capitalised forms -- &S, &D, &I -- and
+            # falls back to name only when cname is *missing*.  It is
+            # never missing: #5 ICharacter declares one, so a character
+            # without its own inherits it, and every third-person message
+            # in the game called the player "ICharacter".  The actor never
+            # sees those, which is why a world can be built for hours
+            # before anyone notices.
+            _set(ichar, 'cname', first_name)
             taken_names.append(first_name)
             _set(this, 'character_names', taken_names)
             _set(ichar, 'chargen_step', 'last_name')

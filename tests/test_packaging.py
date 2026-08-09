@@ -190,3 +190,51 @@ def test_no_config_field_is_read_by_nobody():
             if not real:
                 dead.append(f'{section_name}.{field_name}')
     assert not dead, 'config fields nothing reads: ' + ', '.join(dead)
+
+
+def test_no_shipped_message_uses_the_retired_sigil():
+    """
+    The substitution sigil moved from '%' to '&'.  A message left in the
+    old spelling does not fail -- it is simply shown to the player
+    verbatim, and because '%' is also the display escape it arrives
+    doubled: #20.osuccess read "%%S %%OMODE out." and every room watching
+    somebody leave saw exactly that.
+
+    The actor never sees osuccess or odrop, so this can survive any
+    amount of solo testing.  It took two players in one room to notice.
+    """
+    import re
+    import sqlite3
+
+    world = (pathlib.Path(__file__).resolve().parent.parent
+             / 'moo' / 'templates' / 'starter' / 'world.db')
+    if not world.is_file():
+        import pytest
+        pytest.skip('starter world not present')
+    db = sqlite3.connect(f'file:{world}?mode=ro', uri=True)
+    token = re.compile(r'%(S|s|D|d|I|i|N|MODE|OMODE|ps|po|pp|pr)\b')
+    bad = [f'#{o}.{n} = {v[:40]}'
+           for o, n, v in db.execute('select objnum,name,value from properties')
+           if v and token.search(v)]
+    assert not bad, 'properties still written in the old sigil: ' + '; '.join(bad)
+
+
+def test_every_character_gets_its_own_cname():
+    """
+    Emit substitution prefers cname for the capitalised tokens and falls
+    back to name only when cname is *missing*.  It is never missing: #5
+    ICharacter declares one, so a character without its own inherits it
+    and every third-person message calls the player "ICharacter".
+
+    Chargen must set it, and @initchar must be able to repair a character
+    made before chargen did.
+    """
+    verbs = (pathlib.Path(__file__).resolve().parent.parent
+             / 'moo' / 'templates' / 'starter' / 'verbs')
+    if not verbs.is_dir():
+        import pytest
+        pytest.skip('starter template not present')
+    chargen = (verbs / '7' / 'go_.py').read_text()
+    assert "'cname'" in chargen, 'chargen never sets cname'
+    initchar = (verbs / '3' / '@initchar.py').read_text()
+    assert "'cname'" in initchar, '@initchar cannot repair a missing cname'

@@ -132,8 +132,21 @@ props = {
     'body_damage': {},
 }
 
+# cname is not in the table above because its value is the character's,
+# not a constant.  It has to be here at all because emit substitution
+# prefers cname for &S/&D/&I and falls back to name only when cname is
+# *missing* -- and it never is: #5 ICharacter declares one, so a
+# character without its own inherits it, and every third-person message
+# in the game called the player "ICharacter".  Chargen sets it now; this
+# repairs characters made before it did.
 added = []
 skipped = []
+if 'cname' not in target.properties:
+    _own = getattr(target, 'name', None) or target.noun
+    if _own and _own != 'ICharacter':
+        target.add_property('cname', str(_own))
+        added.append('cname')
+
 for name, default in props.items():
     if name in target.properties:
         skipped.append(name)
