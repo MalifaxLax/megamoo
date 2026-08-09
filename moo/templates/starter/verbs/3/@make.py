@@ -3,6 +3,13 @@ Creates a new object as a child of the specified parent. The parent can
 be a #objnum, $constant, or a name matched in room/inventory.
 
 Usage: @make <parent> = <name> [with <owner>]
+       @create <parent> = <name> [with <owner>]
+
+Also answers to @create, which is what the verb is called in LambdaMOO
+and the first thing most people type. The alias lives on the verb's name
+list in the database, not on disk -- a verb file is named for one of its
+names and the rest leave no trace there, so this line is the only record
+of it a reader of the source will find.
 
 Arguments:
     parent  - The parent object (#objnum, $constant, or name).
