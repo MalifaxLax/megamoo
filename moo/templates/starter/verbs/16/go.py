@@ -84,8 +84,12 @@ try:
     result = call_verb(exit, 'go_')
     if result:
         return
-except Exception:
-    pass
+except Exception as err:
+    # Say so.  A crashing go_ hook -- chargen's, the portal's, anything
+    # a builder hangs on an exit -- used to vanish here and the player
+    # simply walked through, which looks like the hook not being called
+    # at all.
+    server_log(f"go_ hook on #{exit.objnum} failed: {err}", is_error=True)
 # Climbable/jumpable exits require specific commands
 if exit.climbable:
     pobj.msg("You have to climb that!", sub=pobj, dob=dobj, iob=iobj)

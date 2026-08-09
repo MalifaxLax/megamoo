@@ -53,7 +53,11 @@ for key in list(registry):
         expired.append(key)  # do_ verb doesn't exist
         continue
     except Exception as err:
-        pass  # log but don't cancel
+        # The comment said "log but don't cancel" and then did not log, so
+        # a failing effect handler ticked silently for as long as the
+        # effect lasted.  Not cancelling is still right -- one bad tick
+        # should not end an effect -- but it has to be visible.
+        server_log(f"effect {key} tick failed: {err}", is_error=True)
 
     if e['remaining'] <= 0:
         expired.append(key)

@@ -38,16 +38,29 @@ if arg.lower() == 'home':
     else:
         dest = home
 
-# Check for 'mark'
-elif arg.lower() == 'mark':
-    mark = pobj.mark
-    if not mark:
-        pobj.msg("You have no mark set.")
+# Check for 'mark' -- 'mark' alone means the first, 'mark N' the Nth.
+#
+# This read `pobj.mark`, singular, and nothing in the world has ever
+# written that name: the mark command keeps `pobj.marks`, a list.  So the
+# branch could not succeed however many rooms you had marked, and after
+# properties began raising it did not even reach "You have no mark set."
+elif arg.lower().split()[0] == 'mark':
+    marks = getattr(pobj, 'marks', None) or []
+    if not marks:
+        pobj.msg("You have no marks.  Use 'mark' in a room to set one.")
         return
-    if isinstance(mark, int):
-        dest = db.get_object(mark)
-    else:
-        dest = mark
+    parts = arg.split()
+    which = 1
+    if len(parts) > 1:
+        if not parts[1].isdigit():
+            pobj.msg("Usage: @tel mark [number]   ('marks' lists yours)")
+            return
+        which = int(parts[1])
+    if not 1 <= which <= len(marks):
+        pobj.msg(f"You have {len(marks)} mark(s); there is no mark {which}.")
+        return
+    mark = marks[which - 1]
+    dest = db.get_object(mark) if isinstance(mark, int) else mark
 
 # Check for room number (#N or plain number)
 elif arg.startswith('#') and arg[1:].isdigit():

@@ -101,6 +101,11 @@ from .object_utils import (  # noqa: F401 — re-exported for verb code
 )
 from .utils import flatten_list  # noqa: F401 — re-exported for verb code
 from .verb_read import read, read_lines  # noqa: F401 — for verb code
+# server_log existed in moo_builtins and reached nothing.  Verb code had no
+# way to write to the log at all, so when a hook failed the only choices
+# were to tell the player or to swallow it -- and swallowing is what the
+# verbs did.  Note the name: `log` is already the logarithm.
+from .moo_builtins import server_log  # noqa: F401 — re-exported for verb code
 from .string_utils import su as _su
 esub = _su.esub
 from .verb_context import MAX_VERB_DEPTH

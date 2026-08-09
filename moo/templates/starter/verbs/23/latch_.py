@@ -16,7 +16,10 @@ if this.latched:
     return
 
 this.set_property('latched', True, db)
-player.msg(this.latch or 'You latch &d.', dob=this)
+# getattr like its three siblings above: `latch` is declared nowhere,
+# so this crashed the moment a builder set latchable=True -- the one
+# path that reaches it.
+player.msg(getattr(this, 'latch', None) or 'You latch &d.', dob=this)
 if not player.invis:
     omsg = getattr(this, 'olatch', None)
     if omsg:
