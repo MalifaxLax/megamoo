@@ -192,7 +192,7 @@ A representative config (all values shown are the defaults):
     "max_connections": 100,
     "connection_timeout": 3600,
     "max_players": 0,
-    "ssl_enabled": false,
+    "tls_port": 0,
     "websocket_enabled": false,
     "websocket_port": 8888
   },
@@ -512,8 +512,10 @@ Before exposing a server beyond your own machine:
    change it immediately (see [First login](#first-login-the-ownerwizard-account-100)).
 2. **Keep the JSON API local.** Leave `api.host` at `127.0.0.1` and set a strong
    `api.auth_token`; only widen it deliberately.
-3. **Enable TLS** (`ssl_enabled` with cert/key) if the server is reachable over
-   the internet.
+3. **Enable TLS** (`tls_port` with `tls_cert`/`tls_key`, or the
+   `--tls-port` flags) if the server is reachable over the internet. It is
+   an additional listener: the plain port keeps working, because `telnet`
+   cannot speak TLS. Passwords cross the plain port in cleartext.
 4. **Turn off debug mode** in production so internal state isn't exposed.
 5. **Right-size `max_connections`** for your hardware, and review the per-IP
    connection rate limit.

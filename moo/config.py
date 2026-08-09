@@ -100,11 +100,15 @@ class NetworkConfig:
             unlimited.  Connections beyond this limit can connect but cannot
             log in.
         enable_ipv6 (bool): Whether to enable IPv6 dual-stack listening.
-        ssl_enabled (bool): Whether to require TLS encryption on the main port.
-            If ``True``, both ``ssl_cert`` and ``ssl_key`` must point to valid
-            files.
-        ssl_cert (str): Filesystem path to the PEM-encoded SSL certificate.
-        ssl_key (str): Filesystem path to the PEM-encoded SSL private key.
+        tls_port (int): Port for an *additional* TLS listener.  ``0`` (the
+            default) means no TLS listener.  This is deliberately a second
+            port rather than a flag on the main one: the plain port has to
+            keep working, because ``telnet`` cannot speak TLS and it is how
+            most people first reach a world.  Both ports serve the same game.
+        tls_cert (str): Filesystem path to the PEM-encoded certificate,
+            including any intermediates.  Required when ``tls_port`` is set.
+        tls_key (str): Filesystem path to the PEM-encoded private key.
+            Required when ``tls_port`` is set.
         websocket_enabled (bool): Whether to start a WebSocket listener in
             addition to the telnet listener.  This listener also serves the
             browser client's static files.
@@ -130,9 +134,9 @@ class NetworkConfig:
     connection_timeout: int = 3600  # 1 hour
     max_players: int = 0  # 0 = unlimited
     enable_ipv6: bool = False
-    ssl_enabled: bool = False
-    ssl_cert: str = ''
-    ssl_key: str = ''
+    tls_port: int = 0  # 0 = no TLS listener
+    tls_cert: str = ''
+    tls_key: str = ''
     websocket_enabled: bool = False
     websocket_port: int = 8888
     websocket_auto_port: bool = True
@@ -426,8 +430,11 @@ class ServerConfig:
             - Port numbers are in the valid TCP range (1--65535).
             - ``max_connections`` is at least 1.
             - Timeout values are non-negative.
-            - If SSL is enabled, both ``ssl_cert`` and ``ssl_key`` must
-              point to existing files.
+            - If ``tls_port`` is set, ``tls_cert`` and ``tls_key`` are
+              given, point at existing files, and the port is neither out
+              of range nor the plain port.  A cert without a port is an
+              error too: it looks like TLS is on when nothing would
+              listen.
             - ``checkpoint_interval`` is non-negative.
             - ``max_checkpoints`` is at least 1.
             - If the API is enabled, its port must be valid.
@@ -447,14 +454,29 @@ class ServerConfig:
         if self.network.connection_timeout < 0:
             raise ValueError("connection_timeout must be non-negative")
 
-        # Validate SSL configuration -- cert and key must both exist on disk
-        if self.network.ssl_enabled:
-            if not self.network.ssl_cert or not self.network.ssl_key:
-                raise ValueError("SSL enabled but certificate/key not specified")
-            if not os.path.exists(self.network.ssl_cert):
-                raise ValueError(f"SSL certificate not found: {self.network.ssl_cert}")
-            if not os.path.exists(self.network.ssl_key):
-                raise ValueError(f"SSL key not found: {self.network.ssl_key}")
+        # Validate TLS configuration.  Every one of these refuses to start
+        # rather than starting without encryption: a world that quietly
+        # serves plaintext when you asked for TLS is the failure this
+        # whole feature exists to avoid.  The previous settings validated
+        # exactly like this and then were never read by anything.
+        if self.network.tls_port:
+            if not (0 < self.network.tls_port < 65536):
+                raise ValueError(f"tls_port out of range: {self.network.tls_port}")
+            if self.network.tls_port == self.network.port:
+                raise ValueError(
+                    f"tls_port {self.network.tls_port} is the plain port; "
+                    "TLS needs a port of its own")
+            if not self.network.tls_cert or not self.network.tls_key:
+                raise ValueError(
+                    "tls_port is set but tls_cert/tls_key are not")
+            for label, path in (('certificate', self.network.tls_cert),
+                                ('key', self.network.tls_key)):
+                if not os.path.exists(path):
+                    raise ValueError(f"TLS {label} not found: {path}")
+        elif self.network.tls_cert or self.network.tls_key:
+            raise ValueError(
+                "tls_cert/tls_key given without tls_port, so no TLS "
+                "listener would start; set tls_port to serve them")
 
         # Validate database settings
         if self.database.checkpoint_interval < 0:

@@ -353,6 +353,25 @@ Examples:
                  'localhost; set it when serving the client publicly'
         )
         parser.add_argument(
+            '--tls-port',
+            type=int,
+            default=None,
+            help='Serve an additional TLS listener on this exact port. The '
+                 'plain port keeps working -- telnet cannot speak TLS -- so '
+                 'this is a second door to the same world. Requires '
+                 '--tls-cert and --tls-key'
+        )
+        parser.add_argument(
+            '--tls-cert',
+            default=None,
+            help='PEM certificate for --tls-port, including any intermediates'
+        )
+        parser.add_argument(
+            '--tls-key',
+            default=None,
+            help='PEM private key for --tls-port'
+        )
+        parser.add_argument(
             '--log-level',
             choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
             default='INFO',
@@ -549,7 +568,10 @@ Examples:
                        api_token=args.api_token,
                        web_enabled=args.web,
                        web_port=args.web_port,
-                       web_origins=args.web_origins)
+                       web_origins=args.web_origins,
+                       tls_port=args.tls_port,
+                       tls_cert=args.tls_cert,
+                       tls_key=args.tls_key)
             
             return 0
             

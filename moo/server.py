@@ -247,6 +247,13 @@ class MegaMOOServer:
         # The port the telnet listener actually bound; see start().  Only
         # meaningful once the listener is up, hence None until then.
         self.port: Optional[int] = None
+        # The TLS listener's port, or None when no TLS listener is running.
+        # Reported at startup and nowhere else: MSSP would be the natural
+        # place to advertise it, but MSSP here is a negotiation constant
+        # and an enable_mssp flag with no payload behind them, so there is
+        # nothing to advertise it *to* yet.
+        self.tls_port: Optional[int] = None
+        self._tls_server = None
         self._api_server: Optional[ApiServer] = None
         # Verbs are still serialised -- exactly one runs at a time -- but
         # the serialising is done by the baton in verb_baton, not by having
@@ -342,6 +349,31 @@ class MegaMOOServer:
 
         logger.info(f"Server listening on {host}:{port}")
         logger.info(f"Server name: {self.config.server_name}")
+
+        # --- Phase 2b: optional TLS listener ---
+        #
+        # A second port, not a mode on the first.  `telnet` cannot speak
+        # TLS and it is the command in every quickstart, so the plain port
+        # has to keep working; anyone who wants encryption connects to the
+        # other one with a client that supports it.  Same handler, same
+        # game -- TLS sits underneath the stream and the protocol above it
+        # is unchanged.
+        #
+        # No port walking here.  A TLS port is one you have told people
+        # about and pointed a certificate at, so a conflict is an error to
+        # report rather than something to route around.
+        if self.config.network.tls_port:
+            import ssl as _ssl
+            ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_SERVER)
+            ctx.load_cert_chain(self.config.network.tls_cert,
+                                self.config.network.tls_key)
+            ctx.minimum_version = _ssl.TLSVersion.TLSv1_2
+            self._tls_server, tls_port = await listen_walking_ports(
+                self._handle_connection, host, self.config.network.tls_port,
+                1, ssl=ctx, limit=MAX_COMMAND_LENGTH * 2
+            )
+            self.tls_port = tls_port
+            logger.info(f"TLS listening on {host}:{tls_port}")
 
         # --- Phase 3: Optional subsystems ---
 
@@ -494,16 +526,21 @@ class MegaMOOServer:
             except Exception as e:
                 logger.error(f"Error stopping WebSocket server: {e}")
 
-        # --- Close TCP listener ---
-        tcp = getattr(self, '_tcp_server', None)
-        if tcp:
+        # --- Close TCP listeners ---
+        # The TLS listener is closed on the same terms as the plain one: a
+        # port left held after shutdown is a restart that fails to bind,
+        # and a pinned TLS port has nowhere else to go.
+        for label, srv in (('TCP', getattr(self, '_tcp_server', None)),
+                           ('TLS', getattr(self, '_tls_server', None))):
+            if not srv:
+                continue
             try:
-                tcp.close()
-                await asyncio.wait_for(tcp.wait_closed(), timeout=5)
+                srv.close()
+                await asyncio.wait_for(srv.wait_closed(), timeout=5)
             except asyncio.TimeoutError:
-                logger.warning("Timed out closing TCP listener")
+                logger.warning(f"Timed out closing {label} listener")
             except Exception as e:
-                logger.error(f"Error closing TCP listener: {e}")
+                logger.error(f"Error closing {label} listener: {e}")
 
         # --- Drain verb thread pool ---
         # wait=False because we do not want to block on a stuck verb.
@@ -1130,7 +1167,10 @@ def run_server(database_path: str, port: Optional[int] = None,
                api_enabled: bool = False, api_port: Optional[int] = None,
                api_token: Optional[str] = None,
                web_enabled: bool = False, web_port: Optional[int] = None,
-               web_origins: Optional[str] = None):
+               web_origins: Optional[str] = None,
+               tls_port: Optional[int] = None,
+               tls_cert: Optional[str] = None,
+               tls_key: Optional[str] = None):
     """
     Build and run a MegaMOO server from scratch.
 
@@ -1207,6 +1247,23 @@ def run_server(database_path: str, port: Optional[int] = None,
         config.network.websocket_allowed_origins = [
             o.strip() for o in web_origins.split(',') if o.strip()
         ]
+
+    if tls_port is not None:
+        config.network.tls_port = tls_port
+    if tls_cert is not None:
+        config.network.tls_cert = tls_cert
+    if tls_key is not None:
+        config.network.tls_key = tls_key
+
+    # Re-validate now that the overrides are in.
+    #
+    # validate() runs from __post_init__, which is *before* anything on
+    # this path has touched the config -- so until now it only ever
+    # checked the defaults and whatever a config file supplied.  Every
+    # value that arrived by environment variable or command line went
+    # unchecked, which for TLS would mean --tls-cert without --tls-port
+    # starting happily and serving no TLS at all.
+    config.validate()
 
     # --- Database ---
     database = Database(database_path, mode='readwrite')
