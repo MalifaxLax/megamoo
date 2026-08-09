@@ -27,6 +27,7 @@ writes ``from moo.objects import MOOObject`` -- no plugin registry, no
 hooks, nothing new to learn.
 """
 
+import json
 import pathlib
 import shutil
 import sqlite3
@@ -119,10 +120,16 @@ def _point_at_own_verbs(db_path: pathlib.Path, verbs_dir: pathlib.Path):
     """
     con = sqlite3.connect(str(db_path))
     try:
+        # json.dumps, not an f-string with quotes round it.  Property
+        # values are read back with json.loads, and a Windows path --
+        # C:\Users\... -- makes `"{path}"` invalid JSON, because \U is an
+        # escape.  The world then fails to load the one property that
+        # tells it where its own verbs are, on every machine that is not
+        # this one.
         con.execute(
             "update properties set value = ? "
             "where objnum = 8 and name = 'moo_verb_path'",
-            (f'"{verbs_dir}"',))
+            (json.dumps(str(verbs_dir)),))
         con.commit()
     finally:
         con.close()

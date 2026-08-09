@@ -1266,6 +1266,12 @@ def run_server(database_path: str, port: Optional[int] = None,
     config.validate()
 
     # --- Database ---
+    # Record which world this is.  config.database.path is documented and
+    # was never populated on this path, so anything asking the config
+    # where the world lives got '' -- which is why the login splash
+    # resolved against the working directory instead of beside it.
+    config.database.path = database_path
+
     database = Database(database_path, mode='readwrite')
     database.max_checkpoints = config.database.max_checkpoints
 

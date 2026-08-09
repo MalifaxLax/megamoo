@@ -15,7 +15,7 @@ Properties on edible items:
     effects_per_bite - If False, effects only on final bite (default True).
     uses            - Number of uses remaining.
     finish/ofinish  - Messages shown when fully consumed.
-    rtdice          - [num, sides, offset] for round time dice roll.
+    rt_dice         - [num, sides, offset] for round time dice roll.
     prepared        - Bool, whether item is prepared/cooked.
 
 Returns True to indicate the action was handled.
@@ -55,8 +55,10 @@ if uses > 0:
         pobj.location.msg_room("&S eats some of &d.", exclude=[pobj], sub=pobj, dob=this)
 
 # Apply round time (before potential recycle)
-rtdice = this.rtdice or [1, 5, 1]
-rt = dice(rtdice[0], rtdice[1], rtdice[2] if len(rtdice) > 2 else 0)
+# rt_dice, not rtdice: every other consumable verb spells it with the
+# underscore, so food that set rt_dice was silently ignored here.
+rt_dice = this.rt_dice or [1, 5, 1]
+rt = dice(rt_dice[0], rt_dice[1], rt_dice[2] if len(rt_dice) > 2 else 0)
 call_verb(pobj, '_rt', amount=rt)
 
 if uses == 1:

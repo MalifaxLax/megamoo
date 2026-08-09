@@ -217,13 +217,26 @@ def load_display_screen(config: 'ServerConfig') -> str:
             except OSError as exc:
                 logger.warning(f"Could not read display_screen {path}: {exc}")
 
-    # 2. Convention: display_screen.txt in cwd
-    cwd_screen = Path('display_screen.txt')
-    if cwd_screen.is_file():
-        try:
-            return cwd_screen.read_text(encoding='utf-8')
-        except OSError:
-            pass
+    # 2. Convention: display_screen.txt beside the world, then in cwd.
+    #
+    # Beside the world first, because that is where `megamoo init` puts
+    # it and it is a property of the world rather than of wherever you
+    # happened to be standing.  Serving a world by path from somewhere
+    # else -- `megamoo /srv/games/mygame/world.db` -- used to fall
+    # through to the built-in banner with no error at all: the right
+    # world, somebody else's name on the door.
+    candidates = []
+    db_path = getattr(getattr(config, 'database', None), 'path', None)
+    if db_path:
+        candidates.append(Path(db_path).expanduser().resolve().parent
+                          / 'display_screen.txt')
+    candidates.append(Path('display_screen.txt'))
+    for screen in candidates:
+        if screen.is_file():
+            try:
+                return screen.read_text(encoding='utf-8')
+            except OSError:
+                continue
 
     # 3. Inline config string
     if config.login_welcome:
