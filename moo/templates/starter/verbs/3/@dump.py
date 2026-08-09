@@ -67,7 +67,7 @@ for key in ('location', 'contents', 'children', 'created', 'last_move'):
 
 record = {
     'megamoo_dump': 1,
-    'dumped': time.strftime('&Y-&m-%dT&H:&M:&S'),
+    'dumped': time.strftime('%Y-%m-%dT%H:%M:%S'),
     'objnum': target.objnum,
     'name': str(target.name or ''),
     'object': raw,

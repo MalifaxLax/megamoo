@@ -261,6 +261,11 @@ class Database:
 
         # ----- Checkpoint directory (alongside the .sqlite file) -----
         self.checkpoint_dir = self.path.parent / (self.path.stem + '_checkpoints')
+        # How many to keep.  run_server overwrites this from
+        # database.max_checkpoints, which was validated at startup and then
+        # never reached the pruner -- it took its own hardcoded default, so
+        # raising the setting still left you with ten.
+        self.max_checkpoints = 10
 
         # ----- SQLite connection -----
         self._conn: Optional[sqlite3.Connection] = None
@@ -426,7 +431,7 @@ class Database:
         # Create checkpoint directory
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-        timestamp = datetime.now().strftime('&Y&m&d_&H&M&S')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         checkpoint_file = self.checkpoint_dir / f'checkpoint_{timestamp}.sqlite'
 
         # Use SQLite's built-in backup for a consistent snapshot
@@ -444,10 +449,15 @@ class Database:
         # Clean old checkpoints
         self._prune_old_checkpoints()
 
-    def _prune_old_checkpoints(self, max_checkpoints: int = 10):
+    def _prune_old_checkpoints(self, max_checkpoints: Optional[int] = None):
         """Remove old checkpoint files, keeping the most recent ones."""
+        if max_checkpoints is None:
+            max_checkpoints = self.max_checkpoints
         if not self.checkpoint_dir.exists():
             return
+        # Sorted by name, which is why the timestamp in it has to be real:
+        # while every checkpoint was called checkpoint_&Y&m&d_&H&M&S.sqlite
+        # this pruned a list of one, forever.
         checkpoints = sorted(self.checkpoint_dir.glob('checkpoint_*.sqlite'))
         while len(checkpoints) > max_checkpoints:
             oldest = checkpoints.pop(0)

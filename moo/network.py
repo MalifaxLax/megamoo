@@ -274,10 +274,14 @@ def resolve_repeat(player_obj, command: str) -> Optional[str]:
         only the caller knows how its own prompt works.
     """
     if command.strip() == '.':
-        # `or None` is load-bearing: an unset property reads as the falsy
-        # _null_attr sentinel, and the caller tests `is None`, which the
-        # sentinel fails.  Collapse it to a real None.
-        return player_obj.last_command or None
+        # getattr, because a player who has not typed anything yet has no
+        # last_command and a bare read raises E_PROPNF.  Typing '.' first
+        # is something a new account can do, and it answered "An error
+        # occurred processing your command" rather than the "No previous
+        # command." the caller is written to give.  The comment here used
+        # to say an unset property read as a falsy sentinel; that stopped
+        # being true when missing properties began raising.
+        return getattr(player_obj, 'last_command', None) or None
     player_obj.last_command = command
     return command
 
@@ -596,7 +600,7 @@ class PlayerConnection:
                 else:
                     logger.warning(
                         'No login room resolves ($login_room, $start_room); '
-                        'leaving &s where they are.', player.name)
+                        'leaving %s where they are.', player.name)
 
             self.server.database.save_object(player)
 

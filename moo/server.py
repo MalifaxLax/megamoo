@@ -1267,6 +1267,7 @@ def run_server(database_path: str, port: Optional[int] = None,
 
     # --- Database ---
     database = Database(database_path, mode='readwrite')
+    database.max_checkpoints = config.database.max_checkpoints
 
     # --- Server ---
     server = MegaMOOServer(config, database)

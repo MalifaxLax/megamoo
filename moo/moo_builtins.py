@@ -549,7 +549,7 @@ def server_log(message: str, is_error: bool = False) -> None:
         message: What to record.
         is_error: Log at error level rather than info.
     """
-    (logger.error if is_error else logger.info)('&s', message)
+    (logger.error if is_error else logger.info)('%s', message)
 
 
 def seconds_left() -> int:
