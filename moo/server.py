@@ -953,6 +953,19 @@ class MegaMOOServer:
             get_task_queue().complete_task(task)
             return
 
+        # Same gate as the direct path: a queued command is still a
+        # command somebody typed, and must not clear a bar the immediate
+        # route would have stopped it at.
+        from .parser import may_invoke
+        if not may_invoke(player, verb_def):
+            logger.debug(
+                "Queued verb '%s' requires gm%s; player #%s is below it",
+                task.context.verb, getattr(verb_def, 'auth', 0), player.objnum)
+            from .builtins import notify as _notify
+            _notify(player, "Do what?")
+            get_task_queue().complete_task(task)
+            return
+
         # Hand off to the VerbExecutor to run it.
         try:
             result = self.verb_executor.execute(verb_def, task)
@@ -1049,6 +1062,23 @@ class MegaMOOServer:
 
         if not verb_def:
             logger.debug(f"Verb '{parse_result.verb}' not found on object #{verb_obj.objnum}")
+            from .builtins import notify as _notify
+            _notify(player, "Do what?")
+            return
+
+        # The gm level the verb asks for, enforced where the command is
+        # actually resolved.  `find_verb` refuses a hidden verb but knows
+        # nothing about the player, so it cannot weigh `auth` -- and this
+        # lookup is the one that matters for `@` and `+` commands, which
+        # reach here with a minimal parse result rather than a refusal.
+        # Answering "Do what?" rather than "you may not" is deliberate:
+        # the same answer a missing verb gets, so the staff command list
+        # is not discoverable by watching which names deny you.
+        from .parser import may_invoke
+        if not may_invoke(player, verb_def):
+            logger.debug(
+                "Verb '%s' requires gm%s; player #%s is below it",
+                parse_result.verb, getattr(verb_def, 'auth', 0), player.objnum)
             from .builtins import notify as _notify
             _notify(player, "Do what?")
             return

@@ -339,7 +339,48 @@ class CommandParser:
     # Verb search
     # --------------------------------------------------------
 
+    def _may_invoke(self, verb_def) -> bool:
+        """This player against *verb_def*'s level -- see :func:`may_invoke`."""
+        return may_invoke(self.player, verb_def)
+
     def _find_verb(self, verb_name: str) -> Tuple[int, Any]:
+        """
+        Find a verb in the player's environment that they may actually run.
+
+        Wraps :meth:`_search_environment` with the gm-level check, so the
+        level a verb declares gates dispatch the way ``hidden`` does.
+        ``find_verb`` already refuses a hidden verb; ``auth`` sat beside
+        it in the same VerbDef enforcing nothing.  Two places in the
+        engine documented this check as though it existed: ``verb_loader``
+        logs "gating dispatch at N" when it derives a level, and
+        ``moo_builtins.shutdown`` explains that its guard has to live in
+        the verb body because "the command parser's auth check does not
+        cover a call that arrives through call_verb".  Both now describe
+        the code.
+
+        This does not replace the ``auth_level(pobj) < N`` guard a staff
+        verb opens with, and is not meant to.  ``call_verb`` reaches a
+        verb without going through the parser at all, deliberately --
+        internal calls must not be subject to the caller's level.  What
+        this adds is that a *typed* command cannot reach a verb the
+        typist is not entitled to, so a verb whose guard was forgotten is
+        not simply open.
+
+        A refused verb is reported as not found rather than as refused --
+        MOO's convention, and the same answer ``hidden`` gives.  The
+        commands a player cannot use should not be discoverable by
+        watching which ones deny them.
+        """
+        objnum, verb_def = self._search_environment(verb_name)
+        if verb_def is not None and not self._may_invoke(verb_def):
+            logger.debug(
+                "Verb '%s' on #%s requires gm%s; player #%s is below it",
+                verb_name, objnum, getattr(verb_def, 'auth', 0),
+                self.player.objnum)
+            return 0, None
+        return objnum, verb_def
+
+    def _search_environment(self, verb_name: str) -> Tuple[int, Any]:
         """
         Search the player's environment for a verb definition.
 
@@ -726,6 +767,36 @@ class CommandParser:
 # ============================================================
 # STANDALONE UTILITIES
 # ============================================================
+
+
+def may_invoke(player, verb_def) -> bool:
+    """
+    Whether *player* clears the gm level *verb_def* requires.
+
+    The rule is ``auth_level(player) >= verb_def.auth`` -- the level the
+    verb asks for, not a fixed number.  A verb that asks for nothing
+    (``auth`` 0, the default) is open to everyone.
+
+    Lives here rather than on the parser because the parser is not the
+    only place a typed command is resolved.  ``@`` and ``+`` commands
+    take a different route: when the parser cannot find one it returns a
+    minimal result and lets the server look the verb up again, so a check
+    that existed only in the parser would cover ``eval`` and miss
+    ``@dig`` -- which is most of the staff commands there are.
+
+    Never raises.  A player object with no ``auth`` reads as level 0,
+    which is what an ordinary character is; anything that goes wrong
+    while establishing a level refuses, because a staff verb is the
+    wrong place to fail open.
+    """
+    required = getattr(verb_def, 'auth', 0) or 0
+    if required <= 0:
+        return True
+    try:
+        from .builtins import auth_level
+        return auth_level(player) >= required
+    except Exception:
+        return False
 
 
 def split_command_line(line: str) -> List[str]:
