@@ -719,6 +719,14 @@ class MegaMOOServer:
         # verb files predates its first startup.
         mtimes: Dict[str, float] = {}
         adopted = refreshed = 0
+        # Verb directories whose object does not exist in this world, counted
+        # by object rather than reported by file.  A world under development
+        # accumulates these -- you sketch `verbs/900/` for a system you have
+        # not built the objects for yet -- and there is nothing to fix, so a
+        # warning per *file* is eleven lines of noise that say one thing.
+        # Collapsed to a single line naming the objects, which is the part
+        # you would act on if it were a surprise.
+        orphaned: Dict[int, int] = {}
         for objnum, verb_name, filepath in verb_loader.scan_verb_files(base_path):
             try:
                 mtimes[filepath] = os.path.getmtime(filepath)
@@ -726,8 +734,15 @@ class MegaMOOServer:
                 continue
             try:
                 obj = self.database.get_object(objnum)
-                if obj is None:
-                    continue
+            except KeyError:
+                # Distinguished from the failures below on purpose: those are
+                # per-file problems you fix one at a time, this is one fact
+                # about one object repeated once per file it owns.
+                orphaned[objnum] = orphaned.get(objnum, 0) + 1
+                continue
+            if obj is None:
+                continue
+            try:
                 with open(filepath) as f:
                     code = f.read()
                 match = next((v for v in obj.verbs if verb_name in v.names),
@@ -751,6 +766,13 @@ class MegaMOOServer:
             logger.info(
                 f'[autoreload] refreshed {refreshed} verb(s) whose file had '
                 f'changed while the server was down')
+        if orphaned:
+            listed = ', '.join(f'#{n}' for n in sorted(orphaned)[:10])
+            if len(orphaned) > 10:
+                listed += f', and {len(orphaned) - 10} more'
+            logger.warning(
+                f'[autoreload] ignoring {sum(orphaned.values())} verb file(s) '
+                f'for {len(orphaned)} object(s) not in this world: {listed}')
 
         while self.state.running:
             try:
