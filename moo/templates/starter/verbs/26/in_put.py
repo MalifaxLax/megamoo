@@ -43,12 +43,23 @@ ix = dobj.x or 0
 iy = dobj.y or 0
 iz = dobj.z or 0
 if cx and cy and cz and (ix or iy or iz):
+    # The opening is the smallest face, not the largest.
+    #
+    # sorted() ascends, so cdims[1], cdims[2] took the middle and largest
+    # dimensions: a sheath at 2x2x40 was treated as having a 2x40 opening,
+    # diagonal 40, and a cannonball went in.  The mouth of a long thin
+    # thing is its 2x2 end, diagonal 2.83, which refuses one.
     cdims = sorted([cx, cy, cz])
-    opening_w, opening_h = cdims[1], cdims[2]
+    opening_w, opening_h = cdims[0], cdims[1]
     opening_diag = math.sqrt(opening_w**2 + opening_h**2)
-    item_max = max(ix, iy, iz)
-    container_max = max(cx, cy, cz)
-    if opening_diag < item_max and item_max > container_max:
+    idims = sorted([ix, iy, iz])
+    item_girth = math.sqrt(idims[0]**2 + idims[1]**2)
+    item_max = idims[2]
+    container_max = cdims[2]
+    # Two independent refusals, so 'or': it will not pass the mouth, or it
+    # will not fit once inside.  Joined by 'and', a rod too fat for the
+    # opening was admitted so long as it was shorter than the container.
+    if item_girth > opening_diag or item_max > container_max:
         pobj.msg("&D is too big to put in there.", dob=dobj)
         return True
 
@@ -67,11 +78,19 @@ if item_count >= max_items:
     pobj.msg("You can't put anything else in there.")
     return True
 
-# Check weight
+# Check weight -- cumulative, which is what max_weight_in means and what
+# the manual documents.  This compared the item against the limit on its
+# own, so a container with a limit of 16 accepted any number of 16-unit
+# items; current_weight_in was faithfully maintained here and in in_get
+# and read by nothing.
 item_weight = dobj.weight or 0
 max_weight = this.max_weight_in or 16
-if item_weight > max_weight:
-    pobj.msg("&D is too heavy to put in there.", dob=dobj)
+carried_weight = this.current_weight_in or 0
+if carried_weight + item_weight > max_weight:
+    if carried_weight:
+        pobj.msg("&D already has all the weight it can hold.", dob=this)
+    else:
+        pobj.msg("&D is too heavy to put in there.", dob=dobj)
     return True
 
 # Check pass_locks
