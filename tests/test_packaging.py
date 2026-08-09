@@ -146,3 +146,47 @@ def test_every_client_file_is_declared_as_package_data():
         rel = str(f.relative_to(root))
         assert any(fnmatch.fnmatch(rel, p) for p in patterns), (
             f'{rel} is in the tree but no package-data pattern ships it')
+
+
+def test_no_config_field_is_read_by_nobody():
+    """
+    A setting that nothing consumes is worse than a missing feature: it
+    answers "is this on?" with yes.  ssl_enabled did exactly that --
+    documented as requiring TLS, validated at startup so a missing
+    certificate stopped the server, and read by no code at all.  Fifteen
+    more were found the same way.
+
+    So: every field on every config section must appear somewhere in the
+    engine outside config.py's own declaration, docstring and
+    serialisation.  Adding a knob now means wiring it up in the same
+    change, or the suite says so.
+    """
+    import re
+    from moo.config import ServerConfig
+
+    root = pathlib.Path(__file__).resolve().parent.parent / 'moo'
+    sources = {f: f.read_text() for f in root.rglob('*.py')
+               if '__pycache__' not in str(f) and f.name != 'config.py'}
+    config_src = (root / 'config.py').read_text()
+
+    cfg = ServerConfig()
+    sections = {'network': cfg.network, 'database': cfg.database,
+                'protocol': cfg.protocol, 'api': cfg.api, 'dev': cfg.dev}
+    dead = []
+    for section_name, section in sections.items():
+        for field_name in vars(section):
+            if field_name.startswith('_'):
+                continue
+            if any(re.search(rf'\b{re.escape(field_name)}\b', s)
+                   for s in sources.values()):
+                continue
+            # A field may also be consumed inside config.py itself, but
+            # only outside its declaration/docstring/to_dict lines.
+            real = [l for l in config_src.splitlines()
+                    if field_name in l
+                    and not l.strip().startswith((field_name, f"'{field_name}'",
+                                                  f'{field_name} (', '#'))
+                    and f"'{field_name}':" not in l]
+            if not real:
+                dead.append(f'{section_name}.{field_name}')
+    assert not dead, 'config fields nothing reads: ' + ', '.join(dead)

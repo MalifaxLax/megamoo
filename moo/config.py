@@ -94,12 +94,6 @@ class NetworkConfig:
             ``auto_port`` is on (``port`` .. ``port + limit - 1``).
         max_connections (int): Maximum simultaneous TCP connections the server
             will accept.  New connections beyond this limit are refused.
-        connection_timeout (int): Seconds of idle time before a connection is
-            automatically closed.  Set to ``0`` to disable timeouts.
-        max_players (int): Maximum number of logged-in players.  ``0`` means
-            unlimited.  Connections beyond this limit can connect but cannot
-            log in.
-        enable_ipv6 (bool): Whether to enable IPv6 dual-stack listening.
         tls_port (int): Port for an *additional* TLS listener.  ``0`` (the
             default) means no TLS listener.  This is deliberately a second
             port rather than a flag on the main one: the plain port has to
@@ -131,9 +125,6 @@ class NetworkConfig:
     auto_port: bool = True
     port_scan_limit: int = 50
     max_connections: int = 100
-    connection_timeout: int = 3600  # 1 hour
-    max_players: int = 0  # 0 = unlimited
-    enable_ipv6: bool = False
     tls_port: int = 0  # 0 = no TLS listener
     tls_cert: str = ''
     tls_key: str = ''
@@ -161,28 +152,10 @@ class DatabaseConfig:
             snapshots.  Checkpoints create a consistent recovery point.
         max_checkpoints (int): Maximum number of checkpoint files to retain
             on disk.  Older checkpoints are pruned automatically.
-        transaction_log_enabled (bool): Whether to write a transaction log
-            for crash recovery.  Disabling this improves write performance
-            at the cost of durability.
-        auto_save_interval (int): Seconds between automatic in-memory-to-disk
-            saves.  This is separate from (and typically more frequent than)
-            checkpointing.
-        compress_checkpoints (bool): Whether to gzip checkpoint files to
-            save disk space.
-        backup_on_start (bool): Whether to create a full backup of the
-            database file before the server begins modifying it.
-        max_object_cache (int): Maximum number of :class:`~moo.objects.MOOObject`
-            instances to keep in the in-memory LRU cache.  Higher values
-            trade memory for faster repeated lookups.
     """
     path: str = 'game.db'
     checkpoint_interval: int = 3600  # 1 hour
     max_checkpoints: int = 10
-    transaction_log_enabled: bool = True
-    auto_save_interval: int = 300  # 5 minutes
-    compress_checkpoints: bool = True
-    backup_on_start: bool = True
-    max_object_cache: int = 1000
     #: Where verb code reads and writes files, or '' for nowhere.
     #:
     #: A world legitimately wants files: logs, exports, notes it keeps
@@ -232,29 +205,17 @@ class ProtocolConfig:
             MUD listing sites can auto-discover server metadata.
         enable_mccp (bool): Enable MCCP (MUD Client Compression Protocol) to
             compress downstream traffic, saving bandwidth on large text dumps.
-        mxp_default_mode (str): Default MXP security mode for new connections.
-            Must be one of ``'open'``, ``'secure'``, or ``'locked'``.
 
             - ``'open'``:   Client may use all MXP elements.
             - ``'secure'``: Only server-sent MXP elements are trusted (recommended).
             - ``'locked'``: MXP is negotiated but no elements are accepted.
 
-        gmcp_packages (list): List of GMCP package names the server advertises
-            during negotiation (e.g. ``['Core', 'Char', 'Room', 'Comm']``).
-        telnet_options (dict): Low-level telnet option negotiation overrides.
-            Keys are telnet option codes (int); values are booleans indicating
-            whether the server should WILL/DO the option.
     """
     enable_mxp: bool = True
     enable_gmcp: bool = True
     enable_msdp: bool = True
     enable_mssp: bool = True
     enable_mccp: bool = True
-    mxp_default_mode: str = 'secure'
-    gmcp_packages: list = field(default_factory=lambda: [
-        'Core', 'Char', 'Room', 'Comm'
-    ])
-    telnet_options: dict = field(default_factory=dict)
 
 
 # =============================================================================
@@ -373,16 +334,8 @@ class ServerConfig:
                                    player enters credentials.
         display_screen (str):      Path to a text file whose contents are
                                    shown before the login prompt.
-        max_command_length (int):  Maximum characters allowed in a single
-                                   player command.  Longer input is truncated.
-        max_object_moves_per_second (int): Rate limit for object moves, used
-                                   as an anti-spam / anti-abuse measure.
         enable_color (bool):       Whether ANSI colour codes are processed
                                    and sent to clients.
-        debug_mode (bool):         Enables verbose logging and developer-
-                                   facing error messages.
-        log_level (str):           Python logging level name (e.g. ``'INFO'``,
-                                   ``'DEBUG'``, ``'WARNING'``).
     """
     network: NetworkConfig = field(default_factory=NetworkConfig)
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
@@ -395,11 +348,7 @@ class ServerConfig:
     motd: str = 'Welcome to MegaMOO!'
     login_welcome: str = ''
     display_screen: str = ''  # Path to text file shown before login prompt
-    max_command_length: int = 1000
-    max_object_moves_per_second: int = 10
     enable_color: bool = True
-    debug_mode: bool = False
-    log_level: str = 'INFO'
 
     def __post_init__(self):
         """Validate configuration immediately after dataclass initialisation."""
@@ -434,8 +383,6 @@ class ServerConfig:
             - ``checkpoint_interval`` is non-negative.
             - ``max_checkpoints`` is at least 1.
             - If the API is enabled, its port must be valid.
-            - ``mxp_default_mode`` is one of ``'open'``, ``'secure'``,
-              ``'locked'``.
         """
         # Validate network settings
         if not (1 <= self.network.port <= 65535):
@@ -446,9 +393,6 @@ class ServerConfig:
 
         if self.network.max_connections < 1:
             raise ValueError("max_connections must be at least 1")
-
-        if self.network.connection_timeout < 0:
-            raise ValueError("connection_timeout must be non-negative")
 
         # Validate TLS configuration.  Every one of these refuses to start
         # rather than starting without encryption: a world that quietly
@@ -492,14 +436,6 @@ class ServerConfig:
         if self.dev.autoreload_interval <= 0:
             raise ValueError("dev.autoreload_interval must be positive")
 
-        # Validate protocol settings -- MXP mode must be a known value
-        valid_mxp_modes = ['open', 'secure', 'locked']
-        if self.protocol.mxp_default_mode not in valid_mxp_modes:
-            raise ValueError(
-                f"Invalid MXP mode: {self.protocol.mxp_default_mode}. "
-                f"Must be one of {valid_mxp_modes}"
-            )
-
         logger.info("Configuration validated successfully")
 
     # -------------------------------------------------------------------------
@@ -528,11 +464,7 @@ class ServerConfig:
             'motd': self.motd,
             'login_welcome': self.login_welcome,
             'display_screen': self.display_screen,
-            'max_command_length': self.max_command_length,
-            'max_object_moves_per_second': self.max_object_moves_per_second,
             'enable_color': self.enable_color,
-            'debug_mode': self.debug_mode,
-            'log_level': self.log_level,
         }
 
     @classmethod
@@ -694,7 +626,6 @@ class ServerConfig:
             MEGAMOO_DATABASE_PATH=/data/game.db -> config.database.path = '/data/game.db'
             MEGAMOO_PROTOCOL_ENABLE_MXP=false   -> config.protocol.enable_mxp = False
             MEGAMOO_API_INFO_PATH=/tmp/x.json   -> config.api.info_path = '/tmp/x.json'
-            MEGAMOO_DEBUG_MODE=true              -> config.debug_mode = True
 
         Note:
             ``MEGAMOO_API_TOKEN`` is *not* one of these -- the API's field

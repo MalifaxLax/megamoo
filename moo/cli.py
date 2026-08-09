@@ -359,7 +359,13 @@ Examples:
         )
         parser.add_argument(
             '--host',
-            default='0.0.0.0',
+            # None, not '0.0.0.0'.  run_server applies the flag with
+            # `if host:`, so a default here is indistinguishable from the
+            # operator naming it -- and a config.json saying
+            # "host": "127.0.0.1" was silently overridden on every launch,
+            # opening a world to the network its config said to keep local.
+            # The default itself lives on NetworkConfig, where it belongs.
+            default=None,
             help='Host to bind to (default: 0.0.0.0)'
         )
         parser.add_argument(
