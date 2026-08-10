@@ -894,7 +894,7 @@ class MOOObject:
         # --- Verb lookup (walks inheritance) ---
         db = self.__dict__.get('_database')
         if db:
-            defining_objnum, verb_def = self.find_verb(name, db)
+            defining_objnum, verb_def = self.find_verb(name, db, include_hidden=True)
             if verb_def is not None:
                 return self._make_verb_callable(name, db)
         
@@ -1736,9 +1736,27 @@ class MOOObject:
                 
         raise KeyError(f"Verb '{verb_name}' not found on #{self.objnum}")
         
-    def find_verb(self, verb_name: str, database=None):
+    def find_verb(self, verb_name: str, database=None,
+                  include_hidden: bool = False):
         """
         Find a verb by name, checking this object and parents.
+
+        ``hidden`` is filtered out by default, which is what a typed
+        command wants. It is *not* what an internal caller wants: a hook
+        is reached by name from engine code, and a verb marked hidden so
+        players cannot type it must still be callable that way.
+
+        Filtering here rather than at dispatch made ``hidden`` mean
+        "unreachable by anything", so there was no way to express
+        "internal hook, not a command" -- marking one hidden broke the
+        verb that called it. Two docstrings in the shipped world claimed
+        otherwise; one of them was corrected only after `rlook` was
+        hidden and staff silently lost the builder view.
+
+        Callers that resolve a name on behalf of *engine* code --
+        ``call_verb``, the hook dispatcher, attribute-style verb calls --
+        pass ``include_hidden=True``. Everything that resolves a name a
+        *player typed* leaves it alone.
         
         Supports min-length prefix matching.  If a verb has
         ``min_lengths={'examine': 3}``, then 'exa', 'exam', etc.
@@ -1778,13 +1796,13 @@ class MOOObject:
             hit = self._resolved_verbs.get(verb_name)
             if hit is not None:
                 verb_def, defining_objnum = hit
-                if not verb_def.hidden:
+                if include_hidden or not verb_def.hidden:
                     return (defining_objnum, verb_def)
             return (None, None)
 
         # No usable cache -- fall back to scanning what this object has.
         for verb in self.verbs:
-            if verb.matches(verb_name) and not verb.hidden:
+            if verb.matches(verb_name) and (include_hidden or not verb.hidden):
                 return (self.objnum, verb)
 
         return (None, None)

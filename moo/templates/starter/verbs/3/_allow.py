@@ -8,6 +8,9 @@ verb from a base object is not free -- a descendant may define its own
 name suggests a permission check that was planned and not written.
 
 Hidden, so the parser will not dispatch it; call_verb still can.
+That was aspirational when it was written -- the filter lived in
+find_verb, which call_verb shares, so hidden meant unreachable by
+anything. It is true now.
 
 Hidden:  yes
 """

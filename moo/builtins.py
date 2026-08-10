@@ -273,7 +273,7 @@ def _call_hook(obj, hook_name: str, args_str: str = '') -> Any:
     pobj, db, depth = ctx
 
     # Check if the hook verb exists on this object (walks inheritance)
-    defining_objnum, verb_def = obj.find_verb(hook_name, db)
+    defining_objnum, verb_def = obj.find_verb(hook_name, db, include_hidden=True)
     if verb_def is None:
         return None
 
@@ -1654,7 +1654,7 @@ def make_call_verb(pobj, db, _depth=0):
             call_switches = [s for s in parts[1:] if s]
 
         # --- Find verb (walks inheritance chain) ---
-        defining_objnum, verb_def = target.find_verb(clean_verb_name, db)
+        defining_objnum, verb_def = target.find_verb(clean_verb_name, db, include_hidden=True)
         if verb_def is None:
             raise KeyError(f"Verb '{clean_verb_name}' not found on {target.name} (#{target.objnum})")
 
