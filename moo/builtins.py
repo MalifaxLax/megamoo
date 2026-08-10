@@ -1090,6 +1090,19 @@ def _send_room_gmcp(obj, dest_num):
         # destinations are sitting right there in room.dexits, but sending
         # them would hand the player the topology of rooms they have never
         # visited.  A client maps what it has actually seen.
+        # ``no_map`` lets a room opt out of the automap even though it is a
+        # perfectly ordinary in-character room: a maze meant to disorient, a
+        # vehicle interior, somewhere the coordinate layout would be a lie.
+        # It is sent as its own field rather than folded into ``ic`` because
+        # the two are different facts -- a no-map room is still in
+        # character, and anything else reading ``ic`` should keep getting
+        # the truth about it.
+        #
+        # getattr with a default: a room that never heard of the property
+        # must answer False rather than raise, and most rooms never will.
+        # (This is the shape `is_char` takes above, and the shape
+        # `is_trainer` did not, which is how a room's contents could break
+        # a verb by being asked a question they had no answer to.)
         from .roommap import coords_for
         conn.send_gmcp_sync('Room.Info', {
             'num': dest_num,
@@ -1098,6 +1111,7 @@ def _send_room_gmcp(obj, dest_num):
             'exits': exits,
             'coords': coords_for(_database, dest_num),
             'ic': bool(room.is_icroom),
+            'no_map': bool(getattr(room, 'no_map', False)),
         })
     except Exception:
         pass

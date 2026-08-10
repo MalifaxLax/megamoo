@@ -488,14 +488,22 @@ const Automap = {
       let direction = pendingDirection;
       pendingDirection = null;
 
-      // Out-of-character rooms are not part of the world map: the entry
-      // hall, chargen. Nothing about them is recorded, and the panel
-      // goes away while you are in one.
+      // Two kinds of room are not part of the world map, and they are
+      // handled the same way.
       //
-      // previousNum is cleared too, so walking IC -> OOC -> IC does not
-      // fabricate a link between two rooms that are not connected. The
-      // next IC room simply starts a fresh trail.
-      if (!room.ic) {
+      // Out-of-character rooms -- the entry hall, chargen -- because they
+      // are not in the world. And rooms the builder marked `no_map`: a
+      // maze meant to disorient, a vehicle interior, anywhere a tidy
+      // coordinate grid would tell the player something the fiction says
+      // they should not know. Those are in character; they simply decline
+      // to be drawn.
+      //
+      // Nothing about either is recorded, and the panel goes away while
+      // you are in one. previousNum is cleared too, so walking IC -> OOC
+      // -> IC (or in and out of a maze) does not fabricate a link between
+      // two rooms that are not connected. The next mappable room starts a
+      // fresh trail.
+      if (!room.ic || room.no_map) {
         previousNum = null;
         currentNum = null;
         panel.hidden = true;
