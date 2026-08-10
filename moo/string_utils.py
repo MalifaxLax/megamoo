@@ -36,19 +36,19 @@ issues.
 Token Reference
 ---------------
 Emit tokens (esub):
-    &s / &S   -- subject name / cname (capitalised display name)
-    &d / &D   -- direct-object name / cname
-    &i / &I   -- indirect-object name / cname
+    &s / &S   -- subject name / the same name capitalised
+    &d / &D   -- direct-object name / capitalised
+    &i / &I   -- indirect-object name / capitalised
     &u / &U   -- noun string (from uob) / capitalised noun
     &ps/&po/&pp/&pa/&pr -- gender pronouns resolved from the subject
 
 Enactor pronoun tokens (psub1):
-    &N / &CN             -- enactor name / cname
+    &N / &CN             -- enactor name / capitalised
     &EPS / &EPO / &EPP / &EPR  -- enactor pronouns (subject/object/possessive/reflexive)
     &CEPS / &CEPO / &CEPP / &CEPR  -- capitalised enactor pronouns
 
 Target pronoun tokens (psub2, in addition to psub1):
-    &T / &CT             -- target name / cname
+    &T / &CT             -- target name / capitalised
     &OPS / &OPO / &OPP / &OPR  -- target pronouns
     &COPS / &COPO / &COPP / &COPR  -- capitalised target pronouns
 
@@ -119,7 +119,7 @@ def _getprop(obj, name, default=None):
 
     Args:
         obj:     The game object to inspect.
-        name:    Attribute name to look up (e.g. ``'name'``, ``'cname'``).
+        name:    Attribute name to look up (e.g. ``'name'``, ``'noun'``).
         default: Value to return when the attribute is missing or ``None``.
 
     Returns:
@@ -131,6 +131,29 @@ def _getprop(obj, name, default=None):
         return val if val is not None else default
     except Exception:
         return default
+
+
+def _capitalised(name):
+    """
+    A display name for the start of a sentence: *name* with its first
+    letter raised, and nothing else touched.
+
+    This replaces reading a separate ``cname`` property. cname was a
+    second copy of the same fact, and a second copy drifts: an object
+    that never set one inherited its *prototype's*, so a character with
+    a perfectly good name of her own was announced as "ICharacter walks
+    in from the west." Six characters in Shadowfall were in that state.
+
+    Measured before removing it -- of 123 cname values in the starter
+    world, 0 differed from capitalising name; of 405 in Shadowfall, 3
+    differed and all three were *un*capitalised, i.e. wrong. So the
+    property was redundant wherever it was right.
+
+    Only the first character is raised. "a leather cuirass" becomes
+    "A leather cuirass" and "Sinda" stays "Sinda"; title-casing would
+    wreck both.
+    """
+    return (name[:1].upper() + name[1:]) if name else name
 
 
 def _pronoun_map(obj):
@@ -243,9 +266,9 @@ class StringUtils:
             1. ``&u`` / ``&U`` -- noun from *uob* (if provided).
             2. Gender pronouns (``&ps``, ``&po``, etc.) -- resolved from
                *sub*'s gender.
-            3. ``&s`` / ``&S`` -- subject name / cname from *sub*.
-            4. ``&d`` / ``&D`` -- direct-object name / cname from *dob*.
-            5. ``&i`` / ``&I`` -- indirect-object name / cname from *iob*.
+            3. ``&s`` / ``&S`` -- subject name, plain and capitalised.
+            4. ``&d`` / ``&D`` -- direct-object name, plain and capitalised.
+            5. ``&i`` / ``&I`` -- indirect-object name, plain and capitalised.
 
         The order matters: gender-pronoun tokens are processed *before*
         ``&s``/``&S`` so that a ``&s`` inside a pronoun token does not
@@ -315,23 +338,23 @@ class StringUtils:
                 lambda m: self.get_pronoun(m, source=sub), text
             )
             sname = _getprop(sub, 'name', '')
-            scname = _getprop(sub, 'cname', sname)
+            scap = _capitalised(sname)
             text = _sub_token(text, 's', sname)
-            text = _sub_token(text, 'S', scname)
+            text = _sub_token(text, 'S', scap)
 
         # --- Direct object tokens: %d / %D / $d / $D ---
         if dob is not None:
             dname = _getprop(dob, 'name', '')
-            dcname = _getprop(dob, 'cname', dname)
+            dcap = _capitalised(dname)
             text = _sub_token(text, 'd', dname)
-            text = _sub_token(text, 'D', dcname)
+            text = _sub_token(text, 'D', dcap)
 
         # --- Indirect object tokens: %i / %I / $i / $I ---
         if iob is not None:
             iname = _getprop(iob, 'name', '')
-            icname = _getprop(iob, 'cname', iname)
+            icap = _capitalised(iname)
             text = _sub_token(text, 'i', iname)
-            text = _sub_token(text, 'I', icname)
+            text = _sub_token(text, 'I', icap)
 
         return text
 
@@ -348,7 +371,7 @@ class StringUtils:
 
         Supported tokens::
 
-            &N   -> eobj.name          &CN  -> eobj.cname
+            &N   -> eobj.name          &CN  -> capitalised
             &EPS -> he/she/they         &CEPS -> He/She/They
             &EPO -> him/her/them        &CEPO -> Him/Her/Them
             &EPP -> his/her/their       &CEPP -> His/Her/Their
@@ -385,7 +408,7 @@ class StringUtils:
 
         # Replace name tokens
         pstr = _sub_token(tstr, 'N', _getprop(eobj, 'name', ''))
-        pstr = _sub_token(pstr, 'CN', _getprop(eobj, 'cname', _getprop(eobj, 'name', '')))
+        pstr = _sub_token(pstr, 'CN', _capitalised(_getprop(eobj, 'name', '')))
 
         # Replace lowercase enactor pronouns (%EPS, %EPO, %EPP, %EPR)
         # Only scan if '%E' is present (fast-path optimisation)
@@ -451,7 +474,7 @@ class StringUtils:
 
         Additional target tokens::
 
-            &T   -> tobj.name          &CT  -> tobj.cname
+            &T   -> tobj.name          &CT  -> capitalised
             &OPS -> he/she/they         &COPS -> He/She/They
             &OPO -> him/her/them        &COPO -> Him/Her/Them
             &OPP -> his/her/their       &COPP -> His/Her/Their
@@ -484,7 +507,7 @@ class StringUtils:
 
         # Replace target name tokens
         pstr = _sub_token(pstr, 'T', _getprop(tobj, 'name', ''))
-        pstr = _sub_token(pstr, 'CT', _getprop(tobj, 'cname', _getprop(tobj, 'name', '')))
+        pstr = _sub_token(pstr, 'CT', _capitalised(_getprop(tobj, 'name', '')))
 
         # Replace lowercase target pronouns (%OPS, %OPO, %OPP, %OPR)
         if _has_token(pstr, 'O'):
