@@ -384,3 +384,30 @@ def test_terminal_composed_output_is_marked_as_a_grid():
     frame, = _sent_frames(captured)
     assert frame['grid'] is True
     assert frame['type'] == 'text'
+
+
+def test_a_backtick_in_terminal_output_is_a_glyph_not_a_marker():
+    """The splash draws letters with backticks; they are not markup.
+
+    The clickable-marker substitution ate both backticks on one line of the
+    shipped banner and put a span where they had been, so that line arrived
+    two columns short and everything after it slid left. The banner was
+    crooked in a browser and perfect over telnet, which never does this.
+    """
+    import html as H
+    import re
+    conn, captured = _connection()
+    art = r' \ \  \   /  _ \  |   __|   _ \   __ `__ \    _ \ '
+    asyncio.run(conn.send(art, raw=True))
+    frame, = _sent_frames(captured)
+    assert 'clickable' not in frame['data']
+    plain = H.unescape(re.sub(r'<[^>]+>', '', frame['data'])).rstrip('\n')
+    assert plain == art, 'every column must survive the trip'
+
+
+def test_backticks_still_mark_clickables_in_ordinary_output():
+    """The feature itself is untouched for the output it was meant for."""
+    conn, captured = _connection()
+    asyncio.run(conn.send('Obvious exits: `north` and `south`.', raw=False))
+    frame, = _sent_frames(captured)
+    assert frame['data'].count('class="clickable"') == 2

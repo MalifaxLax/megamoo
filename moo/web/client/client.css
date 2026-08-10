@@ -195,7 +195,17 @@ body {
    narrow screen sideways is the better failure -- the opposite of the
    trade-off that is right for prose. */
 .grid {
-  line-height: 1;
+  /* 1.2, not 1, and the number is measured rather than chosen. A terminal
+     cell is about 2:1 -- 8x16, 9x18, 7x14 -- and that is the shape this
+     art was drawn against. At 14px the mono advance width is 8.43px, so:
+
+         line-height 1.0  -> 1.66 : 1   too tight, the art crowds
+         line-height 1.2  -> 1.99 : 1   a terminal cell
+         line-height 1.45 -> 2.41 : 1   the page default, the art skews
+
+     1.2 is also roughly the font's own natural line height, which is what
+     a terminal uses when it is not told otherwise. */
+  line-height: 1.2;
   white-space: pre;
   overflow-x: auto;
 }

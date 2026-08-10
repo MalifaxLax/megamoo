@@ -453,15 +453,26 @@ class WebSocketConnection:
             if _PASSWORD_PROMPT_RE.search(message):
                 await self._send_echo(False)
             html = moo_colors_to_html(message)
+
+            # Backtick markers become dim spans (web clients don't use MXP).
+            # This must run *after* the colour converter: that converter
+            # escapes <, > and &, so substituting markup ahead of it turned
+            # the spans into visible &lt;span ...&gt; text on the page.
+            # Backticks survive escaping untouched, so matching here is safe.
+            #
+            # Not on raw output. A backtick in something composed for a
+            # terminal is a glyph the art is drawn with, not a marker: the
+            # shipped splash draws its lowercase 'a' and 'm' with them. The
+            # substitution consumed both backticks on that line and put a
+            # span in their place, so the line came out two columns short
+            # and everything after the match slid left -- the whole banner
+            # crooked in a browser and perfect over telnet, which never
+            # does this. `raw` already means "formatted for a terminal";
+            # reinterpreting it as markup is the one thing it asks us not
+            # to do.
+            html = _CLICKABLE_RE.sub(r'<span class="clickable">\1</span>', html)
         else:
             html = ansi_to_html(message)
-
-        # Backtick markers become dim spans (web clients don't use MXP).
-        # This must run *after* the colour converter: that converter
-        # escapes <, > and &, so substituting markup ahead of it turned
-        # the spans into visible &lt;span ...&gt; text on the page.
-        # Backticks survive escaping untouched, so matching here is safe.
-        html = _CLICKABLE_RE.sub(r'<span class="clickable">\1</span>', html)
 
         if add_newline and not html.endswith('\n'):
             html += '\n'
