@@ -18,9 +18,17 @@ What was missing was a front door.  This is the front door::
         assert '#16:go' in out
         assert '#17:go' in out
 
-Execution goes through :class:`~moo.verbs.VerbExecutor`, the same path the
-server uses.  A harness that ran verbs its own way would pass while the
-server failed, which is worse than having no harness at all.
+Execution goes through :class:`~moo.verbs.VerbExecutor`, which is *not*
+the path the server uses -- player input reaches
+``MegaMOOServer.execute_command``, which resolves and execs the verb
+itself.  This paragraph used to claim they were the same.
+
+The difference is not cosmetic: ``VerbExecutor`` consults
+``can_execute_verb`` and the server does not, so the harness refuses
+verbs the server will happily run.  A harness that runs verbs its own way
+passes while the server fails, which is worse than having no harness at
+all -- so treat a green run here as evidence about the verb, not about
+the server.
 """
 
 import contextlib

@@ -43,9 +43,15 @@ string such as ``"rwx"`` or ``"rd"``:
 
 Architecture Notes
 ------------------
-* :class:`PermissionChecker` is the single point of truth for all permission
-  decisions.  Command handlers and the verb execution engine call its methods
-  rather than implementing ad-hoc checks.
+* :class:`PermissionChecker` was *intended* as the single point of truth for
+  permission decisions.  It is not one, and this note used to say otherwise.
+  Only ``can_execute_verb`` and ``can_read_property`` are called from
+  anywhere, and ``can_execute_verb`` only from :class:`~moo.verbs.VerbExecutor`
+  -- which the running server does not use, since player input goes through
+  ``MegaMOOServer.execute_command`` instead.  The checks that actually run
+  live in ``verb_namespace`` and ``objects``; the quota system runs nowhere
+  at all.  Check what calls a method here before trusting it to be enforcing
+  anything.
 * The checker receives the ``Database`` at construction time so it can look
   up property/verb metadata without the caller needing to pass it each time.
 * Quota management (``check_quota`` / ``deduct_quota``) is co-located here

@@ -78,7 +78,6 @@ import logging
 
 from .objects import MOOObject, ObjectFlags, _null_attr
 from .properties import MOOObjectRef, MOOError
-from .permissions import PermissionChecker
 from .utils import interactive  # noqa: F401 — re-exported for verb code
 # Small, general helpers a verb should be able to call by name.
 #

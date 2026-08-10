@@ -188,8 +188,9 @@ def fire_hook(hook_point: str, obj, args_str: str = "") -> Any:
 
     Iterates through the hook point's alias list and calls the first
     verb found on the object. The verb is invoked via ``_call_hook()``
-    from ``builtins.py``, which handles verb context setup, permission
-    checks, and depth tracking.
+    from ``builtins.py``, which handles verb context setup and depth
+    tracking.  It does no permission checking, despite how this once
+    read -- a hook fires for whoever triggered it.
 
     Only one verb fires per hook point per object -- the first alias
     that ``obj.find_verb()`` resolves successfully. If no alias is
