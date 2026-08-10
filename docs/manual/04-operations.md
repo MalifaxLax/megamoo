@@ -148,7 +148,15 @@ Two things to do on first login, before anything else:
 | `--api` | off | Enable the JSON API server (first free port from `7778` up). |
 | `--api-port` | auto | Pin the API to this exact port; fails if it is in use. |
 | `--api-token` | — | Shared secret API clients must present. |
+| `--web` | off | Enable the browser client: serves the client and accepts WebSocket players (first free port from `8888` up). |
+| `--web-port` | auto | Pin the browser client to this exact port; fails if it is in use. |
+| `--web-origins` | — | Comma-separated origins allowed to open a WebSocket (e.g. `https://play.example.com`). Omit on localhost; set it when serving the client publicly. |
+| `--web-tls` | off | Serve the browser client over HTTPS, using `--tls-cert`/`--tls-key`. A flag on the web port rather than a second one, because the client picks `ws://` or `wss://` from the page it was served over. |
+| `--tls-port` | — | Serve an additional TLS listener on this exact port. The plain port keeps working — telnet cannot speak TLS — so this is a second door to the same world. Requires `--tls-cert` and `--tls-key`. |
+| `--tls-cert` | — | PEM certificate for `--tls-port`, including any intermediates. |
+| `--tls-key` | — | PEM private key for `--tls-port`. |
 | `--log-level` | `INFO` | `DEBUG`, `INFO`, `WARNING`, or `ERROR`. |
+| `--dev` | off | Development mode: pick the lone `.db` here, reuse the shared API token, publish a discovery file so tooling can find the world, and hot-reload verbs from disk. Turns on `--api` and `--web` as well. |
 | `--version`, `-v` | — | Print the version and exit. |
 | `-h`, `--help` | — | Full help. |
 
