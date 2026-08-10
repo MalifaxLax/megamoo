@@ -20,7 +20,7 @@ if not args:
     # List all available topics
     topics = []
     for name in help_obj.properties_list(include_inherited=False, database=db):
-        if name in ('name', 'cname', 'name_mod_list', 'description'):
+        if name in ('name', 'name_mod_list', 'description'):
             continue
         topics.append(name)
 

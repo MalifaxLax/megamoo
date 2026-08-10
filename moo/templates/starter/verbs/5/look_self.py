@@ -59,10 +59,11 @@ for worn_num in wearing:
     except Exception:
         pass
 
+char_cap = su.capitalise(char.name)
 if clothing:
-    viewer.msg(f"{char.cname} is wearing {su.listtoenglish(clothing)}.")
+    viewer.msg(f"{char_cap} is wearing {su.listtoenglish(clothing)}.")
 if accessories:
-    viewer.msg(f"{char.cname} has {su.listtoenglish(accessories)}.")
+    viewer.msg(f"{char_cap} has {su.listtoenglish(accessories)}.")
 
 # 4. Held items
 mh = char.mh

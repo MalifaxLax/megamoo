@@ -8,8 +8,12 @@ Combines these with the object's noun to form the full display name.
 Called programmatically after modifying name_mod_list components.
 
 Handles a/an article correction based on the first letter of the next
-word (vowel -> "an", consonant -> "a"). Sets both this.name and
-this.cname (capitalized version).
+word (vowel -> "an", consonant -> "a"). Sets this.name.
+
+It used to set a this.cname alongside it -- the same string with its
+first letter raised. Nothing stores that now: emit substitution raises
+it for &S/&D/&I, and a verb that needs it says su.capitalise(x.name).
+A second copy of a name only drifts from the first.
 
 Hidden:  yes
 """
@@ -36,5 +40,4 @@ name = ' '.join(parts)
 if trailer:
     name = f'{name} {trailer}'
 this.name = name
-this.cname = name[0].upper() + name[1:] if name else ''
 this.name_mod_list = nml

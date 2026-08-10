@@ -42,7 +42,7 @@ if sitters and pobj.location:
             else:
                 pstring = 'here'
             prep = (item.sit_prep or 'on')
-            pobj.msg(f"{char.cname} is {pstring} {prep} it.")
+            pobj.msg(f"{su.capitalise(char.name)} is {pstring} {prep} it.")
         except Exception:
             pass
 

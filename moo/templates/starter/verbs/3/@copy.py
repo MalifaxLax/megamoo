@@ -76,7 +76,7 @@ new_noun = _tail if _tail else (source.noun or None)
 # the copy shares the parent, so it already has them, and duplicating them
 # locally would silently detach the copy from later edits to the parent.
 own_props = source.properties_list(include_inherited=False, database=db)
-skip = ('name', 'cname')  # rebuilt from the name parts by make_object
+skip = ('name',)  # rebuilt from the name parts by make_object
 
 made = []
 for _ in range(count):

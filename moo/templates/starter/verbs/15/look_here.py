@@ -102,17 +102,17 @@ for obj in visible:
         if obj.objnum in chars_on_furn:
             continue  # Will show under furniture
         pos = obj.position or 0
-        cname = obj.noun or obj.name
+        label = obj.noun or obj.name
         if pos:
             pstrings = obj.position_strings or []
             pstring = pstrings[pos] if pos < len(pstrings) else ''
             if pstring:
                 pstring = su.esub(pstring, sub=obj)
-                plist.append(f"{cname} ({pstring})")
+                plist.append(f"{label} ({pstring})")
             else:
-                plist.append(cname)
+                plist.append(label)
         else:
-            plist.append(cname)
+            plist.append(label)
     elif not obj.is_exit:
         olist.append(obj.name)
 

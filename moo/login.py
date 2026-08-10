@@ -591,9 +591,8 @@ class LoginHandler:
             # Mark as a player object so the engine treats it specially
             player.set_flag(ObjectFlags.PLAYER)
 
-            # Set display name and coloured name properties
+            # Set the display name
             player.set_property('name', name)
-            player.set_property('cname', name)
 
             # Hash and store the password
             pw_hash = hash_password(pw1) if pw1 else ''

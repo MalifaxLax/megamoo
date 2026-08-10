@@ -25,12 +25,16 @@ Key concepts
 * **noun** -- The base noun of the object (e.g. "sword", "chest").
   Combined with name_mod_list to produce the full display name.
 
-* **cname** -- The capitalised display name (stored as a property).
-
 * **_title verb** -- A verb defined on parent objects that rebuilds
-  ``obj.name`` and ``obj.cname`` from the noun and name_mod_list.
-  This module calls it after object creation, or falls back to
-  inline title logic if no verb context is available.
+  ``obj.name`` from the noun and name_mod_list.  This module calls it
+  after object creation, or falls back to inline title logic if no
+  verb context is available.
+
+  There is no stored capitalised name.  A ``cname`` property used to
+  hold one, and being inheritable it was wrong more often than it was
+  useful -- an object that never set its own answered with its
+  prototype's.  ``&S``/``&D``/``&I`` capitalise ``name`` instead, and
+  verb code that needs it calls ``su.capitalise(obj.name)``.
 
 Architecture
 ------------
@@ -139,7 +143,7 @@ def make_room(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
 
     Rooms are simpler than regular objects: they don't use the
     name_mod_list system.  The room name is set directly as both
-    the ``noun``, ``name``, and ``cname`` properties.
+    the ``noun`` and ``name`` properties.
 
     Room parent objects are defined in ``globals.py``:
 
@@ -172,7 +176,6 @@ def make_room(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
     room_name = name if name else parent.noun
     new_room = make_object(parent, db, pobj, noun=room_name)
     new_room.name = room_name
-    _set_property(new_room, 'cname', room_name)
     return new_room
 
 
@@ -340,8 +343,8 @@ def _call_title(obj: 'MOOObject', db: 'Database', pobj: 'MOOObject'):
     """
     Call the ``_title`` verb on *obj* to rebuild its display name.
 
-    The ``_title`` verb constructs ``obj.name`` and ``obj.cname`` from
-    the object's noun and name_mod_list.  This function first tries to
+    The ``_title`` verb constructs ``obj.name`` from the object's noun
+    and name_mod_list.  This function first tries to
     invoke ``_title`` via the verb execution system (using ``call_verb``
     from the active verb context).  If no verb context is available
     (e.g. during bootstrap or direct script calls), it falls back to
@@ -379,7 +382,7 @@ def _inline_title(obj: 'MOOObject'):
     2. Auto-corrects "a"/"an" based on the first letter of the next word
     3. Joins non-empty parts with spaces
     4. Appends the trailer (e.g. "(broken)") if present
-    5. Sets ``obj.name``, ``cname`` property, and updates name_mod_list
+    5. Sets ``obj.name`` and updates name_mod_list
 
     Args:
         obj: The object whose title needs to be rebuilt.
@@ -420,8 +423,6 @@ def _inline_title(obj: 'MOOObject'):
 
     # Update the object
     obj.name = name
-    cname = name[0].upper() + name[1:] if name else ''
-    _set_property(obj, 'cname', cname)
     _set_property(obj, 'name_mod_list', nml)
 
 

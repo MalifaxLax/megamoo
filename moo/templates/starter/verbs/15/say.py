@@ -27,7 +27,7 @@ spoken = args.replace('&', '&&')
 pobj.msg('You say, "%s"' % spoken)
 
 # &S is the speaker, resolved per listener, so it reads correctly for
-# everyone and honours cname. exclude=[pobj] because the speaker has
+# everyone and capitalises correctly. exclude=[pobj] because the speaker has
 # already had their own phrasing above.
 if pobj.location:
     pobj.location.msg_room('&S says, "%s"' % spoken, exclude=[pobj], sub=pobj)

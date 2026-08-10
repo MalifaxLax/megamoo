@@ -219,22 +219,49 @@ def test_no_shipped_message_uses_the_retired_sigil():
     assert not bad, 'properties still written in the old sigil: ' + '; '.join(bad)
 
 
-def test_every_character_gets_its_own_cname():
+def test_nothing_stores_a_capitalised_name():
     """
-    Emit substitution prefers cname for the capitalised tokens and falls
-    back to name only when cname is *missing*.  It is never missing: #5
-    ICharacter declares one, so a character without its own inherits it
-    and every third-person message calls the player "ICharacter".
+    There is no cname property, and nothing may reintroduce one.
 
-    Chargen must set it, and @initchar must be able to repair a character
-    made before chargen did.
+    It held a second copy of `name` with the first letter raised.  Being
+    inheritable, an object that never set its own answered with its
+    *prototype's*, so a character with a perfectly good name was
+    announced to the room as "ICharacter walks in from the west" -- and
+    the actor never sees a third-person emit, so a world can be built for
+    hours before anyone notices.  Backfilling every character was the
+    treatment, not the cure: the next object made without one was wrong
+    again.
+
+    &S/&D/&I capitalise `name` themselves, and verb code that needs it
+    calls su.capitalise(obj.name).  Measured before removing it: of 123
+    values in the starter world 0 differed from capitalising name; of 405
+    in Shadowfall 3 differed, and all three were *un*capitalised -- wrong
+    rather than deliberate.
     """
-    verbs = (pathlib.Path(__file__).resolve().parent.parent
-             / 'moo' / 'templates' / 'starter' / 'verbs')
-    if not verbs.is_dir():
+    import sqlite3
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    verbs = root / 'moo' / 'templates' / 'starter' / 'verbs'
+    world = root / 'moo' / 'templates' / 'starter' / 'world.db'
+    if not verbs.is_dir() or not world.is_file():
         import pytest
         pytest.skip('starter template not present')
-    chargen = (verbs / '7' / 'go_.py').read_text()
-    assert "'cname'" in chargen, 'chargen never sets cname'
-    initchar = (verbs / '3' / '@initchar.py').read_text()
-    assert "'cname'" in initchar, '@initchar cannot repair a missing cname'
+
+    # Prose may still explain why it is gone; code may not name it.  An
+    # attribute catches `obj.cname`, a bare 'cname' constant catches it
+    # spelled as a property name -- add_property, a skip list -- while
+    # leaving the docstrings that record the reason alone.
+    import ast
+
+    offenders = []
+    for f in sorted(verbs.rglob('*.py')):
+        for node in ast.walk(ast.parse(f.read_text())):
+            hit = (isinstance(node, ast.Attribute) and node.attr == 'cname') or \
+                  (isinstance(node, ast.Constant) and node.value == 'cname')
+            if hit:
+                offenders.append(f'{f.relative_to(verbs)}:{node.lineno}')
+    assert not offenders, 'starter verbs still name cname in code: ' + ', '.join(offenders)
+
+    db = sqlite3.connect(f'file:{world}?mode=ro', uri=True)
+    rows = db.execute("select count(*) from properties where name='cname'").fetchone()[0]
+    assert rows == 0, f'{rows} cname properties still in the shipped world'
