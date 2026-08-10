@@ -487,27 +487,47 @@ how they connected.
 <h2 id="public">Putting it on the internet</h2>
 
 <p>
-Two things change when the client is reachable from outside your machine.
+Put it behind a TLS-terminating proxy, and serve the client only to that
+proxy:
+</p>
+
+<pre><code>megamoo world.db --web --web-host 127.0.0.1 --web-port 8888</code></pre>
+
+<p>
+The client picks <code>wss://</code> or <code>ws://</code> from the page's
+own scheme, so serving the page over HTTPS is all it takes — there is
+nothing to configure in the client. <code>--web-host</code> keeps the plain
+HTTP port on loopback, where only the proxy can reach it, rather than
+leaving it answering the internet beside the encrypted one. It moves the
+browser client only; the game's telnet listener stays on
+<code>--host</code>.
+</p>
+
+<div class="note">
+    <span class="label">Not <code>--dev</code></span>
+    <p>Development mode force-enables the JSON API on a shared token,
+       publishes a discovery file so tooling can find the world, and
+       hot-reloads verbs from disk whenever a file changes. Every one of
+       those is right on your own machine and wrong on a public one. Launch
+       a public world with the flags it actually needs.</p>
+</div>
+
+<p>
+You do not have to name the origins allowed to open a socket. The default
+is same-origin: the page opening it must have come from the host the
+request was addressed to, which is exactly what a browser loading the
+client from your server does. The browser same-origin policy does
+<em>not</em> cover WebSockets, so without a check of some kind any page a
+logged-in player visits could open an authenticated socket to your world
+in their name — this is the check. Reach for
+<code>--web-origins</code> only when the client is served from somewhere
+other than the game, and it <em>adds</em> origins rather than replacing
+your own.
 </p>
 
 <p>
-First, name the origins allowed to open a socket:
-</p>
-
-<pre><code>megamoo --dev --web --web-origins https://play.example.com</code></pre>
-
-<p>
-Without that, any page a logged-in player happens to visit can open an
-authenticated socket to your world in their name. The browser same-origin
-policy does <em>not</em> cover WebSockets, which is what makes this
-necessary rather than paranoid. On localhost you can leave it off.
-</p>
-
-<p>
-Second, put it behind a TLS-terminating proxy. The client picks
-<code>wss://</code> or <code>ws://</code> from the page's own scheme, so
-serving the page over HTTPS is all it takes — there is nothing to configure
-in the client. The socket does need the upgrade headers passed through:
+The socket needs the upgrade headers passed through, and the original
+<code>Host</code> with them:
 </p>
 
 <pre><code>server {
@@ -528,6 +548,25 @@ in the client. The socket does need the upgrade headers passed through:
 The long read timeout matters: a player idling in a room sends nothing for
 minutes at a time, and a proxy's default timeout will drop them.
 </p>
+
+<p>
+So does <code>proxy_set_header Host $host</code>, and more than it used to.
+nginx's default for a proxied request is to rewrite <code>Host</code> to the
+upstream's address — <code>127.0.0.1:8888</code> here — and the same-origin
+check compares <code>Origin</code> against <code>Host</code>. Leave that line
+out and every legitimate socket is refused with a 403, because the browser
+says <code>https://play.example.com</code> and the server was told it is
+<code>127.0.0.1:8888</code>.
+</p>
+
+<p>
+Caddy needs none of this. It passes the original <code>Host</code> through
+and upgrades WebSockets on its own, so the whole configuration is:
+</p>
+
+<pre><code>play.example.com {
+    reverse_proxy 127.0.0.1:8888
+}</code></pre>
 
 <div class="pagenav">
     <a href="moo-compat.html"><span class="dir">Previous</span>Coming from LambdaMOO</a>
