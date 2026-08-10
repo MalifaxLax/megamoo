@@ -147,7 +147,7 @@ over. Each effect is a verb named <code>do_&lt;name&gt;</code> on
 <thead><tr><th>Call</th><th>Does</th></tr></thead>
 <tbody>
 <tr><td><code>$eu.trigger(who, name, times, interval)</code></td><td>Starts one effect.</td></tr>
-<tr><td><code>$eu.trigger_all(who, effects)</code></td><td>Starts a whole list at once — the form food and drink use.</td></tr>
+<tr><td><code>$eu.trigger_all(who, effects)</code></td><td>Starts a whole list at once.</td></tr>
 <tr><td><code>$eu.cancel(who, name)</code></td><td>Ends an effect early.</td></tr>
 <tr><td><code>$eu.list_active(who)</code></td><td>What is currently running on them.</td></tr>
 </tbody>
@@ -155,8 +155,8 @@ over. Each effect is a verb named <code>do_&lt;name&gt;</code> on
 </div>
 
 <p>
-Lists are written as one tuple per effect, which is exactly what you put on a
-piece of food or a drink:
+Lists are written as one tuple per effect, which is what you store on any
+object that should apply several of them at once:
 </p>
 
 <div class="term"><code>effects = [('intoxicate', 3, 60)]      <span class="c"># name, times, seconds apart</span></code></div>
@@ -175,8 +175,8 @@ The character sees the effect arrive, repeat, and wear off on its own:
     <p>Effects are timed, so applying one starts a ticker on the character. A
        character without a <code>tickers</code> property fails with
        <code>Permission denied: cannot create 'tickers'</code> the moment an
-       effect lands — including when they eat or drink something that carries
-       one. <code>@adprop &lt;character&gt;.tickers = {}</code> fixes it.</p>
+       effect lands. <code>@adprop &lt;character&gt;.tickers = {}</code> fixes
+       it.</p>
 </div>
 
 <h2 id="which">Which one do I want?</h2>
@@ -185,7 +185,7 @@ The character sees the effect arrive, repeat, and wear off on its own:
 <table>
 <thead><tr><th>Use a ticker when</th><th>Use an effect when</th></tr></thead>
 <tbody>
-<tr><td>An <em>object</em> should keep doing something — a torch burning, a fountain splashing, a shop restocking.</td><td>A <em>character</em> is temporarily in some state that should wear off on its own.</td></tr>
+<tr><td>An <em>object</em> should keep doing something — a torch burning, a fountain splashing, a beacon sweeping.</td><td>A <em>character</em> is temporarily in some state that should wear off on its own.</td></tr>
 <tr><td>You decide when it stops.</td><td>It stops itself after the count you gave.</td></tr>
 <tr><td>You write the verb it calls, on the object.</td><td>You write the effect once on <code>$eu</code>, and anything can apply it.</td></tr>
 </tbody>
@@ -194,7 +194,7 @@ The character sees the effect arrive, repeat, and wear off on its own:
 
 <div class="pagenav">
     <a href="numbers.html"><span class="dir">Previous</span>Object Numbers &amp; Zones</a>
-    <a class="to-next" href="shops.html"><span class="dir">Next</span>Food, Drink &amp; Shops</a>
+    <a class="to-next" href="commands.html"><span class="dir">Next</span>Command Reference</a>
 </div>
 
 <div class="footer">
