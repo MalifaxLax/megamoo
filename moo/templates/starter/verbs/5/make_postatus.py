@@ -10,6 +10,8 @@ Called programmatically: call_verb(char, 'make_postatus')
 Returns:
     str - A parenthesized string like "(sitting/stunned)" or "(standing)"
           or "" if the character is standing with no active statuses.
+
+Hidden:  yes
 """
 
 position = this.position

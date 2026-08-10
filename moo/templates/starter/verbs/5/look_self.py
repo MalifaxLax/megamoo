@@ -18,6 +18,8 @@ Display order:
     2. Custom description text
     3. Visible worn clothing (size > 1) and accessories (size == 1)
     4. Items held in main hand and/or off hand
+
+Hidden:  yes
 """
 
 char = this

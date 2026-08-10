@@ -8,6 +8,8 @@ Called programmatically: call_verb(char, 'get_position')
 
 Returns:
     int - The character's current position index.
+
+Hidden:  yes
 """
 
 return this.position

@@ -10,6 +10,8 @@ Called by the look verb: call_verb(furniture, 'look_')
 Cleans stale sitters (characters no longer in the room) before display.
 
 Returns True to indicate the action was handled.
+
+Hidden:  yes
 """
 
 item = this

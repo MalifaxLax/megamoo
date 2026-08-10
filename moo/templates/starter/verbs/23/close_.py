@@ -9,6 +9,8 @@ rclose if set.
 Called programmatically: call_verb(exit, 'close_')
 
 Returns True to indicate the close action was handled.
+
+Hidden:  yes
 """
 if this.closed:
     player.msg(this.aclose or '&D is already closed.', dob=this)

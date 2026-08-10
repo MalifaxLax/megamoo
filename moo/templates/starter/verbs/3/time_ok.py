@@ -10,6 +10,8 @@ Called programmatically: call_verb(pobj, 'time_ok')
 Returns:
     False - Character has round time remaining; a wait message is sent.
     True  - Character is free to act.
+
+Hidden:  yes
 """
 
 rt = this.rt or 0

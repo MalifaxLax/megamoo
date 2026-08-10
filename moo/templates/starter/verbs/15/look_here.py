@@ -12,6 +12,8 @@ types 'look' or 'l' with no arguments. Displays:
   6. Obvious exits (dark gray)
 
 'player' is the looker, 'this' is the room.
+
+Hidden:  yes
 """
 
 room = this

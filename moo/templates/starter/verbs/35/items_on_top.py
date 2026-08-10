@@ -12,6 +12,8 @@ with flex at a given position can slide out without removing items above.
 
 Returns:
     list - MOOObjects that are layered on top of this item.
+
+Hidden:  yes
 """
 
 item = this

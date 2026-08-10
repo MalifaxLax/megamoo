@@ -11,6 +11,8 @@ and behind_vol tracking.
 Arguments:
     dobj - The item name (str) to match, or item object to retrieve.
     this - The object being reached behind.
+
+Hidden:  yes
 """
 
 if not dobj:

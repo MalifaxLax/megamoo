@@ -12,6 +12,8 @@ Context variables (injected by _tick):
     pobj      - The affected character.
     tick      - Current tick number (1-based).
     remaining - Ticks remaining after this one.
+
+Hidden:  yes
 """
 
 if tick == 1:

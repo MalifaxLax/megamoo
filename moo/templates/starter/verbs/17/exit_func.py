@@ -1,13 +1,17 @@
-# exit_func on #17 (ICRoom)
-# Called when an object leaves this room.
-# args = objnum string of the departing object.
-# Removes characters from this room's plist.
-#
-# Removes *every* occurrence, not the first.  See enter_func: the pair of
-# them appended on each arrival and removed on none, so rooms in a world
-# that has been played hold long runs of the same player.  Stripping all
-# copies here means those rooms heal themselves the next time each player
-# walks out.
+"""
+exit_func on #17 (ICRoom)
+Called when an object leaves this room.
+args = objnum string of the departing object.
+Removes characters from this room's plist.
+
+Removes *every* occurrence, not the first.  See enter_func: the pair of
+them appended on each arrival and removed on none, so rooms in a world
+that has been played hold long runs of the same player.  Stripping all
+copies here means those rooms heal themselves the next time each player
+walks out.
+
+Hidden:  yes
+"""
 
 _objnum = int(args) if args else None
 if _objnum:

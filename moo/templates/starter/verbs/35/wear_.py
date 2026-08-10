@@ -21,6 +21,8 @@ Ports: wear(), _lorposition(), _puton(), _wearresult(), _mustremove()
 from the original Evennia implementation.
 
 Returns True to indicate the action was handled.
+
+Hidden:  yes
 """
 
 item = this

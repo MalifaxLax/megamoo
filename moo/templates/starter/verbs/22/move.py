@@ -12,6 +12,8 @@ Properties checked:
     closed   - Whether the exit is closed (blocks passage).
     locklist - [lock_obj, lock_func] for access restriction.
     lockfail / olockfail - Messages shown when locked out.
+
+Hidden:  yes
 """
 if this.closed:
     fail = (this.failure or 'That is closed!')

@@ -16,6 +16,8 @@ Returns:
     exit object - if a matching exit object is found in this.exits
     int (enum)  - if a virtual dexit entry exists for that direction
     None        - if no match is found
+
+Hidden:  yes
 """
 
 # Get the room's direction names and exit object list

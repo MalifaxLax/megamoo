@@ -11,6 +11,7 @@ Context variables:
     this   - the character that just moved
     args   - string containing the old location's objnum
 
+Hidden:  yes
 Perms:   rxd
 """
 

@@ -9,6 +9,8 @@ displays that instead. Otherwise lists visible items from under_contents.
 
 Arguments:
     this - The object being looked under.
+
+Hidden:  yes
 """
 
 understr = this.under_string

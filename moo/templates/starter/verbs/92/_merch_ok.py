@@ -12,6 +12,8 @@ the buy verb to speak.  `pobj` is the buyer, `this` is the merchant.
 For now the only rule is case_exclude: some goods (open glasses of
 liquid, etc.) can't be bought by the case/half-case.  case_exclude is a
 list of stock objnums (the item, or the liquid type it holds).
+
+Hidden:  yes
 """
 
 it = citem

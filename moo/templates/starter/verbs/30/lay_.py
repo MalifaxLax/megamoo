@@ -11,6 +11,8 @@ Cleans stale sitters (characters no longer in the room) from the list.
 Uses lay/olay messages from the furniture or defaults.
 
 Returns True to indicate the action was handled.
+
+Hidden:  yes
 """
 
 item = this

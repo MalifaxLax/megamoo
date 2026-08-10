@@ -1,8 +1,12 @@
-# lock_ on #23 (ClosableGoExit)
-# Called by room verbs: call_verb(target, 'lock_', iobj=key_obj)
-# Locks this exit. Checks lockable, closed, already locked.
-# If this.key is set, validates iobj.key matches or is 'skeleton'.
-# Sets locked=True on this and reverse exit.
+"""
+lock_ on #23 (ClosableGoExit)
+Called by room verbs: call_verb(target, 'lock_', iobj=key_obj)
+Locks this exit. Checks lockable, closed, already locked.
+If this.key is set, validates iobj.key matches or is 'skeleton'.
+Sets locked=True on this and reverse exit.
+
+Hidden:  yes
+"""
 
 if not getattr(this, 'lockable', None):
     player.msg("You can't lock that.")

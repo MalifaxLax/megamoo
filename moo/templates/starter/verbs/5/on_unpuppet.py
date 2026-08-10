@@ -4,6 +4,8 @@ on_unpuppet hook on #5 (ICharacter).
 Fires automatically when the player disconnects or exits the game (before
 the character is stored in #2). Cleans up furniture/table state and removes
 the character from the room's plist.
+
+Hidden:  yes
 """
 
 # Clean up furniture/table state

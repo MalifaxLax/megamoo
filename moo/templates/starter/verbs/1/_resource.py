@@ -18,6 +18,7 @@ regen_mods index order (see #5._recalc_combat):
     0 hits, 1 fabric, 2 stamina, 3 mana, 4 focus, 5 psy, 6 adrenalin, 7 bft
 
 Aliases: _hits, _stamina, _mana, _focus, _adrenalin, _fabric
+Hidden:  yes
 """
 
 # Read the injected kwarg into a NEW name -- reassigning `amount` itself would

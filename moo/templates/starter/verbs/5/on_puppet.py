@@ -1,6 +1,10 @@
-# on_puppet on #5 (ICharacter)
-# Called after character is moved to last_location on login/puppet.
-# Adds this character to the room's plist.
+"""
+on_puppet on #5 (ICharacter)
+Called after character is moved to last_location on login/puppet.
+Adds this character to the room's plist.
+
+Hidden:  yes
+"""
 
 # In objnums, not objects -- the same fix as #17's enter_func/exit_func.
 # A reference stored inside a list is serialised as its objnum, so plist

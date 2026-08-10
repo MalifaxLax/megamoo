@@ -12,6 +12,8 @@ and weight_on tracking.
 Arguments:
     dobj - The item being placed on top of this object.
     this - The object to place the item on.
+
+Hidden:  yes
 """
 
 import math

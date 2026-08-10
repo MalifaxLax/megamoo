@@ -26,6 +26,8 @@ Properties on the liquid type (ltype):
     finish/ofinish  - Messages shown when the last of it is consumed.
 
 Returns True to indicate the action was handled.
+
+Hidden:  yes
 """
 
 import random as _random

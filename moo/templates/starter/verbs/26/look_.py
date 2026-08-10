@@ -9,6 +9,8 @@ the visible contents inside (in_contents). If an in_string property
 is set, it is displayed instead of the contents list — this can be
 a text string or an object number referencing a room or object whose
 look verb is invoked.
+
+Hidden:  yes
 """
 # look_ verb on #26 (BaseContainer)
 # Called by look verb when player examines a container

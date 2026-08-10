@@ -7,6 +7,7 @@ Called: call_verb(pobj, '_stun', duration=5)  OR  pobj._stun(5)
 Kwarg: duration (int) — seconds of effect (stacks with existing)
 
 Aliases: _immobilize, _entangle, _imprison, _web, _bind, _unconscious, _sleep, _stun, _paralyze, _intoxicate, _no_parry, _must_parry, _blind
+Hidden:  yes
 """
 
 # Read the injected kwarg into a NEW name -- reassigning `duration` itself would

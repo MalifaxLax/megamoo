@@ -1,7 +1,11 @@
-# latch_ on #23 (ClosableGoExit)
-# Called by room verbs: call_verb(target, 'latch_')
-# Latches this exit. Checks latchable, closed, already latched.
-# Sets latched=True on this and reverse exit.
+"""
+latch_ on #23 (ClosableGoExit)
+Called by room verbs: call_verb(target, 'latch_')
+Latches this exit. Checks latchable, closed, already latched.
+Sets latched=True on this and reverse exit.
+
+Hidden:  yes
+"""
 
 if not this.latchable:
     player.msg("You can't latch that.")

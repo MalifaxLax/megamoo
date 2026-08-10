@@ -9,6 +9,8 @@ Called programmatically: call_verb(char, 'get_condition')
 
 Returns:
     dict - {condition_name: value} for all conditions where value > 0.
+
+Hidden:  yes
 """
 
 return {k: v for k, v in this.condition.items() if v > 0}

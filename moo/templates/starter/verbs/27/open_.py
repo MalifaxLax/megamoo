@@ -9,6 +9,8 @@ osucc/oosucc messages.
 Called by the room-level open verb: call_verb(container, 'open_')
 
 Returns True to indicate the action was handled.
+
+Hidden:  yes
 """
 
 if this.open:

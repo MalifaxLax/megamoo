@@ -9,6 +9,8 @@ Called programmatically: call_verb(exit, 'invoke')
 
 Note: This is the standard entry point for exit traversal. The go/n
 verbs call this after resolving the exit.
+
+Hidden:  yes
 """
 if this.closed:
     fail = (this.failure or 'That is closed!')

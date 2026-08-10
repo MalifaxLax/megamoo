@@ -7,6 +7,8 @@ message. Otherwise sets open to False and shows csucc/ocsucc messages.
 Called by the room-level close verb: call_verb(container, 'close_')
 
 Returns True to indicate the action was handled.
+
+Hidden:  yes
 """
 
 if not this.open:

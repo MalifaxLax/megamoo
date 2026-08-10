@@ -11,6 +11,8 @@ exit if one is defined. Messages the destination room with ropen if set.
 Called programmatically: call_verb(exit, 'open_')
 
 Returns True to indicate the open action was handled.
+
+Hidden:  yes
 """
 
 if not this.closed:

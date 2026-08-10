@@ -13,6 +13,8 @@ Returns:
 
 Note: Checks the 'mh' (main hand) and 'oh' (off hand) properties.
 hand[0] is the mainhand label, hand[1] is the offhand label.
+
+Hidden:  yes
 """
 
 if not this.mh and not this.oh:

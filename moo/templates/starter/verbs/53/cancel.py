@@ -11,6 +11,8 @@ Arguments (via _pyargs):
     target      - The character object to cancel effects on.
     effect_name - Optional specific effect to cancel. If omitted,
                   cancels all active effects on the target.
+
+Hidden:  yes
 """
 
 result = _effects.cancel(*_pyargs)

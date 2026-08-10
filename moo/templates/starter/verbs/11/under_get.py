@@ -11,6 +11,8 @@ under_vol tracking.
 Arguments:
     dobj - The item name (str) to match, or item object to retrieve.
     this - The object to get items from under.
+
+Hidden:  yes
 """
 
 if not dobj:

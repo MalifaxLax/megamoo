@@ -10,6 +10,8 @@ of current uses (cuses) to total uses. If both items and liquid are
 present, shows items "soaking in" the liquid.
 
 Overrides the BaseContainer in_look to handle liquid display.
+
+Hidden:  yes
 """
 
 if not this.open:

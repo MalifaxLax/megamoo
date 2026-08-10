@@ -15,6 +15,8 @@ Every factor is read defensively and defaults to a 1.0 no-op, so a bare
 merchant with no mod tables still quotes a sane price.  The buyer's
 personal standing (char_mod) is read here but only *persisted* at
 purchase time (offer/accept) -- a player can't write merchant props.
+
+Hidden:  yes
 """
 
 # Read kwargs into fresh locals (never reassign a call_verb kwarg name).

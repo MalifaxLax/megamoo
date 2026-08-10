@@ -12,6 +12,8 @@ Uses sit/osit messages from the furniture, or builds defaults from
 the sit_prep property (e.g., "You sit on &d." / "You sit at &d.").
 
 Returns True to indicate the action was handled.
+
+Hidden:  yes
 """
 
 item = this

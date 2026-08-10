@@ -13,6 +13,8 @@ Updates in_contents, current_vol, and current_weight_in tracking.
 Arguments:
     dobj - The item being placed into this container.
     this - The container receiving the item.
+
+Hidden:  yes
 """
 
 import math

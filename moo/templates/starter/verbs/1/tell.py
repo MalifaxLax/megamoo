@@ -15,6 +15,8 @@ This forwards to msg rather than calling notify() itself.  msg is
 overridable on child objects to intercept or filter messages -- a deafened
 character, say -- and going straight to notify would walk around every one
 of those overrides.  Anything msg learns to do, tell inherits for free.
+
+Hidden:  yes
 """
 # `kwargs` is the raw call-kwargs dict and already holds sub/dob/iob/uob
 # when the caller passed them; the namespace variables of the same name are

@@ -10,6 +10,8 @@ Method-call interface: $eu.trigger_all(target, effects_list)
 Arguments (via _pyargs):
     target       - The character object to apply effects to.
     effects_list - List of effect tuples to trigger.
+
+Hidden:  yes
 """
 
 result = _effects.trigger_all(*_pyargs)

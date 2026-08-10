@@ -11,6 +11,8 @@ under_contents and under_vol tracking.
 Arguments:
     dobj - The item being placed under this object.
     this - The object to place the item under.
+
+Hidden:  yes
 """
 
 item = dobj

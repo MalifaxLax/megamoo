@@ -13,6 +13,8 @@ Arguments:
 
 Note: Does not check whether hands are free; caller should verify
 via 'hands_free' before calling.
+
+Hidden:  yes
 """
 
 if not dobj:

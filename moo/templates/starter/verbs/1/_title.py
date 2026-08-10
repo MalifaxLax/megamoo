@@ -10,6 +10,8 @@ Called programmatically after modifying name_mod_list components.
 Handles a/an article correction based on the first letter of the next
 word (vowel -> "an", consonant -> "a"). Sets both this.name and
 this.cname (capitalized version).
+
+Hidden:  yes
 """
 
 if this.name_mod_list:

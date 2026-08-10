@@ -10,6 +10,8 @@ shows visible items in in_contents or reports the container as empty.
 
 Arguments:
     this - The container being looked into.
+
+Hidden:  yes
 """
 
 if not this.open:

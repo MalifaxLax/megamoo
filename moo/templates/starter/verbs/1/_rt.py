@@ -12,6 +12,8 @@ Arguments:
 
 Starts a 1-second ticker (_td_rt) that decrements rt by 1 each second
 until it reaches zero.
+
+Hidden:  yes
 """
 
 try:

@@ -21,6 +21,8 @@ Expected properties on this (exit):
     odrop       - third-person message shown to others (destination room)
     mode        - list of first-person movement verbs by position index
     omode       - list of third-person movement verbs by position index
+
+Hidden:  yes
 """
 
 # Resolve destination (may be int, '#N' string, or MOOObject)

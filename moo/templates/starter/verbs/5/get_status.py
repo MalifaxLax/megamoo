@@ -10,6 +10,8 @@ Called programmatically: call_verb(char, 'get_status')
 Returns:
     dict - {status_name: value} for active statuses. Life is included
            only when it equals 0 (dead).
+
+Hidden:  yes
 """
 
 return {k: v for k, v in this.status.items()

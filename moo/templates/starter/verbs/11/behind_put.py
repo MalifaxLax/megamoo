@@ -11,6 +11,8 @@ behind_contents and behind_vol tracking.
 Arguments:
     dobj - The item being placed behind this object.
     this - The object to place the item behind.
+
+Hidden:  yes
 """
 
 item = dobj

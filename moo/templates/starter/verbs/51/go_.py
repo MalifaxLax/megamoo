@@ -15,6 +15,8 @@ Flow:
     4. Displays the GAME_ENTRY_MESSAGE and puppets the player.
 
 If the player has no completed characters, directs them to chargen.
+
+Hidden:  yes
 """
 
 from moo.globals import GAME_ENTRY_MESSAGE

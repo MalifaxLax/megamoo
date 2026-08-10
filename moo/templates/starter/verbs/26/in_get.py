@@ -11,6 +11,8 @@ current_vol, and current_weight_in tracking.
 Arguments:
     dobj - The item name (str) to match, or item object to retrieve.
     this - The container to get from.
+
+Hidden:  yes
 """
 
 if not dobj:

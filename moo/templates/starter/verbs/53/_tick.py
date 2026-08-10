@@ -17,6 +17,8 @@ Each effect entry in fx_registry tracks:
 
 Expired effects are removed from the registry. If the registry becomes
 empty, the ticker is removed entirely.
+
+Hidden:  yes
 """
 
 import time

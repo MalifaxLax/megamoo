@@ -14,6 +14,8 @@ Arguments:
 
 Returns:
     str - The position string for the character's current position.
+
+Hidden:  yes
 """
 
 pstring = this.position_strings[this.position]

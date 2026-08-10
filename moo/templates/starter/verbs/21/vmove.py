@@ -21,6 +21,8 @@ Messages support substitution tokens:
     &MODE  - player's movement mode (walk, crawl, swim, etc.)
     &OMODE - third-person movement mode (walks, crawls, swims, etc.)
     &S     - player's display name (noun or name)
+
+Hidden:  yes
 """
 
 room = player.location

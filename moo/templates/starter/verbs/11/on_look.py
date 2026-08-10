@@ -9,6 +9,8 @@ that instead. Otherwise lists visible items from on_contents.
 
 Arguments:
     this - The object being looked on top of.
+
+Hidden:  yes
 """
 
 onstr = this.on_string

@@ -22,6 +22,7 @@ Players type 'quit' at any prompt to cancel (character is preserved for resume).
 
 Called from the go verb via call_verb(exit, 'go_').
 
+Hidden:  yes
 Perms:   rxd
 """
 

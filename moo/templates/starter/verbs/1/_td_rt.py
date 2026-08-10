@@ -6,6 +6,7 @@ _td_webbed, _td_bound, _td_no_parry, _td_must_parry, _td_blind
 Called by ticker_add() — no args, uses `verb` to identify which timer.
 
 Aliases: _tick_down
+Hidden:  yes
 """
 
 # Config: verb_name -> (property, dict_key_or_None, step)

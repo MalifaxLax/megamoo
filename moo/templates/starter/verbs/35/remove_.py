@@ -20,6 +20,8 @@ Ports: _remove(), _takeoff(), _doremoveemits(), _lorposition() from
 the original Evennia implementation.
 
 Returns True to indicate the action was handled.
+
+Hidden:  yes
 """
 
 item = this

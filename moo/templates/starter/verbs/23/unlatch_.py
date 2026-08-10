@@ -1,7 +1,11 @@
-# unlatch_ on #23 (ClosableGoExit)
-# Called by room verbs: call_verb(target, 'unlatch_')
-# Unlatches this exit. Checks already not latched.
-# Sets latched=False on this and reverse exit.
+"""
+unlatch_ on #23 (ClosableGoExit)
+Called by room verbs: call_verb(target, 'unlatch_')
+Unlatches this exit. Checks already not latched.
+Sets latched=False on this and reverse exit.
+
+Hidden:  yes
+"""
 
 if not this.latched:
     player.msg(getattr(this, 'culatchf', None) or '&D is not latched.', dob=this)

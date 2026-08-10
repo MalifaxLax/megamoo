@@ -19,6 +19,8 @@ Properties on edible items:
     prepared        - Bool, whether item is prepared/cooked.
 
 Returns True to indicate the action was handled.
+
+Hidden:  yes
 """
 
 import random as _random

@@ -9,6 +9,8 @@ displays that instead. Otherwise lists visible items from behind_contents.
 
 Arguments:
     this - The object being looked behind.
+
+Hidden:  yes
 """
 
 behindstr = this.behind_string

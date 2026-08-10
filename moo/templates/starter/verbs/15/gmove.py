@@ -21,6 +21,8 @@ Keyword arguments (passed via call_verb):
     drop   - first-person arrival message
     odrop  - third-person arrival message (destination room)
     rt     - round time cost (unused here, consumed by caller)
+
+Hidden:  yes
 """
 
 # Validate destination is a valid room

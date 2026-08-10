@@ -12,6 +12,8 @@ Arguments:
 
 Note: If the item is held two-handed (both mh and oh reference it),
 both slots are cleared independently.
+
+Hidden:  yes
 """
 
 if not dobj:

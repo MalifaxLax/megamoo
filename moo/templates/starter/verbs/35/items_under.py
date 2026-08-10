@@ -11,6 +11,8 @@ Handles L/R body positions (pos > 100).
 
 Returns:
     list - MOOObjects that are layered underneath this item.
+
+Hidden:  yes
 """
 
 item = this

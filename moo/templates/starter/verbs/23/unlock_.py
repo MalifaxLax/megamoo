@@ -1,8 +1,12 @@
-# unlock_ on #23 (ClosableGoExit)
-# Called by room verbs: call_verb(target, 'unlock_', iobj=key_obj)
-# Unlocks this exit. Checks already not locked.
-# If this.key is set, validates iobj.key matches or is 'skeleton'.
-# Sets locked=False on this and reverse exit.
+"""
+unlock_ on #23 (ClosableGoExit)
+Called by room verbs: call_verb(target, 'unlock_', iobj=key_obj)
+Unlocks this exit. Checks already not locked.
+If this.key is set, validates iobj.key matches or is 'skeleton'.
+Sets locked=False on this and reverse exit.
+
+Hidden:  yes
+"""
 
 if not this.locked:
     player.msg(this.culockf or '&D is not locked.', dob=this)

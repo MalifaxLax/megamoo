@@ -12,6 +12,8 @@ Arguments (via _pyargs):
     effect_name - Name of the effect (matches a do_{name} verb).
     ticks       - Number of times the effect should fire.
     interval    - Seconds between each fire.
+
+Hidden:  yes
 """
 
 result = _effects.trigger(*_pyargs)

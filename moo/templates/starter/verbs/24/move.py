@@ -16,6 +16,8 @@ Properties checked:
     fail_dest  - Room to fall to on failure (optional).
     fail/ofail - Messages on climb failure.
     fall/ofall - Messages when falling to fail_dest.
+
+Hidden:  yes
 """
 if this.closed:
     fail = (this.failure or 'That is closed!')

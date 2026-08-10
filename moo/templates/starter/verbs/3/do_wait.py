@@ -1,6 +1,10 @@
-# do_wait on #3 (Base_Character)
-# Returns True if the character cannot act (status/condition/RT check).
-# Usage: call_verb(pobj, 'do_wait')
+"""
+do_wait on #3 (Base_Character)
+Returns True if the character cannot act (status/condition/RT check).
+Usage: call_verb(pobj, 'do_wait')
+
+Hidden:  yes
+"""
 
 _status = this.status or {}
 _condition = this.condition or {}

@@ -11,6 +11,8 @@ and weight_on tracking.
 Arguments:
     dobj - The item name (str) to match, or item object to retrieve.
     this - The object to get items from on top of.
+
+Hidden:  yes
 """
 
 if not dobj:

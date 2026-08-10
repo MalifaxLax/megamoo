@@ -14,6 +14,8 @@ Arguments:
 
 Note: Overridable on child objects to intercept or filter messages
 (e.g., for deaf/muted states).
+
+Hidden:  yes
 """
 # Collect the raw-string slots (sN kwargs) for %N substitution.
 _sv = {k: v for k, v in (kwargs or {}).items()

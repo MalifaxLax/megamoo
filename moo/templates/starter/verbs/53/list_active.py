@@ -11,6 +11,8 @@ Arguments (via _pyargs):
 
 Returns:
     list - Active effect names/entries on the target.
+
+Hidden:  yes
 """
 
 result = _effects.list_active(*_pyargs)

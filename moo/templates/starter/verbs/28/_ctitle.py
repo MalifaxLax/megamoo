@@ -15,6 +15,8 @@ miss by design.  (Merchant matching is unaffected: a poured-to-order
 Call after any change to ltype (minting stock, filling, drinking dry)
 -- it strips the liquid trailer any legacy cup may still carry, then
 regenerates name/cname via _title.
+
+Hidden:  yes
 """
 
 nml = list(this.name_mod_list or [])
