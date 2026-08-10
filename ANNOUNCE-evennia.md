@@ -20,6 +20,10 @@ the in-world language instead of the MOO language:
 
 https://malifaxlax.github.io/megamoo/
 
+That last command prints a URL. Opening it puts you in the world — the
+browser client ships with the server, so there is nothing else to install
+and nothing to point at it.
+
 What it's good at, specifically:
 
 - **Objects inherit from objects.** #17 is the parent of your rooms and
@@ -30,8 +34,13 @@ What it's good at, specifically:
 - **Zero dependencies.** Standard library only — no Django, no ORM, no
   migrations. That's a real trade: I gave up everything Django gives you
   to get a server that's one process and one file.
-- **SQLite object database**, browser client served by the game itself,
-  TLS, MCCP2, MSSP.
+- **A browser client that isn't an afterthought.** Served by the game
+  itself over the same world telnet players are in. It lays text out on a
+  terminal's character cell, so ASCII art and box drawing arrive the shape
+  they were drawn rather than stretched into prose spacing. There's an
+  automap built from the room graph, and a world can drop a splash image
+  next to its login banner and the browser shows that instead.
+- **SQLite object database**, TLS, MCCP2, MSSP.
 
 To be clear about what this isn't: it's 0.10 beta, it's one person, and
 Evennia is vastly more capable and better supported. If you want the web
