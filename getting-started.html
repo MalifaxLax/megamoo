@@ -160,15 +160,24 @@ either way — the two are just different doors.
 </p>
 
 <p>
-Log in as <code>wizard</code> with the password <code>megamoo</code>. You arrive
-in the lobby with full authority over the world.
+Log in as <code>Wizard</code>, with the password <code>megamoo init</code> printed
+when it created your game. You arrive in the lobby with full authority over the
+world.
 </p>
 
+<pre><code>$ megamoo init mygame
+  Created mygame
+  ...
+  Wizard login:  Wizard  /  winter-timber-7382
+  Shown once, and unique to this world -- write it down.</code></pre>
+
 <div class="warn">
-    <span class="label">Change the wizard password immediately</span>
-    <p>Every copy of the starter world has the same wizard password, and it is
-       printed in this guide. Use <code>setpass</code> before your world is
-       reachable by anyone else.</p>
+    <span class="label">That password is shown once</span>
+    <p>Every world gets its own, generated when it is created. There is no
+       default to look up and none in the released package &mdash; a shipped
+       password hash is a shipped secret. If you lose it before setting your
+       own with <code>setpass</code>, the quickest route is a fresh
+       <code>megamoo init</code>.</p>
 </div>
 
 <h2 id="tls">Encrypting connections</h2>

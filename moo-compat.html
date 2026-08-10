@@ -244,17 +244,17 @@ The table above is what you do by hand. For a whole verb,
 read the Python it produces, and save it only if you agree.
 </p>
 
-<div class="term"><code>&gt; @port #92.buy
-<span class="o">Porting MOO code into 'buy' on a merchant (#92).</span>
+<div class="term"><code>&gt; @port #12.appraise
+<span class="o">Porting MOO code into 'appraise' on an item (#12).</span>
 <span class="o">Paste MOO source.  '.' alone to finish, '@abort' to cancel.</span>
 <span class="o">-----</span>
-player:tell("That costs ", price, " coins.");
+player:tell("It weighs ", weight, " units.");
 return 1;
 .
 <span class="o">-- translated --</span>
-<span class="o">  tell(pobj, f"That costs {price} coins.")</span>
+<span class="o">  tell(pobj, f"It weighs {weight} units.")</span>
 <span class="o">  return 1</span>
-<span class="o">Save this to buy on #92? [y/N]</span></code></div>
+<span class="o">Save this to appraise on #12? [y/N]</span></code></div>
 
 <p>
 Nothing is saved without a yes. Anything the translator would not guess
@@ -276,8 +276,8 @@ its name.
        improves; when it learns something, a verb that still carries its
        source can simply be redone rather than dug out of the textdump
        again:</p>
-    <div class="term"><code>&gt; @port/again #92.buy
-<span class="o">Re-translating 'buy' on a merchant (#92) from its kept source (2 lines).</span></code></div>
+    <div class="term"><code>&gt; @port/again #12.appraise
+<span class="o">Re-translating 'appraise' on an item (#12) from its kept source (2 lines).</span></code></div>
     <p>It shows the result and asks, exactly as pasting does — it is the
        same code path. A verb with no kept source says so and stops,
        rather than opening an empty editor.</p>

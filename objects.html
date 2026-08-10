@@ -127,11 +127,10 @@ anything.
 
 <div class="warn">
     <span class="label">Keep contents out of names</span>
-    <p>A case holding whiskey should be named "a case", not "a case of fire
-       whiskey". The name is what players type at, so putting the contents in
-       the name means <code>drink whiskey</code> starts matching the box. Put
-       the contents in the description instead, or let players
-       <code>look in</code> it.</p>
+    <p>A chest holding rope should be named "a chest", not "a chest of rope".
+       The name is what players type at, so putting the contents in the name
+       means <code>get rope</code> starts matching the chest. Put the contents
+       in the description instead, or let players <code>look in</code> it.</p>
 </div>
 
 <h2 id="zero">#0 and the $ shortcuts</h2>
@@ -151,8 +150,7 @@ means <code>#12</code> — anywhere you would otherwise type the number.
 
 <div class="term"><code><span class="p">&gt;</span> +props #0
 <span class="o">bed        chair      chest      eu         furniture</span>
-<span class="o">globals    hat        item       obj        pants</span>
-<span class="o">shirt      shoes      table      wearable</span></code></div>
+<span class="o">globals    item       obj        table</span></code></div>
 
 <p>
 So the starter world gives you these to build from:
@@ -166,7 +164,6 @@ So the starter world gives you these to build from:
 <tr><td><code>$obj</code></td><td>Scenery — present in the room, but not carriable.</td></tr>
 <tr><td><code>$chest</code></td><td>A container that holds other objects.</td></tr>
 <tr><td><code>$furniture</code>, <code>$chair</code>, <code>$table</code>, <code>$bed</code></td><td>Things to sit, stand or lie on.</td></tr>
-<tr><td><code>$wearable</code>, <code>$hat</code>, <code>$shirt</code>, <code>$pants</code>, <code>$shoes</code></td><td>Clothing.</td></tr>
 </tbody>
 </table>
 </div>
