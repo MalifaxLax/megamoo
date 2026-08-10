@@ -26,6 +26,9 @@ if not args:
 
     # List verbs with docstrings the player can see
     verb_topics = []
+    # Staff commands, kept apart from the rest -- see where they are
+    # bucketed below for why.
+    staff_topics = []
     seen = set()
     # Engine machinery, not player commands: hook verbs invoked by
     # name via call_verb. They cannot be marked hidden -- that also
@@ -70,10 +73,19 @@ if not args:
             code = vdef.code or ''
             if code.lstrip().startswith('"""') or code.lstrip().startswith("'''"):
                 if canon not in topics:
+                    # Staff commands go in their own list rather than
+                    # mixed in. Sorted together they came first and buried
+                    # everything else: '+', '.' and '@' all precede letters
+                    # in ASCII, so `help` opened with @adjective, @adprop,
+                    # @adtag -- and the account a new world ships with is a
+                    # wizard, so that is what the first player to type it
+                    # saw. The verb's own auth level decides, not the
+                    # spelling, so a staff verb without a sigil sorts right.
+                    bucket = staff_topics if vdef.auth else verb_topics
                     if canon == _DIRECTION_CANON:
-                        verb_topics.extend(_DIRECTION_SHOWN)
+                        bucket.extend(_DIRECTION_SHOWN)
                     else:
-                        verb_topics.append(canon)
+                        bucket.append(canon)
 
     pobj.msg("")
     pobj.msg("&<245>Help Topics&n")
@@ -83,7 +95,11 @@ if not args:
         pobj.msg("")
         pobj.msg("&<245>Command Help&n")
         pobj.msg(', '.join(sorted(verb_topics)))
-    if not topics and not verb_topics:
+    if staff_topics:
+        pobj.msg("")
+        pobj.msg("&<245>Staff Commands&n")
+        pobj.msg(', '.join(sorted(staff_topics)))
+    if not topics and not verb_topics and not staff_topics:
         pobj.msg("No help topics available.")
     return
 

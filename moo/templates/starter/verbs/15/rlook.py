@@ -122,12 +122,17 @@ for obj in clist:
     elif obj.is_exit:
         dest = obj.destination
         d = f"#{dest.objnum}" if dest and hasattr(dest, 'objnum') else (f"#{dest}" if dest else "")
+        # No arrow when there is nothing to point at. An exit whose
+        # destination is decided by its own go_ verb -- the chargen arch is
+        # one -- has no static destination to show, and "-> " with nothing
+        # after it reads as a broken link rather than a programmatic exit.
+        arrow = f" -> {d}" if d else ""
         if obj.is_obvious:
             elist.append(obj)
             nstr = f"{estr}, " if estr else ""
-            estr = f"{nstr}#{obj.objnum}:{obj.name} -> {d}"
+            estr = f"{nstr}#{obj.objnum}:{obj.name}{arrow}"
         else:
-            delist.append(f"#{obj.objnum}:{obj.name} -> {d}")
+            delist.append(f"#{obj.objnum}:{obj.name}{arrow}")
 
     elif obj.dark:
         if obj.objnum not in furn_sitters:
@@ -185,11 +190,17 @@ for o in sorted_exits:
         dest_list = dexits[o] if o < len(dexits) else []
         dest = dest_list[0] if dest_list else None
         d = f"#{dest.objnum}" if dest and hasattr(dest, 'objnum') else (f"#{dest}" if dest else "")
-        estr = f"{nstr}`{dnames[o]}`\x1b[38;5;245m(v) -> {d}"
+        arrow = f" -> {d}" if d else ""
+        estr = f"{nstr}`{dnames[o]}`\x1b[38;5;245m(v){arrow}"
     else:
         dest = o.destination
         d = f"#{dest.objnum}" if dest and hasattr(dest, 'objnum') else (f"#{dest}" if dest else "")
-        estr = f"{nstr}#{o.objnum}:`{o.name}`\x1b[38;5;245m -> {d}"
+        # Same rule as the dark-exit list above: no arrow without a
+        # destination. This is the line the room actually renders from,
+        # and it is where the chargen arch showed as "-> " with nothing
+        # after it.
+        arrow = f" -> {d}" if d else ""
+        estr = f"{nstr}#{o.objnum}:`{o.name}`\x1b[38;5;245m{arrow}"
 
 # Build single display line: characters + furniture sitters + objects
 parts = []
