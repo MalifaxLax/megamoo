@@ -1,11 +1,11 @@
 # Databases
-# mm.db is the shipped starter database, so it is tracked (negated below).
-# Any other *.db is a developer's own world and stays out of the repo.
+# The starter world is shipped, so it is tracked (negated below). Any
+# other *.db is a developer's own world and stays out of the repo.
 *.db
 *.db-shm
 *.db-wal
 *.db.bak-*
-!mm.db
+!moo/templates/starter/world.db
 
 # macOS
 .DS_Store
@@ -44,3 +44,13 @@ test verbs/
 dist/
 build/
 *.egg-info/
+
+# The local embedding model, and the tooling config that points at it.
+# models/ is ~465 MB and has already cost this repository one
+# git-filter-repo history rewrite (2026-06-23, model.onnx at 351 MB).
+# Neither belongs in the tree, and neither was ignored until they turned
+# up untracked in a worktree where one `git add -A` would have done it
+# again.
+models/
+config.json
+vectors.db
