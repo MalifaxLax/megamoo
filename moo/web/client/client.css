@@ -222,18 +222,29 @@ body {
 
 /* A world's own splash image, shown where the ASCII banner would be. */
 .splash {
-  padding: 4px 0 8px;
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 16px;
 }
 
 .splash img {
   display: block;
-  /* Never upscaled. These are small assets -- a logo drawn for a 1990s
-     web page is a couple of hundred pixels wide -- and stretching one to
-     fill the pane trades a crisp small banner for a soft large one. It
-     shrinks on a narrow screen, which is the direction that costs
-     nothing. */
-  max-width: 100%;
+  /* Big, and centred, because this is the first thing anyone sees. Capped
+     so it stays a banner rather than a wall on a wide monitor, and given
+     as a percentage below that so a phone shrinks it instead of scrolling. */
+  width: min(560px, 90%);
   height: auto;
+
+  /* These logos are artwork on a black field, and the page is not quite
+     black (--bg is #0c0e11), so the image arrives as a visible rectangle
+     sitting on the background. Screen blending maps true black to nothing
+     and leaves the glow, which dissolves the edge.
+
+     It only works if the black really is black. A JPEG's is not -- this
+     artwork's corner measured (7,7,7) -- so a world wanting a seamless
+     splash should ship a PNG with its floor crushed to 0. One that ships
+     a JPEG still gets a perfectly good banner, just a squarer one. */
+  mix-blend-mode: screen;
 }
 
 /* Locally echoed commands, so the player can see what they sent. */
