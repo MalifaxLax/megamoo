@@ -34,10 +34,31 @@
   --foe:           #d9564e;   /* opponents */
   --neutral:       #5b90d6;   /* unclaimed orbs */
 
-  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
-          Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  /* Menlo first, deliberately. It is what a Mac terminal reaches for by
+     default, so leading with it makes the game surface here the same face
+     at the same metrics as a native client rather than merely a similar
+     one. Everything after it is the fallback for machines without it. */
+  --mono: Menlo, ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          Consolas, "DejaVu Sans Mono", monospace;
 
+  /* Chrome: headers, panels, buttons. Comfortable, and nothing here is
+     column-aligned, so it is free to be. */
   --line-height: 1.45;
+
+  /* The terminal surface -- game output and the command line -- which is
+     not chrome and is not prose. It is a character grid, so it takes a
+     terminal's metrics: Menlo at 18pt with the line height Menlo itself
+     asks for, which is what MegaTerm shows because it sets no line
+     spacing of its own and inherits the font's.
+
+     AppKit reports Menlo/18 as a 21.000pt line box over a 10.837pt
+     advance -- a 1.938:1 cell -- and 21/18 is this number. Text here
+     therefore lands the same shape as a native client, which matters
+     because the world is written for a terminal: ASCII art, box drawing
+     and column-aligned output all assume that cell. */
+  --term-size: 18px;
+  --term-line-height: 1.1667;
+
   --pad: 12px;
 }
 
@@ -171,6 +192,9 @@ body {
   height: 100%;
   overflow-y: auto;
   padding: var(--pad);
+  /* Terminal metrics, not the page's -- see --term-size. */
+  font-size: var(--term-size);
+  line-height: var(--term-line-height);
   /* Game output is column-aligned ASCII: preserve every space, but still
      wrap rather than force a horizontal scrollbar on a narrow screen. */
   white-space: pre-wrap;
@@ -183,29 +207,15 @@ body {
 /* A block the server composed against a terminal's character cell -- the
    login splash, a full-screen frame -- marked `grid` on the wire.
 
-   Terminal proportions, not the page's. The 1.45 line-height above is
-   what makes paragraphs of game prose readable, and it is wrong for art:
-   ASCII art is drawn assuming rows that touch, so 45% of extra space
-   between them turns a run of underscores into a row of dashes and stops
-   the diagonals meeting. The same splash file renders perfectly in a MUD
-   client and came out skewed here for exactly that reason.
+   The metrics it needs now come from the scrollback itself (--term-size),
+   because the whole surface is a terminal, so all this has left to say is
+   how the block wraps.
 
    `pre` rather than the scrollback's `pre-wrap`: art is a fixed grid, and
    wrapping one row shifts every row below it out of register. Scrolling a
    narrow screen sideways is the better failure -- the opposite of the
-   trade-off that is right for prose. */
+   trade-off that is right for a paragraph. */
 .grid {
-  /* 1.2, not 1, and the number is measured rather than chosen. A terminal
-     cell is about 2:1 -- 8x16, 9x18, 7x14 -- and that is the shape this
-     art was drawn against. At 14px the mono advance width is 8.43px, so:
-
-         line-height 1.0  -> 1.66 : 1   too tight, the art crowds
-         line-height 1.2  -> 1.99 : 1   a terminal cell
-         line-height 1.45 -> 2.41 : 1   the page default, the art skews
-
-     1.2 is also roughly the font's own natural line height, which is what
-     a terminal uses when it is not told otherwise. */
-  line-height: 1.2;
   white-space: pre;
   overflow-x: auto;
 }
@@ -262,6 +272,9 @@ body {
   min-width: 0;
   padding: 6px 8px;
   font: inherit;
+  /* What you type matches what the world says back. */
+  font-size: var(--term-size);
+  line-height: var(--term-line-height);
   color: var(--fg);
   background: var(--bg-sunken);
   border: 1px solid var(--border);

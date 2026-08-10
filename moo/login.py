@@ -393,8 +393,21 @@ class LoginHandler:
         # Show splash banner. Lead with an SGR reset: raw mode bypasses the
         # dangling-style guard in _send, and a reconnecting client may still
         # be carrying attributes from a previous session.
+        #
+        # Then dim grey, xterm 245 -- the same colour the version line below
+        # asks for as `&<245>`, written here as the escape it compiles to,
+        # because a raw send does not read MOO colour codes. The banner is
+        # chrome: it should not arrive louder than the prompt the player is
+        # meant to answer, and dimming it puts those two in the right order.
+        #
+        # Done here rather than in the browser client's stylesheet so that a
+        # terminal and a browser show the same banner. It is one artifact,
+        # and this line is the only place both transports read it from.
+        #
+        # Reset again at the end, or a terminal keeps the attribute and
+        # everything after the splash comes out dim as well.
         screen = load_display_screen(self.config)
-        await send('\x1b[0m' + screen, raw=True)
+        await send('\x1b[0m\x1b[38;5;245m' + screen + '\x1b[0m', raw=True)
         # Sent apart from the banner, and not raw: the splash goes out raw
         # so its ASCII art survives untouched, which also means colour codes
         # in it would print literally.  This line needs the dim grey.
