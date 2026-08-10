@@ -56,6 +56,10 @@ CONFIG = """\
 # Run this game with:  megamoo --dev
 # which picks the database below, publishes a discovery file so tooling
 # can find the world, and reloads verbs as you edit them.
+#
+# Every [server] setting here is read on an ordinary launch too, so a
+# deployment is written down in this file rather than retyped as flags
+# every time.  A flag still wins when you pass one.
 
 [game]
 name = "{name}"
@@ -64,6 +68,36 @@ verbs = "verbs"
 
 [server]
 port = {port}
+
+# Putting this world on the internet.  Uncomment what applies; the
+# values shown are the defaults.
+#
+# host = "0.0.0.0"           # which interface the game listens on
+# web = true                 # serve the browser client
+# web_port = 8888
+#
+# Behind a TLS-terminating proxy (the usual arrangement), keep the
+# client's plain port on loopback so only the proxy can reach it:
+#
+# web_host = "127.0.0.1"
+#
+# Or hold the certificate here and serve HTTPS directly.  Note that a
+# renewed certificate is only picked up by a restart, and a restart
+# disconnects everyone:
+#
+# web_tls = true
+# tls_cert = "certs/fullchain.pem"
+# tls_key  = "certs/privkey.pem"
+# tls_port = 6771            # a second, TLS listener for telnet clients
+#
+# Origins default to same-origin only, which is what a browser loading
+# the client from this server needs.  Add to that only when the client
+# is served from somewhere other than this world:
+#
+# web_origins = ["https://play.example.com"]
+#
+# No token belongs in this file -- it is in your git history the moment
+# you write it.  Pass --api-token, or let --dev use the shared one.
 """
 
 README = """\

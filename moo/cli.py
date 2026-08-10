@@ -152,6 +152,30 @@ def _shared_api_token() -> str:
     return token
 
 
+# What ``[server]`` may say, and what shape each value has.  A world's own
+# file describes how the world is *served* -- which interfaces, which
+# ports, which certificate -- so that a deployment is a property of the
+# game directory rather than a command line somebody has to remember and
+# retype identically forever.
+#
+# No secrets live here.  megamoo.toml is version-controlled alongside
+# verbs/ and game/, so --api-token is deliberately absent: a token in this
+# file is a token in a git history.  Certificate *paths* are fine; the
+# certificate is not in the file.
+_SERVER_KEYS = {
+    'host': str,
+    'port': int,
+    'web': bool,
+    'web_host': str,
+    'web_port': int,
+    'web_origins': list,
+    'web_tls': bool,
+    'tls_port': int,
+    'tls_cert': str,
+    'tls_key': str,
+}
+
+
 def _read_game_toml(directory='.'):
     """
     Read ``megamoo.toml`` from *directory*, or return {} if there is none.
@@ -162,8 +186,11 @@ def _read_game_toml(directory='.'):
     at all -- edit it, restart, and the server came up on 6770 anyway.
 
     Returns a flat dict with the keys this function knows about, so a
-    caller never has to reach into the file's shape:
-    ``{'database': str, 'port': int, 'verbs': str, 'name': str}``.
+    caller never has to reach into the file's shape: ``database``,
+    ``verbs`` and ``name`` from ``[game]``, plus any of `_SERVER_KEYS`
+    from ``[server]``.  ``web_origins`` is normalised to a
+    comma-separated string, which is the shape every other path through
+    the CLI already speaks.
     """
     path = pathlib.Path(directory) / 'megamoo.toml'
     if not path.is_file():
@@ -172,31 +199,94 @@ def _read_game_toml(directory='.'):
         import tomllib
     except ImportError:
         # tomllib arrived in 3.11 and this package supports 3.10.  Rather
-        # than take a dependency for one small file, read the two keys
-        # that matter.  A 3.10 user who wants the full grammar can
-        # upgrade; what they must not get is silence.
+        # than take a dependency for one small file, parse the shapes that
+        # actually appear in it: quoted strings, bare integers, true/false,
+        # and a single-line array of strings.  A 3.10 user who wants the
+        # full grammar can upgrade; what they must not get is silence.
         out = {}
         section = ''
         for line in path.read_text().splitlines():
             line = line.split('#', 1)[0].strip()
             if line.startswith('['):
                 section = line.strip('[]')
-            elif '=' in line:
-                k, _, v = line.partition('=')
-                v = v.strip().strip('"').strip("'")
-                k = k.strip()
-                if section == 'game' and k in ('database', 'verbs', 'name'):
-                    out[k] = v
-                elif section == 'server' and k == 'port' and v.isdigit():
-                    out['port'] = int(v)
+                continue
+            if '=' not in line:
+                continue
+            k, _, raw = line.partition('=')
+            k, raw = k.strip(), raw.strip()
+            if section == 'game' and k in ('database', 'verbs', 'name'):
+                out[k] = raw.strip('"').strip("'")
+            elif section == 'server' and k in _SERVER_KEYS:
+                want = _SERVER_KEYS[k]
+                if want is int and raw.isdigit():
+                    out[k] = int(raw)
+                elif want is bool and raw.lower() in ('true', 'false'):
+                    out[k] = raw.lower() == 'true'
+                elif want is list:
+                    items = raw.strip('[]').split(',')
+                    joined = ','.join(i.strip().strip('"').strip("'")
+                                      for i in items if i.strip())
+                    if joined:
+                        out[k] = joined
+                elif want is str:
+                    out[k] = raw.strip('"').strip("'")
         return out
     data = tomllib.loads(path.read_text())
     game = data.get('game', {}) or {}
     server = data.get('server', {}) or {}
     out = {k: game[k] for k in ('database', 'verbs', 'name') if k in game}
-    if isinstance(server.get('port'), int):
-        out['port'] = server['port']
+    for k, want in _SERVER_KEYS.items():
+        if k not in server:
+            continue
+        v = server[k]
+        if want is list:
+            # A list is the TOML-natural shape; a plain string is what
+            # somebody writes on the first try.  Both mean the same thing.
+            items = v if isinstance(v, list) else str(v).split(',')
+            joined = ','.join(str(i).strip() for i in items if str(i).strip())
+            if joined:
+                out[k] = joined
+        elif want is bool and isinstance(v, bool):
+            out[k] = v
+        elif want is int and isinstance(v, int) and not isinstance(v, bool):
+            out[k] = v
+        elif want is str and isinstance(v, str):
+            out[k] = v
     return out
+
+
+def _apply_game_toml(args):
+    """
+    Let the world's own file fill in anything the command line left unset.
+
+    Called for **every** launch, not just ``--dev``.  It used to be read
+    only from `_apply_dev_defaults`, so a production server -- the one
+    launch that most needs its settings written down rather than retyped
+    -- ignored megamoo.toml completely, ``[server] port`` and all.
+
+    A flag always wins: it is the more specific instruction, and the file
+    is the standing one.  ``web`` is the one asymmetry, because
+    ``store_true`` cannot tell "not asked for" from "asked against"; a
+    world that declares ``web = true`` gets the browser client, and turning
+    it off means editing the file that turned it on.
+
+    Args:
+        args: Parsed arguments, modified in place.
+    """
+    game = _read_game_toml()
+    if not game:
+        return
+    if not args.database and game.get('database'):
+        args.database = game['database']
+    for key in _SERVER_KEYS:
+        if key not in game:
+            continue
+        if key == 'web':
+            args.web = args.web or game['web']
+        elif key == 'web_tls':
+            args.web_tls = args.web_tls or game['web_tls']
+        elif getattr(args, key, None) is None:
+            setattr(args, key, game[key])
 
 
 def _only_database_here():
@@ -235,15 +325,12 @@ def _apply_dev_defaults(args):
     Args:
         args: Parsed arguments, modified in place.
     """
-    # megamoo.toml first, then the lone .db here.  The file is the
-    # world's own statement of what it is, and globbing the directory is
-    # the fallback for a game that has not got one.
-    game = _read_game_toml()
+    # megamoo.toml has already been applied by `_apply_game_toml`, for
+    # every launch rather than only this one, so what is left here is the
+    # fallback for a game that has not got one: the lone .db in the
+    # directory.
     if not args.database:
-        args.database = game.get('database') or _only_database_here()
-    if args.port is None and game.get('port'):
-        # A flag still wins -- it is the more specific instruction.
-        args.port = game['port']
+        args.database = _only_database_here()
 
     args.api = True
     if not args.api_token:
@@ -470,6 +557,11 @@ Examples:
         )
         
         args = parser.parse_args()
+
+        # The world's own file, then dev's forcing on top: --dev insists on
+        # a few things (the API, the browser client, autoreload) that no
+        # megamoo.toml should be able to talk it out of.
+        _apply_game_toml(args)
 
         if args.dev:
             _apply_dev_defaults(args)
