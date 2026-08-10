@@ -150,7 +150,8 @@ Two things to do on first login, before anything else:
 | `--api-token` | — | Shared secret API clients must present. |
 | `--web` | off | Enable the browser client: serves the client and accepts WebSocket players (first free port from `8888` up). |
 | `--web-port` | auto | Pin the browser client to this exact port; fails if it is in use. |
-| `--web-origins` | — | Comma-separated origins allowed to open a WebSocket (e.g. `https://play.example.com`). Omit on localhost; set it when serving the client publicly. |
+| `--web-host` | follows `--host` | Bind the browser client somewhere the game listener isn't. Set `127.0.0.1` when a reverse proxy fronts the client, so the plain HTTP port isn't reachable from outside the box. |
+| `--web-origins` | same-origin only | Comma-separated origins allowed to open a WebSocket **in addition to** the one the client was served from (e.g. `https://play.example.com`). Needed only when the client is served from somewhere other than this server. `*` accepts any origin. |
 | `--web-tls` | off | Serve the browser client over HTTPS, using `--tls-cert`/`--tls-key`. A flag on the web port rather than a second one, because the client picks `ws://` or `wss://` from the page it was served over. |
 | `--tls-port` | — | Serve an additional TLS listener on this exact port. The plain port keeps working — telnet cannot speak TLS — so this is a second door to the same world. Requires `--tls-cert` and `--tls-key`. |
 | `--tls-cert` | — | PEM certificate for `--tls-port`, including any intermediates. |
@@ -553,12 +554,25 @@ Before exposing a server beyond your own machine:
    `--tls-port` flags) if the server is reachable over the internet. It is
    an additional listener: the plain port keeps working, because `telnet`
    cannot speak TLS. Passwords cross the plain port in cleartext.
-4. **Turn off debug mode** in production so internal state isn't exposed.
-5. **Right-size `max_connections`** for your hardware, and review the per-IP
+4. **Decide where TLS terminates for the browser client.** Either the
+   engine holds the certificate (`--web-tls`), or a reverse proxy does and
+   the engine serves plain HTTP behind it. The proxy is usually the better
+   answer: the engine builds its SSL context once at boot, so a renewed
+   certificate only takes effect on a restart — and a restart disconnects
+   every player. If you use a proxy, add `--web-host 127.0.0.1` so the
+   plain port is not independently reachable, and don't rely on a firewall
+   rule to hide it.
+5. **Check the origins if you serve the client from a second domain.**
+   The default is same-origin only, which is what a browser loading the
+   client from this server needs. `--web-origins` adds origins for a
+   separate front end; `*` accepts any origin and should not survive
+   contact with a public deployment.
+6. **Turn off debug mode** in production so internal state isn't exposed.
+7. **Right-size `max_connections`** for your hardware, and review the per-IP
    connection rate limit.
-6. **Keep `backup_on_start` on** (default) and set up **external backups** of the
+8. **Keep `backup_on_start` on** (default) and set up **external backups** of the
    database.
-7. **Grant the minimum auth tier.** Give staff the lowest `gm` level that lets
+9. **Grant the minimum auth tier.** Give staff the lowest `gm` level that lets
    them do their job (see [the permission ladder](#the-permission-ladder)), and
    keep the set of `gm5` accounts small.
 
