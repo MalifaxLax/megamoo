@@ -348,9 +348,9 @@ class CommandParser:
         Find a verb in the player's environment that they may actually run.
 
         Wraps :meth:`_search_environment` with the gm-level check, so the
-        level a verb declares gates dispatch the way ``hidden`` does.
-        ``find_verb`` already refuses a hidden verb; ``auth`` sat beside
-        it in the same VerbDef enforcing nothing.  Two places in the
+        level a verb declares gates dispatch, alongside ``hidden``. Both are
+        decided by :func:`may_invoke`; ``find_verb`` resolves and does
+        not judge.  Two places in the
         engine documented this check as though it existed: ``verb_loader``
         logs "gating dispatch at N" when it derives a level, and
         ``moo_builtins.shutdown`` explains that its guard has to live in
@@ -771,11 +771,24 @@ class CommandParser:
 
 def may_invoke(player, verb_def) -> bool:
     """
-    Whether *player* clears the gm level *verb_def* requires.
+    Whether *player* may reach *verb_def* by typing its name.
 
-    The rule is ``auth_level(player) >= verb_def.auth`` -- the level the
-    verb asks for, not a fixed number.  A verb that asks for nothing
-    (``auth`` 0, the default) is open to everyone.
+    Two rules, and they belong together because they answer the same
+    question -- may this typed command run:
+
+    ``hidden`` -- not a command at all. Internal hooks (``wear_``,
+    ``at_post_move``) are reached by name from engine code and are not
+    things a player types. This check used to live in ``find_verb``,
+    where every internal caller shared it, so ``hidden`` meant
+    "unreachable by anything" and marking a hook hidden broke its own
+    caller. Resolution and dispatch policy are different questions.
+
+    ``auth`` -- the gm level the verb asks for, as
+    ``auth_level(player) >= verb_def.auth``. Not a fixed number: a verb
+    that asks for nothing (0, the default) is open to everyone.
+
+    Keeping both here means the three dispatch sites cannot end up
+    enforcing one and forgetting the other.
 
     Lives here rather than on the parser because the parser is not the
     only place a typed command is resolved.  ``@`` and ``+`` commands
@@ -789,6 +802,9 @@ def may_invoke(player, verb_def) -> bool:
     while establishing a level refuses, because a staff verb is the
     wrong place to fail open.
     """
+    if getattr(verb_def, 'hidden', False):
+        return False
+
     required = getattr(verb_def, 'auth', 0) or 0
     if required <= 0:
         return True

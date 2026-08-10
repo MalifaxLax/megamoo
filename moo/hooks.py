@@ -237,7 +237,7 @@ def fire_hook(hook_point: str, obj, args_str: str = "") -> Any:
     # Try each alias in order; call the first one that exists on the object
     for alias in hp.aliases:
         try:
-            defining_objnum, verb_def = obj.find_verb(alias, db, include_hidden=True)
+            defining_objnum, verb_def = obj.find_verb(alias, db)
         except Exception as exc:
             logger.error(f"Hook '{hook_point}' find_verb('{alias}') on #{obj.objnum} failed: {exc}")
             continue

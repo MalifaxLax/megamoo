@@ -894,7 +894,7 @@ class MOOObject:
         # --- Verb lookup (walks inheritance) ---
         db = self.__dict__.get('_database')
         if db:
-            defining_objnum, verb_def = self.find_verb(name, db, include_hidden=True)
+            defining_objnum, verb_def = self.find_verb(name, db)
             if verb_def is not None:
                 return self._make_verb_callable(name, db)
         
@@ -1736,27 +1736,23 @@ class MOOObject:
                 
         raise KeyError(f"Verb '{verb_name}' not found on #{self.objnum}")
         
-    def find_verb(self, verb_name: str, database=None,
-                  include_hidden: bool = False):
+    def find_verb(self, verb_name: str, database=None):
         """
         Find a verb by name, checking this object and parents.
 
-        ``hidden`` is filtered out by default, which is what a typed
-        command wants. It is *not* what an internal caller wants: a hook
-        is reached by name from engine code, and a verb marked hidden so
-        players cannot type it must still be callable that way.
+        Resolution only. Whether a *player* may reach what this returns
+        is a dispatch question -- see ``moo.parser.may_invoke``, which
+        weighs ``hidden`` and ``auth`` together at the two places a typed
+        command is resolved.
 
-        Filtering here rather than at dispatch made ``hidden`` mean
-        "unreachable by anything", so there was no way to express
-        "internal hook, not a command" -- marking one hidden broke the
-        verb that called it. Two docstrings in the shipped world claimed
-        otherwise; one of them was corrected only after `rlook` was
-        hidden and staff silently lost the builder view.
-
-        Callers that resolve a name on behalf of *engine* code --
-        ``call_verb``, the hook dispatcher, attribute-style verb calls --
-        pass ``include_hidden=True``. Everything that resolves a name a
-        *player typed* leaves it alone.
+        The ``hidden`` filter used to live here, which made it mean
+        "unreachable by anything at all": every internal caller shares
+        this method, so marking a hook hidden broke whatever called it.
+        Hiding ``rlook`` cost staff the builder view for exactly that
+        reason. Policy in a resolution primitive also has to be
+        remembered by every caller, and the one that forgets fails
+        silently -- which is the shape of most of the bugs this engine
+        has had.
         
         Supports min-length prefix matching.  If a verb has
         ``min_lengths={'examine': 3}``, then 'exa', 'exam', etc.
@@ -1796,13 +1792,12 @@ class MOOObject:
             hit = self._resolved_verbs.get(verb_name)
             if hit is not None:
                 verb_def, defining_objnum = hit
-                if include_hidden or not verb_def.hidden:
-                    return (defining_objnum, verb_def)
+                return (defining_objnum, verb_def)
             return (None, None)
 
         # No usable cache -- fall back to scanning what this object has.
         for verb in self.verbs:
-            if verb.matches(verb_name) and (include_hidden or not verb.hidden):
+            if verb.matches(verb_name):
                 return (self.objnum, verb)
 
         return (None, None)
