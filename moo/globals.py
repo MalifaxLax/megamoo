@@ -420,7 +420,7 @@ LOGIN_ROOM = 14
 DEFAULT_SERVER_NAME = 'MegaMOO Server'
 
 # Server version (imported from __init__.py)
-SERVER_VERSION = '0.10.0-beta5'
+SERVER_VERSION = '0.10.0-beta6'
 
 # Server description
 SERVER_DESCRIPTION = 'A Python implementation of LambdaMOO'
