@@ -1,0 +1,97 @@
+"""The shipped starter world must agree with its own verb files.
+
+A world created by `megamoo init` announces the disagreement itself, on
+its very first boot:
+
+    [autoreload] refreshed 3 verb(s) whose file had changed while the
+    server was down
+
+...which for a world thirty seconds old is a claim that cannot be true.
+That is how the duplicate `in` alias on the compass verb was found, and
+0.7.1 shipped a worse version of the same thing: a fixed database beside
+a stale verb file, where the watcher reverted the fix on first start.
+
+This asserts it with **the server's own comparison**, `_verb_matches_file`,
+rather than a hand-written one. The check that shipped the compass bug
+compared verb *code* and passed, because the code was identical -- the
+names disagreed. Any check that is not literally the server's will drift
+away from it again, so this imports the real thing.
+"""
+import json
+import pathlib
+import sqlite3
+
+import pytest
+
+from moo.server import _verb_matches_file
+
+STARTER = pathlib.Path(__file__).resolve().parent.parent / 'moo' / 'templates' / 'starter'
+
+
+class _StoredVerb:
+    """The shape `_verb_matches_file` reads, built from a database row."""
+
+    def __init__(self, names, code, perms, min_lengths, hidden):
+        self.names = names
+        self.code = code
+        self.perms = perms
+        self.min_lengths = min_lengths
+        self.hidden = hidden
+
+
+def _stored_verbs():
+    db = sqlite3.connect(STARTER / 'world.db')
+    try:
+        out = {}
+        for objnum, names, code, perms, min_lengths, hidden in db.execute(
+                'SELECT objnum, names, code, perms, min_lengths, hidden '
+                'FROM verbs'):
+            parsed = json.loads(names)
+            verb = _StoredVerb(parsed, code, perms,
+                               json.loads(min_lengths or '{}'), bool(hidden))
+            for name in parsed:
+                out[(objnum, name)] = verb
+        return out
+    finally:
+        db.close()
+
+
+@pytest.mark.skipif(not (STARTER / 'world.db').is_file(),
+                    reason='starter template not present')
+def test_no_shipped_verb_disagrees_with_its_file():
+    stored = _stored_verbs()
+    drift = []
+    for path in sorted((STARTER / 'verbs').rglob('*.py')):
+        try:
+            objnum = int(path.parent.name)
+        except ValueError:
+            continue
+        verb = stored.get((objnum, path.stem))
+        if verb is None:
+            drift.append(f'{objnum}/{path.stem}: no such verb in world.db')
+            continue
+        if not _verb_matches_file(verb, path.read_text(), path.stem):
+            drift.append(f'{objnum}/{path.stem}')
+    assert not drift, (
+        'these ship disagreeing with world.db, so a new world rewrites them '
+        'on first boot: ' + ', '.join(drift))
+
+
+@pytest.mark.skipif(not (STARTER / 'world.db').is_file(),
+                    reason='starter template not present')
+def test_the_check_would_notice_a_metadata_only_difference():
+    """The bug that got through changed names alone, not code.
+
+    Guards the guard: if this ever passes a verb whose aliases differ while
+    its body matches, the check above is worthless in exactly the way its
+    predecessor was.
+    """
+    stored = _stored_verbs()
+    (objnum, name), verb = next(iter(stored.items()))
+    code = verb.code or ''
+    assert _verb_matches_file(verb, code, name)
+
+    tampered = _StoredVerb(list(verb.names) + ['a_name_the_file_never_declares'],
+                           code, verb.perms, verb.min_lengths, verb.hidden)
+    assert not _verb_matches_file(tampered, code, name), (
+        'a names-only difference must be caught; code equality is not enough')
