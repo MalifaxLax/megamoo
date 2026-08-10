@@ -18,6 +18,9 @@ Key differences from PlayerConnection
   ``type`` field:
 
   - ``{"type": "text", "data": "<html>"}`` -- game output
+  - ``{"type": "text", "data": "<html>", "grid": true}`` -- game output
+    composed against a terminal's character cell (the splash, a
+    full-screen frame), which the client renders at terminal proportions
   - ``{"type": "prompt", "data": "> "}`` -- command prompt
   - ``{"type": "gmcp", "package": "...", "data": {...}}`` -- GMCP data
 
@@ -463,7 +466,22 @@ class WebSocketConnection:
         if add_newline and not html.endswith('\n'):
             html += '\n'
 
-        payload = json.dumps({"type": "text", "data": html})
+        # `grid` says this block was composed against a terminal's character
+        # cell -- the login splash, a full-screen frame -- so the client
+        # should render it with a terminal's proportions rather than the
+        # comfortable spacing it uses for prose.  ASCII art assumes rows
+        # that touch: at the line-height that makes paragraphs readable, a
+        # run of underscores becomes a row of dashes and the diagonals stop
+        # meeting, which is what made the splash look skewed in a browser
+        # and perfect in a terminal.
+        #
+        # It rides on `raw` because `raw` already means precisely this --
+        # the caller formatted for a terminal -- and the only two callers
+        # in the tree are the splash and the grid's frames.
+        frame = {"type": "text", "data": html}
+        if raw:
+            frame["grid"] = True
+        payload = json.dumps(frame)
         try:
             self.writer.write(encode_frame(payload))
             await self.writer.drain()

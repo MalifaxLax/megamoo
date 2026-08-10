@@ -7,6 +7,7 @@
  * Wire protocol (see moo/web/connection.py):
  *
  *   server -> client   {type:"text",   data:"<html>"}
+ *                      {type:"text",   data:"<html>", grid:true}
  *                      {type:"prompt", data:"> "}
  *                      {type:"echo",   enabled:false}
  *                      {type:"gmcp",   package:"Room.Info", data:{...}}
@@ -128,11 +129,19 @@ const term = {
    * tags with class or a validated hex colour.  Nothing a player types
    * reaches this as markup.  Script output goes through `note()` instead,
    * which never interprets HTML.
+   *
+   * `grid` marks a block the server composed against a terminal's
+   * character cell -- the splash, a full-screen frame.  It gets a block
+   * element of its own so it can be laid out at terminal proportions: a
+   * span would not do, because line-height on an inline box does not
+   * govern the line boxes around it, and art has to own its own lines to
+   * come out the shape it was drawn.
    */
-  write(html) {
-    const span = document.createElement('span');
-    span.innerHTML = html;
-    this._append(span);
+  write(html, grid) {
+    const node = document.createElement(grid ? 'div' : 'span');
+    if (grid) node.className = 'grid';
+    node.innerHTML = html;
+    this._append(node);
   },
 
   /** Append plain text as its own line (client notices, script echo). */
@@ -357,7 +366,7 @@ const net = {
 function dispatch(msg) {
   switch (msg.type) {
     case 'text':
-      term.write(msg.data);
+      term.write(msg.data, msg.grid);
       feedLines(msg.data);
       bus.emit('text', msg.data);
       break;

@@ -330,3 +330,57 @@ def test_directory_traversal_is_blocked(tmp_path):
             await web.stop()
 
     asyncio.run(scenario())
+
+
+# ---------------------------------------------------------------------------
+#   Terminal-composed output is marked for the client
+# ---------------------------------------------------------------------------
+
+def _sent_frames(coro_calls):
+    """Decode the JSON payloads out of captured WebSocket frames."""
+    import json
+    out = []
+    for frame in coro_calls:
+        body = frame[2:] if frame[1] < 126 else frame[4:]
+        out.append(json.loads(body.decode('utf-8', 'replace')))
+    return out
+
+
+def _connection():
+    """A WebSocketConnection wired to a writer that just records bytes."""
+    from moo.web.connection import WebSocketConnection
+    captured = []
+
+    class Writer:
+        def write(self, b):
+            captured.append(b)
+
+        async def drain(self):
+            pass
+
+    conn = WebSocketConnection.__new__(WebSocketConnection)
+    conn._disconnected = False
+    conn.writer = Writer()
+    return conn, captured
+
+
+def test_prose_is_not_marked_as_a_grid():
+    """Ordinary output keeps the page's comfortable line spacing."""
+    conn, captured = _connection()
+    asyncio.run(conn.send('Upstairs - Drop Zone', raw=False))
+    frame, = _sent_frames(captured)
+    assert 'grid' not in frame
+
+
+def test_terminal_composed_output_is_marked_as_a_grid():
+    """The splash and full-screen frames are drawn against a terminal cell.
+
+    Without the mark the client renders them at the line-height that makes
+    prose readable, which pulls the rows of ASCII art apart -- underscores
+    become dashes and the diagonals stop meeting.
+    """
+    conn, captured = _connection()
+    asyncio.run(conn.send('\x1b[0m  \\ \\   /  |\n', raw=True))
+    frame, = _sent_frames(captured)
+    assert frame['grid'] is True
+    assert frame['type'] == 'text'

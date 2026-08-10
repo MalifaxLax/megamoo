@@ -180,6 +180,26 @@ body {
 
 .line { min-height: 1px; }
 
+/* A block the server composed against a terminal's character cell -- the
+   login splash, a full-screen frame -- marked `grid` on the wire.
+
+   Terminal proportions, not the page's. The 1.45 line-height above is
+   what makes paragraphs of game prose readable, and it is wrong for art:
+   ASCII art is drawn assuming rows that touch, so 45% of extra space
+   between them turns a run of underscores into a row of dashes and stops
+   the diagonals meeting. The same splash file renders perfectly in a MUD
+   client and came out skewed here for exactly that reason.
+
+   `pre` rather than the scrollback's `pre-wrap`: art is a fixed grid, and
+   wrapping one row shifts every row below it out of register. Scrolling a
+   narrow screen sideways is the better failure -- the opposite of the
+   trade-off that is right for prose. */
+.grid {
+  line-height: 1;
+  white-space: pre;
+  overflow-x: auto;
+}
+
 /* Locally echoed commands, so the player can see what they sent. */
 .line--echo { color: var(--fg-faint); }
 .line--echo::before { content: "> "; color: var(--accent); opacity: 0.5; }
