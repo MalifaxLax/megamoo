@@ -128,8 +128,16 @@ class ServerState:
         # Whether an in-place restart should (re-)enable the JSON API.
         # Defaults to True so the API comes back automatically across
         # restarts regardless of how the process was originally launched;
-        # `@restart noapi` sets this False to opt out for one restart.
+        # `@restart/noapi` sets this False to opt out for one restart.
         self.restart_with_api = True
+        # Whether an in-place restart should add --web.  None means "leave
+        # the launch flags as they were", and that is the default: unlike
+        # the API, the browser client is reachable by anything that can
+        # reach the host, so a restart must not switch it on for a server
+        # that did not ask for it.  `@restart/web` sets this True for one
+        # restart.  --dev turns it on anyway, so this only matters to a
+        # deployment launched without --dev.
+        self.restart_with_web = None
 
 
 async def listen_walking_ports(handler, host: str, first_port: int,
@@ -1466,11 +1474,16 @@ def run_server(database_path: str, port: Optional[int] = None,
         # Normalise the API flag on the re-exec so the restart reflects the
         # requested intent rather than whatever flags the original launch
         # happened to use. Strip any existing --api, then re-add it unless
-        # this restart explicitly opted out (`@restart noapi`).
+        # this restart explicitly opted out (`@restart/noapi`).
         argv = [a for a in sys.argv if a != '--api']
         if server.state.restart_with_api:
             argv.append('--api')
-        logger.info("Restarting server (api=%s)...", server.state.restart_with_api)
+        # --web is only ever added, never stripped: the default is to come
+        # back with whatever was already asked for.
+        if server.state.restart_with_web and '--web' not in argv:
+            argv.append('--web')
+        logger.info("Restarting server (api=%s, web=%s)...",
+                    server.state.restart_with_api, server.state.restart_with_web)
         os.execv(sys.executable, [sys.executable] + argv)
 
     # A server that died on the way up must not look like a clean run: a

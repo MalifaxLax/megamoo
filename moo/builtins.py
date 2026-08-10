@@ -202,7 +202,8 @@ def set_server(server):
         _set_refs(_database, server)
 
 
-def shutdown_server(message="Server shutting down", restart=False, with_api=True):
+def shutdown_server(message="Server shutting down", restart=False, with_api=True,
+                    with_web=None):
     """
     Shut down (and optionally restart) the server from verb code.
 
@@ -217,6 +218,16 @@ def shutdown_server(message="Server shutting down", restart=False, with_api=True
             API on the new process. Defaults to ``True`` so the API comes
             back automatically; pass ``False`` to restart without it.
             Ignored when ``restart`` is ``False``.
+        with_web (bool | None): Whether to add ``--web`` to the re-exec.
+            ``None`` -- the default -- leaves the launch flags alone, so a
+            server comes back serving exactly what it served before.
+
+            Deliberately not symmetric with *with_api*, which is forced on.
+            The API is one loopback socket; the browser client is served to
+            anything that can reach the host, and without ``--web-origins``
+            that is an exposure rather than a convenience. ``--dev`` implies
+            it already, so this only reaches a deployment that chose not to
+            have it.
 
     Raises:
         RuntimeError: If no server reference is available.
@@ -230,6 +241,7 @@ def shutdown_server(message="Server shutting down", restart=False, with_api=True
         raise RuntimeError("No server reference available")
     _server.state.restart_requested = restart
     _server.state.restart_with_api = with_api
+    _server.state.restart_with_web = with_web
     loop = _server.loop or asyncio.get_event_loop()
     loop.call_soon_threadsafe(loop.create_task, _server.shutdown(message))
 

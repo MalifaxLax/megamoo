@@ -355,6 +355,23 @@ unpuppet every connected character before disconnecting:
 changes to **engine Python under `moo/`** — builtins, verb types, the parser, the
 namespace builder. That is the one category that is not hot.
 
+It re-runs the same command line, so every launch flag survives — `--dev`,
+`--web`, `--port`, `--log-level`, the database — and so does the working
+directory. Two flags are handled specially, and deliberately not the same way:
+
+| | Behaviour on restart | Opt out / in |
+|---|---|---|
+| `--api` | **Forced on**, however the server was launched, so tooling reconnects without anyone remembering a flag. | `@restart/noapi` (or the bare word `noapi`) |
+| `--web` | **Left as it was.** Only ever added, never stripped. | `@restart/web` adds it |
+
+The asymmetry is the point: the API is one loopback socket, while the browser
+client is reachable by anything that can reach the host, and without
+`--web-origins` that is an exposure rather than a convenience. A restart must
+not switch it on for a server that never asked.
+
+`--dev` implies both, so on a development server neither switch changes
+anything.
+
 You almost never need it for game content: verbs written in-game with `@program`
 are live immediately, and verbs edited on disk are hot-loaded by the auto-reload
 watcher within a couple of seconds (or on demand with `@reload`). See
