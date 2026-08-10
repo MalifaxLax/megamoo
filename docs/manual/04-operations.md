@@ -89,7 +89,7 @@ On startup the server prints a banner with the version, loads the database, open
 the listener(s), restores tickers, and starts its background tasks
 (checkpointing, the task queue, the ticker loop).
 
-> **Status:** the engine is at `0.10.0-beta8` and has **not yet been load- or
+> **Status:** the engine is at `0.10.0-beta9` and has **not yet been load- or
 > play-tested**. Treat it as pre-release: suitable for development and
 > single-developer worlds, not yet for an open multiplayer deployment. The
 > version shown is `SERVER_VERSION` in `moo/globals.py`, the single source of
