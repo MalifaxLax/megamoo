@@ -55,8 +55,12 @@
      advance -- a 1.938:1 cell -- and 21/18 is this number. Text here
      therefore lands the same shape as a native client, which matters
      because the world is written for a terminal: ASCII art, box drawing
-     and column-aligned output all assume that cell. */
-  --term-size: 18px;
+     and column-aligned output all assume that cell.
+
+     The line height is the part that has to be right; the size is taste.
+     1.1667 holds the cell at 1.9:1 whatever the size, so changing one
+     does not disturb the other. */
+  --term-size: 14px;
   --term-line-height: 1.1667;
 
   --pad: 12px;
