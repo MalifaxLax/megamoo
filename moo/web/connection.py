@@ -420,7 +420,8 @@ class WebSocketConnection:
     # ------------------------------------------------------------------
 
     async def send(self, message: str, add_newline: bool = True,
-                   raw: bool = False, image: Optional[dict] = None):
+                   raw: bool = False, image: Optional[dict] = None,
+                   banner: bool = False):
         """
         Send a message to the web client as a JSON WebSocket text frame.
 
@@ -499,6 +500,10 @@ class WebSocketConnection:
         # banner every other client sees rather than to nothing.
         if image and image.get('src'):
             frame["image"] = {"src": image['src'], "alt": image.get('alt', '')}
+        # Part of the splash rather than of the conversation, so it is laid
+        # out with the banner above it instead of with the game's output.
+        if banner:
+            frame["banner"] = True
         payload = json.dumps(frame)
         try:
             self.writer.write(encode_frame(payload))

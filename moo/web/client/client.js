@@ -137,9 +137,12 @@ const term = {
    * govern the line boxes around it, and art has to own its own lines to
    * come out the shape it was drawn.
    */
-  write(html, grid, image) {
-    const node = document.createElement(grid ? 'div' : 'span');
+  write(html, grid, image, banner) {
+    const node = document.createElement(grid || banner ? 'div' : 'span');
     if (grid) node.className = 'grid';
+    // Belongs to the splash, so it is centred under it rather than sitting
+    // at the left margin where the conversation starts.
+    if (banner) node.className = 'banner';
     node.innerHTML = html;
 
     // A world that ships a splash image gets it in the banner's place.
@@ -384,7 +387,7 @@ const net = {
 function dispatch(msg) {
   switch (msg.type) {
     case 'text':
-      term.write(msg.data, msg.grid, msg.image);
+      term.write(msg.data, msg.grid, msg.image, msg.banner);
       feedLines(msg.data);
       bus.emit('text', msg.data);
       break;

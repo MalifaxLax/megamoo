@@ -54,7 +54,8 @@ class VirtualConnection:
         self._buffer.append(_RE_STRIP_ANSI_ESCAPE.sub('', text))
 
     async def send(self, message: str, add_newline: bool = True,
-                   raw: bool = False, image: Optional[dict] = None):
+                   raw: bool = False, image: Optional[dict] = None,
+                   banner: bool = False):
         # raw=True passthrough is not supported: raw sends only happen
         # inside PlayerConnection's own socket-write loops, which this
         # class never runs.  `image` is accepted for signature parity and

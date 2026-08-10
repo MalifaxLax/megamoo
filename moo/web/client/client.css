@@ -220,6 +220,13 @@ body {
   overflow-x: auto;
 }
 
+/* A line the server marked as belonging to the splash -- the world's
+   version, under the banner. Centred so it sits with the image above it
+   instead of at the left margin, where the conversation begins. */
+.banner {
+  text-align: center;
+}
+
 /* A world's own splash image, shown where the ASCII banner would be. */
 .splash {
   display: flex;

@@ -495,7 +495,13 @@ class LoginHandler:
         # so a 0.9 server introduced itself as 0.7.  A world version
         # cannot rot in that way, because nothing else is entitled to
         # write it.
-        await send(f"&<245>({_world_version(self.database) or SERVER_VERSION})&n")
+        # banner=True: this line belongs to the splash above it rather than
+        # to the conversation, so a client that centres its banner centres
+        # this with it. A terminal ignores it -- centring there would mean
+        # padding to the window width, and the ASCII art it sits under is
+        # left-aligned anyway.
+        await send(f"&<245>({_world_version(self.database) or SERVER_VERSION})&n",
+                   banner=True)
         await send("")
 
         for _ in range(max_attempts):

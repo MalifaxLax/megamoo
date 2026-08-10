@@ -982,7 +982,8 @@ class PlayerConnection:
     # -------------------------------------------------------------------
 
     async def send(self, message: str, add_newline: bool = True,
-                   raw: bool = False, image: Optional[dict] = None):
+                   raw: bool = False, image: Optional[dict] = None,
+                   banner: bool = False):
         """
         Send a message to the connected player's terminal.
 
