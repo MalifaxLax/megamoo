@@ -408,9 +408,19 @@ Examples:
         parser.add_argument(
             '--web-origins',
             default=None,
-            help='Comma-separated list of browser origins allowed to open a '
-                 'WebSocket (e.g. https://play.example.com). Omit on '
-                 'localhost; set it when serving the client publicly'
+            help='Comma-separated browser origins allowed to open a '
+                 'WebSocket *in addition to* the one the client was served '
+                 'from (e.g. https://play.example.com). Omit unless the '
+                 'client is served from somewhere other than this server; '
+                 '"*" accepts any origin'
+        )
+        parser.add_argument(
+            '--web-host',
+            default=None,
+            help='Bind the browser client to this address instead of '
+                 '--host. Use 127.0.0.1 when a reverse proxy fronts the '
+                 'client, so the plain HTTP port is not reachable from '
+                 'outside the box. Does not move the game listener'
         )
         parser.add_argument(
             '--tls-port',
@@ -616,18 +626,26 @@ Examples:
             logger.info(f"Starting server on {args.host}:{args.port}")
             logger.info(f"Database: {args.database}")
             
-            # Serving the browser client on a public interface without
-            # naming the origins allowed to open a socket is the one way
-            # to get this badly wrong: the browser same-origin policy
-            # does not cover WebSockets, so any page a logged-in player
-            # visits could open an authenticated socket as them.
-            if (args.web and not args.web_origins
-                    and args.host not in (None, '127.0.0.1', 'localhost')):
+            # An unset origin list is now same-origin-only, so the old
+            # warning here -- "you have not named your origins" -- was
+            # describing a hole that no longer exists.  It also never fired
+            # in the case that mattered: --host defaults to None so the
+            # config default (0.0.0.0) applies, and None was on its own
+            # skip-list, so the plainest public launch of all,
+            # `megamoo world.db --web`, warned about nothing.
+            #
+            # What is left worth saying is the opposite case: somebody has
+            # asked for any origin explicitly, on an interface the internet
+            # can reach.
+            web_host = args.web_host or args.host or '0.0.0.0'
+            if (args.web and args.web_origins
+                    and '*' in [o.strip() for o in args.web_origins.split(',')]
+                    and web_host not in ('127.0.0.1', 'localhost', '::1')):
                 logger.warning(
-                    'Web client is reachable on %s with no --web-origins '
-                    'set: any page a logged-in player visits can open a '
-                    'socket to this world in their name. Name the origins '
-                    'you serve from.', args.host)
+                    'Web client is reachable on %s and --web-origins is "*": '
+                    'any page a logged-in player visits can open a socket to '
+                    'this world in their name. Name the origins you serve '
+                    'from instead.', web_host)
 
             # run_server handles everything from here
             run_server(args.database, args.port, args.host,
@@ -638,6 +656,7 @@ Examples:
                        web_enabled=args.web,
                        web_port=args.web_port,
                        web_origins=args.web_origins,
+                       web_host=args.web_host,
                        tls_port=args.tls_port,
                        web_tls=args.web_tls,
                        tls_cert=args.tls_cert,

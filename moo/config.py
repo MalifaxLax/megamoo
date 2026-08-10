@@ -121,12 +121,21 @@ class NetworkConfig:
             the server scan forward for a free one.  Turned off when the
             operator names a port explicitly, so a conflict fails loudly.
         websocket_allowed_origins (list): Browser ``Origin`` values allowed
-            to open a WebSocket.  Empty (the default) accepts any origin,
-            which is right for localhost development.  On a public
-            deployment, list your site's origins -- otherwise any web page
-            the player visits can open an authenticated socket to your
-            server in their name (cross-site WebSocket hijacking; the
-            same-origin policy does *not* cover WebSockets).
+            to open a WebSocket, *in addition to* the origin the client was
+            served from.  Empty (the default) means same-origin only, which
+            is what a browser loading the client from this server needs and
+            what a page on another site fails.  Add entries when the client
+            is served from somewhere else; a literal ``'*'`` accepts any
+            origin, which is cross-site WebSocket hijacking waiting to
+            happen on a public deployment (the same-origin policy does
+            *not* cover WebSockets).
+        web_host (str): Address to bind the browser client to.  Empty (the
+            default) follows ``host``, which is what a server serving its
+            own client wants.  Set it to ``'127.0.0.1'`` when a reverse
+            proxy fronts the client: the proxy reaches it over loopback,
+            and the plain HTTP port stops being reachable from outside the
+            box without relying on a firewall rule to hide it.  It does not
+            move the game listener, which keeps answering on ``host``.
     """
     host: str = '0.0.0.0'
     port: int = DEFAULT_PORT
@@ -141,6 +150,12 @@ class NetworkConfig:
     websocket_port: int = 8888
     websocket_auto_port: bool = True
     websocket_allowed_origins: list = field(default_factory=list)
+    web_host: str = ''  # '' = follow `host`
+
+    @property
+    def effective_web_host(self) -> str:
+        """Where the browser client actually binds: ``web_host`` or ``host``."""
+        return self.web_host or self.host
 
 
 # =============================================================================

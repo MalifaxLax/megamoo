@@ -128,9 +128,12 @@ class WebServer:
             static_dir: Filesystem path to the directory containing the
                         web client's static files.
             allowed_origins: Browser origins permitted to open a
-                        WebSocket.  Accepts a list, or a comma-separated
-                        string (which is what an environment variable
-                        delivers).  Empty/``None`` allows any origin.
+                        WebSocket, *in addition to* the origin the client
+                        was served from.  Accepts a list, or a
+                        comma-separated string (which is what an
+                        environment variable delivers).  Empty/``None``
+                        means same-origin only; a literal ``'*'`` allows
+                        any origin.  See ``_origin_allowed``.
             scan_limit: How many consecutive ports to try.  ``1`` pins
                         ``port`` exactly, so a conflict raises.
             ssl_context: An ``ssl.SSLContext`` to serve HTTPS with, or
@@ -252,18 +255,44 @@ class WebServer:
         the browser and cannot be forged by page JavaScript, which is what
         makes it usable here.
 
-        An empty allow-list permits everything -- the right default for
-        localhost development, and the reason a public deployment should
-        configure ``websocket_allowed_origins``.  Non-browser clients send
-        no ``Origin`` at all and are always allowed: they are not subject
-        to the attack this defends against.
+        The default with no allow-list configured is **same origin only**:
+        the page that opens the socket must have come from the host this
+        request was addressed to.  That is the whole of the common case --
+        a browser loads the client from this server and opens a socket
+        back to it -- and it needs no configuration, which matters because
+        the configuration was the part nobody did.
+
+        It is also the only default that holds up behind a reverse proxy.
+        A rule based on which interface the server bound cannot: the proxy
+        makes the world public whatever the bind address is, and the
+        attack arrives through the proxy like any other request.  Comparing
+        ``Origin`` against ``Host`` compares two things the attacker does
+        not control together -- the browser sets ``Origin`` to the page's
+        own origin, and ``Host`` is whichever name the socket was opened
+        to.
+
+        ``websocket_allowed_origins`` then *adds* origins, for a client
+        served from somewhere other than the game (a CDN, a separate front
+        end). A literal ``'*'`` restores the old accept-anything behaviour
+        for anyone who wants it back.
+
+        Non-browser clients send no ``Origin`` at all and are always
+        allowed: they are not subject to the attack this defends against.
         """
-        if not self._allowed_origins:
-            return True
         origin = headers.get('origin')
         if origin is None:
             return True
-        return origin.rstrip('/') in self._allowed_origins
+        if '*' in self._allowed_origins:
+            return True
+        origin = origin.rstrip('/')
+        if origin in self._allowed_origins:
+            return True
+        # Same origin: compare the authority halves, since Origin carries
+        # a scheme and Host does not.  Behind a TLS-terminating proxy the
+        # page is https and this hop is plain, so the schemes legitimately
+        # differ and comparing them would reject the good case.
+        host = (headers.get('host') or '').rstrip('/')
+        return bool(host) and origin.partition('://')[2] == host
 
     async def stop(self):
         """

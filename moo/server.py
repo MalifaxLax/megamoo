@@ -437,7 +437,7 @@ class MegaMOOServer:
             # running from source and 404'd for everyone who installed.
             static_dir = Path(__file__).parent / 'web' / 'client'
             self._web_server = WebServer(
-                self, self.config.network.host,
+                self, self.config.network.effective_web_host,
                 self.config.network.websocket_port,
                 str(static_dir),
                 allowed_origins=self.config.network.websocket_allowed_origins,
@@ -1266,6 +1266,7 @@ def run_server(database_path: str, port: Optional[int] = None,
                api_token: Optional[str] = None,
                web_enabled: bool = False, web_port: Optional[int] = None,
                web_origins: Optional[str] = None,
+               web_host: Optional[str] = None,
                tls_port: Optional[int] = None,
                tls_cert: Optional[str] = None,
                tls_key: Optional[str] = None,
@@ -1346,6 +1347,8 @@ def run_server(database_path: str, port: Optional[int] = None,
         config.network.websocket_allowed_origins = [
             o.strip() for o in web_origins.split(',') if o.strip()
         ]
+    if web_host is not None:
+        config.network.web_host = web_host
 
     if web_tls:
         config.network.web_tls = True

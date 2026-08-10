@@ -94,14 +94,86 @@ def test_pinned_port_conflict_is_fatal(tmp_path):
 #   Origin allow-list
 # ---------------------------------------------------------------------------
 
-def test_empty_allow_list_permits_any_origin(tmp_path):
-    """The localhost-development default: no allow-list, no origin check."""
+def test_empty_allow_list_refuses_a_foreign_origin(tmp_path):
+    """The default is same-origin only, not accept-anything.
+
+    This is the configuration nobody configures, so it is the one that has
+    to be safe: a public world with no origin list used to accept a socket
+    from any page on the internet.
+    """
     async def scenario():
         web = _make(tmp_path, _free_port())
         await web.start()
         try:
             status = await _upgrade_request(web.port, 'https://evil.example')
+            assert '403' in status
+        finally:
+            await web.stop()
+
+    asyncio.run(scenario())
+
+
+def test_empty_allow_list_permits_its_own_origin(tmp_path):
+    """The common case needs no configuration: client and socket, one host."""
+    async def scenario():
+        web = _make(tmp_path, _free_port())
+        await web.start()
+        try:
+            status = await _upgrade_request(
+                web.port, f'http://127.0.0.1:{web.port}')
             assert '101' in status
+        finally:
+            await web.stop()
+
+    asyncio.run(scenario())
+
+
+def test_same_origin_holds_when_a_proxy_terminates_tls(tmp_path):
+    """Behind a proxy the page is https and this hop is not.
+
+    The schemes legitimately differ, so only the authority halves may be
+    compared -- comparing whole origins would reject the recommended
+    deployment.
+    """
+    async def scenario():
+        web = _make(tmp_path, _free_port())
+        await web.start()
+        try:
+            status = await _upgrade_request(
+                web.port, f'https://127.0.0.1:{web.port}')
+            assert '101' in status
+        finally:
+            await web.stop()
+
+    asyncio.run(scenario())
+
+
+def test_star_restores_accept_anything(tmp_path):
+    """An explicit opt-out for anyone who wants the old behaviour back."""
+    async def scenario():
+        web = _make(tmp_path, _free_port(), allowed_origins=['*'])
+        await web.start()
+        try:
+            status = await _upgrade_request(web.port, 'https://evil.example')
+            assert '101' in status
+        finally:
+            await web.stop()
+
+    asyncio.run(scenario())
+
+
+def test_a_listed_origin_is_allowed_alongside_same_origin(tmp_path):
+    """The list adds origins; it does not replace the server's own."""
+    async def scenario():
+        web = _make(tmp_path, _free_port(),
+                    allowed_origins=['https://play.example.com'])
+        await web.start()
+        try:
+            listed = await _upgrade_request(web.port,
+                                            'https://play.example.com')
+            own = await _upgrade_request(web.port,
+                                         f'http://127.0.0.1:{web.port}')
+            assert '101' in listed and '101' in own
         finally:
             await web.stop()
 
@@ -136,6 +208,20 @@ def test_allowed_origin_passes(tmp_path):
             await web.stop()
 
     asyncio.run(scenario())
+
+
+def test_web_host_defaults_to_the_game_host():
+    """One knob served both listeners, so the client could not be hidden."""
+    from moo.config import NetworkConfig
+    assert NetworkConfig(host='0.0.0.0').effective_web_host == '0.0.0.0'
+
+
+def test_web_host_moves_only_the_client():
+    """The proxy case: client on loopback, game still answering publicly."""
+    from moo.config import NetworkConfig
+    net = NetworkConfig(host='0.0.0.0', web_host='127.0.0.1')
+    assert net.effective_web_host == '127.0.0.1'
+    assert net.host == '0.0.0.0'
 
 
 def test_origin_list_accepts_comma_separated_string(tmp_path):
