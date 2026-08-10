@@ -56,7 +56,7 @@ elif dest_str:
 parent = db.get_object(24)
 new_exit = ou.make_exit(parent, db, pobj, noun=name, room=room, dest=dest)
 
-pobj.msg(f"\nYou created a new climbable exit &<245>#{new_exit.objnum}:{new_exit.name}&n.")
+pobj.msg(f"You created a new climbable exit &<245>#{new_exit.objnum}:{new_exit.name}&n.")
 
 if dest:
     pobj.msg(f"Exit linked to: &<245>#{dest.objnum}:{dest.name}&n")

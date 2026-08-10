@@ -91,7 +91,7 @@ obvexits.append(new_exit.objnum)
 room.obvexits = obvexits
 room._mark_modified()
 
-pobj.msg(f"\nYou created a new exit &<245>#{new_exit.objnum}:{name}&n.")
+pobj.msg(f"You created a new exit &<245>#{new_exit.objnum}:{name}&n.")
 if dest:
     pobj.msg(f"Exit linked to: &<245>#{dest.objnum}:{dest.name}&n")
 else:

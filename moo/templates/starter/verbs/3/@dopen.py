@@ -66,7 +66,7 @@ new_exit.add_property('closed', 1, perms='rc')
 new_exit.add_property('ropen', 'The &D opens.', perms='rc')
 new_exit.add_property('rclose', 'The &D closes.', perms='rc')
 
-pobj.msg(f"\nYou created a new closable exit &<245>#{new_exit.objnum}:{new_exit.name}&n.")
+pobj.msg(f"You created a new closable exit &<245>#{new_exit.objnum}:{new_exit.name}&n.")
 pobj.msg(f"Exit linked to: &<245>#{dest.objnum}:{dest.name}&n")
 
 # Create return exit unless /noret switch is set
