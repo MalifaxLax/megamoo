@@ -18,6 +18,7 @@ deliberate (see the design spec).
 """
 
 import logging
+from typing import Optional
 from typing import List
 
 from .color import ColorProcessor, _RE_STRIP_ANSI_ESCAPE
@@ -53,10 +54,11 @@ class VirtualConnection:
         self._buffer.append(_RE_STRIP_ANSI_ESCAPE.sub('', text))
 
     async def send(self, message: str, add_newline: bool = True,
-                   raw: bool = False):
+                   raw: bool = False, image: Optional[dict] = None):
         # raw=True passthrough is not supported: raw sends only happen
         # inside PlayerConnection's own socket-write loops, which this
-        # class never runs.
+        # class never runs.  `image` is accepted for signature parity and
+        # ignored for the same reason -- what this captures is text.
         self.queue_message(message)
 
     async def flush_messages(self):

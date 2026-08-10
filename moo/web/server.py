@@ -52,6 +52,10 @@ from typing import TYPE_CHECKING
 from urllib.parse import unquote
 
 from .connection import WebSocketConnection
+# The one list of names a world may publish, shared with the login flow
+# that advertises them.  Two copies would drift, and the failure would be
+# a splash the client is told about and the server refuses to serve.
+from ..login import SPLASH_IMAGE_NAMES
 
 if TYPE_CHECKING:
     from ..server import MegaMOOServer
@@ -71,6 +75,11 @@ _CONTENT_TYPES = {
     '.json': 'application/json; charset=utf-8',
     '.png': 'image/png',
     '.jpg': 'image/jpeg',
+    # .jpeg and .webp are here because a world may publish its splash as
+    # either; without them the file served correctly and arrived as
+    # application/octet-stream, which a browser downloads instead of draws.
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
     '.gif': 'image/gif',
     '.svg': 'image/svg+xml',
     '.ico': 'image/x-icon',
@@ -114,6 +123,7 @@ class WebServer:
 
     def __init__(self, server: 'MegaMOOServer', host: str, port: int,
                  static_dir: str, allowed_origins=None, scan_limit: int = 1,
+                 world_dir: str = '.',
                  ssl_context=None):
         """
         Initialise the web server.
@@ -153,6 +163,10 @@ class WebServer:
         self._scan_limit = scan_limit
         self._ssl_context = ssl_context
         self._static_dir = Path(static_dir)
+        # The world's own directory -- where display_screen.txt and a
+        # splash image live. Defaults to the working directory, which is
+        # where the engine already looks for both.
+        self._world_dir = Path(world_dir)
         self._tcp_server = None
         self._connections: set = set()
         # Per-IP connection rate limiting
@@ -524,14 +538,27 @@ class WebServer:
         if path == '/':
             path = '/index.html'
 
-        # Resolve the full filesystem path
-        file_path = self._static_dir / path.lstrip('/')
+        # A world's own splash image is served from the world's directory,
+        # not from the installed package. It belongs to the game rather
+        # than the engine -- it travels in the directory `megamoo init`
+        # creates, beside display_screen.txt, and is version-controlled by
+        # whoever owns the world.
+        #
+        # Only the exact names in SPLASH_IMAGE_NAMES resolve here. This is
+        # an allow-list rather than a second document root on purpose: a
+        # directory the operator did not choose to publish must not become
+        # browsable because the client asked nicely.
+        name = path.lstrip('/')
+        if name in SPLASH_IMAGE_NAMES:
+            root, file_path = self._world_dir, self._world_dir / name
+        else:
+            root, file_path = self._static_dir, self._static_dir / name
 
-        # Verify the resolved path is within the static directory
+        # Verify the resolved path is within the directory it came from
         # (defense-in-depth against symlink traversal)
         try:
             file_path = file_path.resolve()
-            if not file_path.is_relative_to(self._static_dir.resolve()):
+            if not file_path.is_relative_to(root.resolve()):
                 await self._send_response(writer, 403, 'Forbidden')
                 return
         except (ValueError, OSError):

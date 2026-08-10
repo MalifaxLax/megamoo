@@ -137,10 +137,28 @@ const term = {
    * govern the line boxes around it, and art has to own its own lines to
    * come out the shape it was drawn.
    */
-  write(html, grid) {
+  write(html, grid, image) {
     const node = document.createElement(grid ? 'div' : 'span');
     if (grid) node.className = 'grid';
     node.innerHTML = html;
+
+    // A world that ships a splash image gets it in the banner's place.
+    // The ASCII is still built above and kept in `node`, so if the file is
+    // missing, misnamed or corrupt the banner appears instead of a broken
+    // image icon -- the same banner every other client shows.
+    if (image && image.src) {
+      const fig = document.createElement('div');
+      fig.className = 'splash';
+      const img = document.createElement('img');
+      // alt, not a decorative empty string: the logo carries the game's
+      // name, and that name is not written anywhere else on this screen.
+      img.alt = image.alt || '';
+      img.onerror = () => fig.replaceWith(node);
+      img.src = image.src;
+      fig.appendChild(img);
+      this._append(fig);
+      return;
+    }
     this._append(node);
   },
 
@@ -366,7 +384,7 @@ const net = {
 function dispatch(msg) {
   switch (msg.type) {
     case 'text':
-      term.write(msg.data, msg.grid);
+      term.write(msg.data, msg.grid, msg.image);
       feedLines(msg.data);
       bus.emit('text', msg.data);
       break;

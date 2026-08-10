@@ -225,6 +225,65 @@ def _world_version(database) -> str:
         return ''
 
 
+def _world_name(database, config) -> str:
+    """
+    What this world calls itself, for a client that can show a name.
+
+    ``$title`` on #0, the same shape as ``$version`` above and for the same
+    reason: #0 exists in every world, so there is one place to look and
+    nothing to configure.
+
+    Deliberately not ``$name``.  Every object carries a native ``name``,
+    and #0's is "SystemObject" -- so ``getattr(sysobj, 'name')`` always
+    succeeds and never means what was asked.  ``$version`` gets away with
+    the pattern because no object has a native ``version`` to collide
+    with.  This one needed a word of its own.
+
+    Falls back to ``server_name`` from the config, which a world nobody
+    has renamed answers with "MegaMOO Server" -- honest, if uninspiring.
+
+    Never raises: the splash has to render even if the database is odd.
+    """
+    try:
+        value = getattr(database.get_object(0), 'title', None)
+        if value:
+            return str(value).strip()
+    except Exception:
+        pass
+    return getattr(config, 'server_name', '') or ''
+
+
+#: Filenames a world can drop beside ``display_screen.txt`` to give the
+#: browser client a splash image.  Checked in this order, so a world that
+#: ships more than one gets the sharpest: vector, then modern raster, then
+#: whatever it has.  Nothing here reaches a terminal -- telnet gets the
+#: ASCII banner, which is the only thing it can show.
+SPLASH_IMAGE_NAMES = ('splash.svg', 'splash.webp', 'splash.png',
+                      'splash.jpg', 'splash.jpeg', 'splash.gif')
+
+
+def find_splash_image(directory='.') -> Optional[str]:
+    """
+    The world's splash image filename, or None if it has none.
+
+    Looked for beside ``display_screen.txt`` in the world's own directory,
+    because a splash is the world's, not the engine's -- it should travel
+    in the game directory `megamoo init` creates and version-controls, not
+    inside the installed package.
+
+    Returns a bare filename rather than a path: it is about to become a
+    URL the browser asks for, and the web server resolves it back against
+    this same directory.
+    """
+    try:
+        for name in SPLASH_IMAGE_NAMES:
+            if (Path(directory) / name).is_file():
+                return name
+    except OSError:
+        pass
+    return None
+
+
 def load_display_screen(config: 'ServerConfig') -> str:
     """
     Load the splash text shown before the login prompt.
@@ -406,8 +465,18 @@ class LoginHandler:
         #
         # Reset again at the end, or a terminal keeps the attribute and
         # everything after the splash comes out dim as well.
+        #
+        # A world may also ship a splash image, which a browser shows in
+        # the banner's place. The ASCII still goes out: it is what a
+        # terminal shows, it is what the browser falls back to if the image
+        # does not load, and sending it unconditionally means the two
+        # transports never disagree about whether there is a banner.
         screen = load_display_screen(self.config)
-        await send('\x1b[0m\x1b[38;5;245m' + screen + '\x1b[0m', raw=True)
+        image = find_splash_image()
+        await send('\x1b[0m\x1b[38;5;245m' + screen + '\x1b[0m', raw=True,
+                   image=({'src': image,
+                           'alt': _world_name(self.database, self.config)}
+                          if image else None))
         # Sent apart from the banner, and not raw: the splash goes out raw
         # so its ASCII art survives untouched, which also means colour codes
         # in it would print literally.  This line needs the dim grey.

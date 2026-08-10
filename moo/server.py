@@ -443,6 +443,10 @@ class MegaMOOServer:
                 allowed_origins=self.config.network.websocket_allowed_origins,
                 scan_limit=(self.config.network.port_scan_limit
                             if self.config.network.websocket_auto_port else 1),
+                # The working directory is the world's: it is where the
+                # engine already finds display_screen.txt, and where a
+                # splash image sits beside it.
+                world_dir='.',
                 ssl_context=(
                     build_tls_context(self.config.network.tls_cert,
                                       self.config.network.tls_key)

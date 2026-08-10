@@ -981,13 +981,20 @@ class PlayerConnection:
     #   Output: send / queue / flush
     # -------------------------------------------------------------------
 
-    async def send(self, message: str, add_newline: bool = True, raw: bool = False):
+    async def send(self, message: str, add_newline: bool = True,
+                   raw: bool = False, image: Optional[dict] = None):
         """
         Send a message to the connected player's terminal.
 
         This is the primary output method.  It applies colour processing,
         word-wrapping, and telnet line-ending normalisation before
         writing to the socket.
+
+        *image* is accepted and ignored.  A caller that has a picture to
+        offer -- the login splash, when the world ships one -- offers it to
+        every transport rather than asking which it is talking to, and a
+        terminal simply has no way to show one.  The accompanying text is
+        what a terminal was always going to display.
 
         The processing pipeline is:
 

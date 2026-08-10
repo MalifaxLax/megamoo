@@ -419,7 +419,8 @@ class WebSocketConnection:
     # Sending Messages
     # ------------------------------------------------------------------
 
-    async def send(self, message: str, add_newline: bool = True, raw: bool = False):
+    async def send(self, message: str, add_newline: bool = True,
+                   raw: bool = False, image: Optional[dict] = None):
         """
         Send a message to the web client as a JSON WebSocket text frame.
 
@@ -492,6 +493,12 @@ class WebSocketConnection:
         frame = {"type": "text", "data": html}
         if raw:
             frame["grid"] = True
+        # The world's own splash image, if it ships one. `data` still
+        # carries the ASCII: the client shows the image and keeps the text
+        # to fall back to, so a broken or missing file degrades to the
+        # banner every other client sees rather than to nothing.
+        if image and image.get('src'):
+            frame["image"] = {"src": image['src'], "alt": image.get('alt', '')}
         payload = json.dumps(frame)
         try:
             self.writer.write(encode_frame(payload))

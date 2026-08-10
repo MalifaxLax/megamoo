@@ -411,3 +411,55 @@ def test_backticks_still_mark_clickables_in_ordinary_output():
     asyncio.run(conn.send('Obvious exits: `north` and `south`.', raw=False))
     frame, = _sent_frames(captured)
     assert frame['data'].count('class="clickable"') == 2
+
+
+# ---------------------------------------------------------------------------
+#   A world's own splash image
+# ---------------------------------------------------------------------------
+
+def test_a_world_without_an_image_says_nothing_about_one():
+    conn, captured = _connection()
+    asyncio.run(conn.send('banner', raw=True))
+    frame, = _sent_frames(captured)
+    assert 'image' not in frame
+
+
+def test_the_image_rides_alongside_the_text_not_instead_of_it():
+    """The ASCII must still arrive: it is the client's fallback."""
+    conn, captured = _connection()
+    asyncio.run(conn.send('the ascii banner', raw=True,
+                          image={'src': 'splash.png', 'alt': 'Shadowfall'}))
+    frame, = _sent_frames(captured)
+    assert frame['image'] == {'src': 'splash.png', 'alt': 'Shadowfall'}
+    assert 'the ascii banner' in frame['data']
+
+
+def test_find_splash_image_prefers_the_sharpest(tmp_path):
+    from moo.login import find_splash_image
+    assert find_splash_image(str(tmp_path)) is None
+    (tmp_path / 'splash.jpg').write_bytes(b'x')
+    assert find_splash_image(str(tmp_path)) == 'splash.jpg'
+    (tmp_path / 'splash.svg').write_bytes(b'x')
+    assert find_splash_image(str(tmp_path)) == 'splash.svg'
+
+
+def test_only_the_allow_listed_names_come_from_the_world_directory(tmp_path):
+    """The world directory is not a document root.
+
+    It holds the database, the logs and whatever else the operator keeps
+    beside them. Publishing a splash must not publish the directory.
+    """
+    from moo.login import SPLASH_IMAGE_NAMES
+    assert 'sf.db' not in SPLASH_IMAGE_NAMES
+    assert 'display_screen.txt' not in SPLASH_IMAGE_NAMES
+    assert all(n.startswith('splash.') for n in SPLASH_IMAGE_NAMES)
+
+
+def test_every_advertised_splash_name_has_a_content_type():
+    """A served image that arrives as octet-stream is downloaded, not drawn."""
+    from moo.login import SPLASH_IMAGE_NAMES
+    from moo.web.server import _CONTENT_TYPES
+    for name in SPLASH_IMAGE_NAMES:
+        suffix = '.' + name.split('.')[-1]
+        assert suffix in _CONTENT_TYPES, f'{name} would be served as a download'
+        assert _CONTENT_TYPES[suffix].startswith('image/')

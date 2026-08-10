@@ -220,6 +220,22 @@ body {
   overflow-x: auto;
 }
 
+/* A world's own splash image, shown where the ASCII banner would be. */
+.splash {
+  padding: 4px 0 8px;
+}
+
+.splash img {
+  display: block;
+  /* Never upscaled. These are small assets -- a logo drawn for a 1990s
+     web page is a couple of hundred pixels wide -- and stretching one to
+     fill the pane trades a crisp small banner for a soft large one. It
+     shrinks on a narrow screen, which is the direction that costs
+     nothing. */
+  max-width: 100%;
+  height: auto;
+}
+
 /* Locally echoed commands, so the player can see what they sent. */
 .line--echo { color: var(--fg-faint); }
 .line--echo::before { content: "> "; color: var(--accent); opacity: 0.5; }
