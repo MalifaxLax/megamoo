@@ -133,29 +133,6 @@ def _getprop(obj, name, default=None):
         return default
 
 
-def _capitalised(name):
-    """
-    A display name for the start of a sentence: *name* with its first
-    letter raised, and nothing else touched.
-
-    This replaces reading a separate ``cname`` property. cname was a
-    second copy of the same fact, and a second copy drifts: an object
-    that never set one inherited its *prototype's*, so a character with
-    a perfectly good name of her own was announced as "ICharacter walks
-    in from the west." Six characters in Shadowfall were in that state.
-
-    Measured before removing it -- of 123 cname values in the starter
-    world, 0 differed from capitalising name; of 405 in Shadowfall, 3
-    differed and all three were *un*capitalised, i.e. wrong. So the
-    property was redundant wherever it was right.
-
-    Only the first character is raised. "a leather cuirass" becomes
-    "A leather cuirass" and "Sinda" stays "Sinda"; title-casing would
-    wreck both.
-    """
-    return (name[:1].upper() + name[1:]) if name else name
-
-
 def _pronoun_map(obj):
     """
     Return the pronoun dictionary for *obj* based on its ``gender`` property.
@@ -244,8 +221,12 @@ class StringUtils:
         typ = matched[1:].lower()           # e.g. "ps", "po"
         pmap = _pronoun_map(source)
         pronoun = pmap.get(typ, matched)
-        # Capitalise if the first letter after '%' was uppercase
-        return pronoun.capitalize() if matched[1].isupper() else pronoun
+        # Capitalise if the first letter after the sigil was uppercase.
+        # capitalise(), not str.capitalize: the pronoun map holds single
+        # lowercase words today, so the two agree, but capitalize()
+        # lowercases the tail and would silently wreck any multi-word or
+        # internally-capitalised pronoun added later.
+        return self.capitalise(pronoun) if matched[1].isupper() else pronoun
 
     # ----------------------------------------------------------------
     # Emit substitution (used by msg / notify)
@@ -338,21 +319,21 @@ class StringUtils:
                 lambda m: self.get_pronoun(m, source=sub), text
             )
             sname = _getprop(sub, 'name', '')
-            scap = _capitalised(sname)
+            scap = self.capitalise(sname)
             text = _sub_token(text, 's', sname)
             text = _sub_token(text, 'S', scap)
 
         # --- Direct object tokens: %d / %D / $d / $D ---
         if dob is not None:
             dname = _getprop(dob, 'name', '')
-            dcap = _capitalised(dname)
+            dcap = self.capitalise(dname)
             text = _sub_token(text, 'd', dname)
             text = _sub_token(text, 'D', dcap)
 
         # --- Indirect object tokens: %i / %I / $i / $I ---
         if iob is not None:
             iname = _getprop(iob, 'name', '')
-            icap = _capitalised(iname)
+            icap = self.capitalise(iname)
             text = _sub_token(text, 'i', iname)
             text = _sub_token(text, 'I', icap)
 
@@ -408,7 +389,7 @@ class StringUtils:
 
         # Replace name tokens
         pstr = _sub_token(tstr, 'N', _getprop(eobj, 'name', ''))
-        pstr = _sub_token(pstr, 'CN', _capitalised(_getprop(eobj, 'name', '')))
+        pstr = _sub_token(pstr, 'CN', self.capitalise(_getprop(eobj, 'name', '')))
 
         # Replace lowercase enactor pronouns (%EPS, %EPO, %EPP, %EPR)
         # Only scan if '%E' is present (fast-path optimisation)
@@ -421,10 +402,10 @@ class StringUtils:
 
         # Replace capitalised enactor pronouns (%CEPS, %CEPO, %CEPP, %CEPR)
         if _has_token(pstr, 'CE'):
-            pstr = _sub_token(pstr, 'CEPR', pmap.get('pr', 'itself').capitalize())
-            pstr = _sub_token(pstr, 'CEPP', pmap.get('pp', 'its').capitalize())
-            pstr = _sub_token(pstr, 'CEPO', pmap.get('po', 'it').capitalize())
-            pstr = _sub_token(pstr, 'CEPS', pmap.get('ps', 'it').capitalize())
+            pstr = _sub_token(pstr, 'CEPR', self.capitalise(pmap.get('pr', 'itself')))
+            pstr = _sub_token(pstr, 'CEPP', self.capitalise(pmap.get('pp', 'its')))
+            pstr = _sub_token(pstr, 'CEPO', self.capitalise(pmap.get('po', 'it')))
+            pstr = _sub_token(pstr, 'CEPS', self.capitalise(pmap.get('ps', 'it')))
         return pstr
 
     def psub1a(self, tstr, eobj=None, s1='', s2='', s3=''):
@@ -507,7 +488,7 @@ class StringUtils:
 
         # Replace target name tokens
         pstr = _sub_token(pstr, 'T', _getprop(tobj, 'name', ''))
-        pstr = _sub_token(pstr, 'CT', _capitalised(_getprop(tobj, 'name', '')))
+        pstr = _sub_token(pstr, 'CT', self.capitalise(_getprop(tobj, 'name', '')))
 
         # Replace lowercase target pronouns (%OPS, %OPO, %OPP, %OPR)
         if _has_token(pstr, 'O'):
@@ -518,10 +499,10 @@ class StringUtils:
 
         # Replace capitalised target pronouns (%COPS, %COPO, %COPP, %COPR)
         if _has_token(pstr, 'CO'):
-            pstr = _sub_token(pstr, 'COPR', tmap.get('pr', 'itself').capitalize())
-            pstr = _sub_token(pstr, 'COPP', tmap.get('pp', 'its').capitalize())
-            pstr = _sub_token(pstr, 'COPO', tmap.get('po', 'it').capitalize())
-            pstr = _sub_token(pstr, 'COPS', tmap.get('ps', 'it').capitalize())
+            pstr = _sub_token(pstr, 'COPR', self.capitalise(tmap.get('pr', 'itself')))
+            pstr = _sub_token(pstr, 'COPP', self.capitalise(tmap.get('pp', 'its')))
+            pstr = _sub_token(pstr, 'COPO', self.capitalise(tmap.get('po', 'it')))
+            pstr = _sub_token(pstr, 'COPS', self.capitalise(tmap.get('ps', 'it')))
         return pstr
 
     def psub2a(self, tstr, eobj=None, tobj=None, s1='', s2='', s3=''):
@@ -790,8 +771,21 @@ class StringUtils:
 
         MOO: ``$string_utils:capitalize``.  Deliberately not
         ``str.capitalize``, which lowercases everything after the first
-        character and would wreck "an OLD sword".
+        character: it turns "an OLD sword" into "An old sword", "MacLeod"
+        into "Macleod", and "O'Brien" into "O'brien".  Chargen used to
+        call it and every such name arrived flattened.
+
+        This is the engine's *only* implementation.  There were three --
+        this one, a module-level ``_capitalised`` that esub called, and a
+        ``capitalize_first`` builtin nothing called -- which is two more
+        chances for the rule to drift than the rule deserves.
+
+        ``None`` passes through unchanged rather than becoming the string
+        ``"None"``, because the substitution code below hands it whatever
+        a missing property returned.
         """
+        if subject is None:
+            return None
         s = str(subject)
         return s[:1].upper() + s[1:]
 

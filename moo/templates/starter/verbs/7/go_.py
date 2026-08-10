@@ -275,10 +275,15 @@ def _run_chargen():
                 _header("What is your first name?")
                 continue
             taken_names = list(this.character_names or [])
-            if name.capitalize() in taken_names:
+            # su.capitalise, not str.capitalize: names admit apostrophes
+            # and hyphens, and capitalize() lowercases everything after
+            # the first letter -- it turned "MacLeod" into "Macleod" and
+            # "O'Brien" into "O'brien".  The taken check folds case
+            # itself so that only affects spelling.
+            first_name = su.capitalise(name)
+            if first_name.lower() in [t.lower() for t in taken_names]:
                 pobj.msg("That name is taken.")
                 continue
-            first_name = name.capitalize()
             ichar.noun = first_name
             _set(ichar, 'name', first_name)
             taken_names.append(first_name)
@@ -305,7 +310,7 @@ def _run_chargen():
                 pobj.msg(err)
                 _header("And what shall your last name be?")
                 continue
-            last_name = name.capitalize()
+            last_name = su.capitalise(name)
             _set(ichar, 'last_name', last_name)
             _set(ichar, 'chargen_step', 'gender')
             step = 'gender'

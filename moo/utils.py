@@ -137,32 +137,6 @@ def article(word: str) -> str:
     return 'a'
 
 
-def capitalize_first(text: str) -> str:
-    """
-    Capitalise only the first character of a string.
-
-    Unlike Python's built-in ``str.capitalize()``, this preserves the
-    case of all characters after the first one (``capitalize()`` would
-    lowercase them).
-
-    Args:
-        text (str): The string to capitalise.
-
-    Returns:
-        str: The string with its first character uppercased.
-
-    Examples::
-
-        >>> capitalize_first('hello World')
-        'Hello World'
-        >>> capitalize_first('')
-        ''
-    """
-    if not text:
-        return text
-    return text[0].upper() + text[1:]
-
-
 def match_pattern(text: str, pattern: str, case_sensitive: bool = False) -> bool:
     """
     Match text against a wildcard pattern.

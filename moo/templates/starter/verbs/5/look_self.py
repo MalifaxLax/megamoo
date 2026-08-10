@@ -71,14 +71,19 @@ oh = char.oh
 mh_valid = mh and hasattr(mh, 'objnum')
 oh_valid = oh and hasattr(oh, 'objnum')
 
+# &Ps follows char.gender, so the verb has to as well: only "ambiguous"
+# -- which is also what an unset gender falls back to -- takes "they",
+# and "They is holding a shot glass." is what you get for not asking.
+hold = 'is' if char.gender in ('male', 'female', 'neutral') else 'are'
+
 if mh_valid and oh_valid and mh.objnum == oh.objnum:
-    viewer.msg(su.esub("&Ps is holding &d.", sub=char, dob=mh))
+    viewer.msg(su.esub(f"&Ps {hold} holding &d.", sub=char, dob=mh))
 elif mh_valid and oh_valid:
-    viewer.msg(su.esub("&Ps is holding &d and &i.", sub=char, dob=mh, iob=oh))
+    viewer.msg(su.esub(f"&Ps {hold} holding &d and &i.", sub=char, dob=mh, iob=oh))
 elif mh_valid:
-    viewer.msg(su.esub("&Ps is holding &d.", sub=char, dob=mh))
+    viewer.msg(su.esub(f"&Ps {hold} holding &d.", sub=char, dob=mh))
 elif oh_valid:
-    viewer.msg(su.esub("&Ps is holding &d.", sub=char, dob=oh))
+    viewer.msg(su.esub(f"&Ps {hold} holding &d.", sub=char, dob=oh))
 else:
     viewer.msg(su.esub("&Pp hands are empty.", sub=char))
 

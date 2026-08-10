@@ -16,7 +16,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from moo.string_utils import StringUtils, _capitalised
+from moo.string_utils import StringUtils
 
 
 @pytest.fixture
@@ -58,9 +58,25 @@ def test_the_lowercase_tokens_are_untouched(su):
 @pytest.mark.parametrize('value,expected', [
     ('', ''), (None, None), ('x', 'X'), ('Sinda', 'Sinda'),
     ('a hat', 'A hat'), ('7 swords', '7 swords'),
+    # The cases str.capitalize() gets wrong, which is why it is not used.
+    ('an OLD sword', 'An OLD sword'), ('MacLeod', 'MacLeod'),
+    ("O'Brien", "O'Brien"), ('Mary-Jane', 'Mary-Jane'),
 ])
-def test_capitalised_edge_cases(value, expected):
-    assert _capitalised(value) == expected
+def test_capitalise_edge_cases(su, value, expected):
+    assert su.capitalise(value) == expected
+
+
+def test_there_is_exactly_one_capitalise():
+    """
+    The rule lived in three places -- su.capitalise, a module-level
+    _capitalised, and a capitalize_first builtin nothing called. Three
+    copies of a rule are two chances for it to drift.
+    """
+    from moo import builtins, string_utils, utils
+
+    assert not hasattr(string_utils, '_capitalised')
+    assert not hasattr(utils, 'capitalize_first')
+    assert not hasattr(builtins, 'capitalize_first')
 
 
 def test_esub_no_longer_reads_cname():

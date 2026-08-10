@@ -91,7 +91,7 @@ from .utils import interactive  # noqa: F401 — re-exported for verb code
 # was reachable only as su.esub -- a needless indirection for the most-used
 # function in the engine.
 from .utils import (  # noqa: F401 — re-exported for verb code
-    article, capitalize_first, elapsed_time, match_pattern, parse_object_ref,
+    article, elapsed_time, match_pattern, parse_object_ref,
 )
 from .object_utils import (  # noqa: F401 — re-exported for verb code
     all_contents, all_properties, all_verbs, contains, defines_property,

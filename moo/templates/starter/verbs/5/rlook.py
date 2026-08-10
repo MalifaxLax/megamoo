@@ -18,11 +18,21 @@ could type `rlook` and get the builder's view of the room.
 The guard below fixes that, and the auth value derives from it, so the
 parser refuses a gm0 before the verb runs.
 
-Hiding it does not work, and was tried: call_verb resolves through
-find_verb, which filters hidden verbs, so `Hidden: yes` made `look`'s own
-call fail and staff quietly got the ordinary view.
+Hiding it is what makes it safe to take `args` on faith. It is not a
+command: `look` calls it with the viewer as an *object*, and a staff
+member who typed it got the raw command text instead, so `target.msg()`
+failed on a str.
+
+Hiding once broke that call, which is why the guard above was written
+instead -- call_verb resolved through find_verb, and find_verb filtered
+hidden verbs, so `Hidden: yes` meant "unreachable by anything". That is
+no longer true: the check moved to may_invoke, which only decides
+whether a *typed* command may run. See parser.py's may_invoke, whose
+docstring records the move.
 
 Auth: gm3+ (auth_level 3)
+
+Hidden:  yes
 """
 
 if auth_level(pobj) < 3:
