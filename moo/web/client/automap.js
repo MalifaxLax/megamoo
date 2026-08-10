@@ -469,6 +469,20 @@ const Automap = {
       if (dir) pendingDirection = dir;
     });
 
+    // A map is a picture of where you are. Once the socket is gone it is a
+    // picture of where you were, and it should not sit there over a dead
+    // connection claiming otherwise.
+    //
+    // Hidden rather than cleared: the rooms already walked are saved, and
+    // a dropped connection reconnects on its own. Forgetting the map every
+    // time the wifi blinked would throw away real exploration for nothing
+    // -- that is what the reset button is for. The next Room.Info brings
+    // the panel straight back.
+    api.on('disconnect', () => {
+      panel.hidden = true;
+      previousNum = null;   // never draw a link across the gap
+    });
+
     api.on('gmcp:Room.Info', (room) => {
       if (!room || room.num == null) return;   // older server: no identity
       let direction = pendingDirection;

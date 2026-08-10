@@ -755,6 +755,30 @@ def unpuppet(obj: Union[int, MOOObject, None] = None):
     _database.save_object(obj_instance)
     _database.save_object(storage)
 
+    # Tell a browser client the character has left the world, before the
+    # connection is unregistered and there is nobody left to tell.
+    #
+    # puppet() announces the room it puts you in; this is the other half of
+    # that pair, and it was missing -- so going in-character moved the map
+    # and coming back out did not, leaving the in-character world on screen
+    # while the player stood in the lobby.
+    #
+    # Storage is not a room, so there is no Room.Info to send about it.
+    # What the client needs to know is that wherever the character is now
+    # is not somewhere it maps, which is the same thing it already
+    # understands about the OOC entry hall: `ic` false, panel away.
+    try:
+        from .network import get_connection_for_player
+        conn = get_connection_for_player(obj_instance.objnum)
+        if conn and 'gmcp' in getattr(conn, 'protocols', set()) \
+                and hasattr(conn, 'send_gmcp_sync'):
+            conn.send_gmcp_sync('Room.Info', {
+                'num': storage.objnum, 'name': '', 'exits': [], 'ic': False,
+            })
+    except Exception:
+        # Never let the map cost somebody their unpuppet.
+        logger.debug('unpuppet: could not announce room', exc_info=True)
+
     # Unregister connection
     with _pc_lock:
         _player_connections.pop(obj_instance.objnum, None)
