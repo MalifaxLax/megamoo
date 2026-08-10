@@ -75,16 +75,31 @@ import logging.handlers
 import signal
 from pathlib import Path
 
-# Configure logging before any other imports
+# Configure logging before any other imports.
+#
+# The file handler is attempted, not assumed.  It opens `megamoo.log` in
+# the working directory at *import* time, so a directory you cannot write
+# to took the whole command down with a traceback out of the logging
+# module before argparse had seen a single argument -- and `megamoo init
+# mygame`, which writes its game somewhere else entirely and has no use
+# for a log, died the same way. Running it from `/` is enough to do it.
+#
+# A log is a convenience. The console handler is the one that matters, so
+# losing the file is a line on stderr and not the end of the run.
+_handlers = [logging.StreamHandler()]
+try:
+    _handlers.insert(0, logging.handlers.RotatingFileHandler(
+        'megamoo.log', maxBytes=10*1024*1024, backupCount=5
+    ))
+except OSError as _log_error:
+    print(f"megamoo: cannot write megamoo.log here "
+          f"({_log_error.strerror}); logging to the console only.",
+          file=sys.stderr)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.handlers.RotatingFileHandler(
-            'megamoo.log', maxBytes=10*1024*1024, backupCount=5
-        ),
-        logging.StreamHandler()
-    ]
+    handlers=_handlers
 )
 logger = logging.getLogger('megamoo')
 
