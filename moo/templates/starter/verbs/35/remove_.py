@@ -207,7 +207,17 @@ pobj.msg(rem_msg, dob=item)
 if not pobj.invis:
     location.msg_room(orem_msg, exclude=[pobj], sub=pobj, dob=item)
 
-# Rebuild cached combat properties from all worn armor
-call_verb(pobj, '_recalc_combat')
+# Rebuild cached combat properties from all worn armor.
+#
+# Optional by design: `_recalc_combat` belongs to a combat system the
+# starter world does not ship. It was called unconditionally, so every
+# `wear` and every `remove` ended with
+#   Error: "Verb '_recalc_combat' not found on ..."
+# printed at the player, on one of the shipped prototype families.
+# A world that implements the verb still gets its callback.
+try:
+    call_verb(pobj, '_recalc_combat')
+except KeyError:
+    pass
 
 return True
