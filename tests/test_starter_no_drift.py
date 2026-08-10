@@ -95,3 +95,36 @@ def test_the_check_would_notice_a_metadata_only_difference():
                            code, verb.perms, verb.min_lengths, verb.hidden)
     assert not _verb_matches_file(tampered, code, name), (
         'a names-only difference must be caught; code equality is not enough')
+
+
+@pytest.mark.skipif(not (STARTER / 'world.db').is_file(),
+                    reason='starter template not present')
+def test_no_shipped_verb_stores_the_wrong_auth_level():
+    """`_verb_matches_file` does not compare auth, so this does.
+
+    The level decides whether `help` lists a command for you, so a verb
+    stored at 0 whose body refuses anyone under gm3 is advertised to
+    players who cannot run it -- and lands in the wrong section of the
+    help listing. @vfind shipped that way for exactly one build.
+    """
+    from moo.verb_loader import auth_level_required
+    db = sqlite3.connect(STARTER / 'world.db')
+    try:
+        wrong = []
+        for path in sorted((STARTER / 'verbs').rglob('*.py')):
+            try:
+                objnum = int(path.parent.name)
+            except ValueError:
+                continue
+            row = db.execute(
+                'SELECT auth FROM verbs WHERE objnum=? AND names LIKE ?',
+                (objnum, f'%"{path.stem}"%')).fetchone()
+            if row is None:
+                continue
+            declared = auth_level_required(path.read_text())
+            if row[0] != declared:
+                wrong.append(f'{objnum}/{path.stem}: stored {row[0]}, '
+                             f'file declares {declared}')
+        assert not wrong, '; '.join(wrong)
+    finally:
+        db.close()
