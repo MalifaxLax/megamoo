@@ -23,11 +23,6 @@ if not item:
     pobj.msg("Put what?")
     return True
 
-# Can't put worn items
-if item.worn:
-    pobj.msg("You're wearing that.")
-    return True
-
 # Gate check: max_on_area of 0 means nothing can go on
 max_area = this.max_on_area or 0
 if not max_area:

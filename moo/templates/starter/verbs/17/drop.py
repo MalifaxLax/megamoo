@@ -7,8 +7,6 @@ Examples:
     drop sword      - Drop a sword on the ground
     drop bag        - Drop a bag
 
-You must remove worn items before you can drop them.
-
 Abbrev:  drop=3
 """
 
@@ -21,21 +19,14 @@ if not args:
 if pobj.do_wait():
     return
 
-# Match item in hands/wearing
+# Match item in hands
 mh = pobj.mh
 oh = pobj.oh
 slist = [x for x in [mh, oh] if x and hasattr(x, 'objnum')]
 slist += list(pobj.location.contents)
-wearing = pobj.wearing or []
-slist += [db.get_object(n) for n in wearing if n]
 item = pmatch(dobj, pobj, slist)
 if not item:
     pobj.msg("You don't have that.")
-    return
-
-# Can't drop worn items
-if item.worn:
-    pobj.msg("You can't drop something you're wearing.")
     return
 
 # Check for drop override on the item (drop_ verb)

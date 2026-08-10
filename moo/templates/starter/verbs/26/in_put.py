@@ -23,11 +23,6 @@ if not dobj:
     pobj.msg("Put what?")
     return True
 
-# Can't put worn items
-if dobj.worn:
-    pobj.msg("You're wearing that.")
-    return True
-
 if not this.open:
     pobj.msg("&D is closed.", dob=this)
     return True

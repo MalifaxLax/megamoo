@@ -20,13 +20,11 @@ if not dobj:
     pobj.location.msg_room("&S taps &ps foot impatiently.", exclude=[pobj], sub=pobj)
     return
 
-# Match in hands, wearing, room
+# Match in hands, room
 mh = pobj.mh
 oh = pobj.oh
 slist = list(pobj.location.contents)
 slist += [x for x in [mh, oh] if x and hasattr(x, 'objnum')]
-wearing = pobj.wearing or []
-slist += [db.get_object(n) for n in wearing if n]
 
 tobj = pmatch(dobj, pobj, slist)
 

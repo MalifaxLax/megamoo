@@ -20,11 +20,6 @@ if not item:
     pobj.msg("Put what?")
     return True
 
-# Can't put worn items
-if item.worn:
-    pobj.msg("You're wearing that.")
-    return True
-
 # Gate check: max_behind_vol of 0 means nothing can go behind
 max_vol = this.max_behind_vol or 0
 if not max_vol:

@@ -43,17 +43,9 @@ if prep:
     elif smatch('behind', prep, 3):
         _prep = 'behind'
 
-# Build search list: room contents + hands + wearing (resolved)
+# Build search list: room contents + hands
 slist = list(loc.contents)
 slist += [x for x in [pobj.mh, pobj.oh] if x]
-wearing = pobj.wearing or []
-for wnum in wearing:
-    try:
-        wobj = db.get_object(wnum)
-        if wobj and wobj not in slist:
-            slist.append(wobj)
-    except Exception:
-        pass
 
 # Match object
 is_staff = auth_level(pobj) >= 3

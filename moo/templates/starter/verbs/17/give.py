@@ -5,11 +5,10 @@ Usage: give <item> to <character>
 
 Examples:
     give sword to guard    - Hand your sword to the guard
-    give coin to merchant  - Give a coin to the merchant
+    give coin to guard     - Give a coin to the guard
 
 You must be holding the item or have it in your inventory.
 The recipient must be a character in the same room.
-Worn items must be removed before giving.
 """
 
 if not args:
@@ -41,11 +40,6 @@ slist += list(pobj.contents)
 item = pmatch(dobj, pobj, slist)
 if not item:
     pobj.msg("You don't have that.")
-    return
-
-# Can't give worn items
-if item.worn:
-    pobj.msg("You can't give something you're wearing.")
     return
 
 # Match recipient in room — must be a character
