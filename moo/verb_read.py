@@ -236,12 +236,17 @@ def read(who=None, prompt: str = '') -> str:
                 pass
 
     # From here the baton is not ours, so nothing below may touch shared
-    # state until it is taken back.
+    # state until it is taken back.  The verb's transaction closes first,
+    # for the same reason it does in suspend(): waiting for a player to
+    # type could take minutes, and holding a transaction open across that
+    # would block every other write in the server.
+    verb_baton.checkpoint_txn()
     verb_baton.release()
     try:
         got = pending.wait(MAX_READ_WAIT)
     finally:
         verb_baton.acquire()
+        verb_baton.resume_txn()
 
     if not got:
         # The wait timed out.  Clearing the slot matters: leaving a dead

@@ -282,6 +282,16 @@ class Database:
         self._cache_hits = 0
         self._cache_misses = 0
 
+        # True while a verb is running: writes still happen, but the
+        # commit is held until the verb finishes so it lands whole or
+        # not at all.  Safe as a plain attribute rather than thread-local
+        # because the baton allows only one writer at a time.
+        self._deferring = False
+
+        #: Objects written during the current verb transaction, so a
+        #: rollback knows whose in-memory state to put back.
+        self._txn_objects = set()
+
         # Identity map: every object handed out, for as long as anything
         # still holds a reference to it.
         #
@@ -966,14 +976,107 @@ class Database:
         if self.mode == 'readonly':
             return
 
-        with self._lock:
-            # Update cache (and the identity map, via _admit)
-            self._admit(obj.objnum, obj)
+        # The baton before the database lock, always in that order, so
+        # this can never deadlock against a verb which takes them the
+        # same way round.  A write from outside verb execution -- the
+        # API, a login -- would otherwise commit whatever a running verb
+        # had pending, since they share one connection.
+        from . import verb_baton
+        with verb_baton.exclusive():
+            with self._lock:
+                # Update cache (and the identity map, via _admit)
+                self._admit(obj.objnum, obj)
 
-            # Save to SQLite
-            self._save_object_to_sql(obj)
+                # Save to SQLite
+                self._save_object_to_sql(obj)
+                # Held back while a verb is running: the verb commits as
+                # a whole, or rolls back as a whole.
+                if self._deferring:
+                    self._txn_objects.add(obj.objnum)
+                else:
+                    self._conn.commit()
+                self._mutation_gen += 1
+
+    # ------------------------------------------------------------------
+    # Verb transactions
+    # ------------------------------------------------------------------
+
+    def begin_verb_txn(self):
+        """
+        Stop committing on each write until the verb finishes.
+
+        A verb that raised halfway used to leave everything it had
+        already written -- half a trade, a debited purse and no goods.
+        Deferring the commit makes the verb the unit that succeeds or
+        fails, which is the one idea worth taking from mooR's
+        transactional model without adopting the rest of it.
+        """
+        self._deferring = True
+        self._txn_objects = set()
+
+    def commit_verb_txn(self):
+        """Commit everything the verb wrote and resume normal commits."""
+        self._deferring = False
+        self._txn_objects = set()
+        if self._conn:
             self._conn.commit()
-            self._mutation_gen += 1
+
+    def rollback_verb_txn(self):
+        """
+        Discard everything the verb wrote and resume normal commits.
+
+        Rolling back SQLite is only half of it.  The objects live in
+        memory as well, still holding the values the verb assigned, and
+        the identity map hands out those same instances -- so evicting
+        them from the cache would not help, and the next save would write
+        the rolled-back values straight back. Each touched object has its
+        state read again from disk, in place, so memory and database say
+        the same thing.
+        """
+        self._deferring = False
+        touched, self._txn_objects = self._txn_objects, set()
+        if self._conn:
+            try:
+                self._conn.rollback()
+            except sqlite3.Error as e:
+                logger.warning("Verb rollback failed: %s", e)
+        for objnum in touched:
+            self._revert_object(objnum)
+
+    def _revert_object(self, objnum: int):
+        """
+        Put one object's in-memory state back to what is on disk.
+
+        Refreshes the *existing* instance rather than replacing it: verb
+        code is still holding references to it, and the identity map
+        exists precisely so there is only ever one.
+
+        Args:
+            objnum (int): Object to revert.
+        """
+        live = self._objects.get(objnum) or self._live.get(objnum)
+        if live is None:
+            return
+        try:
+            fresh = self._load_object_from_sql(objnum)
+        except KeyError:
+            # It was created inside the rolled-back transaction, so on
+            # disk it never existed.  Drop it rather than leave a ghost.
+            self._objects.pop(objnum, None)
+            self._live.pop(objnum, None)
+            return
+        d = live.__dict__
+        d['properties'] = fresh.properties
+        d['verbs'] = fresh.verbs
+        for field in ('parent', 'noun', 'aliases', 'owner', 'flags',
+                      'created', 'last_move', '_location_id'):
+            d[field] = fresh.__dict__[field]
+        d['_dirty_props'] = set()
+        d['_all_dirty'] = False
+        try:
+            live.invalidate_inheritance_cache()
+        except Exception:
+            pass
 
     # ========================================================================
     # INHERITANCE CACHE MANAGEMENT

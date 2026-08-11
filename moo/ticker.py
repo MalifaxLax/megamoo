@@ -391,7 +391,7 @@ class TickerHandler:
         # the things that fire while a player is mid-command.
         token = set_verb_context(obj, self._db, depth=0)
         try:
-            with verb_baton.guarded():
+            with verb_baton.guarded(db=self._db):
                 call_verb = make_call_verb(obj, self._db, _depth=0)
                 call_verb(obj, verb_name)
         except KeyError:

@@ -162,7 +162,11 @@ def run_guarded(compiled, namespace, record: Optional['Execution'] = None):
         pass
 
     try:
-        exec(compiled, namespace)
+        # The whole body is one transaction: a verb that raises leaves
+        # nothing half-written.  `db` comes out of the namespace the
+        # dispatcher already built, so no call site has to pass it.
+        with _verb_txn(namespace.get('db')):
+            exec(compiled, namespace)
     finally:
         if framed:
             try:
@@ -175,7 +179,96 @@ def run_guarded(compiled, namespace, record: Optional['Execution'] = None):
 
 
 @contextmanager
-def guarded(record: Optional['Execution'] = None):
+def exclusive():
+    """
+    Hold the baton for a block that is *not* verb code, and is safe to
+    re-enter from code that already holds it.
+
+    Database writes reach SQLite from outside verb execution too -- the
+    API, the login flow, connection bookkeeping -- and those share one
+    connection with whatever verb is running.  A commit from any of them
+    would flush a verb's half-finished transaction, so they queue behind
+    verbs like everything else and the "one writer at a time" rule holds
+    for the whole process rather than only for verbs.
+
+    Re-entrant by inspection rather than by lock type: the baton is a
+    plain semaphore, so a verb that already holds it must *not* try to
+    take it again.  Nested use is a no-op.
+
+    Unlike :func:`guarded` this sets up no Execution record, because
+    there is no verb here to charge time to.
+    """
+    if holder():
+        yield                       # already ours; do not re-acquire
+        return
+    acquire()
+    try:
+        yield
+    finally:
+        release()
+
+
+@contextmanager
+def _verb_txn(db):
+    """
+    Make the verb the unit that commits, or does not.
+
+    Writes still reach SQLite as they happen; only the commit waits, so
+    a verb that raises leaves nothing behind instead of half a trade.
+
+    ``suspend()`` and ``read()`` close the transaction before they park
+    and open a fresh one on the way back -- see :func:`checkpoint_txn`.
+    That is not a compromise: parking gives the baton back, so other
+    verbs run and observe this one's writes, and rolling back past that
+    point would erase state the world has already acted on.  LambdaMOO
+    treats a suspend as a task boundary for the same reason.
+
+    Args:
+        db: The Database, or None to run untransacted.
+    """
+    if db is None:
+        yield
+        return
+    _local.txn_db = db
+    db.begin_verb_txn()
+    try:
+        yield
+    except BaseException:
+        db.rollback_verb_txn()
+        raise
+    else:
+        db.commit_verb_txn()
+    finally:
+        _local.txn_db = None
+
+
+def checkpoint_txn():
+    """
+    Commit the running verb's transaction, if it has one.
+
+    Called where a verb stops being the only thing running -- before it
+    parks in ``suspend()`` or waits for input in ``read()``.
+    """
+    db = getattr(_local, 'txn_db', None)
+    if db is not None:
+        try:
+            db.commit_verb_txn()
+        except Exception as e:                  # never break the park
+            logger.warning("Verb checkpoint failed: %s", e)
+
+
+def resume_txn():
+    """Re-open a verb transaction after parking.  Pairs with checkpoint_txn."""
+    db = getattr(_local, 'txn_db', None)
+    if db is not None:
+        try:
+            db.begin_verb_txn()
+        except Exception as e:
+            logger.warning("Verb transaction resume failed: %s", e)
+
+
+@contextmanager
+def guarded(record: Optional['Execution'] = None, db=None):
     """
     Hold the baton for the duration of a block, and always give it back.
 
@@ -191,6 +284,8 @@ def guarded(record: Optional['Execution'] = None):
 
     Args:
         record: Optional Execution the caller can watch.
+        db: Database to run the block as one transaction against, so a
+            verb that raises leaves nothing half-written.  None to skip.
 
     Yields:
         Execution: the record for this run.
@@ -203,7 +298,8 @@ def guarded(record: Optional['Execution'] = None):
     rec.parked = 0.0
     _local.record = rec
     try:
-        yield rec
+        with _verb_txn(db):
+            yield rec
     finally:
         _local.record = None
         rec.started = None
@@ -241,6 +337,11 @@ def suspend(seconds: float = 0.0) -> None:
     with _count_lock:
         _suspended += 1
     began = time.time()
+    # Commit before parking.  Giving the baton back lets other verbs run
+    # and see what this one has written, so its transaction cannot stay
+    # open across the gap -- and rolling back past this point later would
+    # erase state the world has already acted on.
+    checkpoint_txn()
     release()
     try:
         # A plain sleep is enough: the baton is what serialises verbs, and
@@ -248,6 +349,7 @@ def suspend(seconds: float = 0.0) -> None:
         time.sleep(seconds)
     finally:
         acquire()
+        resume_txn()
         rec = getattr(_local, 'record', None)
         if rec is not None:
             # Charged as parked, not running, so the command timeout does
