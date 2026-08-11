@@ -3706,6 +3706,37 @@ def caller_perms():
         return None
 
 
+def current_perms():
+    """
+    Who the *currently running* verb acts as.
+
+    A verb runs with its programmer's permissions, so this is the owner
+    recorded on the innermost frame.  Distinct from :func:`caller_perms`,
+    which deliberately skips that frame to answer about the caller.
+
+    Falls back to the acting player when there is no frame -- direct
+    engine calls, bootstrap, tests -- and to ``None`` when there is no
+    verb context at all, which callers read as "unrestricted", since
+    nothing that reaches that state came from player input.
+
+    Returns:
+        int | None: An object number, or None if unknown.
+    """
+    stack = _frames()
+    if stack:
+        owner = stack[-1].get('owner')
+        if owner is not None:
+            return owner
+        player = stack[-1].get('player')
+        return getattr(player, 'objnum', player)
+    from .verb_context import verb_ctx
+    ctx = verb_ctx.get(None)
+    if ctx is None:
+        return None
+    pobj, _, _ = ctx
+    return getattr(pobj, 'objnum', None)
+
+
 def set_task_perms(who=None):
     """
     Accepted, and deliberately does nothing.

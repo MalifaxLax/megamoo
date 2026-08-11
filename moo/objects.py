@@ -192,18 +192,30 @@ class PropertyInfo:
     def can_write(self, player_objnum: int, player_wizard: bool = False) -> bool:
         """
         Check if a player can write this property.
-        
+
+        Mirrors :meth:`can_read`: the permission bit opens the property to
+        everyone, and the owner never needed the bit in the first place.
+
+        It used to read ``return self.is_writable`` for the owner, which
+        inverted the MOO model -- there ``w`` is what grants write to
+        *other* people, and an owner may always write their own property.
+        The practical effect was that 2,043 of 2,045 properties in a real
+        world refused their own owner, so nothing could use the checked
+        path, so nothing was checked.
+
         Args:
             player_objnum: Player's object number
             player_wizard: Whether player is a wizard
-            
+
         Returns:
             bool: True if player can write
         """
         if player_wizard:
             return True
+        if self.is_writable:
+            return True
         if player_objnum == self.owner:
-            return self.is_writable
+            return True
         return False
 
 
@@ -1069,6 +1081,29 @@ class MOOObject:
         'flags', 'properties',
         'verbs', 'created', 'last_move', 'tags',
     })
+
+    # Native attributes a verb may not write unless it runs as a wizard.
+    #
+    # These are not properties, so they never reach the property
+    # permission check -- they go straight to object.__setattr__.  That
+    # made them the shortest escalation in the engine: `pobj.flags = 4`
+    # sets the WIZARD bit outright, and `pobj.owner = me` takes ownership
+    # of whatever it is written on, after which every other check agrees
+    # you were entitled all along.
+    _PRIVILEGED_ATTRS = frozenset({'flags', 'owner'})
+
+    # Properties a verb may not write unless it runs as a wizard.
+    #
+    # `auth` carries staff level, and the engine reads it: auth_level()
+    # derives authority from it and sync_auth_flags() promotes the
+    # PROGRAMMER / WIZARD flags to match.  Writing it is therefore the
+    # same act as setting those flags, one step removed.
+    #
+    # It cannot be distinguished by permissions -- on #3, `auth` and `rt`
+    # are both 'rc' owned by 0, and a player must be able to write their
+    # own `rt`.  The difference is meaning, not bits, and the engine is
+    # already the thing that knows what `auth` means.
+    _PRIVILEGED_PROPS = frozenset({'auth'})
     
     def __setattr__(self, name: str, value: Any):
         """
@@ -1089,6 +1124,8 @@ class MOOObject:
         """
         # Private/dunder attrs and core native attrs: normal Python path
         if name.startswith('_') or name in MOOObject._NATIVE_ATTRS:
+            if name in MOOObject._PRIVILEGED_ATTRS:
+                self._check_privileged(name)
             object.__setattr__(self, name, value)
             # Auto-save native attr changes (no-op during init/from_dict
             # when _database is None)
@@ -1143,6 +1180,7 @@ class MOOObject:
 
         # Update existing local property
         if name in props:
+            self._check_write(name, props[name])
             props[name].value = value
             self._invalidate_local()
             self._auto_save_to_db(db)
@@ -1155,6 +1193,7 @@ class MOOObject:
         if resolved and name in resolved:
             # Inherited property exists — create a local override
             inherited_info, _defining_obj = resolved[name]
+            self._check_write(name, inherited_info)
             self.add_property(name, value=value, perms=inherited_info.perms)
             return
 
@@ -1170,6 +1209,98 @@ class MOOObject:
                 )
         self.add_property(name, value=value, perms='rc')
     
+    def _check_privileged(self, name):
+        """
+        Refuse a native-attribute write that only a wizard may make.
+
+        Covers ``flags`` and ``owner`` -- see ``_PRIVILEGED_ATTRS``.
+        Engine-level writes (startup, migration, ``from_dict``, tests)
+        run with no verb context and are allowed; only code executing as
+        a verb is held to this.
+
+        Args:
+            name (str): The attribute being written.
+
+        Raises:
+            PermissionError: If the running verb is not a wizard.
+        """
+        try:
+            from .builtins import current_perms
+            actor = current_perms()
+        except Exception:
+            return
+        if actor is None:
+            return                      # not inside a verb
+        db = self.__dict__.get('_database')
+        if db is None:
+            return
+        try:
+            if getattr(db.get_object(actor), 'is_wizard', False):
+                return
+        except Exception:
+            return
+        raise PermissionError(
+            f"Permission denied: cannot set '{name}' on #{self.objnum}"
+        )
+
+    def _check_write(self, name, prop_info):
+        """
+        Refuse a property write the running verb is not entitled to make.
+
+        ``obj.x = v`` used to be entirely ungated while ``setattr(obj,
+        'x', v)`` was checked, so the permission model was decoration:
+        every verb simply used the assignment form.  ``pobj.flags = 4``
+        was wizard, and ``pobj.auth = ['gm5']`` was too.
+
+        The check runs against the *verb owner* -- who the running verb
+        acts as -- not the player who typed the command.  That is the MOO
+        model, and it is what keeps ordinary play working: staff own both
+        the verbs and the properties, so a staff verb writing a player's
+        stats is the owner writing its own property.  A player-authored
+        verb reaching for someone else's property is not.
+
+        Outside a verb entirely -- engine startup, migrations, tests --
+        there is nobody to check against and the write proceeds.
+
+        Args:
+            name (str): Property being written.
+            prop_info (PropertyInfo): Its permission record.
+
+        Raises:
+            PermissionError: If the running verb may not write it.
+        """
+        try:
+            from .builtins import current_perms
+            actor = current_perms()
+        except Exception:
+            return
+        if actor is None:
+            return                      # no verb context: engine-level write
+        db = self.__dict__.get('_database')
+        is_wizard = False
+        if db is not None:
+            try:
+                is_wizard = bool(getattr(db.get_object(actor), 'is_wizard', False))
+            except Exception:
+                is_wizard = False
+        if is_wizard:
+            return
+        if name in MOOObject._PRIVILEGED_PROPS:
+            raise PermissionError(
+                f"Permission denied: cannot write '{name}' on #{self.objnum}"
+            )
+        # 'c' is chown: a descendant's copy of an inherited property
+        # belongs to that descendant's owner, so the object's owner may
+        # write it.  This is what lets a player's own verb set their own
+        # character's `rt` -- the property is declared up on #3 and owned
+        # by the system, but the copy being written is theirs.
+        if prop_info.is_inherited and actor == self.owner:
+            return
+        if not prop_info.can_write(actor, is_wizard):
+            raise PermissionError(
+                f"Permission denied: cannot write '{name}' on #{self.objnum}"
+            )
+
     def _auto_save_to_db(self, db=None):
         """
         Persist this object to the database (best-effort).

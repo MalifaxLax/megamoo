@@ -206,31 +206,25 @@ def _make_safe_setattr(pobj, db):
         if name.startswith('_'):
             return setattr(obj, name, value)
 
-        # Native attrs (objnum, noun, flags, etc.) and special names
-        # (contents, location, parent) are handled by __setattr__
-        # and don't go through the property system — allow them for
-        # the object's owner or wizards.
+        # `obj.x = v` is checked too now, in MOOObject.__setattr__, and
+        # it asks a different question than the code below did: it holds
+        # the *verb owner* to account rather than whoever typed the
+        # command.  Two forms of the same write answering differently is
+        # what made this checkable path unusable in the first place, so
+        # defer to it -- the assignment underneath is the same one, and
+        # it raises for itself.
+        #
+        # Native attrs and the special names still route here, because
+        # __setattr__ only guards the two that escalate (flags, owner);
+        # the object-owner rule below is the right one for the rest.
         if name in MOOObject._NATIVE_ATTRS or name in ('contents', 'location', 'parent'):
+            if name in MOOObject._PRIVILEGED_ATTRS:
+                return setattr(obj, name, value)      # __setattr__ decides
             if is_wizard or obj.owner == pobj_num:
                 return setattr(obj, name, value)
             raise PermissionError(
                 f"Permission denied: cannot set '{name}' on #{obj.objnum}"
             )
-
-        # Check write permission on existing property
-        try:
-            prop_info = obj.get_property_info(name, db)
-            if not prop_info.can_write(pobj_num, is_wizard):
-                raise PermissionError(
-                    f"Permission denied: cannot write '{name}' on #{obj.objnum}"
-                )
-        except KeyError:
-            # Property doesn't exist — creating a new property.
-            # Only allow if player is wizard or owns the object.
-            if not is_wizard and obj.owner != pobj_num:
-                raise PermissionError(
-                    f"Permission denied: cannot create '{name}' on #{obj.objnum}"
-                )
 
         return setattr(obj, name, value)
 
@@ -629,6 +623,14 @@ def build_verb_namespace(
         'player': pobj,
         'this': this,
         'caller': caller,
+        # Who this verb runs *as*.  A verb acts with its programmer's
+        # permissions rather than those of whoever typed the command,
+        # which is what stops a player reaching everything a staff verb
+        # can reach simply by invoking it.  The outermost frame is pushed
+        # from the baton -- on the thread the verb runs on -- and reads
+        # this to record the owner; nested calls get theirs from
+        # call_verb.  Underscored because it is plumbing, not API.
+        '_verb_owner': getattr(verb_def, 'owner', None),
         'location': location,
         'db': db,
         'verb': verb_name,

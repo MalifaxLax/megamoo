@@ -154,7 +154,8 @@ def run_guarded(compiled, namespace, record: Optional['Execution'] = None):
     try:
         from .builtins import push_frame, pop_frame
         push_frame(namespace.get('this'), namespace.get('verb', ''),
-                   namespace.get('caller'), namespace.get('pobj'))
+                   namespace.get('caller'), namespace.get('pobj'),
+                   owner=namespace.get('_verb_owner'))
         framed = True
     except Exception:
         pass
