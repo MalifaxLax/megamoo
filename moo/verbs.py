@@ -113,7 +113,17 @@ _MASTER_RE = re.compile(
     r'|("""[\s\S]*?""")'           # 2: triple double-quoted string
     r"|('[^'\\]*(?:\\.[^'\\]*)*')" # 3: single-quoted string
     r'|("[^"\\]*(?:\\.[^"\\]*)*")' # 4: double-quoted string
-    r'|(\#(?!\d).*$)'             # 5: comment (# NOT followed by digit)
+    # 5: a comment.  Two shapes, because `#N` collides with Python's own
+    # comment syntax and the collision is real: `#5 minute cooldown` at
+    # column 0 is prose, and used to compile as `db.get_object(5) minute
+    # cooldown` -- a SyntaxError pointing at a line that is visibly a
+    # comment.  What follows the digits decides.  Punctuation, an
+    # operator or end-of-expression means a reference (`#5.foo`, `f(#5)`,
+    # `o == #5`); whitespace then a word means prose.  Python's word
+    # operators are the exception -- `#5 and x`, `#5 in y` are code, not
+    # commentary -- so they are excluded by name.
+    r'|(\#(?!\d).*$'
+    r'|\#\d+[ \t]+(?!(?:and|or|not|in|is|if|else|for)\b)[A-Za-z_][^\n]*$)'
     r'|(\#\d+)'                    # 6: object ref #N
     r'|(\$[A-Za-z_]\w*)',          # 7: system property $name
     re.MULTILINE
