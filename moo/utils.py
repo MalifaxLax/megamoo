@@ -573,6 +573,26 @@ class InteractiveSession:
             if token is not None:
                 clear_verb_context(token)
 
+        # A multi-step verb does its work *here*, not in the command that
+        # started it: ``@delete`` recycles what you are holding only once
+        # you have answered its "are you sure?".  Both command loops feed
+        # that answer straight into the generator and ``continue``, so
+        # nothing on this path goes through ``execute_command``, and
+        # without this the announce there never fires for the step that
+        # actually changed anything.
+        #
+        # In ``resume()`` rather than in each command loop because there
+        # are two of those -- telnet and web -- and they would drift.
+        #
+        # Free for a client that cannot show an inventory: the announce
+        # returns immediately unless the connection negotiated GMCP,
+        # which a plain telnet session never does.
+        try:
+            from .builtins import send_inventory_gmcp
+            send_inventory_gmcp(self.player_obj)
+        except Exception:
+            pass
+
     def cancel(self):
         """
         Abort the interactive session.

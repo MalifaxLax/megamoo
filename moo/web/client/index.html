@@ -37,7 +37,10 @@
       <button id="scroll-latest" type="button" hidden>Jump to latest &darr;</button>
     </section>
 
-    <!-- Corner overlays: the world map, then any script-declared panels. -->
+    <!-- The left column: the world map, what you are carrying, then any
+         script-declared panels. Still called "corner" in the CSS and here
+         because that is where it started and renaming it would touch every
+         script that positions a panel. -->
     <aside id="corner" aria-label="Overlays">
 
       <section id="automap" class="automap" aria-label="Map" hidden>
@@ -48,6 +51,19 @@
         </header>
         <canvas id="automap-canvas" role="img"
                 aria-label="Map of rooms you have visited"></canvas>
+      </section>
+
+      <!-- What the player is carrying, from GMCP Char.Inventory. It sits
+           under the map so the column the map reserves is doing work all
+           the way down instead of holding empty space. Containers nest,
+           with a triangle to fold them shut. A world that defines no
+           inv_data verb sends nothing, and this stays hidden -- the
+           shipped starter world is one of those. -->
+      <section id="inventory" class="automap" aria-label="Inventory" hidden>
+        <header class="automap-head">
+          <span class="automap-room">carrying</span>
+        </header>
+        <ul id="inventory-list" class="inv-list"></ul>
       </section>
 
       <!-- Panels declared by user scripts, rendered from a widget
@@ -101,6 +117,7 @@
      wasmoon itself is loaded lazily by the Lua host, only if a Lua script
      is actually enabled — it is ~420KB and most sessions never need it. -->
 <script src="automap.js"></script>
+<script src="inventory.js"></script>
 <script src="panels.js"></script>
 <script src="scripting.js"></script>
 <script src="hosts/js-worker.js"></script>

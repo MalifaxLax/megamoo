@@ -1117,6 +1117,63 @@ def _send_room_gmcp(obj, dest_num):
         pass
 
 
+def send_inventory_gmcp(obj):
+    """
+    Send GMCP ``Char.Inventory``, if this world says what inventory means.
+
+    The engine deliberately does not decide.  A character's contents are
+    not their inventory in most worlds: one may count what is in the
+    hands, another hands and worn items, another pockets or a familiar's
+    saddlebags.  So the character is asked, through an optional
+    ``inv_data`` verb, and a world that does not define one simply has no
+    inventory panel -- the same bargain as ``examine_`` and a world's
+    splash image.  The shipped starter world defines no ``inv_data``.
+
+    ``inv_data`` returns a list of items, each a dict the client can
+    render::
+
+        [{'num': 5022, 'name': 'a broadsword', 'where': 'right hand'},
+         {'num': 5031, 'name': 'a leather pouch', 'where': 'worn',
+          'contents': [{'num': 5033, 'name': 'a gold coin'}]}]
+
+    Only ``name`` is required.  A ``contents`` list marks the item a
+    container, which the client draws with a disclosure triangle, and it
+    nests to any depth.  Anything else the world puts there travels
+    untouched, so a world can add its own fields without the engine
+    learning about them.
+
+    Sent only when it differs from what this connection was last told:
+    this is called after every command, and most commands do not touch
+    what you are carrying.
+
+    Never raises.  An inventory panel is not worth a player's command.
+    """
+    try:
+        from .network import get_connection_for_player
+        conn = get_connection_for_player(obj.objnum)
+        if not conn or 'gmcp' not in getattr(conn, 'protocols', set()):
+            return
+        if not hasattr(conn, 'send_gmcp_sync'):
+            return
+        from .verb_context import set_verb_context, clear_verb_context
+        token = set_verb_context(obj, _database, 0)
+        try:
+            call = make_call_verb(obj, _database)
+            items = call(obj, 'inv_data')
+        except KeyError:
+            return          # this world does not describe an inventory
+        finally:
+            clear_verb_context(token)
+        if not isinstance(items, list):
+            return
+        if getattr(conn, '_last_inventory', None) == items:
+            return
+        conn._last_inventory = items
+        conn.send_gmcp_sync('Char.Inventory', {'items': items})
+    except Exception:
+        logger.debug('send_inventory_gmcp failed', exc_info=True)
+
+
 def chparent(obj: Union[int, MOOObject], new_parent: int):
     """
     Change an object's parent (prototype).

@@ -243,7 +243,14 @@ const panel  = document.getElementById('automap');
 function showPanel(visible) {
   panel.hidden = !visible;
   const back = document.getElementById('scrollback');
-  if (back) back.classList.toggle('has-map', visible);
+  // The column belongs to whichever readout is showing, so it stays
+  // reserved while either does -- the mirror of the test in inventory.js.
+  // Both panels follow the same room rule and so normally appear and go
+  // together, but "normally" is how a stripe of dead space, or a line of
+  // text under a panel, survives a refactor.
+  const inv = document.getElementById('inventory');
+  const wanted = visible || (inv && !inv.hidden);
+  if (back) back.classList.toggle('has-map', !!wanted);
 }
 const canvas = document.getElementById('automap-canvas');
 const label  = document.getElementById('automap-room');

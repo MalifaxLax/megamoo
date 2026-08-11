@@ -638,6 +638,7 @@ window.MegaMOO = api;
 installPalette();
 
 if (window.Automap) window.Automap.attach(api);
+if (window.Inventory) window.Inventory.attach(api);
 if (window.MegaMOOScripting) window.MegaMOOScripting.attach(api);
 
 input.disable();

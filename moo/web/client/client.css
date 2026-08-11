@@ -89,9 +89,10 @@
 
   --pad: 12px;
 
-  /* The map's width, in one place: #corner sizes itself from it and the
-     scrollback reserves exactly that much. Two copies would drift, and the
-     drift shows as text under the map or a stripe of dead space. */
+  /* The width of the left column, in one place: #corner sizes itself from
+     it and the scrollback reserves exactly that much. Two copies would
+     drift, and the drift shows as text under the map or a stripe of dead
+     space. */
   --map-width: min(280px, 42vw);
 }
 
@@ -117,10 +118,24 @@ body {
   display: grid;
   /* Fixed header and input row; the stage takes whatever is left, which
      is what keeps the input reachable on a phone without the page
-     itself scrolling. */
-  grid-template-rows: auto minmax(0, 1fr) auto;
+     itself scrolling.
+
+     Four rows, and every child says which one it is in. The stale-client
+     banner sits between the header and the stage and is usually
+     `display: none`, which takes it out of the grid entirely -- so with
+     auto placement the number of children changes with it, and the row
+     the stage lands in changes too. It claimed the 1fr, the stage
+     collapsed to its content, and the overlay column drew over the
+     banner. Naming the rows makes the layout the same either way; the
+     empty row costs nothing. */
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   height: 100dvh;
 }
+
+#topbar       { grid-row: 1; }
+#stale-banner { grid-row: 2; }
+#stage        { grid-row: 3; }
+#input-row    { grid-row: 4; }
 
 /* --- top bar --- */
 
@@ -235,16 +250,21 @@ body {
   scrollbar-color: var(--border-bright) transparent;
 }
 
-/* Room reserved for the map, so text stops running underneath it.
-   Toggled by automap.js alongside the panel itself, so the column exists
-   exactly when the map does -- it goes away in an OOC room, on a no-map
-   room, and when the connection drops, and the full width comes back.
+/* Room reserved for the map and the inventory under it, so text stops
+   running underneath them. Toggled alongside the panels themselves, so the
+   column exists exactly when they do -- it goes away in an OOC room, on a
+   no-map room, and when the connection drops, and the full width comes
+   back.
+
+   On the left, which is where a MUD's readouts have always lived: the eye
+   returns to a fixed left margin on every line anyway, so a panel there is
+   read in passing, and one on the right is only read when you look for it.
 
    A reserved column rather than a float, because the map has to stay put.
    A float is in-flow and would scroll away with the first screenful; this
    is the price of a map that is always where you left it. */
 #scrollback.has-map {
-  padding-right: calc(var(--map-width) + var(--pad) * 2);
+  padding-left: calc(var(--map-width) + var(--pad) * 2);
 }
 
 .line { min-height: 1px; }
@@ -592,11 +612,11 @@ body {
    Rendered from a widget vocabulary, never from script-supplied markup.
    ======================================================================== */
 
-/* Upper-right overlay stack: map first, then script panels. */
+/* Upper-left overlay stack: map, then inventory, then script panels. */
 #corner {
   grid-area: 1 / 1;
   align-self: start;
-  justify-self: end;
+  justify-self: start;
   z-index: 2;
   display: flex;
   flex-direction: column;
@@ -615,6 +635,41 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* On a narrow screen there is no width for a column of readouts beside a
+   column of prose. 42vw of a phone is 157px, which is too little for the
+   map and far too much to take from the text -- the world arrives six
+   words to a line.
+
+   So below this the overlay stops being an overlay: the stage becomes two
+   rows, the readouts take the top one at full width, and the scrollback
+   gets everything under it. Capped at a third of the height, and it
+   scrolls, so a long inventory cannot push the game off the screen. */
+@media (max-width: 700px) {
+  #stage { grid-template-rows: auto minmax(0, 1fr); }
+
+  #corner {
+    grid-area: 1 / 1;
+    justify-self: stretch;
+    width: 100%;
+    max-height: 33vh;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: var(--pad);
+    overflow-x: auto;
+  }
+
+  /* Side by side rather than stacked: the map is square and the
+     inventory is a list, so the two fit in a strip that costs one map's
+     worth of height instead of two. */
+  #automap { flex: none; width: var(--map-width); }
+  #inventory { flex: 1; min-width: 0; }
+
+  #terminal-pane { grid-area: 2 / 1; }
+
+  /* Nothing left to reserve: the readouts are above the text now. */
+  #scrollback.has-map { padding-left: var(--pad); }
 }
 
 /* --- automap --- */
@@ -810,4 +865,86 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .cf { animation: none; opacity: 1; font-weight: 700; }
   .panel-bar-fill { transition: none; }
+}
+
+/* ========================================================================
+   Inventory
+   ======================================================================== */
+
+/* Fed by GMCP Char.Inventory, which the server sends only when what you
+   are carrying has actually changed. It reuses .automap's frame so the
+   left column reads as one stack rather than two unrelated boxes.
+
+   A tree, not a list: a pouch inside a pack inside a hand is the shape the
+   world actually has, and flattening it loses which container a thing is
+   in -- the one question an inventory panel exists to answer. */
+
+.inv-list,
+.inv-children {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Nesting is carried entirely by this indent, so depth reads at a glance
+   without a guide line per level. It lines the child's marker up under its
+   parent's name, which is where the eye already is. */
+.inv-children { margin-left: 12px; }
+
+/* Marker, name, then where it is. A grid rather than a flex row so a long
+   name wraps under itself instead of under the marker -- these are MUD
+   object names in a 280px column, so most of the interesting ones wrap. */
+.inv-row {
+  display: grid;
+  grid-template-columns: 11px minmax(0, 1fr) auto;
+  gap: 4px;
+  align-items: baseline;
+  color: var(--fg);
+}
+
+/* The disclosure control on a container. A real button: it is the only
+   thing in this panel you can operate, and reimplementing focus and the
+   Enter key on a <span> to save one line of CSS is a bad trade. */
+.inv-toggle {
+  font: inherit;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--fg-dim);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.inv-toggle:hover { color: var(--accent); }
+
+.inv-toggle:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* A leaf's marker. Quiet: it is punctuation, not information, and the
+   triangles beside it are the ones worth noticing. */
+.inv-bullet {
+  color: var(--fg-faint);
+  font-size: 9px;
+  text-align: left;
+}
+
+/* Where the thing is -- "right hand", "worn" -- is context for the name,
+   not the point of the line, so it recedes. Only the top level carries it;
+   inside a pouch, "in the pouch" is what the indent already said. */
+.inv-where {
+  color: var(--fg-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.inv-empty {
+  color: var(--fg-dim);
+  font-size: 12px;
+  font-style: italic;
 }

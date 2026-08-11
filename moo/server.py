@@ -1211,7 +1211,27 @@ class MegaMOOServer:
             logger.error(f"Verb execution error: {e}", exc_info=True)
             from .builtins import notify as _notify
             _notify(player, f"Error: {e}")
-        
+
+        # Tell a browser client what the player is carrying, if this world
+        # describes that at all.
+        #
+        # Here rather than at the places inventory changes, because there
+        # is no such place: get, drop, wear, remove, give, buy, eat and a
+        # world's own verbs all move things about, and a list of call sites
+        # would be wrong the first time somebody wrote a new one. This runs
+        # after every command instead, and sends nothing unless the answer
+        # actually differs from what this connection was last told.
+        #
+        # After the except blocks, so a command that failed still reports:
+        # a verb can move things and then raise, and the player is left
+        # holding whatever it managed before it did.
+        try:
+            from .builtins import send_inventory_gmcp
+            send_inventory_gmcp(player)
+        except Exception:
+            logger.debug('inventory announce failed', exc_info=True)
+
+
     # --------------------------------------------------------
     # Presentation helpers
     # --------------------------------------------------------
