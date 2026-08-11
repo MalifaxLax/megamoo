@@ -1264,6 +1264,10 @@ class Database:
         obj._auto_save = True
         obj._database = None
         obj._pending_save = False
+        # Straight off disk, so nothing is pending: the targeted write
+        # path is eligible until something actually changes.
+        obj._dirty_props = set()
+        obj._all_dirty = False
 
         # Initialize tag handler
         from .objects import TagHandler
@@ -1333,12 +1337,32 @@ class Database:
         """
         objnum = obj.objnum
 
-        # Upsert object row
+        # A real upsert, not INSERT OR REPLACE.
+        #
+        # REPLACE is a DELETE followed by an INSERT, and `properties` and
+        # `verbs` both carry ON DELETE CASCADE -- so writing the object
+        # row destroyed every property and verb it had, every time.  The
+        # full rewrite below hid it by re-inserting them immediately
+        # afterwards, which is why saving one property had to write all
+        # 192 rows: the DELETE was not thrift, it was repair.
+        #
+        # Updating in place cascades nothing, so a targeted write is
+        # possible at all -- and the window where a concurrent reader
+        # could see an object with no verbs is gone with it.
         self._conn.execute(
-            """INSERT OR REPLACE INTO objects
+            """INSERT INTO objects
                (objnum, parent, noun, aliases, owner, location, flags,
                 created, last_move)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(objnum) DO UPDATE SET
+                   parent    = excluded.parent,
+                   noun      = excluded.noun,
+                   aliases   = excluded.aliases,
+                   owner     = excluded.owner,
+                   location  = excluded.location,
+                   flags     = excluded.flags,
+                   created   = excluded.created,
+                   last_move = excluded.last_move""",
             (
                 objnum,
                 obj.parent,
@@ -1351,6 +1375,36 @@ class Database:
                 obj.last_move,
             )
         )
+
+        # The targeted path: only the properties whose values changed,
+        # and no verb traffic at all.
+        #
+        # A full rewrite of a character prototype is 192 statements -- 111
+        # properties and 78 verbs, the verbs carrying their entire source
+        # text -- and it ran on *every* attribute assignment.  An object
+        # is only eligible when nothing structural has happened to it;
+        # _mark_modified sets _all_dirty for everything else, so a save
+        # this code did not anticipate still writes the lot.
+        if not getattr(obj, '_all_dirty', True):
+            for name in getattr(obj, '_dirty_props', ()):
+                prop = obj.properties.get(name)
+                if prop is None:
+                    self._conn.execute(
+                        "DELETE FROM properties WHERE objnum = ? AND name = ?",
+                        (objnum, name)
+                    )
+                    continue
+                self._conn.execute(
+                    """INSERT INTO properties (objnum, name, value, owner, perms)
+                       VALUES (?, ?, ?, ?, ?)
+                       ON CONFLICT(objnum, name) DO UPDATE SET
+                           value = excluded.value,
+                           owner = excluded.owner,
+                           perms = excluded.perms""",
+                    (objnum, name, json.dumps(prop.value), prop.owner, prop.perms)
+                )
+            obj.__dict__['_dirty_props'] = set()
+            return
 
         # Replace all properties
         self._conn.execute(
@@ -1392,6 +1446,11 @@ class Database:
                     verb.auth,
                 )
             )
+
+        # Everything on disk matches the object now, so the next save is
+        # eligible for the targeted path until something dirties it again.
+        obj.__dict__['_all_dirty'] = False
+        obj.__dict__['_dirty_props'] = set()
 
     def _load_objects(self):
         """

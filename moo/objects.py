@@ -539,7 +539,23 @@ class MOOObject:
         self._auto_save = True
         self._database = None   # Assigned by the database layer on load
         self._pending_save = False
-        
+
+        # --- Write tracking ---
+        #
+        # Saving used to rewrite the whole object every time: DELETE all
+        # properties, re-INSERT all of them, DELETE all verbs, re-INSERT
+        # all of them *including full source text* -- 192 statements for
+        # one property change on a character prototype.
+        #
+        # `_dirty_props` names the properties whose values changed, so a
+        # save can touch only those.  `_all_dirty` is the safety valve:
+        # it forces the old full rewrite, and _mark_modified -- the
+        # central hook every structural mutation already calls -- sets
+        # it.  So anything not specifically accounted for here still
+        # writes everything, and only the hot path is optimised.
+        self._dirty_props = set()
+        self._all_dirty = True          # a new object has everything to write
+
     def __repr__(self) -> str:
         """String representation of object."""
         return f"MOOObject(#{self.objnum}, '{self.name}')"
@@ -1182,6 +1198,7 @@ class MOOObject:
         if name in props:
             self._check_write(name, props[name])
             props[name].value = value
+            self.__dict__['_dirty_props'].add(name)
             self._invalidate_local()
             self._auto_save_to_db(db)
             return
@@ -1358,7 +1375,7 @@ class MOOObject:
         self._auto_save = False
         logger.debug(f"Auto-save disabled for #{self.objnum}")
     
-    def _mark_modified(self):
+    def _mark_modified(self, value_only: bool = False):
         """
         Central mutation hook: invalidate caches and persist.
 
@@ -1368,7 +1385,17 @@ class MOOObject:
         2. Auto-saves to the database if enabled.
         3. Sets ``_pending_save`` if auto-save is off, so a later
            explicit ``save()`` call knows work is pending.
+
+        Args:
+            value_only: True when the change was one property's *value*
+                and the caller has already named it in ``_dirty_props``.
+                Everything else -- a new property, a verb, a reparent --
+                leaves the object marked wholly dirty, so a save it did
+                not anticipate still writes everything.  That default is
+                what makes the targeted write path safe to add.
         """
+        if not value_only:
+            self.__dict__['_all_dirty'] = True
         self.invalidate_inheritance_cache()
         if self._auto_save and self._database:
             try:
@@ -1825,8 +1852,9 @@ class MOOObject:
         # If property exists locally, set it
         if name in self.properties:
             self.properties[name].value = value
+            self.__dict__['_dirty_props'].add(name)
             self.invalidate_inheritance_cache()
-            self._mark_modified()  # AUTO-SAVE
+            self._mark_modified(value_only=True)  # AUTO-SAVE
             return
             
         # If property is inherited, create local override
