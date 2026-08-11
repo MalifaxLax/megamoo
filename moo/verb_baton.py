@@ -43,6 +43,7 @@ what was read before.
 import logging
 import threading
 import time
+from contextlib import contextmanager
 from typing import Optional
 
 logger = logging.getLogger('megamoo.baton')
@@ -168,6 +169,42 @@ def run_guarded(compiled, namespace, record: Optional['Execution'] = None):
                 pop_frame()
             except Exception:
                 pass
+        _local.record = None
+        rec.started = None
+        release()
+
+
+@contextmanager
+def guarded(record: Optional['Execution'] = None):
+    """
+    Hold the baton for the duration of a block, and always give it back.
+
+    :func:`run_guarded` is the version for a compiled verb body dispatched
+    straight into the pool.  This one is for callers that already have
+    their own way of getting into verb code -- the ticker calls through
+    ``call_verb``, which pushes its own frame -- and only need the
+    one-verb-at-a-time guarantee wrapped around it.
+
+    Sets up the same :class:`Execution` record, so ``suspend()`` and
+    ``read()`` work inside the block exactly as they do in a verb reached
+    from a typed command.
+
+    Args:
+        record: Optional Execution the caller can watch.
+
+    Yields:
+        Execution: the record for this run.
+    """
+    acquire()
+    rec = record if record is not None else Execution()
+    # As in run_guarded: the clock starts after the baton is taken, so
+    # queueing behind another verb is not charged to this one.
+    rec.started = time.time()
+    rec.parked = 0.0
+    _local.record = rec
+    try:
+        yield rec
+    finally:
         _local.record = None
         rec.started = None
         release()

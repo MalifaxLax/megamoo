@@ -275,10 +275,27 @@ class TickerHandler:
         """
         Background coroutine that fires due subscriptions every second.
 
-        Due tickers are launched as fire-and-forget ``asyncio.Task``\\s
-        that dispatch to the server's verb thread pool.  The run loop
-        never awaits verb execution, so a slow or runaway ticker can
-        never block the event loop or delay other tickers.
+        Everything due in a given second is collected and fired **one at
+        a time**, not as one fire-and-forget task per subscription.
+
+        The old shape launched a task per due ticker, each taking a
+        thread from a 32-worker pool and calling verb code with no baton
+        -- so ticker bodies ran concurrently with each other and with a
+        player's command.  The corpus does read-modify-write on shared
+        objects (``d = dict(obj.p)``, mutate, assign back), which
+        silently loses updates the moment two verbs interleave; and under
+        CPython that interleaving bought no parallelism to pay for it,
+        since the GIL means threads take turns rather than run at once.
+        All of the hazard, none of the speed.
+
+        Firing serially also bounds the work: 500 characters with combat
+        tickers meant 500 tasks contending for the pool every second.  It
+        is one queue now, drained in order.
+
+        Each firing is still awaited individually rather than holding a
+        thread for the whole batch, so the event loop keeps running
+        between tickers and a player's command can take the baton in the
+        gaps.
 
         Args:
             server: The MegaMOOServer instance.
@@ -290,30 +307,51 @@ class TickerHandler:
             if not server.state.running:
                 break
             now = time.time()
+            due = []
             for key, sub in list(self._subscriptions.items()):
+                # The reentrancy guard.  next_fire used to advance before
+                # the verb ran, and nothing checked whether the previous
+                # firing had finished -- so a ticker slower than its own
+                # interval stacked copies of itself without bound and
+                # never recovered.
+                if sub.get('_in_flight'):
+                    continue
                 if now >= sub['next_fire']:
-                    sub['next_fire'] = now + sub['interval']
-                    objnum, idstring = key
-                    asyncio.create_task(
-                        self._fire_async(objnum, idstring, sub['verb']))
+                    sub['_in_flight'] = True
+                    due.append((key, sub))
+            if due:
+                asyncio.create_task(self._fire_due(due))
 
-    async def _fire_async(self, objnum: int, idstring: str, verb: str):
-        """Dispatch a single ticker verb to the thread pool with timeout."""
+    async def _fire_due(self, due):
+        """
+        Fire a batch of due subscriptions, one after another.
+
+        Args:
+            due: list of ``((objnum, idstring), subscription)`` pairs,
+                each already marked ``_in_flight`` by the caller.
+        """
         from .globals import COMMAND_TIMEOUT
 
         loop = asyncio.get_running_loop()
-        try:
-            await asyncio.wait_for(
-                loop.run_in_executor(
-                    self._server._verb_thread_pool,
-                    self._fire, objnum, verb),
-                timeout=COMMAND_TIMEOUT)
-        except asyncio.TimeoutError:
-            logger.error(
-                f"Ticker verb '{verb}' on #{objnum} timed out "
-                f"after {COMMAND_TIMEOUT}s")
-        except Exception as e:
-            logger.error(f"Ticker fire error #{objnum} '{idstring}': {e}")
+        for (objnum, idstring), sub in due:
+            try:
+                await asyncio.wait_for(
+                    loop.run_in_executor(
+                        self._server._verb_thread_pool,
+                        self._fire, objnum, sub['verb']),
+                    timeout=COMMAND_TIMEOUT)
+            except asyncio.TimeoutError:
+                logger.error(
+                    f"Ticker verb '{sub['verb']}' on #{objnum} timed out "
+                    f"after {COMMAND_TIMEOUT}s")
+            except Exception as e:
+                logger.error(f"Ticker fire error #{objnum} '{idstring}': {e}")
+            finally:
+                # Measured from completion rather than from when it was
+                # due, so a ticker that takes longer than its interval
+                # runs less often instead of queueing behind itself.
+                sub['next_fire'] = time.time() + sub['interval']
+                sub['_in_flight'] = False
 
     # -----------------------------------------------------------------
     # Verb invocation
@@ -343,10 +381,19 @@ class TickerHandler:
         if obj is None:
             return
 
+        from . import verb_baton
+
+        # Under the baton, like every other way into verb code.  This was
+        # the gap: run_guarded covered the two dispatch sites in
+        # server.py and nothing covered this one, so the "at no instant
+        # do two verbs execute" invariant the module documents was true
+        # of player commands and false of tickers -- which are exactly
+        # the things that fire while a player is mid-command.
         token = set_verb_context(obj, self._db, depth=0)
         try:
-            call_verb = make_call_verb(obj, self._db, _depth=0)
-            call_verb(obj, verb_name)
+            with verb_baton.guarded():
+                call_verb = make_call_verb(obj, self._db, _depth=0)
+                call_verb(obj, verb_name)
         except KeyError:
             pass
         except Exception as e:
