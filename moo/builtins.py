@@ -254,9 +254,23 @@ def shutdown_server(message="Server shutting down", restart=False, with_api=True
 # register for and fire.  See ``moo/hooks.py`` for the registry,
 # ``fire_hook()``, ``register_hook()``, etc.
 #
+# Hooks whose caller reads ``is False`` as "veto this".  A hook in this
+# set that *raises* is treated as a veto too: it was asked whether the
+# action may proceed and did not manage to say yes.  Everything not
+# listed here is a notification, where an exception should stay a logged
+# warning rather than silently start blocking the action.
+#
 # ``_call_hook`` is the low-level internal helper that actually executes
 # a hook verb on a specific object.  It is used by the builtin functions
 # (``move``, ``recycle``, ``chparent``, etc.) to invoke before/after hooks.
+
+CANCELLABLE_HOOKS = frozenset({
+    'before_recycle',
+    'before_move',
+    'before_leave',
+    'before_enter',
+    'before_reparent',
+})
 
 
 def _call_hook(obj, hook_name: str, args_str: str = '') -> Any:
@@ -292,8 +306,20 @@ def _call_hook(obj, hook_name: str, args_str: str = '') -> Any:
         call_verb_fn = make_call_verb(pobj, db, depth)
         return call_verb_fn(obj, hook_name, args=args_str)
     except Exception as e:
-        logger.warning(f"Hook {hook_name} on #{obj.objnum} raised: {e}")
-        return None
+        # Fail closed, not open.  Callers test the result `is False` to
+        # mean "veto", so returning None on error let a hook that raised
+        # be read as consent: a before_move that threw -- a typo'd
+        # property is an exception now, not a falsy sentinel -- allowed
+        # the move it existed to forbid.  A locked exit, a no-entry room
+        # and a recycle veto all quietly became no-ops, recorded as a
+        # warning nobody was reading.
+        #
+        # Only cancellable hooks are turned into a veto; a notification
+        # hook has no False to return and should not start blocking the
+        # thing it was only observing.
+        logger.warning("Hook %s on #%s raised: %s", hook_name, obj.objnum, e,
+                       exc_info=True)
+        return False if hook_name in CANCELLABLE_HOOKS else None
 
 
 # ============================================================================
@@ -1061,22 +1087,34 @@ def _send_room_gmcp(obj, dest_num):
         if not dest_num or dest_num <= 0:
             return
         room = _database.get_object(dest_num)
-        # Build exit list from directional exits (dnames/obvexits)
-        dnames = (room.dnames or [])
-        obvexits = (room.obvexits or [])
+        # Build exit list from directional exits (dnames/obvexits).
+        #
+        # getattr throughout, for the reason spelled out at the Room.Info
+        # payload below: a missing property raises E_PROPNF now, and a
+        # destination is not always a room.  Move a character into a
+        # container, a vehicle, or #2 while puppeting and a bare
+        # `room.dnames` raised -- straight into the `except: pass` at the
+        # bottom, so the client simply stopped being told where it was,
+        # with nothing in the log to say why.
+        dnames = getattr(room, 'dnames', None) or []
+        obvexits = getattr(room, 'obvexits', None) or []
         exits = []
         for idx in obvexits:
             if isinstance(idx, int) and idx < len(dnames):
                 exits.append(dnames[idx])
-        # Also include exit objects that are marked as obvious
+        # Also include exit objects that are marked as obvious.  `is_exit`
+        # is declared on #10 BaseObject, not #1, so the handful of objects
+        # under #1 but outside #10 -- #2, #6, #9 -- raise when asked.  One
+        # of those turning up in a room's contents used to abort the whole
+        # frame.
         for c in room.contents:
             if isinstance(c, int):
                 try:
                     c = _database.get_object(c)
                 except Exception:
                     continue
-            if c.is_exit and c.is_obvious:
-                exits.append((c.name or ''))
+            if getattr(c, 'is_exit', False) and getattr(c, 'is_obvious', False):
+                exits.append((getattr(c, 'name', '') or ''))
         # ``num`` is the room's identity, which is what lets a client map
         # the world exactly rather than guessing from room names (which
         # repeat).  ``coords`` is its cell in the canonical layout derived
@@ -1106,15 +1144,19 @@ def _send_room_gmcp(obj, dest_num):
         from .roommap import coords_for
         conn.send_gmcp_sync('Room.Info', {
             'num': dest_num,
-            'name': (room.name or ''),
-            'desc': (room.description or ''),
+            'name': (getattr(room, 'name', '') or ''),
+            'desc': (getattr(room, 'description', '') or ''),
             'exits': exits,
             'coords': coords_for(_database, dest_num),
-            'ic': bool(room.is_icroom),
+            'ic': bool(getattr(room, 'is_icroom', False)),
             'no_map': bool(getattr(room, 'no_map', False)),
         })
     except Exception:
-        pass
+        # Logged, unlike before.  A silent `pass` here meant the automap
+        # and the room panel could stop updating for the rest of the
+        # session with nothing at all to show for it -- the sibling
+        # send_inventory_gmcp already logs, and this should match.
+        logger.warning("Room.Info for #%s failed", dest_num, exc_info=True)
 
 
 def send_inventory_gmcp(obj):
@@ -1814,9 +1856,11 @@ def make_call_verb(pobj, db, _depth=0):
         ns['argv'] = list(argv)
 
         # --- Execute the verb code ---
-        from .verbs import preprocess_verb_code
         from .verb_context import set_verb_context, clear_verb_context
-        processed = preprocess_verb_code(verb_def.code)
+        # Cached, for the reasons in server.execute_command: a verb calling
+        # a verb paid the same recompilation, and nested calls compounded it.
+        if not verb_def.compiled_code:
+            verb_def.compile()
         from .verb_namespace import verb_body_vetoed, run_at_post_cmd
         token = set_verb_context(pobj, db, _depth + 1)
         # Record the frame so callers() and caller_perms() have a stack to
@@ -1828,7 +1872,7 @@ def make_call_verb(pobj, db, _depth=0):
             # The lifecycle applies to verb-to-verb calls too: at_pre_cmd()
             # ran when this namespace was built, and may have vetoed.
             if not verb_body_vetoed(ns):
-                exec(compile(processed, f'<verb {clean_verb_name}>', 'exec'), ns)
+                exec(verb_def.compiled_code, ns)
             run_at_post_cmd(ns, ns.get('result'))
         except Exception as e:
             run_at_post_cmd(ns, error=e)

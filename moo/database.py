@@ -51,12 +51,14 @@ import shutil
 import sqlite3
 import threading
 import time
+import weakref
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Set
 
+from .globals import OBJECT_CACHE_SIZE
 from .objects import MOOObject, ObjectFlags
 from .properties import MOOObjectRef, MOOError
 
@@ -276,9 +278,24 @@ class Database:
         self._index = DatabaseIndex()
 
         # ----- Object cache tuning -----
-        self._cache_size = 1000        # Max objects held in memory
+        self._cache_size = OBJECT_CACHE_SIZE   # Max objects held in memory
         self._cache_hits = 0
         self._cache_misses = 0
+
+        # Identity map: every object handed out, for as long as anything
+        # still holds a reference to it.
+        #
+        # `_objects` is a *bounded* cache, so it evicts.  Eviction alone
+        # was enough to split an object in two: verb code keeps `pobj`,
+        # `this` and `dobj` live across a whole verb body, and if the
+        # objnum was evicted mid-body a later get_object() built a second
+        # instance of the same object.  Two instances, each writing the
+        # whole row on save, silently discarded each other's changes.
+        #
+        # Weak values, so this map costs nothing once the last real
+        # reference goes away and never keeps the world in memory.
+        self._live: 'weakref.WeakValueDictionary[int, MOOObject]' = \
+            weakref.WeakValueDictionary()
 
         # ----- Inheritance cache stats -----
         self._inheritance_cache_builds = 0
@@ -392,6 +409,31 @@ class Database:
 
         logger.info(f"Saved {saved_count} modified objects (of {len(self._objects)} cached)")
 
+    def checkpoint_wal(self) -> bool:
+        """
+        Fold the write-ahead log back into the database file.
+
+        Distinct from :meth:`checkpoint`, which copies the whole database
+        to a timestamped backup.  This one moves committed pages out of
+        the ``-wal`` sidecar so the ``.db`` on disk *is* the world -- what
+        matters before a restart, a copy, or a commit, since the sidecar
+        is not tracked and a stale ``.db`` looks complete.
+
+        Returns:
+            bool: True if the checkpoint ran, False if there was no
+            connection or SQLite refused (a reader can block it).
+        """
+        if not self._conn:
+            return False
+        try:
+            with self._lock:
+                self._conn.commit()
+                self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            return True
+        except sqlite3.Error as e:
+            logger.warning("WAL checkpoint failed: %s", e)
+            return False
+
     def close(self):
         """
         Close the database, flushing any pending changes first.
@@ -401,6 +443,8 @@ class Database:
         """
         if self.mode != 'readonly':
             self.save()
+            # Leave the .db self-contained rather than half in a sidecar.
+            self.checkpoint_wal()
         if self._conn:
             self._conn.close()
             self._conn = None
@@ -495,6 +539,17 @@ class Database:
                     obj._database = self
                 return obj
 
+            # Evicted from the bounded cache, but still alive somewhere?
+            # Then that instance *is* the object, and loading a second
+            # copy would fork it.  Promote the existing one instead.
+            live = self._live.get(objnum)
+            if live is not None:
+                self._cache_hits += 1
+                if live._database is None:
+                    live._database = self
+                self._admit(objnum, live)
+                return live
+
             # Cache miss -- load from SQLite
             self._cache_misses += 1
             obj = self._load_object_from_sql(objnum)
@@ -503,15 +558,33 @@ class Database:
             obj._database = self
             obj.enable_auto_save(self)
 
-            # Evict oldest cached object if cache is full
-            if len(self._objects) >= self._cache_size:
-                evict_key = next(iter(self._objects))
-                evicted = self._objects.pop(evict_key)
-                if getattr(evicted, '_pending_save', False):
-                    self._save_object_to_sql(evicted)
-
-            self._objects[objnum] = obj
+            self._admit(objnum, obj)
             return obj
+
+    def _admit(self, objnum: int, obj: MOOObject) -> None:
+        """
+        Put *obj* in the bounded cache, evicting to make room.
+
+        Also records it in the identity map, which is what guarantees
+        that an eviction can never hand out a second instance of an
+        object something else is still holding.
+
+        Args:
+            objnum (int): The object's number.
+            obj (MOOObject): The instance to cache.
+        """
+        # Never evict down to nothing, and never evict the object we are
+        # admitting: `>=` on a full cache pops before inserting.
+        while len(self._objects) >= self._cache_size:
+            evict_key = next(iter(self._objects))
+            if evict_key == objnum:
+                break
+            evicted = self._objects.pop(evict_key)
+            if getattr(evicted, '_pending_save', False):
+                self._save_object_to_sql(evicted)
+
+        self._objects[objnum] = obj
+        self._live[objnum] = obj
 
     def create_object(self, parent: int = 0, owner: int = 0) -> MOOObject:
         """
@@ -563,7 +636,7 @@ class Database:
             self._index.max_object = max(self._index.max_object, objnum)
 
             # Add to cache
-            self._objects[objnum] = obj
+            self._admit(objnum, obj)
 
             # Save to SQLite immediately
             self._save_object_to_sql(obj)
@@ -614,7 +687,7 @@ class Database:
             if objnum >= self._index.next_objnum:
                 self._index.next_objnum = objnum + 1
 
-            self._objects[objnum] = obj
+            self._admit(objnum, obj)
 
             self._save_object_to_sql(obj)
             self._save_metadata()
@@ -707,9 +780,15 @@ class Database:
                 except KeyError:
                     pass
 
-            # Remove from in-memory cache
+            # Remove from in-memory cache, and from the identity map with
+            # it.  The map exists to stop a second instance being built
+            # for a number that is still live; a *recycled* number is the
+            # opposite case -- if this number is later reissued to a new
+            # object, anything still clutching the dead one must not be
+            # handed back as the new one's identity.
             if objnum in self._objects:
                 del self._objects[objnum]
+            self._live.pop(objnum, None)
 
             # DELETE CASCADE removes object + properties + verbs
             self._conn.execute(
@@ -747,8 +826,8 @@ class Database:
             return
 
         with self._lock:
-            # Update cache
-            self._objects[obj.objnum] = obj
+            # Update cache (and the identity map, via _admit)
+            self._admit(obj.objnum, obj)
 
             # Save to SQLite
             self._save_object_to_sql(obj)
@@ -957,7 +1036,7 @@ class Database:
         for obj in template_db.objects():
             new_obj = MOOObject.from_dict(obj.to_dict())
             new_obj._database = self
-            self._objects[new_obj.objnum] = new_obj
+            self._admit(new_obj.objnum, new_obj)
             self._save_object_to_sql(new_obj)
 
         # Copy index
@@ -1191,7 +1270,7 @@ class Database:
                     obj = self._load_object_from_sql(objnum)
                     obj._database = self
                     obj.enable_auto_save(self)
-                    self._objects[objnum] = obj
+                    self._admit(objnum, obj)
                     count += 1
                 except Exception as e:
                     logger.error(f"Error loading object #{objnum}: {e}")
@@ -1254,7 +1333,14 @@ class Database:
         logical transaction.
 
         Acquires the database lock for the duration of the block.  On
-        successful completion the changes are committed.
+        successful completion the changes are committed; if the block
+        raises, they are rolled back.
+
+        The rollback is the point.  Without it a failed block left its
+        statements pending on the shared connection, and the next
+        unrelated ``commit()`` -- a ticker saving itself, an autosave --
+        wrote them out.  A transaction that raised could therefore still
+        land, minutes later, in someone else's commit.
 
         Usage::
 
@@ -1264,6 +1350,11 @@ class Database:
                 db.save_object(obj)
         """
         with self._lock:
-            yield
+            try:
+                yield
+            except Exception:
+                if self._conn:
+                    self._conn.rollback()
+                raise
             if self._conn:
                 self._conn.commit()

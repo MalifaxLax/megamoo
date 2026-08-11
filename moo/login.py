@@ -49,6 +49,7 @@ License: MIT
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import logging
@@ -57,7 +58,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from .objects import MOOObject, ObjectFlags
-from .globals import SERVER_VERSION
+from .globals import SERVER_VERSION, CONNECTION_TIMEOUT
 from .globals import PASSWORD_PROMPT_RE  # noqa: F401  (re-exported for callers)
 
 if TYPE_CHECKING:
@@ -150,8 +151,13 @@ def check_password(plain: str, hashed: str) -> bool:
         unrecognised format, preventing login with a corrupted hash.
     """
     if not hashed:
-        # No password set — accept anything (new / unclaimed object)
-        return True
+        # No password set -- deny.  This used to return True, reasoning
+        # that an unclaimed pool object has no password to check.  The
+        # effect was that any object which ever ended up with an empty
+        # hash became permanently open: every password matched it, for
+        # good.  An object with no password is not an account anyone
+        # should be able to log into.
+        return False
     if _HAS_BCRYPT and hashed.startswith('$2'):
         # bcrypt hash (starts with $2a$, $2b$, or $2y$)
         return _bcrypt.checkpw(plain.encode(), hashed.encode())
@@ -351,6 +357,30 @@ def load_display_screen(config: 'ServerConfig') -> str:
     return DEFAULT_SCREEN
 
 
+def _with_login_timeout(read_line, timeout: float = CONNECTION_TIMEOUT):
+    """
+    Wrap a ``read_line`` callable so a silent client cannot wait forever.
+
+    Returns ``None`` on timeout rather than raising, because that is
+    already the login flow's signal for "the client is gone" and every
+    read site handles it.  The connection is closed by the caller.
+
+    Args:
+        read_line: The ``async callable() -> str | None`` to wrap.
+        timeout: Seconds to wait for one line.
+
+    Returns:
+        An async callable with the same contract.
+    """
+    async def guarded():
+        try:
+            return await asyncio.wait_for(read_line(), timeout)
+        except asyncio.TimeoutError:
+            logger.info("Login read timed out after %ss; dropping.", timeout)
+            return None
+    return guarded
+
+
 # =========================================================================
 #   LoginHandler — async conversation driver
 # =========================================================================
@@ -449,6 +479,15 @@ class LoginHandler:
             logged, and presented to the player as user-friendly
             messages.
         """
+        # A client that connects and then says nothing used to hold its
+        # slot for good: nothing timed out a login read, so a hundred
+        # silent sockets could fill max_connections and keep every real
+        # player out until a restart.  Wrapping once here covers all six
+        # read sites, _create_flow's included, and a timeout is reported
+        # as None -- which every one of them already handles as "the
+        # client went away".
+        read_line = _with_login_timeout(read_line)
+
         # Show splash banner. Lead with an SGR reset: raw mode bypasses the
         # dangling-style guard in _send, and a reconnecting client may still
         # be carrying attributes from a previous session.
@@ -570,7 +609,18 @@ class LoginHandler:
                     return None
                 pw = pw.strip()
 
-            if stored_hash and not check_password(pw, stored_hash):
+            # Not `if stored_hash and not check_password(...)`: that
+            # short-circuit let an account whose hash was empty skip the
+            # check completely -- the same hole check_password itself
+            # used to have, one layer up.  Always verify.
+            #
+            # In a thread, because verifying is deliberately expensive:
+            # PBKDF2 at 600k rounds measures ~133ms here, and run inline
+            # that is 133ms during which no other player's command, tick
+            # or socket read is served.  A crowd reconnecting after a
+            # restart would have queued behind each other one at a time.
+            if not await asyncio.get_running_loop().run_in_executor(
+                    None, check_password, pw, stored_hash):
                 await send("Incorrect password.\n")
                 continue
 
@@ -665,6 +715,14 @@ class LoginHandler:
             await send("Passwords do not match.\n")
             return None
 
+        # Pressing Enter twice used to pass the match check above and
+        # store an empty hash, which check_password then accepted from
+        # anybody.  Both of those now fail closed; refusing it here as
+        # well means the account never reaches that state to begin with.
+        if not pw1:
+            await send("A password is required.\n")
+            return None
+
         # --- Claim a PlayerPlace object from the pool ---
         # #2 (PLAYER_POOL) is a container holding blank PlayerPlace
         # objects.  We scan its contents for the first unclaimed one.
@@ -676,13 +734,30 @@ class LoginHandler:
                 break
 
         if player is None:
-            # Pool exhausted — no blank objects left.  An admin needs
-            # to create more PlayerPlace objects in #2.
-            await send(
-                "There's been an error creating your account. "
-                "Please email: devmind@deviousminds.com\n"
-            )
-            return None
+            # Pool exhausted -- mint one.
+            #
+            # The pool is a convenience, not a quota: it exists so the
+            # common case reuses a pre-made object, and running out of
+            # pre-made objects is no reason to stop taking players.  It
+            # used to be exactly that.  The shipped world holds 98
+            # claimable slots, so player 99 was turned away -- and turned
+            # away with an email address belonging to whoever built the
+            # world this code came from, which is not an address the
+            # operator can do anything about.
+            #
+            # parent/owner match a seeded PlayerPlace exactly (#4, 0), so
+            # the configuration below cannot tell the difference.
+            try:
+                player = self.database.create_object(
+                    parent=self.DEFAULT_PARENT, owner=0)
+                logger.info("Player pool empty; minted #%s for '%s'.",
+                            player.objnum, name)
+            except Exception as exc:
+                logger.error("Could not mint a player object: %s", exc,
+                             exc_info=True)
+                await send("Could not create your account just now. "
+                           "Please tell the administrator.\n")
+                return None
 
         try:
             # --- Configure the claimed object as the new player ---
@@ -694,8 +769,11 @@ class LoginHandler:
             # Set the display name
             player.set_property('name', name)
 
-            # Hash and store the password
-            pw_hash = hash_password(pw1) if pw1 else ''
+            # Hash and store the password.  Threaded for the same reason
+            # the verify is: hashing costs the same ~133ms, and account
+            # creation should not stop the world either.
+            pw_hash = await asyncio.get_running_loop().run_in_executor(
+                None, hash_password, pw1)
             try:
                 player.set_property('password', pw_hash)
             except KeyError:

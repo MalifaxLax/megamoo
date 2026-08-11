@@ -10,6 +10,16 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'tools'))
 
+# The bridge imports the `mcp` SDK, which is not an engine dependency --
+# pyproject declares none at all.  Imported bare, this line failed
+# *collection* in a fresh clone, so `pytest` reported one error and ran
+# zero tests: a new contributor's first command looked like a broken
+# repository rather than an optional extra they had not installed.
+pytest.importorskip(
+    'mcp.server.fastmcp',
+    reason="the MCP SDK is optional; `pip install mcp` to run these",
+)
+
 import megamoo_mcp
 
 

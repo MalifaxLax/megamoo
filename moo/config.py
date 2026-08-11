@@ -62,7 +62,8 @@ from dataclasses import dataclass, field, asdict
 import logging
 
 from moo.globals import (DEFAULT_PORT, DEFAULT_AUTORELOAD_VERBS,
-                         DEFAULT_AUTORELOAD_INTERVAL)
+                         DEFAULT_AUTORELOAD_INTERVAL,
+                         DEFAULT_MAX_CONNECTIONS)
 
 logger = logging.getLogger('megamoo.config')
 
@@ -141,7 +142,11 @@ class NetworkConfig:
     port: int = DEFAULT_PORT
     auto_port: bool = True
     port_scan_limit: int = 50
-    max_connections: int = 100
+    # From globals rather than a second, smaller number written out
+    # here: the two disagreed (100 against 500), this was the one
+    # actually enforced, and the constant meant to express the target
+    # was referenced nowhere in the engine.
+    max_connections: int = DEFAULT_MAX_CONNECTIONS
     tls_port: int = 0  # 0 = no TLS listener
     web_tls: bool = False
     tls_cert: str = ''

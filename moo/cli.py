@@ -180,6 +180,7 @@ def _shared_api_token() -> str:
 _SERVER_KEYS = {
     'host': str,
     'port': int,
+    'max_connections': int,
     'web': bool,
     'web_host': str,
     'web_port': int,

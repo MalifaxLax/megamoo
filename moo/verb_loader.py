@@ -227,7 +227,13 @@ def reload_verb_code(obj, verb_name: str, code: str, *, create: bool = True) -> 
             auth=existing.auth,
         )
         candidate.compile()  # raises CompileError -> caller logs, verb untouched
-        renamed = list(existing.names) != list(meta['names'])
+        # Abbreviations are part of what the cache stores: matchable_names()
+        # is built from names *and* min_lengths, so editing `examine=3` to
+        # `examine=2` with the names untouched left every descendant still
+        # matching only `exa`, and a removed abbreviation went on answering
+        # until something unrelated happened to invalidate the cache.
+        renamed = (list(existing.names) != list(meta['names'])
+                   or dict(existing.min_lengths) != dict(meta['min_lengths']))
         existing.code = code
         existing.compiled_code = candidate.compiled_code
         existing.names = list(meta['names'])

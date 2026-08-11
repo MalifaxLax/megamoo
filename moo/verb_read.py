@@ -199,7 +199,12 @@ def read(who=None, prompt: str = '') -> str:
 
     if who is not None and actor is not None:
         same = (getattr(who, 'objnum', who) == getattr(actor, 'objnum', actor))
-        if not same and not getattr(actor, 'wizard', False):
+        # `is_wizard`, not `wizard`: there is no attribute or property by
+        # the latter name, so getattr always answered False and no wizard
+        # could ever read from another player.  It failed closed, which is
+        # why it went unnoticed -- and would have turned into a hole the
+        # day any world declared a property literally called `wizard`.
+        if not same and not getattr(actor, 'is_wizard', False):
             raise MOOError('read() on another player requires wizard '
                            'permissions')
 

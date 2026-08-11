@@ -1151,10 +1151,17 @@ class MegaMOOServer:
             )
 
             logger.debug(f"Executing verb code...")
-            from .verbs import preprocess_verb_code
             from .verb_context import set_verb_context, clear_verb_context
-            processed_code = preprocess_verb_code(verb_def.code)
-            compiled = compile(processed_code, f'<verb {verb_def.names[0]}>', 'exec')
+            # Compile once per verb, not once per command.  VerbDef caches
+            # the code object, and every path that changes a verb's source
+            # already clears it -- set_verb, the API, the autoreload
+            # watcher, @reload -- so a stale body cannot outlive an edit.
+            # Compiling inline here instead spent the median verb's ~200us
+            # on the event loop for every command any player typed, which
+            # is the one thread the whole game shares.
+            if not verb_def.compiled_code:
+                verb_def.compile()
+            compiled = verb_def.compiled_code
             # depth=0 because this is a top-level player command, not a
             # verb calling another verb.
             from .verb_namespace import verb_body_vetoed, run_at_post_cmd
@@ -1511,6 +1518,21 @@ def run_server(database_path: str, port: Optional[int] = None,
             argv.append('--web')
         logger.info("Restarting server (api=%s, web=%s)...",
                     server.state.restart_with_api, server.state.restart_with_web)
+
+        # execv replaces this process image outright: no atexit handlers,
+        # no __del__, no SQLite cleanup.  Shutdown commits, but nothing
+        # ever closed the connection or folded the WAL back into the
+        # database, so every restart left the world split across a .db
+        # and a sidecar that grew across restarts.  SQLite recovers it on
+        # open, so no data was lost -- but the tracked .db on disk was
+        # not the world, which is the trap behind having to checkpoint by
+        # hand before committing one.
+        try:
+            server.database.checkpoint_wal()
+            server.database.close()
+        except Exception as e:                  # never block a restart
+            logger.warning("Pre-restart database close failed: %s", e)
+
         os.execv(sys.executable, [sys.executable] + argv)
 
     # A server that died on the way up must not look like a clean run: a

@@ -92,6 +92,7 @@ License: MIT
 
 import asyncio
 import errno
+import hmac
 import json
 import logging
 import os
@@ -300,9 +301,11 @@ class ApiConnection:
         """
         Authenticate the client with a shared-secret token.
 
-        If no ``auth_token`` is configured on the server, authentication
-        succeeds unconditionally.  Otherwise the client must provide the
-        correct token.
+        A server with no ``auth_token`` configured refuses to authenticate
+        anyone.  It used to succeed unconditionally, which meant a plain
+        ``--api`` with no token handed ``eval`` -- arbitrary Python, in
+        process -- to anything that could reach the port.  Failing closed
+        turns that from a silent hole into a startup message.
 
         Args:
             args (dict): Expected keys:
@@ -312,11 +315,19 @@ class ApiConnection:
             dict: ``{'authenticated': True}`` on success.
 
         Raises:
-            PermissionError: If the token does not match.
+            PermissionError: If no token is configured, or if the supplied
+                token does not match.
         """
         token = args.get('token', '')
         required = self.api.config.auth_token
-        if required and token != required:
+        if not required:
+            raise PermissionError(
+                'API authentication is not configured, so no client can '
+                'authenticate. Start the server with --api-token, or with '
+                '--dev, which generates one.')
+        # Constant time: a plain != leaks the token a byte at a time to
+        # anyone who can measure the reply.
+        if not hmac.compare_digest(str(token), str(required)):
             raise PermissionError('Invalid auth token')
         self.authenticated = True
         return {'authenticated': True}
