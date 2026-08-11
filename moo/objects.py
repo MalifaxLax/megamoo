@@ -771,6 +771,74 @@ class MOOObject:
             return {k: self._resolve_objref(v) for k, v in value.items()}
         return value
 
+    def msg(self, message: str = '', sub=None, dob=None, iob=None,
+            uob=None, **kwargs):
+        """
+        Send *message* to this object, with emit substitution.
+
+        The single most-called thing in a running world: every line of
+        room description, every emote, and every combat message arrives
+        through here, and ``msg_room`` calls it once per listener.
+
+        Native, but still overridable.  ``msg`` used to be a three-line
+        verb on #1 that did nothing but forward to ``notify()``, and it
+        cost 168us to reach a 1.1us primitive -- about 150x overhead for a
+        pass-through, multiplied by however many people are standing in
+        the room.  What that bought was one genuinely valuable thing: an
+        object could define its own ``msg`` and filter what it hears, which
+        is how a deafened character stops hearing things.
+
+        So the option is kept and the cost is not.  ``find_verb`` answers
+        "does anything override this?" in 0.17us against a cache, and only
+        an object that actually does one pays for a verb dispatch.  It is
+        consulted per call, so a ``msg`` verb added at runtime takes effect
+        immediately -- there is no cache here to go stale.
+
+        There is deliberately no ``msg`` verb on #1 any more.  A default
+        that lives in two places, one of which silently never runs, is the
+        shape of bug that outlives everyone who understood it.
+
+        Args:
+            message: Message text.  Supports emit tokens (``&S``, ``&d``,
+                ``&i``, ``&u`` and the pronoun forms) and the ``&0``/``&1``
+                raw-string slots.
+            sub: Subject object, for ``&s``/``&S`` and pronouns.
+            dob: Direct object, for ``&d``/``&D``.
+            iob: Indirect object, for ``&i``/``&I``.
+            uob: Noun source, for ``&u``/``&U``.
+            **kwargs: ``s0``/``s1``/... raw-string slots, passed through to
+                the substitution engine.  Anything else is forwarded to an
+                override verb and otherwise ignored.
+        """
+        from . import builtins as _builtins
+
+        # Does this object -- or anything it inherits from -- override
+        # messaging?  Almost nothing does, and asking is nearly free.
+        db = self.__dict__.get('_database')
+        if db is not None:
+            try:
+                _, verb_def = self.find_verb('msg', db)
+            except Exception:
+                verb_def = None
+            if verb_def is not None:
+                from .verb_context import verb_ctx
+                ctx = verb_ctx.get(None)
+                if ctx is not None:
+                    pobj, ctx_db, depth = ctx
+                    call = _builtins.make_call_verb(pobj, ctx_db, depth)
+                    return call(self, 'msg', args=str(message), sub=sub,
+                                dob=dob, iob=iob, uob=uob,
+                                _pyargs=(message,), **kwargs)
+                # No verb context to dispatch under (a ticker firing during
+                # startup, say).  Falling through to notify is the right
+                # failure: the player hears the line rather than nothing.
+
+        # The raw-string slots the substitution engine reads as &0/&1/...
+        svals = {k: v for k, v in kwargs.items()
+                 if len(k) >= 2 and k[0] == 's' and k[1:].isdigit()}
+        _builtins.notify(self, message, sub=sub, dob=dob, iob=iob, uob=uob,
+                         svals=svals or None)
+
     def msg_room(self, message: str, exclude=None, **kwargs):
         """
         Send *message* to all players in this object's contents.
