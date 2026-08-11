@@ -38,8 +38,9 @@
         <li><a href="#copy">Creating a world</a></li>
         <li><a href="#start">Starting a world</a></li>
         <li><a href="#login">Logging in</a></li>
-        <li><a href="#several">Running several worlds at once</a></li>
+        <li><a href="#yours">Making it yours</a></li>
         <li><a href="#tls">Encrypting connections</a></li>
+        <li><a href="#several">Running several worlds at once</a></li>
     </ol>
 </nav>
 
@@ -181,6 +182,37 @@ world.
        password hash is a shipped secret. If you lose it before setting your
        own with <code>setpass</code>, the quickest route is a fresh
        <code>megamoo init</code>.</p>
+</div>
+
+<h2 id="yours">Making it yours</h2>
+
+<p>
+<code>Wizard</code> is a placeholder. That account is meant to become
+<em>your</em> character, so the first thing worth doing is renaming it:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @rname #100 = Malifax
+<span class="o">Account #100:Wizard is now Malifax.</span>
+<span class="o">It logs in as 'Malifax'.</span></code></div>
+
+<p>
+The login name moves with it. From the next connection you are
+<code>Malifax</code> at the prompt and <code>Wizard</code> no longer
+works. Set your own password at the same time, with
+<code>setpass &lt;newpassword&gt;</code>.
+</p>
+
+<div class="note">
+    <span class="label">Why not <code>@name</code></span>
+    <p><code>@name</code> renames an object, and an account is two things:
+       the object, and the name in the login index that a player types at
+       the prompt. <code>@name</code> changes only the first, which would
+       leave you called by your own name while still logging in as
+       <code>Wizard</code>. <code>@rname</code> changes both, and refuses a
+       name that already belongs to another account rather than quietly
+       taking the login off them.</p>
+    <p><code>@name</code> is still the right verb for rooms, objects and
+       exits &mdash; everything that nobody logs in as.</p>
 </div>
 
 <h2 id="tls">Encrypting connections</h2>

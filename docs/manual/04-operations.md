@@ -126,10 +126,17 @@ Two things to do on first login, before anything else:
    the [security checklist](#security-checklist).
 2. **Make it yours — rename #100.** This account is meant to *become* the
    owner's own character, not stay a generic "Wizard." Rename it with
-   `@name #100 = <YourName>` (see
-   [naming objects](03-building-worlds.md#objects-create-name-describe)); the
-   login username follows the account name. From here you grant other staff their
-   tiers with `@auth` (see [the permission ladder](#the-permission-ladder)).
+   `@rname #100 = <YourName>`, which moves the login name with it — you log
+   in as the new name from then on, and `Wizard` stops working.
+
+   Use `@rname`, not `@name`, for an account. `@name` renames the object
+   and leaves the login where it was, so you would end up called by your
+   own name while still typing `Wizard` at the prompt. `@name` remains the
+   right verb for everything that is not an account (see
+   [naming objects](03-building-worlds.md#objects-create-name-describe)).
+
+   From here you grant other staff their tiers with `@auth` (see
+   [the permission ladder](#the-permission-ladder)).
 
 > Keep at least one account at `gm5`. If you rename and re-secure #100 it remains
 > your god account; only create additional `gm5` accounts deliberately.
