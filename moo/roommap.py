@@ -95,7 +95,22 @@ def _exits_of(room, dnames):
 
 
 def _is_room(obj):
-    return bool(obj.is_room)
+    """Whether *obj* is a room, asked so that every object can answer.
+
+    getattr with a default, not a bare read.  #1 declares ``is_room``
+    false precisely so anything under Root can be asked -- but #0 is not
+    under Root.  It is the system object, its parent is 0, and it inherits
+    none of those declarations, so the bare read raised E_PROPNF on it.
+
+    That mattered more than it looks.  The walk below runs over objects in
+    numeric order, so it reached #0 first and died there every time;
+    ``get_layout`` caught the exception, logged it, and cached an empty
+    layout.  Every room then reported no coordinates, every mapping client
+    fell back to dead-reckoning from whichever way the player happened to
+    walk, and the canonical layout this module exists to provide had never
+    once been computed.
+    """
+    return bool(getattr(obj, 'is_room', False))
 
 
 def _free_cell(taken, x, y, z):
