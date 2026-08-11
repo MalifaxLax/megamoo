@@ -405,10 +405,24 @@ class CommandParser:
 
         Returns:
             tuple[int, VerbDef | None]: ``(object_number, verb_def)``
-            where ``object_number`` is the objnum of the object that
-            *defines* the verb (which may be an ancestor), and
-            ``verb_def`` is the ``VerbDef`` instance.  Returns
+            where ``object_number`` is the objnum of the object the verb
+            was found *on* -- the player, the room, an object in it --
+            and ``verb_def`` is the ``VerbDef`` instance.  Returns
             ``(0, None)`` if the verb is not found anywhere.
+
+            Not the ancestor that defines the verb, which is what this
+            used to report.  Player commands live on the room prototypes
+            (#16, #17), so every typed command arrived with ``this``
+            bound to #17 rather than to the room the player was standing
+            in, and ``this.counter += 1`` in a room verb wrote to the
+            prototype shared by every room in the game.  The corpus
+            worked around it by reaching for ``pobj.location`` instead;
+            #15's own helpers document ``this`` as "the room being
+            searched", which is what it now is.
+
+            The caller re-resolves the verb from this object anyway, and
+            ``find_verb`` walks inheritance, so reporting the object
+            rather than the definer loses nothing.
 
         Notes:
             Exceptions from individual ``find_verb`` calls on room
@@ -420,10 +434,11 @@ class CommandParser:
         logger.debug(f"Player: #{self.player.objnum}, location: {self.player.location}")
 
         # 1. Check the player object itself
-        objnum, verb_def = self.player.find_verb(verb_name, self.database)
+        _defined_on, verb_def = self.player.find_verb(verb_name, self.database)
         if verb_def:
-            logger.debug(f"Found verb on player #{objnum}")
-            return objnum, verb_def
+            logger.debug(f"Found verb on player #{self.player.objnum}"
+                         f" (defined on #{_defined_on})")
+            return self.player.objnum, verb_def
 
         # 2. Check the player's location (room)
         location = self.player.location
@@ -431,10 +446,11 @@ class CommandParser:
             logger.debug(f"Checking location #{location.objnum}")
             try:
                 logger.debug(f"Location: {location.name}, has {len(location.verbs)} verbs")
-                objnum, verb_def = location.find_verb(verb_name, self.database)
+                _defined_on, verb_def = location.find_verb(verb_name, self.database)
                 if verb_def:
-                    logger.debug(f"Found verb on location #{objnum}")
-                    return objnum, verb_def
+                    logger.debug(f"Found verb on location #{location.objnum}"
+                                 f" (defined on #{_defined_on})")
+                    return location.objnum, verb_def
                 else:
                     logger.debug(f"Verb '{verb_name}' not found on location")
 
@@ -444,9 +460,9 @@ class CommandParser:
                     if obj.objnum == self.player.objnum:
                         continue
                     try:
-                        objnum, verb_def = obj.find_verb(verb_name, self.database)
+                        _defined_on, verb_def = obj.find_verb(verb_name, self.database)
                         if verb_def:
-                            return objnum, verb_def
+                            return obj.objnum, verb_def
                     except Exception:
                         pass
             except Exception as e:
@@ -457,9 +473,9 @@ class CommandParser:
         # 4. Check the player's inventory (carried objects)
         for obj in self.player.contents:
             try:
-                objnum, verb_def = obj.find_verb(verb_name, self.database)
+                _defined_on, verb_def = obj.find_verb(verb_name, self.database)
                 if verb_def:
-                    return objnum, verb_def
+                    return obj.objnum, verb_def
             except Exception:
                 pass
 
