@@ -88,6 +88,11 @@
   --term-line-height: 1.1667;
 
   --pad: 12px;
+
+  /* The map's width, in one place: #corner sizes itself from it and the
+     scrollback reserves exactly that much. Two copies would drift, and the
+     drift shows as text under the map or a stripe of dead space. */
+  --map-width: min(280px, 42vw);
 }
 
 /* ========================================================================
@@ -228,6 +233,18 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
   scrollbar-color: var(--border-bright) transparent;
+}
+
+/* Room reserved for the map, so text stops running underneath it.
+   Toggled by automap.js alongside the panel itself, so the column exists
+   exactly when the map does -- it goes away in an OOC room, on a no-map
+   room, and when the connection drops, and the full width comes back.
+
+   A reserved column rather than a float, because the map has to stay put.
+   A float is in-flow and would scroll away with the first screenful; this
+   is the price of a map that is always where you left it. */
+#scrollback.has-map {
+  padding-right: calc(var(--map-width) + var(--pad) * 2);
 }
 
 .line { min-height: 1px; }
@@ -584,10 +601,13 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: min(280px, 42vw);
+  width: var(--map-width);
   max-height: 100%;
   overflow-y: auto;
-  padding: var(--pad);
+  /* No padding at the top: the map's own top edge lines up with the top of
+     the text area rather than hanging below it. Sides and bottom keep the
+     gutter so it does not touch the pane edge. */
+  padding: 0 var(--pad) var(--pad);
   pointer-events: none;   /* overlays are readouts; don't block the terminal */
 }
 

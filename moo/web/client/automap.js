@@ -234,6 +234,17 @@ const map = {
  * ========================================================================= */
 
 const panel  = document.getElementById('automap');
+
+/* Showing the map reserves a column for it in the scrollback, so game text
+ * stops running underneath it. Every place that shows or hides the panel
+ * goes through here, so the two cannot get out of step -- a reserved column
+ * with no map in it is a stripe of wasted width, and a map with no column
+ * is text hidden behind a box. */
+function showPanel(visible) {
+  panel.hidden = !visible;
+  const back = document.getElementById('scrollback');
+  if (back) back.classList.toggle('has-map', visible);
+}
 const canvas = document.getElementById('automap-canvas');
 const label  = document.getElementById('automap-room');
 const ctx    = canvas.getContext('2d');
@@ -479,7 +490,7 @@ const Automap = {
     // -- that is what the reset button is for. The next Room.Info brings
     // the panel straight back.
     api.on('disconnect', () => {
-      panel.hidden = true;
+      showPanel(false);
       previousNum = null;   // never draw a link across the gap
     });
 
@@ -506,7 +517,7 @@ const Automap = {
       if (!room.ic || room.no_map) {
         previousNum = null;
         currentNum = null;
-        panel.hidden = true;
+        showPanel(false);
         return;
       }
 
@@ -530,7 +541,7 @@ const Automap = {
       label.textContent = levels.size > 1
         ? `${record.name}  ·  level ${record.z || 0}`
         : record.name;
-      panel.hidden = false;
+      showPanel(true);
       map.save();
       draw();
     });
@@ -542,7 +553,7 @@ const Automap = {
     map.clear();
     previousNum = null;
     currentNum = null;
-    panel.hidden = true;
+    showPanel(false);
   },
 
   get rooms() { return map.rooms.size; },
