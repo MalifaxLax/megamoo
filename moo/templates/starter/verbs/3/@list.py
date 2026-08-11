@@ -37,6 +37,12 @@ else:
 
 pobj.msg(f"Start: {start} End: {end}")
 
+# Gaps in the number line are normal -- recycled objects, and the holes
+# left between prototype blocks -- so they are counted, not narrated.
+# A virgin world has 63 of them, and printing a line each made a third of
+# this command's output an error report about nothing being wrong.
+missing = 0
+
 for num in range(start, end + 1):
     try:
         obj = db.get_object(num)
@@ -46,6 +52,10 @@ for num in range(start, end + 1):
         else:
             pobj.msg(f"#{num} is a placeholder object,")
     except Exception:
-        pobj.msg(f"#{num} is not a valid object number.")
+        missing += 1
+
+if missing:
+    pobj.msg(f"({missing} unused object number"
+             f"{'' if missing == 1 else 's'} in this range.)")
 
 pobj.msg("Done.")

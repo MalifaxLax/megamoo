@@ -45,13 +45,13 @@ if not args:
     pobj.msg("Jump what?")
     return
 
-# Roundtime and posture. Reading a property that is not defined returns a
-# falsy sentinel rather than raising, so neither needs a guard.
-if pobj.rt > 0:
-    pobj.msg("You must wait.")
+# Can the character act? do_wait covers roundtime as well as the
+# immobilising conditions, and emits its own message.
+if pobj.do_wait():
     return
 
-if pobj.position:
+pos = pobj.position or 0
+if pos:
     pobj.msg("You can't do that in your current position.")
     return
 
@@ -96,9 +96,9 @@ which is the same spelling verbs already use for `moo.objects`. That is
 the whole extension mechanism — no plugin registry, no hooks, nothing
 new to learn.
 
-The starter world comes with 200+ verbs: player commands, staff and
-building tools (66 `@`-commands), character generation, and the
-edibles/liquids and merchant systems. They are copied into your game, so
+The starter world comes with 190 verbs: player commands, staff and
+building tools (75 `@`-commands), rooms and exits, containers and
+furniture, and character generation. They are copied into your game, so
 they are yours to edit — the engine keeps no copy you have to merge
 against.
 
@@ -149,7 +149,7 @@ the option to turn server-side wrapping off entirely. See
 | [Getting Started](https://malifaxlax.github.io/megamoo/getting-started.html) | Your first room, object and verb |
 | [Building Worlds](https://malifaxlax.github.io/megamoo/rooms.html) | Rooms, exits, objects, shops |
 | [Writing Verbs](https://malifaxlax.github.io/megamoo/verbs.html) | The programming model |
-| [Command Reference](https://malifaxlax.github.io/megamoo/commands.html) | All 74 staff commands |
+| [Command Reference](https://malifaxlax.github.io/megamoo/commands.html) | All 75 staff commands |
 | **[Coming from LambdaMOO](https://malifaxlax.github.io/megamoo/moo-compat.html)** | **Importing an old database, and porting its verbs** |
 | [The Web Client](https://malifaxlax.github.io/megamoo/web-client.html) | Playing in a browser |
 
