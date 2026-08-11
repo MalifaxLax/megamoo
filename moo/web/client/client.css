@@ -265,8 +265,15 @@ body {
 }
 
 /* Locally echoed commands, so the player can see what they sent. */
-.line--echo { color: var(--fg-faint); }
+.line--echo { color: var(--fg-dim); }
 .line--echo::before { content: "> "; color: var(--accent); opacity: 0.5; }
+
+/* An echo finishing a prompt the server left open, rather than starting a
+   line of its own. No "> " -- the prompt is already the marker -- and the
+   same dim as any other echo, which is a shade you can actually read.
+   --fg-faint, which both of these used to be, is the palette's quietest
+   colour and belongs on chrome nobody needs to notice. */
+.echo-inline { color: var(--fg-dim); }
 
 /* Client-generated notices (connection state), kept visually distinct
    from anything the game itself said. */

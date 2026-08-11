@@ -165,16 +165,41 @@ const term = {
     this._append(node);
   },
 
-  /** Append plain text as its own line (client notices, script echo). */
+  /** Append plain text as its own line (client notices, script echo).
+   *
+   * An echo is the exception. A prompt the server left open -- "Enter your
+   * username or NEW to create a new account: ", sent with no newline -- is
+   * waiting to be finished by what you type, and a block element cannot
+   * finish it: the answer dropped to the line below and the prompt sat
+   * there looking unanswered. When the line is still open the echo goes in
+   * inline, completing it the way a terminal does.
+   *
+   * The "> " marker goes with it. At the start of a line it separates what
+   * you typed from what the game said, and it earns its place; halfway
+   * through a prompt it just reads as noise.
+   */
   note(text, kind) {
+    if (kind === 'echo' && !this.atLineStart) {
+      const span = document.createElement('span');
+      span.className = 'echo-inline';
+      span.textContent = text + '\n';
+      this._append(span);
+      return;
+    }
     const div = document.createElement('div');
     div.className = 'line line--' + (kind || 'client');
     div.textContent = text;
     this._append(div);
   },
 
+  /** True when the last thing appended ended a line, so the next thing
+   *  starts one. Anything that leaves a line open -- a prompt -- clears it. */
+  atLineStart: true,
+
   _append(node) {
     scrollback.appendChild(node);
+    const text = node.textContent || '';
+    if (text) this.atLineStart = text.endsWith('\n');
     while (scrollback.childNodes.length > MAX_NODES) {
       scrollback.removeChild(scrollback.firstChild);
     }
@@ -456,6 +481,13 @@ const input = {
     // person at the keyboard.
     if (this.masked) {
       net.send({ type: 'input', data: text });
+      // The line still ends, even though nothing of it is shown. A
+      // terminal emits this newline itself when you press Enter, and the
+      // server counts on it: without one here the password prompt stayed
+      // open and the room description arrived on the same line as
+      // "Password:". Adding it server-side instead gave telnet, which
+      // already had its own, two blank lines and the browser one.
+      if (!term.atLineStart) term.note('', 'echo');
       this.setMasked(false);
       return;
     }
