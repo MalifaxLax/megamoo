@@ -31,7 +31,9 @@ client picks `wss://` automatically from the page's own scheme.
 | `index.html` | Page structure |
 | `client.css` | All styling, plus the colour classes `moo/web/color.py` emits |
 | `client.js` | Socket, scrollback, input line, event bus, public API |
+| `commands.js` | The `\` client commands: aliases, triggers, speech |
 | `automap.js` | Corner map of the world, built from `Room.Info` |
+| `inventory.js` | Corner inventory panel, built from `Char.Inventory` |
 | `panels.js` | Renders script-declared UI from a widget vocabulary |
 | `scripting.js` | Script manager, host registry, the API scripts call |
 | `scripts-ui.js` | Script manager dialog |
@@ -169,11 +171,68 @@ each end instead — the connection still reads, without the clutter.
 If a server sends no `coords`, the client falls back to placing rooms by
 the direction the player moved.
 
+## Client commands
+
+A line starting with `\` is the client's own and never reaches the game.
+The set follows MegaTerm's, so muscle memory carries between the two.
+
+| Command | Does |
+| --- | --- |
+| `\connect [wsUrl]` | Reconnect. A URL re-points the socket, **this origin only** |
+| `\disconnect` | Close the socket and stay closed |
+| `\quit` | Disconnect — a browser tab cannot close itself |
+| `\clear` | Empty the scrollback |
+| `\alias [name] [value...]` | Set, show, or list aliases |
+| `\unalias <name>` | Remove one |
+| `\trigger <sub> ...` | `add`, `remove`, `enable`, `disable`, `list`, `test` |
+| `\speech` | Toggle text-to-speech over the output |
+| `\su` / `\sd` / `\se` | Scroll up / down / to the end |
+| `\test [ansi\|plain]` | Fill the scrollback, to look at colour and scrolling |
+| `\help` | The above |
+
+Aliases expand the **first word only** — `k orc` with `k = kill` sends
+`kill orc`. Both aliases and triggers live in `localStorage` and save as
+you set them, which is why there is no `\save`.
+
+### Triggers
+
+```
+\trigger add <name> text <pattern> <action> [value]
+\trigger add <name> gmcp <package> send <command>
+```
+
+Patterns are regular expressions; quote one containing spaces. The
+actions are `send <command>`, `highlight <style>`, and `gag`. Styles are
+a fixed set — `yellow red green cyan blue magenta grey` — rendered as
+translucent backgrounds rather than text colours, because game text
+arrives already wrapped in its own colour spans and those win over any
+foreground set on an ancestor.
+
+`gag` and `highlight` are why `term.write` buffers output by line: a
+filter that can suppress a line has to run *before* that line is in the
+document. Composed blocks — the splash, a full-screen frame, an image —
+are exempt, since gagging one row of ASCII art would only wreck the
+drawing it belongs to. A gagged line is still published on the `line`
+event, so scripts see the whole stream either way.
+
+`\connect` refuses a cross-origin URL on purpose. Everything arriving on
+the socket is trusted *as markup* by the terminal, which is safe only
+because the server at the other end is the one that escaped it; a socket
+aimed elsewhere is script execution on this page and a convincing fake
+password prompt. The legitimate cross-origin case — page on a CDN, game
+elsewhere — is configured once in `?ws=` at load, where it is the
+deployment's decision rather than a typed one.
+
 ## Scripting
 
 Scripts are written in **Lua** or **JavaScript** and managed from the
 *Scripts* button. Both languages get an identical API, so logic ports
 between them.
+
+Scripts get their own regex triggers and aliases through `moo.trigger`
+and `moo.alias`; those are independent of the `\` commands above, and
+run after them — `commands.js` attaches first, so a script's alias
+pattern cannot swallow `\help`.
 
 ### Choosing a language
 

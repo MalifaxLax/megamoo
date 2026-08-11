@@ -343,6 +343,20 @@ body {
   font-style: italic;
 }
 
+/* Lines marked by a \trigger ... highlight rule.
+   Backgrounds, not foregrounds: game text arrives already wrapped in its
+   own colour spans, which win over any colour set on an ancestor — so a
+   foreground highlight would be invisible on exactly the coloured lines
+   people most want marked. Translucent, so the text underneath keeps its
+   own colour and stays readable. */
+.hl-yellow  { background-color: rgb(217 164  65 / 0.28); }
+.hl-red     { background-color: rgb(217  86  78 / 0.30); }
+.hl-green   { background-color: rgb( 89 196 106 / 0.26); }
+.hl-cyan    { background-color: rgb( 79 163 168 / 0.30); }
+.hl-blue    { background-color: rgb( 91 144 214 / 0.30); }
+.hl-magenta { background-color: rgb(164  99 176 / 0.32); }
+.hl-grey    { background-color: rgb(124 134 149 / 0.24); }
+
 #scroll-latest {
   position: absolute;
   right: var(--pad);

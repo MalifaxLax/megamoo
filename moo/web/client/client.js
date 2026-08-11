@@ -117,9 +117,74 @@ const jumpButton = document.getElementById('scroll-latest');
 
 const MAX_NODES = 4000;   // scrollback cap; old output is dropped wholesale
 
+/* -------------------------------------------------------------------------
+ * Output filters
+ * -------------------------------------------------------------------------
+ * A filter sees each completed line as plain text and may suppress it or
+ * ask for it to be marked.  Registered by commands.js for \trigger; the
+ * hook is kept generic so the core never has to know that exists.
+ *
+ *   fn(text) -> {gag: true} | {highlight: '<class>'} | null
+ * ------------------------------------------------------------------------- */
+
+const outputFilters = new Set();
+
+function runOutputFilters(text) {
+  let gag = false;
+  let highlight = null;
+  for (const fn of Array.from(outputFilters)) {
+    try {
+      const verdict = fn(text);
+      if (!verdict) continue;
+      if (verdict.gag) gag = true;
+      if (verdict.highlight && !highlight) highlight = verdict.highlight;
+    } catch (err) {
+      console.error('[megamoo] output filter threw:', err);
+    }
+  }
+  return { gag, highlight };
+}
+
+/**
+ * Cut every *complete* line out of `container`, leaving the unterminated
+ * tail in place.
+ *
+ * Ranges rather than string surgery: a newline can fall inside a <span>,
+ * and extractContents() splits the enclosing elements and keeps the
+ * markup intact on both sides of the cut, which slicing the HTML string
+ * cannot do.
+ */
+function takeCompleteLines(container) {
+  const lines = [];
+  for (;;) {
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    let hit = null;
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const index = node.data.indexOf('\n');
+      if (index !== -1) { hit = { node, index }; break; }
+    }
+    if (!hit) return lines;
+    const range = document.createRange();
+    range.setStart(container, 0);
+    range.setEnd(hit.node, hit.index + 1);   // the newline goes with its line
+    lines.push(range.extractContents());
+  }
+}
+
 const term = {
   /** True when the view is parked at the bottom and should follow output. */
   pinned: true,
+
+  /**
+   * The trailing, not-yet-terminated line of plain output.
+   *
+   * Text accumulates here and only *leaves* once a newline completes the
+   * line, which is what gives a trigger something whole to judge before
+   * the player sees it.  It stays in the DOM meanwhile, so a prompt
+   * written without a newline still appears at once rather than looking
+   * like a hung client.
+   */
+  open: null,
 
   /**
    * Append server HTML.
@@ -138,31 +203,107 @@ const term = {
    * come out the shape it was drawn.
    */
   write(html, grid, image, banner) {
-    const node = document.createElement(grid || banner ? 'div' : 'span');
-    if (grid) node.className = 'grid';
-    // Belongs to the splash, so it is centred under it rather than sitting
-    // at the left margin where the conversation starts.
-    if (banner) node.className = 'banner';
-    node.innerHTML = html;
+    // Composed blocks are not line-oriented, so they are neither buffered
+    // nor offered to the filters: a trigger that gagged one row of ASCII
+    // art would only wreck the drawing that row was part of.
+    if (grid || image || banner) {
+      this._closeOpen();
+      const node = document.createElement(grid || banner ? 'div' : 'span');
+      if (grid) node.className = 'grid';
+      // Belongs to the splash, so it is centred under it rather than sitting
+      // at the left margin where the conversation starts.
+      if (banner) node.className = 'banner';
+      node.innerHTML = html;
 
-    // A world that ships a splash image gets it in the banner's place.
-    // The ASCII is still built above and kept in `node`, so if the file is
-    // missing, misnamed or corrupt the banner appears instead of a broken
-    // image icon -- the same banner every other client shows.
-    if (image && image.src) {
-      const fig = document.createElement('div');
-      fig.className = 'splash';
-      const img = document.createElement('img');
-      // alt, not a decorative empty string: the logo carries the game's
-      // name, and that name is not written anywhere else on this screen.
-      img.alt = image.alt || '';
-      img.onerror = () => fig.replaceWith(node);
-      img.src = image.src;
-      fig.appendChild(img);
-      this._append(fig);
+      // A world that ships a splash image gets it in the banner's place.
+      // The ASCII is still built above and kept in `node`, so if the file is
+      // missing, misnamed or corrupt the banner appears instead of a broken
+      // image icon -- the same banner every other client shows.
+      if (image && image.src) {
+        const fig = document.createElement('div');
+        fig.className = 'splash';
+        const img = document.createElement('img');
+        // alt, not a decorative empty string: the logo carries the game's
+        // name, and that name is not written anywhere else on this screen.
+        img.alt = image.alt || '';
+        img.onerror = () => fig.replaceWith(node);
+        img.src = image.src;
+        fig.appendChild(img);
+        this._append(fig);
+        this._blockLines(node);
+        return;
+      }
+      this._append(node);
+      this._blockLines(node);
       return;
     }
-    this._append(node);
+
+    const open = this._openNode();
+    // Appending rather than replacing is safe for the same reason the old
+    // whole-message innerHTML write was: color.py closes every span it
+    // opens before the message ends, so each message stands alone.
+    open.insertAdjacentHTML('beforeend', html);
+    for (const line of takeCompleteLines(open)) this._emitLine(line);
+    this.atLineStart = !open.textContent;
+    if (this.pinned) this.toBottom();
+  },
+
+  /** The open tail, created on first use and always the last child. */
+  _openNode() {
+    if (!this.open) {
+      this.open = document.createElement('span');
+      scrollback.appendChild(this.open);
+    }
+    return this.open;
+  },
+
+  /**
+   * Stop adding to the open tail.
+   *
+   * Whatever is in it stays exactly where it is -- it is an unterminated
+   * line, so there is nothing complete for a filter to judge, and a
+   * prompt is never gagged.  An empty one would be a stray node, so that
+   * goes.
+   */
+  _closeOpen() {
+    if (this.open && !this.open.textContent) this.open.remove();
+    this.open = null;
+  },
+
+  /**
+   * Judge one completed line, and show it unless a filter said not to.
+   *
+   * The 'line' event fires either way.  A gag hides a line from the
+   * player; hiding it from scripts as well would put \trigger gag and the
+   * script API in a fight over the same stream.
+   */
+  _emitLine(fragment) {
+    const text = fragment.textContent.replace(/\n$/, '');
+    bus.emit('line', text);
+    const verdict = runOutputFilters(text);
+    if (verdict.gag) return;
+    // The line keeps its own trailing newline and stays inline, so every
+    // line no filter touches renders exactly as it did before output was
+    // buffered at all.
+    const span = document.createElement('span');
+    if (verdict.highlight) span.className = verdict.highlight;
+    span.appendChild(fragment);
+    this._append(span);
+  },
+
+  /**
+   * Publish a composed block's text on the bus, unfiltered.
+   *
+   * The filters skip these, but a 'line' subscription should still see
+   * the same stream it saw before output was buffered -- the splash
+   * included.
+   */
+  _blockLines(node) {
+    const text = node.textContent || '';
+    if (!text) return;
+    const parts = text.split('\n');
+    if (parts[parts.length - 1] === '') parts.pop();
+    for (const line of parts) bus.emit('line', line);
   },
 
   /** Append plain text as its own line (client notices, script echo).
@@ -179,6 +320,9 @@ const term = {
    * through a prompt it just reads as noise.
    */
   note(text, kind) {
+    // Nothing further will join the open tail: an echo finishes the line
+    // it left open, and any other notice starts a new one below it.
+    this._closeOpen();
     if (kind === 'echo' && !this.atLineStart) {
       const span = document.createElement('span');
       span.className = 'echo-inline';
@@ -192,18 +336,37 @@ const term = {
     this._append(div);
   },
 
+  /** Append plain text carrying one extra class (the \test colour sweep). */
+  styled(text, className) {
+    this._closeOpen();
+    const div = document.createElement('div');
+    div.className = className ? 'line ' + className : 'line';
+    div.textContent = text;
+    this._append(div);
+  },
+
   /** True when the last thing appended ended a line, so the next thing
    *  starts one. Anything that leaves a line open -- a prompt -- clears it. */
   atLineStart: true,
 
   _append(node) {
-    scrollback.appendChild(node);
+    // Ahead of the open tail, so a line that completes now cannot jump
+    // past the partial one still being assembled. A null ref appends.
+    scrollback.insertBefore(node, this.open);
     const text = node.textContent || '';
     if (text) this.atLineStart = text.endsWith('\n');
     while (scrollback.childNodes.length > MAX_NODES) {
+      if (scrollback.firstChild === this.open) break;
       scrollback.removeChild(scrollback.firstChild);
     }
     if (this.pinned) this.toBottom();
+  },
+
+  clear() {
+    scrollback.replaceChildren();
+    this.open = null;
+    this.atLineStart = true;
+    this.toBottom();
   },
 
   toBottom() {
@@ -232,40 +395,22 @@ scrollback.addEventListener('click', (event) => {
   input.submit('go ' + target.textContent.trim());
 });
 
-/* -------------------------------------------------------------------------
- * Line extraction
- * -------------------------------------------------------------------------
- * Triggers match plain text, but the wire carries HTML, and a message
- * boundary is not a line boundary (a prompt arrives with no trailing
- * newline).  So: strip to text, buffer, and emit only completed lines.
- * ------------------------------------------------------------------------- */
-
-const decoder = document.createElement('div');
-let partialLine = '';
-
-function htmlToText(html) {
-  decoder.innerHTML = html;
-  return decoder.textContent;
-}
-
-function feedLines(html) {
-  partialLine += htmlToText(html);
-  const parts = partialLine.split('\n');
-  partialLine = parts.pop();          // trailing fragment stays pending
-  for (const line of parts) {
-    bus.emit('line', line);
-  }
-}
+/* Line extraction now happens in term.write, which buffers the markup
+ * itself rather than a parallel plain-text copy of it: a filter that can
+ * suppress a line has to run before that line is in the document, and the
+ * old strip-to-text pass ran after. */
 
 /* =========================================================================
  * Connection
  * ========================================================================= */
 
+// ?ws= lets the page be served from somewhere other than the game (a dev
+// server, a static host) and still find the socket.  Read once rather
+// than per call, so \connect can re-point it within the same origin.
+let wsOverride = new URLSearchParams(location.search).get('ws') || null;
+
 function socketUrl() {
-  // ?ws= lets the page be served from somewhere other than the game
-  // (a dev server, a static host) and still find the socket.
-  const override = new URLSearchParams(location.search).get('ws');
-  if (override) return override;
+  if (wsOverride) return wsOverride;
   const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${scheme}//${location.host}/ws`;
 }
@@ -412,8 +557,9 @@ const net = {
 function dispatch(msg) {
   switch (msg.type) {
     case 'text':
+      // write() emits 'line' itself, once per completed line, after the
+      // output filters have had their say about it.
       term.write(msg.data, msg.grid, msg.image, msg.banner);
-      feedLines(msg.data);
       bus.emit('text', msg.data);
       break;
 
@@ -594,6 +740,44 @@ const api = {
     term.note(String(text), kind === 'echo' ? 'echo' : 'client');
   },
 
+  /**
+   * Write a plain-text line carrying one extra CSS class.
+   *
+   * The class is validated rather than trusted: this is reachable from
+   * the input line via \test, and `class` is an attribute worth being
+   * careful with even where the text itself can never be markup.
+   */
+  echoClass(text, className) {
+    const name = String(className);
+    term.styled(String(text), /^[\w-]+$/.test(name) ? name : '');
+  },
+
+  /** Empty the scrollback. */
+  clear() { term.clear(); },
+
+  /** Scroll the output: 'up', 'down', or 'end'. */
+  scroll(direction) {
+    if (direction === 'end') { term.toBottom(); return; }
+    scrollback.scrollBy({
+      top: scrollback.clientHeight * (direction === 'up' ? -0.9 : 0.9),
+    });
+  },
+
+  /**
+   * Judge each completed output line before the player sees it.
+   *
+   * Return {gag: true} to drop the line or {highlight: '<class>'} to mark
+   * it; anything else shows it unchanged.  The line is published on the
+   * bus either way — see term._emitLine.
+   */
+  filterOutput(handler) {
+    outputFilters.add(handler);
+    return () => outputFilters.delete(handler);
+  },
+
+  /** Where the socket points, so a caller can check it before changing it. */
+  get endpoint() { return socketUrl(); },
+
   on(event, handler) { return bus.on(event, handler); },
   off(event, handler) { bus.off(event, handler); },
   emit(event, payload) { bus.emit(event, payload); },
@@ -615,9 +799,18 @@ const api = {
   /** The client build this page loaded, for diagnosing a stale tab. */
   get build() { return loadedBuild; },
 
-  reconnect() {
+  /**
+   * Reconnect, optionally re-pointing the socket.
+   *
+   * `url` is taken on trust here and vetted by the caller: everything a
+   * socket sends is trusted *as markup* by term.write, so the decision
+   * about which hosts may feed it belongs with whoever is asking, not
+   * buried in the transport.  \connect allows same-origin only.
+   */
+  reconnect(url) {
+    if (url) wsOverride = String(url);
     net.deliberate = false;
-    if (net.socket) net.socket.close();
+    if (net.socket) net.socket.close();   // 'close' schedules the retry
     else net.connect();
   },
 
@@ -637,6 +830,10 @@ window.MegaMOO = api;
 
 installPalette();
 
+// Commands attach first so their interceptor is registered first: input
+// interceptors run in insertion order, and a script's alias pattern must
+// not get the chance to swallow \help before it is dispatched.
+if (window.MegaMOOCommands) window.MegaMOOCommands.attach(api);
 if (window.Automap) window.Automap.attach(api);
 if (window.Inventory) window.Inventory.attach(api);
 if (window.MegaMOOScripting) window.MegaMOOScripting.attach(api);
