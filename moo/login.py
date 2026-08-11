@@ -471,9 +471,20 @@ class LoginHandler:
         # terminal shows, it is what the browser falls back to if the image
         # does not load, and sending it unconditionally means the two
         # transports never disagree about whether there is a banner.
-        screen = load_display_screen(self.config)
+        # Exactly one blank line above the banner, whatever the world's
+        # file happens to start with.
+        #
+        # Leaving the gap to the file meant it depended on how the world
+        # was created: the engine's built-in screen opens with a blank
+        # line, `megamoo init` used to strip it, and a world made before
+        # that was fixed still greets players flush against whatever the
+        # terminal was showing -- with no way to put it right short of
+        # editing a file in a world somebody else owns. Deciding it here
+        # fixes every world at once, old and new, and cannot double up on
+        # one whose file already has the line.
+        screen = load_display_screen(self.config).lstrip('\n')
         image = find_splash_image()
-        await send('\x1b[0m\x1b[38;5;245m' + screen + '\x1b[0m', raw=True,
+        await send('\x1b[0m\n\x1b[38;5;245m' + screen + '\x1b[0m', raw=True,
                    image=({'src': image,
                            'alt': _world_name(self.database, self.config)}
                           if image else None))
