@@ -34,21 +34,28 @@
   --foe:           #d9564e;   /* opponents */
   --neutral:       #5b90d6;   /* unclaimed orbs */
 
-  /* PT Mono first: humanist rather than engineered, with rounder
-     terminals and less of Menlo's squareness -- a softer face to read a
-     world in, which is the point of a game client and not of a code
-     editor.
+  /* Monaco first: softer and rounder than Menlo, and the face a Mac
+     terminal wore for twenty years, which is most of where the look of
+     this kind of game comes from. A world is read here, not edited.
 
-     It costs nothing in geometry. PT Mono's advance is 8.400 at 14px
-     against Menlo's 8.429, a 0.3% difference, so no column moves and no
-     ASCII art shifts. Menlo stays next in line, so a machine without PT
-     Mono lands on the face this was calibrated against, and the rest of
-     the stack carries everywhere else.
+     It costs nothing in geometry, which is the only reason the choice is
+     free. Monaco advances 8.401 at 14px, Menlo 8.429, PT Mono 8.400 --
+     all within 0.4% -- so any of them can lead without moving a column or
+     disturbing the ASCII art, and the line height calibrated against
+     Menlo still lands a 1.944:1 cell on Monaco.
 
-     PT Mono ships with macOS and little else, so most of the world will
-     see Menlo or ui-monospace. That is a deliberate order, not an
-     oversight: this is a preference, and the fallbacks are all sane. */
-  --mono: "PT Mono", Menlo, ui-monospace, "SF Mono", "Cascadia Mono",
+     One thing to know if it ever looks cramped: Monaco asks for a much
+     taller line than the others, 19px at 14px size against Menlo's 16 and
+     PT Mono's 15 -- a 2.26:1 cell. --term-line-height overrides that down
+     to 1.1667 on purpose, because that is what keeps the art the shape it
+     was drawn. Loosening it for comfort stretches the art again; that is
+     the trade, and it is the same one the whole rule exists to make.
+
+     Monaco and PT Mono both ship with macOS and little else, so most of
+     the world sees Menlo or ui-monospace. Deliberate order, sane
+     fallbacks, and Menlo is the face all the measurements were taken
+     against. */
+  --mono: Monaco, "PT Mono", Menlo, ui-monospace, "SF Mono", "Cascadia Mono",
           "JetBrains Mono", Consolas, "DejaVu Sans Mono", monospace;
 
   /* Chrome: headers, panels, buttons. Comfortable, and nothing here is
@@ -71,9 +78,9 @@
      1.1667 holds the cell at 1.9:1 whatever the size, so changing one
      does not disturb the other.
 
-     It survives the change of face for the same reason. PT Mono, which
-     now leads the stack, advances 8.400 at 14px against Menlo's 8.429, so
-     1.1667 lands a 1.945:1 cell there -- marginally closer to a real
+     It survives a change of face for the same reason. Monaco, which now
+     leads the stack, advances 8.401 at 14px against Menlo's 8.429, so
+     1.1667 lands a 1.944:1 cell there -- marginally closer to a real
      terminal's 2:1 than Menlo was. A font swap only needs this number
      revisited if the advance moves, and a monospace face that changed its
      advance by more than a fraction would break the art anyway. */
