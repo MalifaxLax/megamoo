@@ -574,6 +574,13 @@ class LoginHandler:
                 await send("Incorrect password.\n")
                 continue
 
+            # A blank line between the password prompt and the world. The
+            # room description arrived hard against "Password:", so the
+            # first thing a player read ran straight on from the last thing
+            # they typed. Only on success: a wrong password should answer
+            # immediately, not after a pause for effect.
+            await send("")
+
             # Check for existing connection (direct or puppeted)
             from .network import find_connection_for_account, disconnect_for_takeover
             existing_conn = find_connection_for_account(player.objnum)

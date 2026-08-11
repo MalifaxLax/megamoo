@@ -246,16 +246,22 @@ body {
   width: min(560px, 90%);
   height: auto;
 
-  /* These logos are artwork on a black field, and the page is not quite
-     black (--bg is #0c0e11), so the image arrives as a visible rectangle
-     sitting on the background. Screen blending maps true black to nothing
-     and leaves the glow, which dissolves the edge.
+  /* No blend mode. These logos are artwork on a black field and the page
+     is not quite black (--bg is #0c0e11), so an opaque one arrives as a
+     visible rectangle. `mix-blend-mode: screen` maps true black to
+     nothing and would dissolve the edge -- but it blends against the
+     backdrop *within the current stacking context*, so whether it works
+     depends on what the scrollback and its ancestors happen to establish.
+     It did not work here, and a fix that depends on stacking context is a
+     fix that breaks the next time the layout changes.
 
-     It only works if the black really is black. A JPEG's is not -- this
-     artwork's corner measured (7,7,7) -- so a world wanting a seamless
-     splash should ship a PNG with its floor crushed to 0. One that ships
-     a JPEG still gets a perfectly good banner, just a squarer one. */
-  mix-blend-mode: screen;
+     A world that wants a seamless splash ships a PNG with real
+     transparency instead. For artwork that is a glow on black, taking
+     luminance as alpha does it exactly: black goes transparent, the glow
+     keeps its soft edges, and the image composites correctly over any
+     background without the stylesheet having to know anything. A world
+     that ships an opaque JPEG still gets a perfectly good banner, just a
+     squarer one. */
 }
 
 /* Locally echoed commands, so the player can see what they sent. */
