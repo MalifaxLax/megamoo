@@ -34,12 +34,22 @@
   --foe:           #d9564e;   /* opponents */
   --neutral:       #5b90d6;   /* unclaimed orbs */
 
-  /* Menlo first, deliberately. It is what a Mac terminal reaches for by
-     default, so leading with it makes the game surface here the same face
-     at the same metrics as a native client rather than merely a similar
-     one. Everything after it is the fallback for machines without it. */
-  --mono: Menlo, ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
-          Consolas, "DejaVu Sans Mono", monospace;
+  /* PT Mono first: humanist rather than engineered, with rounder
+     terminals and less of Menlo's squareness -- a softer face to read a
+     world in, which is the point of a game client and not of a code
+     editor.
+
+     It costs nothing in geometry. PT Mono's advance is 8.400 at 14px
+     against Menlo's 8.429, a 0.3% difference, so no column moves and no
+     ASCII art shifts. Menlo stays next in line, so a machine without PT
+     Mono lands on the face this was calibrated against, and the rest of
+     the stack carries everywhere else.
+
+     PT Mono ships with macOS and little else, so most of the world will
+     see Menlo or ui-monospace. That is a deliberate order, not an
+     oversight: this is a preference, and the fallbacks are all sane. */
+  --mono: "PT Mono", Menlo, ui-monospace, "SF Mono", "Cascadia Mono",
+          "JetBrains Mono", Consolas, "DejaVu Sans Mono", monospace;
 
   /* Chrome: headers, panels, buttons. Comfortable, and nothing here is
      column-aligned, so it is free to be. */
@@ -59,7 +69,14 @@
 
      The line height is the part that has to be right; the size is taste.
      1.1667 holds the cell at 1.9:1 whatever the size, so changing one
-     does not disturb the other. */
+     does not disturb the other.
+
+     It survives the change of face for the same reason. PT Mono, which
+     now leads the stack, advances 8.400 at 14px against Menlo's 8.429, so
+     1.1667 lands a 1.945:1 cell there -- marginally closer to a real
+     terminal's 2:1 than Menlo was. A font swap only needs this number
+     revisited if the advance moves, and a monospace face that changed its
+     advance by more than a fraction would break the art anyway. */
   --term-size: 14px;
   --term-line-height: 1.1667;
 
