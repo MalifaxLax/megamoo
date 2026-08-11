@@ -1199,7 +1199,13 @@ class MegaMOOServer:
                 from .network import get_connection_for_player
                 conn = get_connection_for_player(player.objnum)
                 if conn:
-                    session = InteractiveSession(result, player, db=self.database).start()
+                    # verb_owner: the paused body is still this verb, and
+                    # it resumes after the call frame is gone.  Without
+                    # it, writes from the second half are attributed to
+                    # the player instead of the verb's owner.
+                    session = InteractiveSession(
+                        result, player, db=self.database,
+                        verb_owner=getattr(verb_def, 'owner', None)).start()
                     if not session.finished:
                         # Cancel any previous interactive session on this
                         # connection to avoid stacking.

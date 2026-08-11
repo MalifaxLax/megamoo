@@ -1889,7 +1889,11 @@ def make_call_verb(pobj, db, _depth=0):
             from .network import get_connection_for_player
             conn = get_connection_for_player(pobj.objnum)
             if conn:
-                session = InteractiveSession(result, pobj, db=db).start()
+                # See server.execute_command: the resumed half of the verb
+                # must keep the verb's permissions, not the player's.
+                session = InteractiveSession(
+                    result, pobj, db=db,
+                    verb_owner=getattr(verb_def, 'owner', None)).start()
                 if not session.finished:
                     # Cancel any previous interactive session
                     prev = getattr(conn, '_interactive_session', None)

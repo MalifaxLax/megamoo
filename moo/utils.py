@@ -48,6 +48,7 @@ Copyright (c) 2026
 License: MIT
 """
 
+from contextlib import contextmanager
 from typing import Any, List, Optional, Union
 import re
 import hashlib
@@ -471,7 +472,7 @@ class InteractiveSession:
         these sessions.
     """
 
-    def __init__(self, generator, player_obj, db=None):
+    def __init__(self, generator, player_obj, db=None, verb_owner=None):
         """
         Create a new interactive session.
 
@@ -488,6 +489,16 @@ class InteractiveSession:
         self.prompt = None
         self.finished = False
         self.error = None
+        # Who the paused verb runs as.
+        #
+        # The body between two yields is still that verb, but it resumes
+        # long after the call frame is gone -- so without this, a write
+        # from the second half was attributed to the *player* rather than
+        # to the verb's owner, and chargen could not write to the account
+        # it had just been asked to fill in.  Passed in by the caller,
+        # which still has the VerbDef; there is nothing left to read it
+        # from by the time we get here.
+        self.verb_owner = verb_owner
 
     # -------------------------------------------------------------------------
     # State inspection properties
@@ -517,6 +528,34 @@ class InteractiveSession:
     # Lifecycle methods
     # -------------------------------------------------------------------------
 
+    @contextmanager
+    def _as_verb(self):
+        """
+        Advance the generator with the paused verb's permissions.
+
+        A generator step is a continuation of the verb that created it,
+        but it runs long after that verb's call frame was popped -- so
+        anything it writes would otherwise be attributed to the player
+        who typed the line rather than to the verb's owner.  For chargen
+        that meant being refused the account it exists to fill in.
+        """
+        from .builtins import push_frame, pop_frame
+        framed = False
+        try:
+            push_frame(self.player_obj, '<interactive>', None,
+                       self.player_obj, owner=self.verb_owner)
+            framed = True
+        except Exception:                       # never block the session
+            pass
+        try:
+            yield
+        finally:
+            if framed:
+                try:
+                    pop_frame()
+                except Exception:
+                    pass
+
     def start(self):
         """
         Advance the generator to its first ``yield``.
@@ -531,7 +570,8 @@ class InteractiveSession:
         from .verb_context import set_verb_context, clear_verb_context
         token = set_verb_context(self.player_obj, self.db, 0) if self.db else None
         try:
-            self.prompt = next(self.generator)
+            with self._as_verb():
+                self.prompt = next(self.generator)
         except StopIteration:
             # Generator returned immediately -- nothing to wait for
             self.finished = True
@@ -560,7 +600,8 @@ class InteractiveSession:
         from .verb_context import set_verb_context, clear_verb_context
         token = set_verb_context(self.player_obj, self.db, 0) if self.db else None
         try:
-            self.prompt = self.generator.send(player_input)
+            with self._as_verb():
+                self.prompt = self.generator.send(player_input)
         except StopIteration:
             # Generator finished normally
             self.finished = True
