@@ -269,8 +269,16 @@ def init_game(destination, name=None, port=6770, template=None) -> pathlib.Path:
     # first thing anyone wants to change about a new world is its name on
     # the way in -- and that should mean editing your own world, not the
     # engine.  The server reads it from the working directory.
+    # Written whole, including the blank line it opens with.
+    #
+    # That line is the gap between whatever the terminal was showing and
+    # the banner, and the engine's own fallback has always had it -- so
+    # stripping it here meant a world created by `init` greeted players
+    # more tightly than one running on the built-in screen, for no reason
+    # anybody chose. The splash is the first thing anyone sees; it can
+    # afford the line.
     from moo.login import DEFAULT_SCREEN
-    (dest / 'display_screen.txt').write_text(DEFAULT_SCREEN.lstrip('\n'))
+    (dest / 'display_screen.txt').write_text(DEFAULT_SCREEN)
 
     print(f'Created {dest}')
     print(f'  {copied} verb files, a starter world, and an empty game/ package')
