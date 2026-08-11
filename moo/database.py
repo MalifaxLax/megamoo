@@ -609,11 +609,25 @@ class Database:
 
         with self._lock:
             # Find the lowest unused, unreserved object number.
+            #
+            # A recycled number is additionally checked for traces before
+            # it is handed out again.  _clear_refs_to erased the scalar
+            # '#N' references at recycle time, but an objnum sitting as a
+            # bare integer in some list cannot be told apart from an
+            # index or a plain number, so it is not safe to erase -- and
+            # reissuing the number under it would make that integer start
+            # naming the wrong object.  Skipping the number costs one
+            # objnum and settles the question.
+            #
+            # Only recycled candidates pay for the scan; a fresh number
+            # off the end has nothing pointing at it by definition.
             reserved = self._index.reserved_objects
+            recycled = self._index.recycled_objects
             objnum = 0
-            while objnum in self._objects or \
-                  objnum in reserved or \
-                  self._object_exists_in_sql(objnum):
+            while (objnum in self._objects
+                   or objnum in reserved
+                   or self._object_exists_in_sql(objnum)
+                   or (objnum in recycled and self._refs_block_reuse(objnum))):
                 objnum += 1
             if objnum >= self._index.next_objnum:
                 self._index.next_objnum = objnum + 1
@@ -730,6 +744,126 @@ class Database:
         self._save_metadata()
         self._conn.commit()
 
+    @staticmethod
+    def _mentions_objnum(value, objnum: int) -> bool:
+        """
+        Does *value* contain *objnum* as a bare integer, nested anywhere?
+
+        Only the integer form.  A scalar ``'#N'`` string is a reference
+        the engine itself resolves, and :meth:`_clear_refs_to` erases
+        those outright; this looks for the form it cannot safely touch.
+
+        Args:
+            value: A decoded property value.
+            objnum (int): The object number to look for.
+
+        Returns:
+            bool: True if the number appears as an int somewhere inside.
+        """
+        if isinstance(value, bool):
+            return False                      # bool is an int subclass
+        if isinstance(value, int):
+            return value == objnum
+        if isinstance(value, list):
+            return any(Database._mentions_objnum(v, objnum) for v in value)
+        if isinstance(value, dict):
+            return any(Database._mentions_objnum(v, objnum)
+                       for v in value.values())
+        return False
+
+    def _clear_refs_to(self, objnum: int) -> int:
+        """
+        Erase every scalar ``'#N'`` reference to a recycled object.
+
+        A property whose whole value is ``'#500'`` is auto-resolved on
+        read (:meth:`MOOObject._resolve_objref`).  Left in place across a
+        recycle it did something worse than dangle: once #500 was handed
+        out again, the property silently started resolving to a
+        completely unrelated live object, and nothing raised.
+
+        Only the scalar string form is touched, because only that form is
+        unambiguously a reference.  An integer inside a list may be an
+        objnum, but it may equally be an index -- ``obvexits`` holds
+        indices into ``dnames`` -- and there is nothing in the value to
+        tell them apart.  Those are handled by refusing to reissue the
+        number instead; see :meth:`_lingering_refs`.
+
+        Args:
+            objnum (int): The object number being recycled.
+
+        Returns:
+            int: How many properties were cleared.
+        """
+        token = json.dumps(f'#{objnum}')
+        rows = self._conn.execute(
+            "SELECT objnum, name FROM properties WHERE value = ?", (token,)
+        ).fetchall()
+        for owner_num, name in rows:
+            self._conn.execute(
+                "UPDATE properties SET value = ? WHERE objnum = ? AND name = ?",
+                (json.dumps(None), owner_num, name)
+            )
+            # Keep any instance already in memory in step, or it would go
+            # on serving the old string and write it back on next save.
+            cached = self._objects.get(owner_num) or self._live.get(owner_num)
+            info = getattr(cached, 'properties', {}).get(name) if cached else None
+            if info is not None:
+                info.value = None
+        if rows:
+            logger.info("Cleared %d reference(s) to recycled #%s", len(rows), objnum)
+        return len(rows)
+
+    def _lingering_refs(self, objnum: int):
+        """
+        Find properties that still mention *objnum* as a bare integer.
+
+        Used to decide whether a recycled number is safe to hand out
+        again.  It is cheaper than it looks: the ``LIKE`` prefilter
+        rejects almost everything before any JSON is parsed, and this
+        only runs for numbers that are actually being reused.
+
+        Args:
+            objnum (int): The candidate number.
+
+        Returns:
+            list[tuple[int, str]]: ``(objnum, property_name)`` pairs.
+        """
+        rows = self._conn.execute(
+            "SELECT objnum, name, value FROM properties WHERE value LIKE ?",
+            (f'%{objnum}%',)
+        ).fetchall()
+        hits = []
+        for owner_num, name, raw in rows:
+            try:
+                decoded = json.loads(raw) if raw is not None else None
+            except (ValueError, TypeError):
+                continue
+            if self._mentions_objnum(decoded, objnum):
+                hits.append((owner_num, name))
+        return hits
+
+    def _refs_block_reuse(self, objnum: int) -> bool:
+        """
+        Is it unsafe to hand *objnum* out again?
+
+        True when something still mentions the number as a bare integer.
+        Logged rather than silent: a number that keeps being skipped is
+        usually a list somebody forgot to tidy, and that is worth being
+        able to see.
+
+        Args:
+            objnum (int): The candidate number.
+
+        Returns:
+            bool: True if the number should be skipped.
+        """
+        hits = self._lingering_refs(objnum)
+        if hits:
+            where = ', '.join(f'#{o}.{n}' for o, n in hits[:5])
+            logger.info("Not reusing #%s; still referenced by %s%s",
+                        objnum, where, ' ...' if len(hits) > 5 else '')
+        return bool(hits)
+
     def recycle_object(self, objnum: int):
         """
         Delete an object and mark its number for future reuse.
@@ -760,6 +894,13 @@ class Database:
                 raise ValueError(
                     f"Cannot recycle #{objnum}: has contents {obj._content_ids}"
                 )
+
+            # Past the guards, so nothing below can bail out and leave the
+            # world half-swept.  Pointers *to* the object go before the
+            # object does: reusing a number is fine, but reusing one that
+            # something still points at is exactly how a stale reference
+            # turns into a valid pointer to an unrelated object.
+            self._clear_refs_to(objnum)
 
             # Remove from parent's children set
             if obj.parent > 0:
