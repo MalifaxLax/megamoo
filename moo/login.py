@@ -290,6 +290,45 @@ def find_splash_image(directory='.') -> Optional[str]:
     return None
 
 
+#: A world can put its own screen in front of account creation -- house
+#: rules, a warning, the tone it expects -- by dropping this file beside
+#: ``display_screen.txt``.  A world that ships none is unaffected, which
+#: is why this is a file rather than a setting: the default is silence.
+#:
+#: The last line is the prompt, sent without a newline. Only an answer
+#: that begins the word "enter" goes on; anything else ends the
+#: connection, because a screen worth showing is one worth answering.
+NEW_ACCOUNT_SCREEN_NAME = 'newaccount_screen.txt'
+
+
+class _LeaveLogin(Exception):
+    """The player declined the world's new-account screen."""
+
+
+def load_new_account_screen(config: 'ServerConfig') -> Optional[str]:
+    """
+    The world's new-account screen, or None if it ships none.
+
+    Resolved the way ``display_screen.txt`` is -- beside the database
+    first, then the working directory -- so the two travel together in
+    the game directory `megamoo init` creates. There is no built-in
+    fallback: the engine has nothing to say here, only the world does.
+    """
+    candidates = []
+    db_path = getattr(getattr(config, 'database', None), 'path', None)
+    if db_path:
+        candidates.append(Path(db_path).expanduser().resolve().parent
+                          / NEW_ACCOUNT_SCREEN_NAME)
+    candidates.append(Path(NEW_ACCOUNT_SCREEN_NAME))
+    for screen in candidates:
+        if screen.is_file():
+            try:
+                return screen.read_text(encoding='utf-8')
+            except OSError:
+                continue
+    return None
+
+
 def load_display_screen(config: 'ServerConfig') -> str:
     """
     Load the splash text shown before the login prompt.
@@ -584,7 +623,16 @@ class LoginHandler:
 
             # --- NEW account ---
             if name.upper() == 'NEW':
-                player = await self._create_flow(send, read_line)
+                try:
+                    player = await self._create_flow(send, read_line)
+                except _LeaveLogin:
+                    # Declined the world's screen: end the connection
+                    # rather than return them to the prompt they just
+                    # walked away from.  Say so first -- a socket that
+                    # simply closes is indistinguishable from a dropped
+                    # link, and this one was asked for.
+                    await send("\nGoodbye!")
+                    return None
                 if player:
                     return player
                 # Creation failed — loop back to username prompt
@@ -693,8 +741,29 @@ class LoginHandler:
             any validation fails, the pool is empty, or an error
             occurs.
         """
-        # --- Character name ---
-        await send("Choose a character name: ", add_newline=False)
+        # --- The world's own screen, if it ships one ---
+        # Ahead of every question below, because a player who is going to
+        # be turned away should be turned away before being asked to
+        # choose anything.
+        screen = load_new_account_screen(self.config)
+        if screen:
+            lines = screen.rstrip('\n').split('\n')
+            for line in lines[:-1]:
+                await send(line)
+            # The last line is the prompt, so it keeps the cursor.
+            await send(lines[-1], add_newline=False)
+            answer = await read_line()
+            if answer is None:
+                return None
+            answer = answer.strip().lower()
+            if not answer or not 'enter'.startswith(answer):
+                raise _LeaveLogin
+
+        # --- Account name ---
+        # An account, not a character: this claims a PlayerPlace from the
+        # pool and owns the login, and the character comes later and
+        # separately -- in a world that has chargen, from chargen.
+        await send("Choose a name for your account: ", add_newline=False)
         name = await read_line()
         if name is None:
             return None
