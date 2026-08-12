@@ -13,16 +13,19 @@ Examples:
     @adalias #17.inventory = i
     @adalias #15.look_here = glance
 
-The alias is written into the verb's docstring as well as the database,
-on its `Aliases:` line, because that line is where a name actually lives.
-The database copy alone does not survive: a verb is reloaded from its
-file whenever the file changes, and a name the file does not mention is
-gone at that moment. That is not hypothetical -- #1:_td_rt listed
-thirteen timer names under a `Names:` heading the engine does not read,
-and twelve of them were tickers firing at nothing.
+The alias is written to the verb's **file on disk**, on its `Aliases:`
+line, before the database is touched -- disk is authoritative, being what
+git tracks and what an editor opens, and the loader refreshes a stored
+verb from its file whenever the two disagree. A name added only to the
+database therefore survives until the next reload and no longer. That is
+not hypothetical: #1:_td_rt listed thirteen timer names under a `Names:`
+heading the engine does not read, and twelve of them were tickers firing
+at nothing.
 
-If the verb has no docstring there is nowhere to write the line, so the
-alias is added to the database only and you are told so.
+If the file cannot be written the alias is not added at all, rather than
+added somewhere that will forget it. If the verb has no docstring to hold
+an Aliases line, or the world keeps no verb tree, there is nowhere on
+disk for the name to go and you are told so.
 
 Use @min to give the new alias an abbreviation length.
 
@@ -93,17 +96,36 @@ for other in obj.verbs:
 
 v.names.append(alias)
 
-# Write the name where it lives: the docstring's Aliases line.  Without
-# this the alias is database-only and the next reload of this verb's file
-# drops it -- see the note in the docstring above.
+# Write the name where it lives: the Aliases line of the verb's file on
+# disk.  Not the database copy of the source -- that is what makes this
+# look like it works and then lose the alias at the next restart, because
+# the loader compares the stored verb against the file and refreshes from
+# the file when they disagree.  write_verb_file puts it plainly: "Disk is
+# authoritative -- it is what git tracks and what an editor opens".
+#
+# So: file first, database second, and abandon the whole thing if the file
+# cannot be written, which is the order @program and @port already keep.
 from moo.verb_meta import render_verb_meta
+from moo.builtins import verb_file_path, write_verb_file
 
 rewritten = render_verb_meta(v.code, v.names,
                              getattr(v, 'min_lengths', None) or {},
                              bool(getattr(v, 'hidden', False)),
                              getattr(v, 'perms', None) or 'rx')
-persisted = rewritten != v.code
-if persisted:
+
+# render_verb_meta returns the source unchanged when there is no docstring
+# to put the line in; there is then nothing on disk worth rewriting.
+persisted = False
+if rewritten != v.code:
+    path = verb_file_path(db, obj.objnum, v.names[0])
+    if path:
+        err = write_verb_file(path, rewritten)
+        if err:
+            v.names.remove(alias)          # nothing was changed
+            pobj.msg(f"Could not write {path}: {err}")
+            pobj.msg("Alias not added.")
+            return
+        persisted = True
     v.code = rewritten
     v.compiled_code = None   # force recompile, as @program does
     v.compile()
@@ -114,10 +136,12 @@ db.save_object(obj)
 
 where = f"&<245>#{obj.objnum}:{obj.noun}&n"
 if inherited_from:
-    pobj.msg(f"Added alias &W{alias}&n to inherited verb &<245>{verb_name}&n on {where}.")
+    pobj.msg(f"Added alias &<255>{alias}&n to inherited verb &<245>{verb_name}&n on {where}.")
 else:
-    pobj.msg(f"Added alias &W{alias}&n to &<245>{verb_name}&n on {where}.")
+    pobj.msg(f"Added alias &<255>{alias}&n to &<245>{verb_name}&n on {where}.")
 pobj.msg(f"Names are now: {', '.join(v.names)}")
 if not persisted:
-    pobj.msg("&<208>That verb has no docstring, so the alias is in the database "
-             "only and will be lost the next time its file is loaded.&n")
+    pobj.msg("&<208>Nothing was written to disk -- that verb has no docstring "
+             "to hold an Aliases line, or this world keeps no verb tree -- so "
+             "the alias is in the database only and the next reload from file "
+             "will drop it.&n")
