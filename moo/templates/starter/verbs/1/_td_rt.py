@@ -1,11 +1,16 @@
 """
 _tick_down — generic decrement-to-zero ticker callback
-Names: _td_rt, _td_unconscious, _td_sleeping, _td_stunned, _td_paralyzed,
-_td_intoxicated, _td_immobilized, _td_entangled, _td_imprisoned,
-_td_webbed, _td_bound, _td_no_parry, _td_must_parry, _td_blind
-Called by ticker_add() — no args, uses `verb` to identify which timer.
 
-Aliases: _tick_down
+Called by ticker_add() — no args, uses `verb` to identify which timer,
+which is why every timer name has to be a name of *this* verb. The list
+below is the _TD table's keys; they must stay in step, because a name in
+_TD that is not an alias is a ticker that fires at nothing. That was the
+state until now: the names were declared on a `Names:` line, which the
+engine does not read -- it parses Aliases, Abbrev, Hidden and Perms and
+nothing else -- so only _td_rt and _tick_down existed, and the thirteen
+afflictions _afflict starts would have applied and then never expired.
+
+Aliases: _td_unconscious, _td_sleeping, _td_stunned, _td_paralyzed, _td_intoxicated, _td_immobilized, _td_entangled, _td_imprisoned, _td_webbed, _td_bound, _td_no_parry, _td_must_parry, _td_blind, _tick_down
 Hidden:  yes
 """
 
