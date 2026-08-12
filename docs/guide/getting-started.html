@@ -92,6 +92,18 @@ touched.
 </p>
 
 <div class="note">
+    <span class="label">Saying something before you take a player</span>
+    <p>Drop a <code>newaccount_screen.txt</code> beside
+       <code>display_screen.txt</code> and new players see it before
+       account creation asks them anything — house rules, the tone you
+       expect, a warning. Its last line is the prompt and keeps the
+       cursor, so you write the question yourself; only an answer
+       beginning <code>enter</code> goes on, and anything else ends the
+       connection. <code>megamoo init</code> writes no such file, and a
+       world that ships none is unaffected.</p>
+</div>
+
+<div class="note">
     <span class="label">What belongs in version control</span>
     <p><code>verbs/</code> and <code>game/</code> are the source of your
        world and belong in git. <code>world.db</code> is running state —
