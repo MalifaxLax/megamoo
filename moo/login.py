@@ -648,13 +648,13 @@ class LoginHandler:
             # Look up the player name in the database's name→objnum index
             player_num = self.database.get_player(name)
             if player_num is None:
-                await send(f"No character named '{name}'.\n")
+                await send(f"No account named '{name}'.\n")
                 continue
 
             try:
                 player = self.database.get_object(player_num)
             except KeyError:
-                await send("Error loading character.\n")
+                await send("Error loading that account.\n")
                 continue
 
             # Get stored password hash
@@ -876,10 +876,10 @@ class LoginHandler:
             self.database.save_object(player)
 
             logger.info(f"New player created: {name} (#{player.objnum})")
-            await send(f"Character '{name}' created. Welcome!\n")
+            await send(f"Account '{name}' created. Welcome!\n")
             return player
 
         except Exception as exc:
             logger.error(f"Error creating player: {exc}", exc_info=True)
-            await send("Error creating character.\n")
+            await send("Error creating your account.\n")
             return None
