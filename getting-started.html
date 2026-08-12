@@ -55,7 +55,7 @@ and edit.
 <div class="term"><code><span class="p">$</span> pip install megamoo
 <span class="p">$</span> megamoo init mygame
 <span class="o">Created /home/you/mygame</span>
-<span class="o">  190 verb files, a starter world, and an empty game/ package</span>
+<span class="o">  191 verb files, a starter world, and an empty game/ package</span>
 <span class="o"></span>
 <span class="o">  Wizard login:  Wizard  /  winter-timber-7382</span>
 <span class="o">  Shown once, and unique to this world -- write it down.</span></code></div>
@@ -85,11 +85,23 @@ README.md            <span class="c"># a reminder of the layout</span>
 <p>
 The starter world it copies in contains the base object library, an
 out-of-character lobby, a character generator, one in-character room, and
-a wizard account. Those 190 verb files are <em>yours</em> — edit them
+a wizard account. Those 191 verb files are <em>yours</em> — edit them
 freely. The engine keeps no copy you have to merge against, so upgrading
 is <code>pip install --upgrade megamoo</code> and nothing you wrote is
 touched.
 </p>
+
+<div class="note">
+    <span class="label">Saying something before you take a player</span>
+    <p>Drop a <code>newaccount_screen.txt</code> beside
+       <code>display_screen.txt</code> and new players see it before
+       account creation asks them anything — house rules, the tone you
+       expect, a warning. Its last line is the prompt and keeps the
+       cursor, so you write the question yourself; only an answer
+       beginning <code>enter</code> goes on, and anything else ends the
+       connection. <code>megamoo init</code> writes no such file, and a
+       world that ships none is unaffected.</p>
+</div>
 
 <div class="note">
     <span class="label">What belongs in version control</span>
