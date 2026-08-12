@@ -56,6 +56,37 @@ if not dest:
     pobj.msg("Invalid destination.")
     return
 
+# --- IC/OOC boundary ---
+#
+# The same rule @tel keeps for people, kept here for things. Neither a
+# character nor a bucket should cross by being carried across: an account
+# body (#4) in an IC room has no hands, because move_to_hand lives on #5,
+# and an IC object in the lobby is reachable by verbs that assume it is
+# not.
+#
+# Compared room to room, not location to location, because either end may
+# be a container or a character -- @move takes both -- and a sack changing
+# hands inside one room crosses nothing.
+def _room_of(o):
+    """The room enclosing o, or None if it is not inside one."""
+    for _ in range(16):          # a bounded walk: containers nest
+        if o is None:
+            return None
+        if getattr(o, 'is_room', False):
+            return o
+        o = getattr(o, 'location', None)
+    return None
+
+src_room = _room_of(obj.location)
+dst_room = _room_of(dest)
+if src_room is not None and dst_room is not None:
+    if ((src_room.is_icroom and dst_room.is_ocroom)
+            or (src_room.is_ocroom and dst_room.is_icroom)):
+        kind = "an OOC" if dst_room.is_ocroom else "an IC"
+        pobj.msg(f"You can't move &<245>#{obj.objnum}:{obj.name}&n into "
+                 f"{kind} area from where it is.")
+        return
+
 # Move the object
 old_loc = obj.location
 move(obj, dest)

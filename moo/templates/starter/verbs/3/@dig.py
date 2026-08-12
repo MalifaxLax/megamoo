@@ -56,6 +56,23 @@ if not parent.is_room:
 new_room = make_room(parent, db, pobj, name=rname)
 pobj.msg(f"You create a new room &<245>#{new_room.objnum}:{new_room.name}&n of type {rtype.upper()}.")
 
-# /tel switch: move the builder into the newly created room
+# /tel switch: move the builder into the newly created room.
+#
+# Subject to the same IC/OOC boundary @tel enforces, which this used to
+# walk straight through -- and it is the easiest way to cross it, because
+# the room on the far side is one you just made. An account body (#4) in
+# an IC room has no hands: `get` answers "Verb 'move_to_hand' not found",
+# because move_to_hand lives on #5 and never will live anywhere else.
+#
+# The room is still created. Only the trip is refused, so the switch
+# turns into a no-op rather than losing the work.
 if 'tel' in switches:
-    move(pobj, new_room)
+    here = pobj.location
+    src_ic = getattr(here, 'is_icroom', False)
+    src_oc = getattr(here, 'is_ocroom', False)
+    if (src_ic and new_room.is_ocroom) or (src_oc and new_room.is_icroom):
+        kind = "an OOC" if new_room.is_ocroom else "an IC"
+        pobj.msg(f"Not moved: {kind} room is across the boundary from here. "
+                 f"Use &<245>@tel #{new_room.objnum}&n from the other side.")
+    else:
+        move(pobj, new_room)
