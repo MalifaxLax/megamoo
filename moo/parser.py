@@ -313,6 +313,28 @@ class CommandParser:
 
         # Search for the verb definition in the environment
         verb_obj, verb_def = self._find_verb(verb)
+
+        # --- Punctuation-named verbs, typed hard against their argument ---
+        #
+        # #15:say carries the alias `'`, and the whole point of naming a
+        # verb `'` rather than `say` is that you type `'hello` -- nobody
+        # types `' hello`.  The command splits on whitespace, so `'hello`
+        # arrived as one token, matched nothing, and answered "Do what?"
+        # while the alias sat correctly in the database.
+        #
+        # `/` has this hardcoded above.  The rule is the same for any
+        # punctuation character that names a verb, and it is reached only
+        # after the ordinary token has failed -- so a verb whose name
+        # merely begins with punctuation still wins, and nothing that
+        # parsed before parses differently now.
+        if not verb_def and not command[0].isalnum():
+            lead = command[0]
+            lead_obj, lead_def = self._find_verb(lead)
+            if lead_def:
+                verb, switches = lead, []
+                argstr = command[1:].strip()
+                verb_obj, verb_def = lead_obj, lead_def
+
         if not verb_def:
             raise ParseError("Do what?")
 
