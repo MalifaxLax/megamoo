@@ -128,3 +128,34 @@ def test_no_shipped_verb_stores_the_wrong_auth_level():
         assert not wrong, '; '.join(wrong)
     finally:
         db.close()
+
+
+@pytest.mark.skipif(not (STARTER / 'world.db').is_file(),
+                    reason='starter template not present')
+def test_no_shipped_verb_is_missing_its_file():
+    """Every verb in world.db has a file, which is the other direction.
+
+    The test above walks files and asks whether the database agrees. It
+    cannot see a verb that exists *only* in the database -- and that is
+    the drift this repository keeps meeting, most recently in @adalias,
+    which added a name to the stored verb and not to the file, so the
+    name lasted exactly until the next reload.
+
+    A verb with no file is worse than out of date: it is not in git, an
+    editor cannot open it, and `megamoo init` ships it as source nobody
+    can read. `.` is the awkward case that proves the rule -- its file is
+    `..py`, a dotfile `ls` hides and rglob still finds.
+    """
+    files = {(p.parent.name, p.stem) for p in (STARTER / 'verbs').rglob('*.py')}
+    db = sqlite3.connect(STARTER / 'world.db')
+    try:
+        orphans = [
+            f'#{objnum}:{json.loads(names)[0]}'
+            for objnum, names in db.execute('SELECT objnum, names FROM verbs')
+            if (str(objnum), json.loads(names)[0]) not in files
+        ]
+    finally:
+        db.close()
+    assert not orphans, (
+        'these are in world.db with no file on disk, so they are outside git '
+        'and unreadable to anyone editing the world: ' + ', '.join(orphans))
