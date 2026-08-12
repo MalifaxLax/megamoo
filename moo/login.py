@@ -372,12 +372,22 @@ def _with_login_timeout(read_line, timeout: float = CONNECTION_TIMEOUT):
     Returns:
         An async callable with the same contract.
     """
+    state = {'timed_out': False}
+
     async def guarded():
         try:
             return await asyncio.wait_for(read_line(), timeout)
         except asyncio.TimeoutError:
             logger.info("Login read timed out after %ss; dropping.", timeout)
+            state['timed_out'] = True
             return None
+
+    # A timeout has to be distinguishable from a blank line.  The username
+    # loop reads None as "nothing typed, ask again", which is right for
+    # someone who pressed Enter and wrong for someone who left -- it made
+    # an idle login screen re-prompt every timeout and stack the prompts
+    # up, three times over, before finally dropping.
+    guarded.timed_out = lambda: state['timed_out']
     return guarded
 
 
@@ -560,6 +570,11 @@ class LoginHandler:
                        add_newline=False)
 
             name = await read_line()
+            if getattr(read_line, 'timed_out', bool)():
+                # Idle, not a typo.  Asking again would only redraw the
+                # prompt at nobody, and the prompt carries no newline, so
+                # each retry piled onto the same line.
+                return None
             if name is None or name == '':
                 # Disconnect or empty input — retry
                 continue
