@@ -1092,8 +1092,21 @@ class MegaMOOServer:
         try:
             parse_result = parser.parse(command)
             logger.debug(f"Parsed: verb={parse_result.verb}, verb_obj={parse_result.verb_obj}")
+        except ParseError as e:
+            # Not a server error.  ParseError is how the parser says "no such
+            # verb" and "empty command", and its message is the line the
+            # player is shown.  At error level every typo anyone made wrote
+            # `ERROR - Parse error: Do what?` -- the ordinary answer to an
+            # unrecognised command -- so a busy world's log filled with
+            # ERRORs that were nothing, and buried the ones that were
+            # something.
+            logger.debug(f"Unparsed command from #{player.objnum}: {e}")
+            from .builtins import notify as _notify
+            _notify(player, "Do what?")
+            return
         except Exception as e:
-            logger.error(f"Parse error: {e}")
+            # Anything else is the parser itself failing, and stays loud.
+            logger.error(f"Parse error: {e}", exc_info=True)
             from .builtins import notify as _notify
             _notify(player, "Do what?")
             return
