@@ -25,9 +25,16 @@ so a name left in the file simply comes back. The line is regenerated
 from the verb's names rather than edited word by word, so prose elsewhere
 in the docstring that happens to mention the name is left alone.
 
+An alias never has a file of its own -- a verb's source is stored under
+its primary name -- so the line is rewritten in that one file, whichever
+of the verb's names you happened to type.
+
 If the file cannot be written the alias is not removed at all. If the
 verb has no docstring holding an Aliases line, or the world keeps no verb
 tree, there is nowhere on disk to change and you are told so.
+
+Walks the inheritance chain when the verb is not found locally, and says
+so when the verb it changed lives on an ancestor.
 
 Abbrev:  @rmalias=5
 Auth: gm3+ (auth_level 3)
