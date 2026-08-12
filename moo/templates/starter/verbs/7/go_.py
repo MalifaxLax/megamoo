@@ -133,7 +133,7 @@ def _run_chargen():
             slots = list(characters) + [None] * (max_chars - len(characters))
             slots = slots[:max_chars]
 
-            _header("Which slot would you like to use? [Q]uit or [H]elp any time.")
+            _header("Which slot would you like to use? [Q]uit or [B]ack any time.")
             for i, cnum in enumerate(slots, 1):
                 if cnum:
                     try:
