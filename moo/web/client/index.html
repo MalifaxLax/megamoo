@@ -13,20 +13,22 @@
 
   <header id="topbar">
     <span class="brand">Mega<span class="brand-accent">MOO</span></span>
+
+    <!-- Shown when the files on disk change under a page that is still
+         running the old ones. It lives in the header chrome, and stays
+         there: as a banner of its own between the header and the stage
+         it took a whole row, pushing the scrollback and the map down the
+         moment it appeared. Persistent rather than a scrollback line,
+         which would scroll away unread. -->
+    <button id="stale-reload" type="button"
+            class="topbar-button topbar-update" hidden
+            title="This page is running superseded code">update &mdash; reload</button>
+
     <span class="topbar-right">
       <button id="scripts-open" type="button" class="topbar-button">Scripts</button>
       <span id="conn-status" class="status status--connecting">connecting</span>
     </span>
   </header>
-
-  <!-- Shown when the files on disk change under a page that is still
-       running the old ones. Persistent rather than a scrollback line,
-       which would scroll away unread. -->
-  <div id="stale-banner" hidden>
-    <span>A newer client is available.</span>
-    <button id="stale-reload" type="button">Reload</button>
-    <button id="stale-dismiss" type="button" aria-label="Dismiss">&times;</button>
-  </div>
 
   <main id="stage">
 
@@ -34,7 +36,6 @@
          moo/web/color.py, which is the only source of markup here. -->
     <section id="terminal-pane" aria-label="Game output">
       <div id="scrollback" role="log" aria-live="polite" aria-atomic="false"></div>
-      <button id="scroll-latest" type="button" hidden>Jump to latest &darr;</button>
     </section>
 
     <!-- The left column: the world map, what you are carrying, then any

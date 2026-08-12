@@ -113,7 +113,6 @@ function installPalette() {
  * ========================================================================= */
 
 const scrollback = document.getElementById('scrollback');
-const jumpButton = document.getElementById('scroll-latest');
 
 const MAX_NODES = 4000;   // scrollback cap; old output is dropped wholesale
 
@@ -372,18 +371,16 @@ const term = {
   toBottom() {
     scrollback.scrollTop = scrollback.scrollHeight;
     this.pinned = true;
-    jumpButton.hidden = true;
   },
 };
 
+// `pinned` decides whether arriving output follows the view down. There
+// is no button to get back: typing does it, the way a terminal does.
 scrollback.addEventListener('scroll', () => {
   const distance =
     scrollback.scrollHeight - scrollback.scrollTop - scrollback.clientHeight;
   term.pinned = distance < 40;
-  jumpButton.hidden = term.pinned;
 });
-
-jumpButton.addEventListener('click', () => term.toBottom());
 
 // Backtick-marked words are click targets, matching what telnet clients
 // get from MXP: moo/network.py wraps them in <send href="go NAME">, so
@@ -445,30 +442,27 @@ async function checkForNewBuild() {
   }
   if (build !== loadedBuild && !staleNoticeShown) {
     staleNoticeShown = true;
-    showStaleBanner();
+    showUpdateNotice();
   }
 }
 
 /**
  * Announce that the page is running superseded code.
  *
- * A banner rather than a scrollback line: game output keeps coming, so a
- * line saying "you are running old code" is buried within seconds -- and
- * being buried is exactly how a stale page goes on being mistaken for a
- * broken feature.
+ * It appears in the header rather than the scrollback, because game
+ * output keeps coming and a line saying "you are running old code" is
+ * buried within seconds -- being buried is exactly how a stale page goes
+ * on being mistaken for a broken feature. And in the header rather than
+ * a band above the stage, because that band cost the scrollback and the
+ * map a row of height for something that is never urgent.
  */
-function showStaleBanner() {
-  const banner = document.getElementById('stale-banner');
-  if (banner) banner.hidden = false;
+function showUpdateNotice() {
+  const notice = document.getElementById('stale-reload');
+  if (notice) notice.hidden = false;
 }
 
-const staleBanner = document.getElementById('stale-banner');
-if (staleBanner) {
-  document.getElementById('stale-reload')
-    .addEventListener('click', () => location.reload());
-  document.getElementById('stale-dismiss')
-    .addEventListener('click', () => { staleBanner.hidden = true; });
-}
+document.getElementById('stale-reload')
+  ?.addEventListener('click', () => location.reload());
 
 // Polled as well as checked on reconnect: a page can sit open for hours
 // without the socket ever dropping, and would otherwise never find out.
@@ -622,6 +616,11 @@ const input = {
   },
 
   submit(text) {
+    // Sending is the other half of "typing returns you to the present":
+    // a command issued while reading back belongs at the bottom, next to
+    // the answer it is about to get.
+    term.toBottom();
+
     // Never echo or record a masked line: that is the whole point of the
     // mask, and history would otherwise leak the password to the next
     // person at the keyboard.
@@ -705,13 +704,46 @@ cmdInput.addEventListener('keydown', (event) => {
   }
 });
 
+/** Fields that own their own keystrokes: the script editor, chiefly. */
+function isEditable(el) {
+  return el instanceof Element
+    && el !== cmdInput
+    && (/^(input|textarea|select)$/i.test(el.tagName) || el.isContentEditable);
+}
+
 // Typing anywhere on the page should reach the command line — a MUD
-// habit. Modifier combos (copy, find, devtools) are left alone.
+// habit — and should snap the view back to the newest output, the way a
+// terminal does. That snap is what replaced the jump-to-latest button:
+// reading back is a scroll, and the next thing you type ends it.
+// Modifier combos (copy, find, devtools) are left alone.
 document.addEventListener('keydown', (event) => {
-  if (event.target === cmdInput) return;
   if (event.ctrlKey || event.metaKey || event.altKey) return;
-  if (event.key.length !== 1 && event.key !== 'Backspace') return;
-  if (window.getSelection().toString()) return;   // don't steal a copy
+  if (isEditable(event.target)) return;
+  // Paging is a deliberate move through the scrollback, so it must not
+  // be undone by the very keystroke that made it.
+  if (['PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) return;
+  if (event.key.length !== 1
+      && event.key !== 'Backspace' && event.key !== 'Enter') return;
+  if (event.target !== cmdInput) {
+    if (window.getSelection().toString()) return;   // don't steal a copy
+    cmdInput.focus();
+  }
+  term.toBottom();
+});
+
+// A click on the page puts the caret back in the command line. Unlike
+// typing it does not scroll: clicking is how you read back — following a
+// link, selecting a line — and yanking the view to the bottom would
+// fight that.
+document.addEventListener('pointerup', (event) => {
+  if (event.button !== 0) return;
+  // On a phone the caret arrives with a keyboard over half the screen,
+  // so let a tap on the input itself be the thing that asks for it.
+  if (event.pointerType === 'touch') return;
+  const el = event.target;
+  if (!(el instanceof Element) || el === cmdInput) return;
+  if (el.closest('button, a, select, textarea, input, dialog, [contenteditable]')) return;
+  if (window.getSelection().toString()) return;   // a drag-select, not a click
   cmdInput.focus();
 });
 

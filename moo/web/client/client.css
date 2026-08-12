@@ -120,22 +120,21 @@ body {
      is what keeps the input reachable on a phone without the page
      itself scrolling.
 
-     Four rows, and every child says which one it is in. The stale-client
-     banner sits between the header and the stage and is usually
-     `display: none`, which takes it out of the grid entirely -- so with
-     auto placement the number of children changes with it, and the row
-     the stage lands in changes too. It claimed the 1fr, the stage
-     collapsed to its content, and the overlay column drew over the
-     banner. Naming the rows makes the layout the same either way; the
-     empty row costs nothing. */
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+     Three rows, and every child says which one it is in. Explicit rows
+     rather than auto placement: anything here that can be `display:
+     none` takes itself out of the grid, and under auto placement every
+     row below it shifts up -- the stage lost the 1fr, collapsed to its
+     content, and the overlay column drew over its neighbour. Naming the
+     rows makes the layout the same however many children are showing.
+     (Notices belong in the header for the same reason: a row of their
+     own would push the scrollback and the map down.) */
+  grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100dvh;
 }
 
-#topbar       { grid-row: 1; }
-#stale-banner { grid-row: 2; }
-#stage        { grid-row: 3; }
-#input-row    { grid-row: 4; }
+#topbar    { grid-row: 1; }
+#stage     { grid-row: 2; }
+#input-row { grid-row: 3; }
 
 /* --- top bar --- */
 
@@ -181,38 +180,6 @@ body {
 .status--online     { color: var(--own); }
 .status--connecting { color: var(--accent); }
 .status--offline    { color: var(--foe); }
-
-/* --- stale-client banner --- */
-
-#stale-banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 7px var(--pad);
-  font-size: 13px;
-  color: var(--bg);
-  background: var(--accent);
-}
-
-#stale-banner button {
-  font: inherit;
-  font-size: 12px;
-  color: var(--bg);
-  background: transparent;
-  border: 1px solid rgb(0 0 0 / 0.4);
-  border-radius: 3px;
-  padding: 2px 10px;
-  cursor: pointer;
-}
-
-#stale-banner button:hover { background: rgb(0 0 0 / 0.12); }
-
-#stale-dismiss {
-  margin-left: auto;
-  border: 0 !important;
-  font-size: 16px !important;
-  line-height: 1;
-}
 
 /* --- stage --- */
 
@@ -357,21 +324,6 @@ body {
 .hl-magenta { background-color: rgb(164  99 176 / 0.32); }
 .hl-grey    { background-color: rgb(124 134 149 / 0.24); }
 
-#scroll-latest {
-  position: absolute;
-  right: var(--pad);
-  bottom: var(--pad);
-  padding: 6px 12px;
-  font: inherit;
-  font-size: 12px;
-  color: var(--bg);
-  background: var(--accent);
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-  box-shadow: 0 2px 12px rgb(0 0 0 / 0.5);
-}
-
 /* ========================================================================
    Input row
    ======================================================================== */
@@ -443,6 +395,19 @@ body {
 .topbar-button:hover {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+/* The update notice. Coloured enough to be noticed on a glance at the
+   chrome, small enough not to be an interruption -- it is never urgent,
+   and the page goes on working until the player chooses to reload. */
+.topbar-update {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.topbar-update:hover {
+  color: var(--bg);
+  background: var(--accent);
 }
 
 #scripts-dialog {
