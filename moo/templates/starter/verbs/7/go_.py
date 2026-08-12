@@ -260,90 +260,103 @@ def _run_chargen():
                 step = 'first_name'
                 break
 
-    # ── Step 2: First name ────────────────────────────────────────────
+    # A dispatch loop, so `step` can move backwards.  These were plain
+    # sequential blocks: setting `step` to an earlier name broke out of the
+    # current one, and every block above it had already been passed, so the
+    # player fell out of the bottom of the sequence and chargen ended
+    # without a word.  Typing B at the gender prompt -- which the slot
+    # header offers "any time" -- dropped them back in the room instead.
+    #
+    # The membership test is the guard: the loop runs only while `step`
+    # names a block that exists, so a typo'd or unknown step falls out
+    # instead of spinning.
+    _STEPS = frozenset({'first_name', 'last_name', 'gender'})
+    while step in _STEPS:
 
-    while step == 'first_name':
-        _header("What is your first name?")
-        while True:
-            name = yield from _input("&<255>>&n ")
-            name = name.strip()
-            if not name:
-                continue
-            err = _validate_name(name, 'first')
-            if err:
-                pobj.msg(err)
-                _header("What is your first name?")
-                continue
-            taken_names = list(this.character_names or [])
-            # su.capitalise, not str.capitalize: names admit apostrophes
-            # and hyphens, and capitalize() lowercases everything after
-            # the first letter -- it turned "MacLeod" into "Macleod" and
-            # "O'Brien" into "O'brien".  The taken check folds case
-            # itself so that only affects spelling.
-            first_name = su.capitalise(name)
-            if first_name.lower() in [t.lower() for t in taken_names]:
-                pobj.msg("That name is taken.")
-                continue
-            ichar.noun = first_name
-            _set(ichar, 'name', first_name)
-            taken_names.append(first_name)
-            _set(this, 'character_names', taken_names)
-            _set(ichar, 'chargen_step', 'last_name')
-            step = 'last_name'
-            break
+        # ── Step 2: First name ────────────────────────────────────────────
 
-    # ── Step 3: Last name ─────────────────────────────────────────────
-
-    while step == 'last_name':
-        _header("And what shall your last name be?")
-        while True:
-            name = yield from _input("&<255>>&n ")
-            name = name.strip()
-            if name.lower() == 'back':
-                step = 'first_name'
-                _set(ichar, 'chargen_step', 'first_name')
-                break
-            if not name:
-                continue
-            err = _validate_name(name, 'last')
-            if err:
-                pobj.msg(err)
-                _header("And what shall your last name be?")
-                continue
-            last_name = su.capitalise(name)
-            _set(ichar, 'last_name', last_name)
-            _set(ichar, 'chargen_step', 'gender')
-            step = 'gender'
-            break
-
-    # ── Step 4: Gender ────────────────────────────────────────────────
-
-    while step == 'gender':
-        _header("[M]ale or [F]emale? (Contact a GM if you'd like other gender pronouns.)")
-        while True:
-            ans = yield from _input("&<255>>&n ")
-            ans = ans.strip().lower()
-            if not ans:
-                continue
-            if 'back'.startswith(ans):
-                step = 'last_name'
+        while step == 'first_name':
+            _header("What is your first name?")
+            while True:
+                name = yield from _input("&<255>>&n ")
+                name = name.strip()
+                if not name:
+                    continue
+                err = _validate_name(name, 'first')
+                if err:
+                    pobj.msg(err)
+                    _header("What is your first name?")
+                    continue
+                taken_names = list(this.character_names or [])
+                # su.capitalise, not str.capitalize: names admit apostrophes
+                # and hyphens, and capitalize() lowercases everything after
+                # the first letter -- it turned "MacLeod" into "Macleod" and
+                # "O'Brien" into "O'brien".  The taken check folds case
+                # itself so that only affects spelling.
+                first_name = su.capitalise(name)
+                if first_name.lower() in [t.lower() for t in taken_names]:
+                    pobj.msg("That name is taken.")
+                    continue
+                ichar.noun = first_name
+                _set(ichar, 'name', first_name)
+                taken_names.append(first_name)
+                _set(this, 'character_names', taken_names)
                 _set(ichar, 'chargen_step', 'last_name')
+                step = 'last_name'
                 break
-            if 'male'.startswith(ans):
-                gender = 'male'
-            elif 'female'.startswith(ans):
-                gender = 'female'
-            else:
-                pobj.msg("")
-                pobj.msg("&<245>Try again...&n")
-                pobj.msg("")
-                _header("[M]ale or [F]emale? (Contact a GM if you'd like other gender pronouns.)")
-                continue
-            _set(ichar, 'gender', gender)
-            _set(ichar, 'chargen_step', 'finalize')
-            step = 'finalize'
-            break
-        continue
+
+        # ── Step 3: Last name ─────────────────────────────────────────────
+
+        while step == 'last_name':
+            _header("And what shall your last name be?")
+            while True:
+                name = yield from _input("&<255>>&n ")
+                name = name.strip()
+                if name.lower() == 'back':
+                    step = 'first_name'
+                    _set(ichar, 'chargen_step', 'first_name')
+                    break
+                if not name:
+                    continue
+                err = _validate_name(name, 'last')
+                if err:
+                    pobj.msg(err)
+                    _header("And what shall your last name be?")
+                    continue
+                last_name = su.capitalise(name)
+                _set(ichar, 'last_name', last_name)
+                _set(ichar, 'chargen_step', 'gender')
+                step = 'gender'
+                break
+
+        # ── Step 4: Gender ────────────────────────────────────────────────
+
+        while step == 'gender':
+            _header("[M]ale or [F]emale? (Contact a GM if you'd like other gender pronouns.)")
+            while True:
+                ans = yield from _input("&<255>>&n ")
+                ans = ans.strip().lower()
+                if not ans:
+                    continue
+                if 'back'.startswith(ans):
+                    step = 'last_name'
+                    _set(ichar, 'chargen_step', 'last_name')
+                    break
+                if 'male'.startswith(ans):
+                    gender = 'male'
+                elif 'female'.startswith(ans):
+                    gender = 'female'
+                else:
+                    pobj.msg("")
+                    pobj.msg("&<245>Try again...&n")
+                    pobj.msg("")
+                    _header("[M]ale or [F]emale? (Contact a GM if you'd like other gender pronouns.)")
+                    continue
+                _set(ichar, 'gender', gender)
+                _set(ichar, 'chargen_step', 'finalize')
+                step = 'finalize'
+                break
+            continue
 
     # ── Step 5: Finalization ──────────────────────────────────────────
 
