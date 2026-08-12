@@ -417,6 +417,30 @@ class EffectsManager:
                 continue
             to_remove.append(key)
 
+        # Tell each handler its effect is over before dropping it.
+        #
+        # A handler's contract is that remaining == 0 is the last tick: it
+        # is where the effect clears whatever state it set, and where a
+        # narrative effect says its closing line.  Cancelling ends an
+        # effect exactly as running out of ticks does, so it has to honour
+        # the same contract -- without this, cancel removed the schedule
+        # and left the state, and a cancelled blindness stayed blind with
+        # nothing still running that could ever clear it.
+        from .builtins import make_call_verb
+        call_on_target = make_call_verb(pobj, _db)
+        for key in to_remove:
+            entry = registry[key]
+            try:
+                call_on_target(eu_obj, f"do_{entry['name']}",
+                               tick=entry.get('tick', 0) + 1, remaining=0,
+                               effect_args=entry.get('args', []),
+                               effect_kwargs=entry.get('kwargs', {}))
+            except KeyError:
+                pass  # no do_ verb for this effect: nothing to clean up
+            except Exception as exc:
+                logger.error("effect %s: cancel handler failed: %s", key, exc,
+                             exc_info=True)
+
         # Remove matched entries
         for key in to_remove:
             del registry[key]
