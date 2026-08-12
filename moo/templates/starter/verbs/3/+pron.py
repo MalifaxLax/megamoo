@@ -19,14 +19,14 @@ pmap = globals.GENDER_PRONOUN_MAP
 
 pobj.msg("")
 pobj.msg("&<245>Pronoun substitution tags for msg:&n")
-pobj.msg("  %%ps / %%Ps = subject    (he, she, it, they)")
-pobj.msg("  %%po / %%Po = object     (him, her, it, them)")
-pobj.msg("  %%pp / %%Pp = possessive (his, her, its, their)")
-pobj.msg("  %%pa / %%Pa = absolute   (his, hers, its, theirs)")
-pobj.msg("  %%pr / %%Pr = reflexive  (himself, herself, itself, themself)")
+pobj.msg("  &&ps / &&Ps = subject    (he, she, it, they)")
+pobj.msg("  &&po / &&Po = object     (him, her, it, them)")
+pobj.msg("  &&pp / &&Pp = possessive (his, her, its, their)")
+pobj.msg("  &&pa / &&Pa = absolute   (his, hers, its, theirs)")
+pobj.msg("  &&pr / &&Pr = reflexive  (himself, herself, itself, themself)")
 pobj.msg("  Uppercase P = capitalize output.")
 pobj.msg("")
-pobj.msg("  Gender        %%ps    %%po    %%pp    %%pa      %%pr")
+pobj.msg("  Gender        &&ps    &&po    &&pp    &&pa      &&pr")
 for gender, pronouns in pmap.items():
     ps = pronouns['ps'].ljust(6)
     po = pronouns['po'].ljust(6)
@@ -36,4 +36,4 @@ for gender, pronouns in pmap.items():
     pobj.msg(f"  {gender.ljust(13)} {ps} {po} {pp} {pa} {pr}")
 
 pobj.msg("")
-pobj.msg("Other tags: %%S/%%s = sub name, %%D/%%d = dobj name, %%I/%%i = iobj name")
+pobj.msg("Other tags: &&S/&&s = sub name, &&D/&&d = dobj name, &&I/&&i = iobj name")
