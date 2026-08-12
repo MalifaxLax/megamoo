@@ -306,6 +306,26 @@ class StringUtils:
         if not text or not isinstance(text, str):
             return text
 
+        # --- Protect a doubled sigil, the way the colour codes already do ---
+        #
+        # A doubled sigil is how you write a literal one: color.py hides
+        # `&&` behind a placeholder before reading any code and restores a
+        # single `&` at the end.  Substitution never learned the same rule,
+        # and the token regex matches `&S` wherever it sits -- including on
+        # the second `&` of an escaped pair -- so `&&S` came out as `&`
+        # followed by a name.
+        #
+        # It matters wherever a verb puts a player's own words into a
+        # message: `act` doubles what you type precisely so that a stray
+        # `&S` stays text rather than naming somebody else inside a line
+        # attributed to you, and only half that escape was being honoured.
+        #
+        # Restored as `&&`, not `&`: colour processing runs after this and
+        # still has its own half of the escape to consume.  Undoubling here
+        # would hand it a live `&<196>` instead of a literal one.
+        _ESC = '\x00SIG\x00'
+        text = text.replace(SUBST_SIGILS[0] * 2, _ESC)
+
         # --- Raw-string slots: %0 / %1 ... / %N (also $0 / $1 ... / $N) ---
         # Each `sN` value (passed straight as a kwarg, e.g. s0="txt0") replaces
         # the matching %N/$N token verbatim -- the kwarg keeps its `s` prefix,
@@ -352,7 +372,7 @@ class StringUtils:
             text = _sub_token(text, 'i', iname)
             text = _sub_token(text, 'I', icap)
 
-        return text
+        return text.replace(_ESC, SUBST_SIGILS[0] * 2)
 
     # ----------------------------------------------------------------
     # Pronoun substitution (single enactor)
