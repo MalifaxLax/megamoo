@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hooks &amp; Internal Verbs — MegaMOO Guide</title>
+<!-- seo:begin -->
+<meta name="description" content="The 81 verbs in the MegaMOO starter world that nobody can type: what calls them, what arrives in them, what they should return, and how to write your own.">
+<link rel="canonical" href="https://malifaxlax.github.io/megamoo/hooks.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MegaMOO">
+<meta property="og:title" content="Hooks &amp; Internal Verbs — MegaMOO Guide">
+<meta property="og:description" content="The 81 verbs in the MegaMOO starter world that nobody can type: what calls them, what arrives in them, what they should return, and how to write your own.">
+<meta property="og:url" content="https://malifaxlax.github.io/megamoo/hooks.html">
+<meta property="og:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Hooks &amp; Internal Verbs — MegaMOO Guide">
+<meta name="twitter:description" content="The 81 verbs in the MegaMOO starter world that nobody can type: what calls them, what arrives in them, what they should return, and how to write your own.">
+<meta name="twitter:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
+<link rel="icon" href="https://malifaxlax.github.io/megamoo/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="https://malifaxlax.github.io/megamoo/apple-touch-icon.png">
+<!-- seo:end -->
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<p class="crumb"><a href="index.html">← MegaMOO Guide</a></p>
+
+<h1 class="wordmark" style="font-size:clamp(1.8rem,6vw,2.4rem)">Hooks &amp; Internal Verbs</h1>
+
+<p class="tagline">The verbs nobody types, and how to write your own.</p>
+
+<nav class="toc">
+    <span class="kicker">On this page</span>
+    <ol>
+        <li><a href="#what">What a hidden verb is</a></li>
+        <li><a href="#calling">The five ways one gets called</a></li>
+        <li><a href="#namespace">What arrives inside it</a></li>
+        <li><a href="#exceptions">Exception verbs — <code>&lt;verb&gt;_</code></a></li>
+        <li><a href="#faces">Container faces — in, on, under, behind</a></li>
+        <li><a href="#lifecycle">Lifecycle hooks</a></li>
+        <li><a href="#effects">Effects — <code>do_&lt;name&gt;</code> and <code>$eu</code></a></li>
+        <li><a href="#tickers">Ticker callbacks</a></li>
+        <li><a href="#character">Character state helpers</a></li>
+        <li><a href="#movement">Movement &amp; rendering internals</a></li>
+        <li><a href="#writing">Writing your own</a></li>
+    </ol>
+</nav>
+
+<h2 id="what">What a hidden verb is</h2>
+
+<p>
+A hidden verb is an ordinary verb that a player cannot type. It lives on an
+object like any other, it is written in Python like any other, and it can be
+called by other verbs like any other — the only thing it cannot be is the first
+word of a command.
+</p>
+
+<p>
+You mark one by putting a line in its docstring:
+</p>
+
+<div class="term"><code><span class="c">"""</span>
+<span class="c">in_get -- take an item out of this container.</span>
+
+<span class="c">Hidden:  yes</span>
+<span class="c">"""</span></code></div>
+
+<p>
+The starter world ships <strong>81 of them</strong>, answering to 107 names once
+aliases are counted, spread across 18 objects. They are the seams of the world:
+the places the engine and the shipped verbs stop and ask <em>this object</em> what
+it wants to do. Learning them is how you stop editing shared verbs and start
+attaching behaviour to individual things.
+</p>
+
+<div class="note">
+    <span class="label">Hidden means untypeable, not unreachable</span>
+    <p>The decision is made in the parser, at the point where a typed command is
+       matched to a verb — not in <code>find_verb</code>, which is what
+       <code>call_verb</code> uses. So a hidden verb is fully reachable from code
+       and completely unreachable from the prompt. <code>help</code> does not list
+       them either. To see them in-game, staff can use <code>+verbs</code>,
+       which does not filter them out — add <code>/all</code> to include the
+       ones inherited from parents — or <code>@vfind</code>, which marks each
+       match it finds as hidden.</p>
+</div>
+
+<h2 id="calling">The five ways one gets called</h2>
+
+<p>
+This matters more than it sounds, because <strong>the five paths behave
+differently when the verb is missing</strong>, and a missing hook is the normal
+case rather than an error — most of these are optional by design.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead>
+<tr><th>Called by</th><th>Written</th><th>If the verb does not exist</th></tr>
+</thead>
+<tbody>
+<tr><td>Another verb</td><td><code>call_verb(obj, 'in_get')</code></td><td>raises <code>KeyError</code></td></tr>
+<tr><td>Another verb, method style</td><td><code>obj.in_get()</code></td><td>raises <code>AttributeError</code> — <em>not</em> <code>KeyError</code></td></tr>
+<tr><td>The engine, at a hook point</td><td><code>fire_hook('after_move', obj)</code></td><td>nothing happens, silently</td></tr>
+<tr><td>A ticker</td><td><code>ticker_add(1, '_td_rt', obj, id)</code></td><td>swallowed; the ticker keeps running</td></tr>
+<tr><td>The effects system</td><td><code>$eu.trigger(who, 'stun', 5, 1)</code></td><td>the effect is dropped on its first fire</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="warn">
+    <span class="label">The two exception types are not interchangeable</span>
+    <p>If you guard an optional hook, guard the right thing. This is correct for
+       the <code>call_verb</code> form:</p>
+    <div class="term"><code><span class="k">try</span>:
+    <span class="k">if</span> call_verb(item, <span class="s">'get_'</span>):
+        <span class="k">return</span>
+<span class="k">except</span> KeyError:
+    <span class="k">pass</span>       <span class="c"># no get_ on this item, which is the usual case</span></code></div>
+    <p>The method form <code>item.get_()</code> raises <code>AttributeError</code>
+       instead, and sails straight through that <code>except</code>. Pick one
+       style per call site and match the guard to it.</p>
+</div>
+
+<h2 id="namespace">What arrives inside it</h2>
+
+<p>
+Every verb — hidden or not — is handed the same core names:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Name</th><th>What it is</th></tr></thead>
+<tbody>
+<tr><td><code>this</code></td><td>the object the verb was found on</td></tr>
+<tr><td><code>pobj</code>, <code>player</code></td><td>the character who caused this to happen</td></tr>
+<tr><td><code>caller</code></td><td>the object whose verb called this one</td></tr>
+<tr><td><code>location</code></td><td>where <code>pobj</code> is</td></tr>
+<tr><td><code>db</code></td><td>the database</td></tr>
+<tr><td><code>verb</code></td><td>the name this was invoked as — the alias, not the filename</td></tr>
+<tr><td><code>args</code>, <code>argstr</code>, <code>argv</code></td><td>whatever the caller passed as text</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+On top of that, each family gets its own extras, passed as keyword arguments by
+whatever called it. Those are listed with each family below, and they are the
+part worth reading before you write a hook — a handler that ignores
+<code>remaining</code> will misbehave in a way nothing warns you about.
+</p>
+
+<div class="note">
+    <span class="label"><code>verb</code> tells you which name was typed</span>
+    <p>Several of these verbs answer to many names and switch on which one was
+       used. <code>#1:_afflict</code> answers to thirteen; <code>_stun</code> and
+       <code>_blind</code> are the same file, reading <code>verb</code> to decide
+       what to do. If you add an alias, remember the body has to know about it.</p>
+</div>
+
+<h2 id="exceptions">Exception verbs — <code>&lt;verb&gt;_</code></h2>
+
+<p>
+This is the pattern the whole design rests on, so it is worth stating plainly:
+<strong>every typeable command should have a <code>verb_</code> exception after it
+has matched its target.</strong> The shared verb does the parsing, the matching
+and the "you can't see that here" — then it asks the object whether it would
+like to handle the rest.
+</p>
+
+<p>
+That is how you attach behaviour to <em>one thing</em> without editing the verb
+everybody uses. The cursed sword that refuses to be picked up is a
+<code>get_</code> on the sword, not an <code>if</code> in <code>#17:get</code>.
+</p>
+
+<div class="term"><code><span class="c"># get_ on the one cursed sword</span>
+pobj.msg(<span class="s">"The hilt burns. You snatch your hand back."</span>)
+result = <span class="k">True</span>    <span class="c"># handled -- get stops here</span></code></div>
+
+<p>
+Return a true value and the shared verb stops. Return nothing and it carries on
+as normal, so a hook that only wants to <em>watch</em> can emit a message and
+fall through.
+</p>
+
+<div class="note">
+    <span class="label">Most exceptions do not ship, and that is the point</span>
+    <p><code>get_</code>, <code>put_</code>, <code>drop_</code>,
+       <code>give_</code> and <code>examine_</code> are called by the shipped
+       verbs and defined by nothing. They are the contract, waiting for you. An
+       object without one is the ordinary case, which is why every caller wraps
+       the call in <code>try/except KeyError</code>.</p>
+</div>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Verb</th><th>On</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>open_</code></td><td>#23, #27</td><td>Opens the exit or container. Refuses if locked; announces through to the far side.</td></tr>
+<tr><td><code>close_</code></td><td>#23, #27</td><td>Closes it, and closes the matching exit on the other side.</td></tr>
+<tr><td><code>lock_</code></td><td>#23</td><td>Locks a closed exit. Checks <code>lockable</code>, and the key against <code>this.key</code>.</td></tr>
+<tr><td><code>unlock_</code></td><td>#23</td><td>The reverse, with the same key check.</td></tr>
+<tr><td><code>latch_</code>, <code>unlatch_</code></td><td>#23</td><td>As lock, for a latch — no key involved.</td></tr>
+<tr><td><code>look_</code></td><td>#26, #30</td><td>Replaces the ordinary description. The container lists contents; the furniture lists who is sitting on it.</td></tr>
+<tr><td><code>sit_</code>, <code>lay_</code></td><td>#30</td><td>Seats or beds a character. Checks capacity and sets their position.</td></tr>
+<tr><td><code>go_</code></td><td>#7, #51</td><td>Runs when a character walks into the arch (chargen) or the portal (entering the game).</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="faces">Container faces — in, on, under, behind</h2>
+
+<p>
+An object has four faces a thing can be put, and each face has three verbs. They
+are the exception pattern again, one step more specific: <code>#17:put</code>
+works out <em>which</em> face you meant from the preposition you typed, then calls
+that face's hook.
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> put coin in chest      <span class="c">→  in_put on the chest</span>
+<span class="p">&gt;</span> put coin on table      <span class="c">→  on_put on the table</span>
+<span class="p">&gt;</span> put coin under rug     <span class="c">→  under_put on the rug</span>
+<span class="p">&gt;</span> look behind painting   <span class="c">→  behind_look on the painting</span></code></div>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Face</th><th>Verbs</th><th>On</th></tr></thead>
+<tbody>
+<tr><td>inside</td><td><code>in_get</code>, <code>in_put</code>, <code>in_look</code></td><td>#26 BaseContainer</td></tr>
+<tr><td>on top of</td><td><code>on_get</code>, <code>on_put</code>, <code>on_look</code></td><td>#11 object</td></tr>
+<tr><td>underneath</td><td><code>under_get</code>, <code>under_put</code>, <code>under_look</code></td><td>#11 object</td></tr>
+<tr><td>behind</td><td><code>behind_get</code>, <code>behind_put</code>, <code>behind_look</code></td><td>#11 object</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+Every object in the world inherits the on, under and behind faces from
+<code>#11</code>, so you can already put a coin under any rock. Only containers
+have an inside.
+</p>
+
+<h2 id="lifecycle">Lifecycle hooks</h2>
+
+<p>
+These are fired by the <em>engine</em>, not by another verb, at moments in an
+object's life. They are optional everywhere: no verb, nothing happens, no error.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Hook</th><th>On</th><th>Fires when</th></tr></thead>
+<tbody>
+<tr><td><code>at_post_move</code></td><td>#3</td><td>a character has finished moving</td></tr>
+<tr><td><code>on_puppet</code></td><td>#5</td><td>a player takes control of the character — adds them to the room's list</td></tr>
+<tr><td><code>on_unpuppet</code></td><td>#5</td><td>they disconnect or leave the game</td></tr>
+<tr><td><code>enter_func</code></td><td>#17, #26</td><td>something enters the room, or climbs into the container</td></tr>
+<tr><td><code>exit_func</code></td><td>#17, #26</td><td>something leaves it</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="note">
+    <span class="label">Some hooks can veto</span>
+    <p>The engine's <code>before_</code> hooks — before a move, a recycle, a
+       reparent — read a <code>False</code> return as "do not do this", and stop.
+       <strong>A hook that raises is also read as <code>False</code></strong>,
+       deliberately: a broken guard fails closed rather than letting the thing
+       through. The starter ships no <code>before_</code> verbs; the hook points
+       are there for you.</p>
+</div>
+
+<h2 id="effects">Effects — <code>do_&lt;name&gt;</code> and <code>$eu</code></h2>
+
+<p>
+Anything that should happen repeatedly and then stop — a poison, a stun, a spell
+that burns down — is an <em>effect</em>. You start one and the effects object
+(<code>$eu</code>, which is <code>#53</code>) does the rest: the scheduling, the
+counting down, the expiry, the stacking.
+</p>
+
+<div class="term"><code>_effects.trigger(pobj, <span class="s">'stun'</span>, <span class="s">5</span>, <span class="s">1</span>)   <span class="c"># 'stun', 5 times, one second apart</span></code></div>
+
+<p>
+Every second, <code>$eu</code> calls <code>do_stun</code> on itself — the effect's
+name <em>is</em> the verb's name, which is the whole binding. There is no table
+to register in. <strong>Adding a file called <code>do_poison</code> is all it
+takes to have a poison effect.</strong>
+</p>
+
+<h3>What a handler receives</h3>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Name</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>pobj</code></td><td>the character the effect is on</td></tr>
+<tr><td><code>tick</code></td><td>which firing this is, counting from 1</td></tr>
+<tr><td><code>remaining</code></td><td>firings left after this one — <strong>zero means this is the last</strong></td></tr>
+<tr><td><code>effect_args</code>, <code>effect_kwargs</code></td><td>anything extra passed to <code>trigger</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+The shipped handlers all do the same two things: keep a countdown in the
+character's <code>status</code> or <code>condition</code>, and clear it on the
+last tick. That number is what the rest of the world reads — <code>do_wait</code>
+consults it to decide whether you can act at all.
+</p>
+
+<div class="term"><code><span class="c"># do_stun, in full</span>
+_d = <span class="k">dict</span>(pobj.status <span class="k">or</span> {})
+<span class="k">if</span> remaining &gt; <span class="s">0</span>:
+    _d[<span class="s">'stunned'</span>] = remaining
+<span class="k">else</span>:
+    _d.pop(<span class="s">'stunned'</span>, <span class="k">None</span>)
+pobj.status = _d</code></div>
+
+<div class="warn">
+    <span class="label">Assign a fresh dict, and do not use setattr</span>
+    <p>Two traps in three lines. Changing the dict in place never reaches the
+       database — you must build a new one and assign it. And plain assignment is
+       required: <code>setattr</code> goes through the permission check, and the
+       effect is running as the character, who does not own their own
+       <code>status</code>. It would be refused.</p>
+</div>
+
+<h3>The thirteen shipped effects</h3>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Handler</th><th>Sets</th><th>Also reachable as</th></tr></thead>
+<tbody>
+<tr><td><code>do_stun</code></td><td><code>status['stunned']</code></td><td><code>pobj._stun(n)</code></td></tr>
+<tr><td><code>do_blind</code></td><td><code>status['blind']</code></td><td><code>pobj._blind(n)</code></td></tr>
+<tr><td><code>do_sleep</code></td><td><code>status['sleeping']</code></td><td><code>pobj._sleep(n)</code></td></tr>
+<tr><td><code>do_unconscious</code></td><td><code>status['unconscious']</code></td><td><code>pobj._unconscious(n)</code></td></tr>
+<tr><td><code>do_paralyze</code></td><td><code>status['paralyzed']</code></td><td><code>pobj._paralyze(n)</code></td></tr>
+<tr><td><code>do_intoxicate</code></td><td><code>status['intoxicated']</code></td><td><code>pobj._intoxicate(n)</code></td></tr>
+<tr><td><code>do_no_parry</code></td><td><code>status['no_parry']</code></td><td><code>pobj._no_parry(n)</code></td></tr>
+<tr><td><code>do_must_parry</code></td><td><code>status['must_parry']</code></td><td><code>pobj._must_parry(n)</code></td></tr>
+<tr><td><code>do_web</code></td><td><code>condition['webbed']</code></td><td><code>pobj._web(n)</code></td></tr>
+<tr><td><code>do_bind</code></td><td><code>condition['bound']</code></td><td><code>pobj._bind(n)</code></td></tr>
+<tr><td><code>do_entangle</code></td><td><code>condition['entangled']</code></td><td><code>pobj._entangle(n)</code></td></tr>
+<tr><td><code>do_immobilize</code></td><td><code>condition['immobilized']</code></td><td><code>pobj._immobilize(n)</code></td></tr>
+<tr><td><code>do_imprison</code></td><td><code>condition['imprisoned']</code></td><td><code>pobj._imprison(n)</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+<code>do_intoxicate</code> is the one to read first. It does the state half like
+all the others, then adds what a game actually wants — an onset line, a line each
+tick, and a recovery line. Copy its shape, not its prose.
+</p>
+
+<h3>Managing effects</h3>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Verb</th><th>Call it as</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>trigger</code></td><td><code>$eu.trigger(who, name, ticks, interval)</code></td><td>Starts one. Triggering the same effect again <strong>stacks</strong> — the remaining count goes up.</td></tr>
+<tr><td><code>trigger_all</code></td><td><code>$eu.trigger_all(who, [...])</code></td><td>Several at once.</td></tr>
+<tr><td><code>cancel</code></td><td><code>$eu.cancel(who[, name])</code></td><td>Ends one, or all of them. <strong>Calls the handler once more with <code>remaining=0</code></strong>, so the state clears and the recovery message plays.</td></tr>
+<tr><td><code>list_active</code></td><td><code>$eu.list_active(who)</code></td><td>What is running, with ticks left.</td></tr>
+<tr><td><code>_tick</code></td><td>—</td><td>The dispatcher. Runs once a second for the whole world, not once per effect.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="tickers">Ticker callbacks</h2>
+
+<p>
+Below the effects system sit two raw tickers on <code>#1</code>, for numbers that
+count on their own. They are older and simpler than <code>$eu</code>: no
+registry, one ticker per thing per character.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Verb</th><th>Answers to</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>_td_rt</code></td><td><code>_tick_down</code></td><td>Counts roundtime down to zero, then stops itself.</td></tr>
+<tr><td><code>_tick_up</code></td><td><code>_tu_hits</code>, <code>_tu_stamina</code>, <code>_tu_mana</code>, <code>_tu_focus</code>, <code>_tu_adrenalin</code>, <code>_tu_fabric</code></td><td>Regenerates a resource back up to its maximum.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="warn">
+    <span class="label">A ticker runs as the character, and cannot use setattr</span>
+    <p>The same trap as the effect handlers, for the same reason. <code>rt</code>
+       and the resource dictionaries are not writable by the character who owns
+       them, so <code>setattr</code> is refused and the timer silently never
+       ticks. Assign directly: <code>this.rt = value</code>.</p>
+</div>
+
+<h2 id="character">Character state helpers</h2>
+
+<p>
+These answer questions about a character. Most are called by other verbs to build
+what a player sees, and they are the ones to override if your game measures
+people differently.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Verb</th><th>On</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>do_wait</code></td><td>#3</td><td>The gate on every action. <strong>Returns true when the character <em>cannot</em> act</strong> — unconscious, asleep, paralysed, webbed, or still in roundtime.</td></tr>
+<tr><td><code>hands_free</code></td><td>#3</td><td>Which hands are empty, for anything that needs one.</td></tr>
+<tr><td><code>time_ok</code></td><td>#3</td><td>Roundtime alone. Superseded by <code>do_wait</code>, which checks more.</td></tr>
+<tr><td><code>move_to_hand</code></td><td>#5</td><td>Puts an item in a hand. Handles two-handed items.</td></tr>
+<tr><td><code>clear_hand</code></td><td>#5</td><td>Takes it out again.</td></tr>
+<tr><td><code>get_status</code></td><td>#5</td><td>Which statuses are active — stunned, asleep and the rest.</td></tr>
+<tr><td><code>get_condition</code></td><td>#5</td><td>Which conditions are — webbed, bound, immobilised.</td></tr>
+<tr><td><code>get_position</code></td><td>#5</td><td>Standing, sitting or lying, as a number.</td></tr>
+<tr><td><code>postring</code></td><td>#5</td><td>That number as words — "sitting", "lying down".</td></tr>
+<tr><td><code>make_postatus</code></td><td>#5</td><td>Position and status combined, as the room sees it.</td></tr>
+<tr><td><code>look_self</code></td><td>#5</td><td>What a character looks like to somebody else.</td></tr>
+<tr><td><code>rlook</code></td><td>#5</td><td>The same, for staff, with the numbers shown.</td></tr>
+<tr><td><code>_afflict</code></td><td>#1</td><td>Applies an affliction by name. Answers to thirteen: <code>_stun</code>, <code>_blind</code>, <code>_sleep</code>, <code>_web</code> and the rest — each one hands off to <code>$eu</code>.</td></tr>
+<tr><td><code>_resource</code></td><td>#1</td><td>Drains a resource. Answers to <code>_hits</code>, <code>_stamina</code>, <code>_mana</code>, <code>_focus</code>, <code>_adrenalin</code>, <code>_fabric</code>.</td></tr>
+<tr><td><code>_rt</code></td><td>#1</td><td>Applies roundtime and starts it counting down.</td></tr>
+<tr><td><code>_title</code></td><td>#1</td><td>Rebuilds an object's display name from its article, adjectives and noun.</td></tr>
+<tr><td><code>tell</code></td><td>#1</td><td>The MOO spelling of <code>msg()</code>, for pasted MOO code.</td></tr>
+<tr><td><code>_allow</code></td><td>#3</td><td>Reserved, and empty. Nothing calls it.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="movement">Movement &amp; rendering internals</h2>
+
+<p>
+The machinery under <code>go</code> and <code>look</code>. You are unlikely to
+call these, but overriding one is how you change how movement or room
+descriptions work everywhere at once.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Verb</th><th>On</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>gmove</code></td><td>#15, #20</td><td>The generic move: takes the traveller, the destination and the four messages, and performs the move.</td></tr>
+<tr><td><code>move</code></td><td>#21, #22, #24, #25</td><td>One per exit kind. Each checks what its kind cares about — closed, locked, climbable, jumpable — then delegates to <code>gmove</code>.</td></tr>
+<tr><td><code>vmove</code></td><td>#21</td><td>The same for virtual exits, which have no object of their own.</td></tr>
+<tr><td><code>invoke</code></td><td>#20</td><td>Checks whether an exit will let you through, and says why not.</td></tr>
+<tr><td><code>match_exit</code></td><td>#15</td><td>Turns "north" or "2 door" into an actual exit.</td></tr>
+<tr><td><code>look_here</code></td><td>#15</td><td>Builds the room description a player sees.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="writing">Writing your own</h2>
+
+<p>
+Nothing special is required. A hidden verb is made the same way as any other —
+the only difference is the line in its docstring.
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @adverb #412.get_
+<span class="p">&gt;</span> @program #412.get_</code></div>
+
+<p>
+Then write it, ending the docstring with <code>Hidden:&nbsp;&nbsp;yes</code>. Four
+things are worth keeping in mind:
+</p>
+
+<ol>
+    <li><strong>Name it for the verb it serves.</strong> A trailing underscore
+        means "the exception for this command". <code>get_</code> is called by
+        <code>get</code>; <code>do_poison</code> is called for the effect named
+        <code>poison</code>. The name is the wiring.</li>
+    <li><strong>Return <code>True</code> only if you handled it.</strong> For an
+        exception verb that stops the shared command. Return nothing and it
+        continues, which is what you want if you only added a message.</li>
+    <li><strong>Assign whole values, not parts of them.</strong> Changing a dict
+        or list in place does not reach the database. Build a new one and assign
+        it.</li>
+    <li><strong>Put the name in the file, not just the database.</strong> If you
+        give your verb an alias, add it to the <code>Aliases:</code> line —
+        <code>@alias</code> does this for you. A name that exists only in the
+        database is lost the next time the verb is loaded from disk.</li>
+</ol>
+
+<div class="note">
+    <span class="label">Finding them in a running world</span>
+    <p><code>+verbs #26</code> lists every verb on an object, hidden ones
+       included; <code>/all</code> adds the ones it inherits. And <code>@vfind in_get</code> finds which objects define a
+       given hook. <code>+decompile #26.in_get</code> prints the source exactly as
+       stored, which is the ground truth for what is actually running.</p>
+</div>
+
+<div class="pagenav">
+    <a href="verbs.html"><span class="dir">Previous</span>Verbs</a>
+    <a class="to-next" href="help.html"><span class="dir">Next</span>The Help System</a>
+</div>
+
+<div class="footer">
+    <span><a href="index.html">← MegaMOO Guide</a></span>
+    <span>Hooks &amp; Internal Verbs</span>
+</div>
+
+</div>
+</body>
+</html>
