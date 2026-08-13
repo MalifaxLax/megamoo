@@ -69,7 +69,7 @@ PREPOSITIONS = {
     'on':      ['on', ('onto', 3), ('upon', 3), 'on top of', ('atop', 3)],
     'from':    [('from', 3), 'out of'],
     'with':    [('with', 3), ('using', 3)],
-    'at':      ['at', 'to'],
+    'at':      ['at'],
     'as':      ['as'],
     'for':     ['for'],
     'about':   [('about', 4), ('concerning', 3)],
@@ -81,6 +81,8 @@ PREPOSITIONS = {
     'off':     ['off'],
     'between': [('between', 3)],
     'among':   [('among', 3), ('amongst', 3)],
+    'to':      ['to'],
+    
     '=': ['='],  # Assignment preposition (e.g., @name obj=value)
     '?': ['?'],  # Query preposition (e.g., @property obj?prop)
 }

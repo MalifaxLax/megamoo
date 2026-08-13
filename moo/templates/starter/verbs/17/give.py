@@ -20,7 +20,11 @@ if not args:
 if pobj.do_wait():
     return
 
-if not prep or prep_match(prep) != 'at':
+# 'to', not 'at': they were the same word until the preposition table
+# separated them, and they mean different things.  You look *at* someone
+# and give something *to* them; `give sword at bob` was only ever reachable
+# because the two shared an entry.
+if not prep or prep_match(prep) != 'to':
     pobj.msg("Give what to whom?")
     return
 

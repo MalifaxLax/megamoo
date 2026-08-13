@@ -92,8 +92,21 @@
   /* The width of the left column, in one place: #corner sizes itself from
      it and the scrollback reserves exactly that much. Two copies would
      drift, and the drift shows as text under the map or a stripe of dead
-     space. */
-  --map-width: min(280px, 42vw);
+     space.
+
+     These three are load-bearing together, so change them as a set:
+
+       map drawn at  = --map-width - --map-inset * 2   (border-box)
+       text starts at = --map-width + --map-gutter
+
+     The map keeps the width it has always had -- 268 - 6*2 = 256 -- while
+     the column around it lost the 12px inset it did not need and the strip
+     reserved beyond it went from --pad*2 to --map-gutter. The column is
+     26px narrower and the gap from the map's edge to the first character
+     went 36px -> 16px, without the drawing changing size. */
+  --map-width: min(268px, 42vw);
+  --map-inset: 6px;
+  --map-gutter: 10px;
 }
 
 /* ========================================================================
@@ -231,7 +244,7 @@ body {
    A float is in-flow and would scroll away with the first screenful; this
    is the price of a map that is always where you left it. */
 #scrollback.has-map {
-  padding-left: calc(var(--map-width) + var(--pad) * 2);
+  padding-left: calc(var(--map-width) + var(--map-gutter));
 }
 
 .line { min-height: 1px; }
@@ -663,9 +676,11 @@ body {
   max-height: 100%;
   overflow-y: auto;
   /* No padding at the top: the map's own top edge lines up with the top of
-     the text area rather than hanging below it. Sides and bottom keep the
-     gutter so it does not touch the pane edge. */
-  padding: 0 var(--pad) var(--pad);
+     the text area rather than hanging below it. Sides and bottom keep a
+     small inset so it does not touch the pane edge -- --map-inset rather
+     than --pad, because this one has to stay in step with --map-width to
+     keep the drawing the size it was. */
+  padding: 0 var(--map-inset) var(--map-inset);
   pointer-events: none;   /* overlays are readouts; don't block the terminal */
 }
 
