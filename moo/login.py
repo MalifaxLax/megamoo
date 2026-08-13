@@ -687,6 +687,16 @@ class LoginHandler:
                 await send("Incorrect password.\n")
                 continue
 
+            # No blank line is sent here, and adding one is a mistake worth
+            # not repeating: `look_here` runs next (network.py, on entering
+            # the command loop) and its `leader` defaults to True, so it
+            # already opens with a newline.  That newline is the blank line
+            # after "Password:" -- provided the password's own line has been
+            # ended first.  When it has not, it is spent ending that line
+            # instead and the room appears to butt against the prompt, which
+            # is a client-side omission and was fixed there.  Sending one
+            # from here as well simply gives everybody two.
+
 
             # Check for existing connection (direct or puppeted)
             from .network import find_connection_for_account, disconnect_for_takeover

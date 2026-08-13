@@ -259,6 +259,14 @@ body {
   text-align: center;
 }
 
+/* ...but the ASCII banner is a `pre` block at the left margin, and a
+   centred line under left-aligned art lines up with nothing. Under ASCII
+   the version goes left, where the art's own first column is. The client
+   picks between the two, and moves it if a splash image fails to load. */
+.banner--left {
+  text-align: left;
+}
+
 /* A world's own splash image, shown where the ASCII banner would be. */
 .splash {
   display: flex;
@@ -301,7 +309,15 @@ body {
    same dim as any other echo, which is a shade you can actually read.
    --fg-faint, which both of these used to be, is the palette's quietest
    colour and belongs on chrome nobody needs to notice. */
-.echo-inline { color: var(--fg-dim); }
+/* The same dim the server writes with: `&<245>` is xterm-256 index 245,
+   which xterm256() in client.js generates as #8a8a8a off the greyscale
+   ramp (8 + 13*10 = 138). Literal rather than var(--fg-dim), because the
+   point is to match what the game itself emits, not the page's own
+   chrome -- an echoed answer should read as the same weight of grey as
+   the prompt it is answering. Kept in step with that generator by hand;
+   there is no CSS variable for the 256 palette, since it is built at
+   load. */
+.echo-inline { color: #8a8a8a; }
 
 /* Client-generated notices (connection state), kept visually distinct
    from anything the game itself said. */
@@ -377,6 +393,49 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
+}
+
+/* --- world picker --- */
+
+/* margin-right:auto keeps it beside the brand: #topbar is space-between,
+   which would otherwise fling a third child into the middle. */
+.world-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+}
+
+.world-label {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+.world-input {
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border-bright);
+  border-radius: 3px;
+  padding: 3px 8px;
+  /* Wide enough for "bml localhost:8890" -- the longest thing routinely
+     typed here -- without the placeholder being clipped mid-word. */
+  width: 24ch;
+}
+
+.world-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* The header already carries a brand, two buttons and a status lamp; on a
+   narrow screen this is the part that can wait, since \con still works. */
+@media (max-width: 620px) {
+  .world-row { display: none; }
 }
 
 .topbar-button {

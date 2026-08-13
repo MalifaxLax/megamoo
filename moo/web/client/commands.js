@@ -6,18 +6,23 @@
  * set and its spelling follow MegaTerm's (MegaMOO/Commands/) so muscle
  * memory carries between the native client and this one.
  *
- * Three of MegaTerm's could not port literally, because they assume a
- * native app with a session book and a telnet socket it can point
- * anywhere:
+ * \connect keeps MegaTerm's session book:
  *
- *   \connect   a browser cannot open telnet, and this page has exactly
- *              one game — it reconnects, and takes an optional WebSocket
- *              URL, restricted to this origin (see canRepoint below).
+ *     \con ml <host> <port> <user> <pass>    name a session and connect
+ *     \save                                  remember it under that name
+ *     \con ml                                connect by name thereafter
+ *     \default ml                            and then a bare \con does too
+ *
+ * A browser still cannot open telnet, so a session resolves to a
+ * WebSocket URL (ws://host:port/ws) rather than a telnet socket.  The
+ * one thing that does not port is pointing at another *machine* on the
+ * fly: everything a socket sends is trusted as markup by term.write, so
+ * canRepoint refuses it and offers the ?ws= page-load instead, which
+ * starts a fresh document rather than feeding this one from somewhere
+ * new.  Any port on this machine is allowed, since that is your own
+ * second world rather than someone else's server.
+ *
  *   \quit      there is no application to terminate; it disconnects.
- *   \save      aliases and triggers persist as they are set, so there is
- *   \default   nothing to save and no second session to choose between.
- *              Both are still recognised, and say so, rather than coming
- *              back as "unknown command" to someone with the habit.
  *
  * \edit is deliberately absent.  MegaTerm opens a verb in its own editor
  * over a channel this client does not have; it is a feature to build, not
@@ -26,11 +31,47 @@
 (function () {
 'use strict';
 
-/** Recognised at the start of an input line. Matches MegaTerm's default. */
-const PREFIX = '\\';
+/**
+ * Recognised at the start of an input line. MegaTerm's default, and like
+ * MegaTerm's it is configurable -- see \prefix and STORE_PREFIX.
+ *
+ * A `let` read at call time rather than captured: every usage string in
+ * this file interpolates it from inside a handler, so changing it takes
+ * effect on the next line typed without anything having to be rebuilt.
+ */
+let PREFIX = '\\';
+
+/** Where \prefix keeps its choice. MegaTerm's is `command_prefix`. */
+const STORE_PREFIX = 'megamoo.prefix';
+
+/**
+ * Characters the game owns, which the client must not shadow.
+ *
+ * `/` is eval -- `/2+2`, `/sac` -- and parser.py parses it as a verb in
+ * its own right. `'` is say and `:` is emote, both real verbs reachable
+ * by punctuation. A client that claimed one of these would swallow the
+ * game command silently, which is the worst way to lose a feature.
+ */
+const RESERVED_PREFIXES = new Set(['/', "'", ':', '"']);
 
 const STORE_ALIASES = 'megamoo.aliases';
 const STORE_TRIGGERS = 'megamoo.triggers';
+
+/**
+ * handle -> {host, port, username, password}.
+ *
+ * ON STORING CREDENTIALS.  This is localStorage: plain text, readable by
+ * any script on this origin, and it outlives the tab.  MegaTerm keeps the
+ * same fields in ~/.megamoo-client.json, which is at least a file with
+ * user permissions rather than a browser origin.  The socket is also ws://
+ * and not wss:// in every world shipped so far, so a saved password
+ * crosses the network in clear as well as resting in clear.  \save says so
+ * the first time it is asked to store one.
+ */
+const STORE_SESSIONS = 'megamoo.sessions';
+
+/** Handle that a bare \con uses, as MegaTerm's default_name does. */
+const STORE_DEFAULT = 'megamoo.defaultSession';
 
 /**
  * Highlight styles, as an allowlist mapping a name to a CSS class.
@@ -65,6 +106,32 @@ let triggers = [];
 
 /** Compiled counterparts of `triggers`, rebuilt whenever that changes. */
 let compiled = [];
+
+/** handle -> {host, port, username, password}. See STORE_SESSIONS. */
+let sessions = {};
+
+/**
+ * The session in play, or null.
+ *
+ * Held separately from `sessions` so \con can connect without committing
+ * anything to storage: you try a host, and \save is what writes it down.
+ * That is MegaTerm's order too, and it means a mistyped password is not
+ * persisted by the act of failing to log in with it.
+ */
+let current = null;
+
+/** Credentials waiting for the socket to come up. See scheduleAutoLogin. */
+let pendingLogin = null;
+
+/**
+ * Handle a bare \con goes to, or null.
+ *
+ * Null is the meaningful default here rather than an oversight: with none
+ * set, \con keeps the behaviour this client had before sessions existed
+ * and reconnects where it already is, which is right for a page served by
+ * the very game it is talking to.
+ */
+let defaultHandle = null;
 
 let speechOn = false;
 
@@ -205,25 +272,222 @@ function speak(text) {
  * ========================================================================= */
 
 /**
- * May the socket be re-pointed at `url`?
+ * Is `host` a misspelling of "localhost" rather than a real elsewhere?
  *
- * Only within this origin.  Everything arriving on the socket is trusted
- * *as markup* by the terminal — that is safe precisely because the server
- * at the other end is the one that escaped it.  A socket aimed somewhere
- * else is script execution on this page and a convincing fake password
- * prompt, and "type this to fix your connection" is an old trick.  The
- * cross-origin case that is legitimate — a page served from a CDN with
- * the game elsewhere — is configured once in the ?ws= query parameter at
- * load, where it is the deployment's decision rather than a typed one.
+ * One edit away, by the cheap length-difference-plus-mismatch test rather
+ * than a full Levenshtein: this only has to catch a slip like `localost`
+ * or `lcoalhost`, and being wrong in either direction costs nothing worse
+ * than a suggestion. Never treats the name as loopback -- it only changes
+ * what the refusal says.
+ */
+function nearlyLocalhost(host) {
+  const a = String(host).toLowerCase();
+  const b = 'localhost';
+  if (a === b || Math.abs(a.length - b.length) > 1) return false;
+  if (a.length === b.length) {                 // one substitution or swap
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) diff++;
+    return diff > 0 && diff <= 2;
+  }
+  const [longer, shorter] = a.length > b.length ? [a, b] : [b, a];
+  for (let i = 0; i < longer.length; i++) {    // one insertion or deletion
+    if (longer.slice(0, i) + longer.slice(i + 1) === shorter) return true;
+  }
+  return false;
+}
+
+/**
+ * May the live socket be re-pointed at `url`?
+ *
+ * Same origin only, and this is not a stylistic choice — the *server*
+ * enforces it. moo/web/server.py:_origin_allowed compares the browser's
+ * `Origin` against `Host` and answers **403** to anything else, so that no
+ * page a logged-in player wanders onto can open a socket and drive their
+ * game as them. A cross-origin re-point is not a thing the client may
+ * decide to permit; it is a thing the far end refuses.
+ *
+ * It is also the rule this page wants for itself. Everything arriving on
+ * the socket is trusted *as markup* by the terminal, which is safe exactly
+ * because the server at the other end is the one that escaped it. A socket
+ * aimed elsewhere is script execution here and a convincing fake password
+ * prompt.
+ *
+ * `host`, so the port counts: a different port is a different origin to
+ * the check at the far end, whatever it is to a person. Reaching another
+ * of your worlds is done by going to *its* page — see connectTo — which
+ * needs no exception here, because a page served by the world it talks to
+ * is same-origin once it loads.
  */
 function canRepoint(url) {
   try {
-    const target = new URL(url);
-    if (target.host === location.host) return true;
-    return target.host === new URL(api.endpoint, location.href).host;
+    return new URL(url).host === location.host;
   } catch {
     return false;
   }
+}
+
+/** A session's WebSocket endpoint. The path is fixed by moo/web/server.py. */
+function sessionUrl(s) {
+  return `ws://${s.host}:${s.port}/ws`;
+}
+
+/** Known handles, for the "no such session" reply. */
+function sessionList() {
+  const names = Object.keys(sessions).sort();
+  return names.length ? names.join(', ') : '(none saved)';
+}
+
+/**
+ * Read the World: field into \con's argument list.
+ *
+ * The field takes either a saved handle on its own, or a handle followed
+ * by an address:
+ *
+ *     bml                     a saved world
+ *     bml localhost:8890      name one and connect
+ *
+ * `host:port` rather than \con's `host port` because a colon is how a
+ * person writes an address into a box, while the command line already
+ * splits on spaces and cannot. Anything after the address is passed on
+ * untouched, so the credentials \con accepts work here too.
+ *
+ * Returns an argv array for handlers.connect, or {error} to report.
+ */
+function parseWorldField(text) {
+  const parts = String(text).trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return null;
+  const handle = parts[0];
+  if (parts.length === 1) return [handle];
+
+  const addr = parts[1];
+  // lastIndexOf, so a bracketed IPv6 literal keeps its own colons.
+  const cut = addr.lastIndexOf(':');
+  const host = cut === -1 ? '' : addr.slice(0, cut);
+  const port = cut === -1 ? '' : addr.slice(cut + 1);
+  if (!host || !port) {
+    return { error: `Expected <handle> <host>:<port>, as in `
+                    + `"${handle} localhost:8890".` };
+  }
+  return [handle, host, port, ...parts.slice(2)];
+}
+
+/**
+ * Fill the header's world picker from the session book.
+ *
+ * Called wherever `sessions` changes rather than polled: the datalist is
+ * the only place a saved handle is discoverable without typing a command,
+ * so a stale one is a world you cannot see you have.
+ *
+ * Tolerates the elements being absent — the command layer is loaded by
+ * anything that includes commands.js, and it should not depend on a
+ * particular page's chrome existing.
+ */
+function refreshWorldUI() {
+  const list = document.getElementById('world-list');
+  const field = document.getElementById('world-name');
+  if (!list || !field) return;
+  list.textContent = '';
+  for (const name of Object.keys(sessions).sort()) {
+    const option = document.createElement('option');
+    option.value = name;
+    list.appendChild(option);
+  }
+  // Only when empty: refilling under someone mid-type would fight them.
+  if (!field.value) {
+    field.value = (current && current.handle) || defaultHandle || '';
+  }
+}
+
+/**
+ * Send the stored credentials once the socket is up.
+ *
+ * Timed rather than driven off the login prompt, which is what MegaTerm
+ * does (SessionState.scheduleAutoLogin): the prompt is a bare string that
+ * a world is free to reword, and a matcher that guesses wrong would type
+ * a password into whatever else was on screen.  A delay types it into
+ * nothing at worst.
+ *
+ * The username is echoed so the transcript reads like a normal login. The
+ * password never is: it would otherwise sit in the scrollback, in
+ * screenshots, and in anything the player copies out of it.
+ */
+function scheduleAutoLogin(creds) {
+  if (!creds || !creds.username) return;
+  setTimeout(() => {
+    if (!api.connected) return;
+    // api.echo(_, 'echo'), not note(): 'echo' is what the input row uses
+    // for a line you typed, and it goes *into* the prompt the server left
+    // open, in the same colour a typed answer has. note() defaults to the
+    // client's own notice style -- faint, italic, and on a line of its
+    // own -- so the name appeared under the prompt rather than on it.
+    api.echo(creds.username, 'echo');
+    api.send(creds.username);
+    if (!creds.password) return;
+    setTimeout(() => {
+      if (!api.connected) return;
+      api.send(creds.password);
+      // The password is never shown, but the line it answered still has to
+      // end -- the masked input path does exactly this, and for the same
+      // reason: without it "Password:" stays open and the room description
+      // arrives on the same line as the prompt.
+      //
+      // Exactly one, matching that path. A second echo here looked like it
+      // would add the blank line the login wanted, and did -- on top of the
+      // break this one already makes, which is one line too many. Whatever
+      // spacing follows a password is the server's to send, so that both
+      // clients get the same of it.
+      api.echo('', 'echo');
+    }, 500);
+  }, 1000);
+}
+
+/**
+ * Point the client at `s`, by whichever route actually reaches it.
+ *
+ * Same origin: re-point the live socket, which keeps the scrollback.
+ *
+ * Anywhere else: **go to that world's own page**.  Re-pointing cannot work
+ * across origins however much the client would like it to -- the server
+ * answers 403 to a socket whose `Origin` is not its `Host`, and the ?ws=
+ * link this used to offer had exactly the same problem, since the document
+ * still came from here.  A world serves its own client, so arriving there
+ * makes the socket same-origin and the question disappears rather than
+ * being argued with.
+ *
+ * The cost is a page load: the scrollback goes, and localStorage is
+ * per-origin, so the world you land on keeps its own session book rather
+ * than this one's.  Both are said out loud below instead of surprising
+ * someone who typed a name and lost their screen.
+ */
+function connectTo(s, handle) {
+  const url = sessionUrl(s);
+  current = Object.assign({}, s, { handle });
+
+  if (canRepoint(url)) {
+    note(`*** Connecting to ${handle} (${url})...`);
+    pendingLogin = s.username ? { username: s.username, password: s.password } : null;
+    api.reconnect(url);
+    return;
+  }
+
+  // A near-miss of "localhost" is a typo, not another world. Caught before
+  // navigating, because leaving the page over a slip is a poor trade.
+  if (nearlyLocalhost(s.host)) {
+    note(`*** No such host "${s.host}" — did you mean localhost?`);
+    note(`    ${PREFIX}con ${handle} localhost ${s.port}`);
+    return;
+  }
+
+  // The handle rides along, and *only* the handle. It is a name you chose,
+  // not a secret, so it is safe in a URL -- which a password never is:
+  // query strings reach history, bookmarks, logs and referrers. The world's
+  // own page looks the name up in its own storage and logs in from there,
+  // so credentials are read on the origin that already had them and never
+  // travel between the two.
+  const href = `http://${s.host}:${s.port}/?session=${encodeURIComponent(handle)}`;
+  note(`*** ${handle} is a different world, so it is opened as its own page.`);
+  note(`    ${href}`);
+  location.assign(href);
 }
 
 const handlers = {
@@ -231,25 +495,89 @@ const handlers = {
   /* ---- connection ---- */
 
   connect(args) {
-    const url = args[0];
-    if (!url) {
+    const first = args[0];
+
+    // No argument: the default session if one is set -- MegaTerm's rule --
+    // and otherwise reconnect where we already are.
+    if (!first) {
+      if (defaultHandle && sessions[defaultHandle]) {
+        connectTo(sessions[defaultHandle], defaultHandle);
+        return;
+      }
       note('*** Reconnecting...');
+      pendingLogin = current && current.username
+        ? { username: current.username, password: current.password }
+        : null;
       api.reconnect();
       return;
     }
-    if (!/^wss?:\/\//i.test(url)) {
-      note('*** A WebSocket URL is expected, starting ws:// or wss://.');
-      note(`    Usage: ${PREFIX}connect [ws://host:port/ws]`);
+
+    // An explicit URL still works, and still only within this origin.
+    if (/^wss?:\/\//i.test(first)) {
+      if (!canRepoint(first)) {
+        note('*** Refusing: that is a different origin. The server answers');
+        note('    403 to a socket whose Origin is not its Host, and this');
+        note('    terminal trusts what a socket sends as markup. To play');
+        note(`    elsewhere, ${PREFIX}con <handle> <host> <port> — that opens`);
+        note('    the world\'s own page instead of re-pointing this one.');
+        return;
+      }
+      note(`*** Connecting to ${first}...`);
+      pendingLogin = null;
+      api.reconnect(first);
       return;
     }
-    if (!canRepoint(url)) {
-      note('*** Refusing: that is a different host, and everything a socket');
-      note('    sends is trusted as markup by this terminal. If you really');
-      note('    mean to play elsewhere, reload the page with ?ws=<url>.');
+
+    // \con <handle> -- a saved session.
+    if (args.length === 1) {
+      const s = sessions[first];
+      if (!s) {
+        note(`*** No session named '${first}'. Saved: ${sessionList()}`);
+        note(`    ${PREFIX}con ${first} <host> <port> [user] [pass] names one.`);
+        return;
+      }
+      connectTo(s, first);
       return;
     }
-    note(`*** Connecting to ${url}...`);
-    api.reconnect(url);
+
+    // \con <handle> <host> <port> [user] [pass] -- name one and connect.
+    // Not stored yet: \save is what writes it down, so a wrong password is
+    // not persisted by the act of failing to log in with it.
+    if (args.length >= 3) {
+      const port = Number(args[2]);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        note('*** Port must be a whole number between 1 and 65535.');
+        // Nearly always the handle being left off: `\con localhost 8890
+        // user pass` reads as handle=localhost, host=8890, and then a
+        // username where the port should be. Saying "port must be a
+        // number" while pointing at a word that was never meant to be one
+        // is true and no help at all.
+        const maybePort = Number(args[1]);
+        if (Number.isInteger(maybePort) && maybePort > 0 && maybePort <= 65535) {
+          note('    The first word names the session, so that reads as');
+          note(`    host "${args[1]}" and port "${args[2]}". You want:`);
+          note(`    ${PREFIX}con <handle> ${args[0]} ${args[1]}`
+               + (args.length > 3 ? ' ...' : ''));
+        } else {
+          note(`    Usage: ${PREFIX}con <handle> <host> <port> [user] [pass]`);
+        }
+        return;
+      }
+      // Re-pointing a handle keeps the credentials you already saved for
+      // it, so changing a port does not mean retyping a password.
+      const saved = sessions[first] || {};
+      connectTo({
+        host: args[1],
+        port,
+        username: args.length >= 4 ? args[3] : saved.username,
+        password: args.length >= 5 ? args[4] : saved.password,
+      }, first);
+      return;
+    }
+
+    note(`*** Usage: ${PREFIX}connect [handle] [host] [port] [user] [pass]`);
+    note(`           ${PREFIX}connect [ws://host:port/ws]`);
+    note(`    Saved: ${sessionList()}`);
   },
 
   disconnect() {
@@ -266,11 +594,134 @@ const handlers = {
   },
 
   save() {
-    note('*** Nothing to save: aliases and triggers are stored as you set them.');
+    if (!current) {
+      note('*** Nothing to save: no session in play.');
+      note(`    ${PREFIX}con <handle> <host> <port> [user] [pass] first.`);
+      note('    Aliases and triggers are stored as you set them.');
+      return;
+    }
+    const { handle, host, port, username, password } = current;
+    const first = !sessions[handle];
+    sessions[handle] = { host, port, username, password };
+    save(STORE_SESSIONS, sessions);
+    refreshWorldUI();
+    note(`*** Saved '${handle}' -> ${host}:${port}`
+         + (username ? ` as ${username}` : ''));
+    if (password && first) {
+      // Said once per handle, not on every re-save, so it stays a warning
+      // rather than noise -- but said at all, because "the browser
+      // remembers it" reads as something safer than it is.
+      note('    Note: the password is kept in this browser\'s localStorage in');
+      note('    plain text, and ws:// sends it unencrypted. Fine for a local');
+      note('    world; think twice on a shared machine or a public server.');
+    }
+    note(`    ${PREFIX}con ${handle} connects to it from now on.`);
   },
 
-  default: function setDefault() {
-    note('*** This client serves one game; there is no default session to set.');
+  forget(args) {
+    const handle = args[0];
+    if (!handle) {
+      note(`*** Usage: ${PREFIX}forget <handle>.  Saved: ${sessionList()}`);
+      return;
+    }
+    if (!sessions[handle]) {
+      note(`*** No session named '${handle}'. Saved: ${sessionList()}`);
+      return;
+    }
+    delete sessions[handle];
+    save(STORE_SESSIONS, sessions);
+    refreshWorldUI();
+    note(`*** Forgot '${handle}', password included.`);
+    if (defaultHandle === handle) {
+      // Otherwise a bare \con would point at a session that is gone.
+      defaultHandle = null;
+      save(STORE_DEFAULT, null);
+      note('    It was the default; that is cleared too.');
+    }
+  },
+
+  prefix(args) {
+    const want = args[0];
+    if (!want) {
+      note(`*** Command prefix is "${PREFIX}".`);
+      note(`    ${PREFIX}prefix <char> changes it.`);
+      return;
+    }
+    if ([...want].length !== 1) {
+      note('*** A prefix is a single character.');
+      return;
+    }
+    if (/[\w\s]/.test(want)) {
+      // A letter or digit would eat ordinary game commands: with `k` as
+      // the prefix, `kill orc` is a client command that does not exist.
+      note('*** A letter, digit or space cannot be a prefix -- it would');
+      note('    swallow ordinary commands typed to the game.');
+      return;
+    }
+    if (RESERVED_PREFIXES.has(want)) {
+      const why = want === '/' ? 'eval' : want === ':' ? 'emote' : 'say';
+      note(`*** "${want}" is a game command (${why}); the client claiming it`);
+      note('    would shadow it silently. Pick another character.');
+      return;
+    }
+    PREFIX = want;
+    save(STORE_PREFIX, want);
+    note(`*** Command prefix is now "${want}" -- ${want}help lists commands.`);
+  },
+
+  sessions() {
+    const names = Object.keys(sessions).sort();
+    if (!names.length) {
+      note('*** No saved sessions.');
+      note(`    ${PREFIX}con <handle> <host> <port> [user] [pass] then ${PREFIX}save.`);
+      return;
+    }
+    note('*** Saved sessions:');
+    for (const n of names) {
+      const s = sessions[n];
+      // The password is never printed, only acknowledged.
+      const who = s.username ? `  ${s.username}` : '';
+      const pw = s.password ? ' +password' : '';
+      const marks = [];
+      if (current && current.handle === n) marks.push('current');
+      if (defaultHandle === n) marks.push('default');
+      const tail = marks.length ? `  <- ${marks.join(', ')}` : '';
+      note(`    ${n.padEnd(12)} ${s.host}:${s.port}${who}${pw}${tail}`);
+    }
+  },
+
+  default: function setDefault(args) {
+    const handle = args[0];
+    if (!handle) {
+      if (defaultHandle && sessions[defaultHandle]) {
+        const s = sessions[defaultHandle];
+        note(`*** Default: ${defaultHandle} -> ${s.host}:${s.port}`);
+      } else if (defaultHandle) {
+        // Survives its session being forgotten out from under it only if
+        // that happened in another tab; say so rather than silently ignore.
+        note(`*** Default is '${defaultHandle}', which is no longer saved.`);
+      } else {
+        note('*** No default set; a bare \\con reconnects where you are.');
+      }
+      note(`    ${PREFIX}default <handle> sets it.  Saved: ${sessionList()}`);
+      return;
+    }
+    if (handle === '-' || handle === 'none') {
+      defaultHandle = null;
+      save(STORE_DEFAULT, null);
+      note('*** Default cleared; a bare \\con reconnects where you are.');
+      return;
+    }
+    if (!sessions[handle]) {
+      note(`*** No session named '${handle}'. Saved: ${sessionList()}`);
+      note(`    Save it first: ${PREFIX}con ${handle} <host> <port> ... then ${PREFIX}save.`);
+      return;
+    }
+    defaultHandle = handle;
+    save(STORE_DEFAULT, handle);
+    const s = sessions[handle];
+    note(`*** Default is now '${handle}' -> ${s.host}:${s.port}.`);
+    note(`    A bare ${PREFIX}con goes there.`);
   },
 
   /* ---- display ---- */
@@ -354,7 +805,12 @@ const handlers = {
 
   help() {
     const p = PREFIX;
-    note(`  ${p}connect [wsUrl]              - Reconnect (this origin only)`);
+    note(`  ${p}con [handle] [host] [port] [user] [pass] - Connect`);
+    note(`  ${p}save                         - Remember the session in play`);
+    note(`  ${p}sessions                     - List saved sessions`);
+    note(`  ${p}default [handle]             - Where a bare ${p}con goes (- clears)`);
+    note(`  ${p}forget <handle>              - Delete one, password included`);
+    note(`  ${p}prefix [char]                - Change this "${p}" (not / ' : ")`);
     note(`  ${p}disconnect                   - Disconnect`);
     note(`  ${p}quit                         - Disconnect (a tab cannot self-close)`);
     note(`  ${p}clear                        - Clear output`);
@@ -517,7 +973,8 @@ function runCommand(line) {
   const args = raw ? raw.split(/\s+/) : [];
 
   // The abbreviations MegaTerm accepts.
-  const canonical = { con: 'connect', def: 'default' }[name] || name;
+  // `ses`, not `se` -- \se is scroll-to-end and was here first.
+  const canonical = { con: 'connect', def: 'default', ses: 'sessions' }[name] || name;
 
   const handler = Object.hasOwn(handlers, canonical) ? handlers[canonical] : null;
   if (!handler) {
@@ -556,7 +1013,83 @@ window.MegaMOOCommands = {
 
     aliases = load(STORE_ALIASES, {});
     triggers = load(STORE_TRIGGERS, []);
+    sessions = load(STORE_SESSIONS, {});
+    defaultHandle = load(STORE_DEFAULT, null);
+    // Validated on the way back in, not just on the way out: storage is
+    // editable by hand, and a prefix of "" or "kill" would make every
+    // command either unreachable or ruinous.
+    const storedPrefix = load(STORE_PREFIX, null);
+    if (typeof storedPrefix === 'string' && [...storedPrefix].length === 1
+        && !/[\w\s]/.test(storedPrefix) && !RESERVED_PREFIXES.has(storedPrefix)) {
+      PREFIX = storedPrefix;
+    }
     recompile();
+
+    // Credentials are sent on the socket coming up, not at the moment the
+    // command is typed: \con returns immediately and the connection is
+    // still being made. Cleared on use so a later reconnect the player did
+    // not ask for does not replay them.
+    api.on('connect', () => {
+      const creds = pendingLogin;
+      pendingLogin = null;
+      scheduleAutoLogin(creds);
+    });
+
+    // The header's World: field, which is \con with a button on it.
+    const worldForm = document.getElementById('world-row');
+    if (worldForm) {
+      worldForm.addEventListener('submit', (event) => {
+        event.preventDefault();       // never navigate; this is not a GET
+        const field = document.getElementById('world-name');
+        const parsed = parseWorldField(field.value);
+        if (!parsed) {
+          note(`*** Type a world name first. Saved: ${sessionList()}`);
+          note(`    A new one takes an address: <handle> <host>:<port>`);
+          return;
+        }
+        if (parsed.error) {
+          note(`*** ${parsed.error}`);
+          return;
+        }
+        // Straight through \con, so the field and the command cannot drift
+        // apart on the origin rule, the auto-login or the error wording.
+        handlers.connect(parsed);
+        field.blur();                 // put the keyboard back on the game
+      });
+    }
+
+    // Arrived here from another world's page, which passed the handle it
+    // was asked for. The credentials are read *here*, from this origin's
+    // own storage -- the page we came from could not send them, and should
+    // not have been able to.
+    //
+    // The socket already points at this world, since this page is the one
+    // that serves it, so there is nothing to reconnect: this only has to
+    // get the login sent.
+    const asked = new URLSearchParams(location.search).get('session');
+    if (asked) {
+      // Consumed, so a reload does not silently log in again after someone
+      // has deliberately disconnected.
+      history.replaceState(null, '', location.pathname + location.hash);
+      const arrived = sessions[asked];
+      if (!arrived) {
+        note(`*** Sent here for '${asked}', which is not saved on this page.`);
+        note(`    Storage is per-world: ${PREFIX}con ${asked} <host> <port>`);
+        note(`    [user] [pass] then ${PREFIX}save, and it will be next time.`);
+      } else {
+        current = Object.assign({}, arrived, { handle: asked });
+        if (arrived.username) {
+          const creds = { username: arrived.username,
+                          password: arrived.password };
+          // Already up if the socket beat attach() to it; otherwise the
+          // 'connect' listener registered above will take it.
+          if (api.connected) scheduleAutoLogin(creds);
+          else pendingLogin = creds;
+        }
+      }
+    }
+
+    refreshWorldUI();
 
     api.intercept((text) => {
       const line = text.trimStart();

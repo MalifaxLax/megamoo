@@ -24,6 +24,26 @@
             class="topbar-button topbar-update" hidden
             title="This page is running superseded code">update &mdash; reload</button>
 
+    <!-- The saved worlds of \con / \save, as a control rather than a
+         command. A form, not a button with a click handler, so Enter in
+         the field connects too -- the same reflex the input row trains.
+         The datalist is filled from storage at attach and whenever the
+         session book changes.
+
+         Takes a bare handle for a saved world, or "<handle> <host>:<port>"
+         to name a new one -- see parseWorldField. Note the port wanted
+         here is the WebSocket one (8890 by default), not telnet's. -->
+    <form id="world-row" class="world-row" autocomplete="off">
+      <label class="world-label" for="world-name">World:</label>
+      <input id="world-name" class="world-input" type="text" list="world-list"
+             spellcheck="false" autocapitalize="none"
+             placeholder="handle, or handle host:port"
+             title="A saved world's name, or &quot;name host:port&quot; to add one (WebSocket port, e.g. 8890)"
+             aria-label="World to connect to: a saved name, or name and host:port">
+      <datalist id="world-list"></datalist>
+      <button id="world-connect" type="submit" class="topbar-button">Connect</button>
+    </form>
+
     <span class="topbar-right">
       <button id="scripts-open" type="button" class="topbar-button">Scripts</button>
       <span id="conn-status" class="status status--connecting">connecting</span>

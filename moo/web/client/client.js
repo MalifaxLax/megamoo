@@ -186,6 +186,25 @@ const term = {
   open: null,
 
   /**
+   * Did the splash currently on screen render as an image?
+   *
+   * Decides how the version line under it is aligned: centred beneath a
+   * centred image, left beneath the ASCII banner, which is a `pre` block
+   * at the left margin and has nothing a centred line would line up with.
+   */
+  splashImage: false,
+
+  /**
+   * The banner lines laid out since that splash.
+   *
+   * Kept because the image can fail *after* they are on screen -- its
+   * onerror swaps the ASCII back in, and these have to move left with it.
+   * That fallback is exactly the ASCII case, so getting it wrong would
+   * misalign the one arrangement this alignment exists for.
+   */
+  bannerNodes: [],
+
+  /**
    * Append server HTML.
    *
    * `html` is trusted *as markup* because moo/web/color.py is its only
@@ -209,9 +228,19 @@ const term = {
       this._closeOpen();
       const node = document.createElement(grid || banner ? 'div' : 'span');
       if (grid) node.className = 'grid';
-      // Belongs to the splash, so it is centred under it rather than sitting
-      // at the left margin where the conversation starts.
-      if (banner) node.className = 'banner';
+      // A splash frame: whatever banner lines follow belong to *this* one.
+      if (grid || image) {
+        this.splashImage = !!(image && image.src);
+        this.bannerNodes = [];
+      }
+      // Belongs to the splash, so it is laid out with it rather than at the
+      // left margin where the conversation starts -- centred under a centred
+      // image, but left under the ASCII banner, which is a left-aligned pre
+      // block that a centred line sits off-axis from.
+      if (banner) {
+        node.className = this.splashImage ? 'banner' : 'banner banner--left';
+        this.bannerNodes.push(node);
+      }
       node.innerHTML = html;
 
       // A world that ships a splash image gets it in the banner's place.
@@ -225,7 +254,15 @@ const term = {
         // alt, not a decorative empty string: the logo carries the game's
         // name, and that name is not written anywhere else on this screen.
         img.alt = image.alt || '';
-        img.onerror = () => fig.replaceWith(node);
+        img.onerror = () => {
+          fig.replaceWith(node);
+          // The ASCII is what is on screen now, so any version line already
+          // centred for the image belongs at the left margin with it.
+          this.splashImage = false;
+          for (const line of this.bannerNodes) {
+            line.className = 'banner banner--left';
+          }
+        };
         img.src = image.src;
         fig.appendChild(img);
         this._append(fig);
