@@ -2428,7 +2428,13 @@ def find_player(name: str) -> Optional[int]:
             player_obj = get_object(alice)
     """
     if _database:
-        return _database.find_player(name)
+        # get_player, not find_player: the database has never had a method
+        # by the latter name, so this raised AttributeError every time it
+        # was called with a database bound -- which is every real call.
+        # @tel takes a character name in its own usage line and could not
+        # ever have done it.  get_player lowercases the name, so the
+        # case-insensitivity promised above is real.
+        return _database.get_player(name)
     return None
 
 
