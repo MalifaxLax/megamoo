@@ -363,7 +363,13 @@ class WebServer:
                 return
 
             method = parts[0]
-            path = parts[1]
+            # The query string is the client's, not the router's: it names
+            # a file, and "/" and "/?session=wh" are the same file. Without
+            # this every query 404s, which quietly broke the one escape
+            # hatch the client documents -- ?ws=, read in client.js and
+            # named in \connect's own refusal message as the way to reach
+            # another origin. It could never have worked.
+            path = parts[1].partition('?')[0] or '/'
 
             # Read all HTTP headers into a dict with lowercase keys
             headers = {}
@@ -394,6 +400,11 @@ class WebServer:
             # Build stamp, so a page can tell it has gone stale.
             if method == 'GET' and path == '/build':
                 await self._serve_build_stamp(writer)
+                return
+
+            # Every world running on this machine, with a link to each.
+            if method == 'GET' and path == '/worlds':
+                await self._serve_worlds(writer)
                 return
 
             # Static file serving for GET requests
@@ -498,6 +509,129 @@ class WebServer:
         header = (
             "HTTP/1.1 200 OK\r\n"
             "Content-Type: application/json\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Cache-Control: no-store\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+        )
+        try:
+            writer.write(header.encode() + body)
+            await writer.drain()
+        except Exception:
+            pass
+
+    # -----------------------------------------------------------------
+    # Worlds index
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _running_worlds():
+        """
+        Every world with a live discovery file, newest name first.
+
+        ``~/.megamoo/run`` holds one file per world that published itself
+        (``megamoo --dev`` does).  A file outlives a crash, so each is
+        checked against its pid before being believed -- otherwise the
+        index would keep offering worlds that died days ago, which is
+        worse than not having an index.
+        """
+        import json
+        import os
+        from pathlib import Path
+
+        out = []
+        run_dir = Path.home() / '.megamoo' / 'run'
+        try:
+            files = sorted(run_dir.glob('*.api.json'))
+        except OSError:
+            return out
+        for f in files:
+            try:
+                info = json.loads(f.read_text(encoding='utf-8'))
+            except (OSError, ValueError):
+                continue
+            pid = info.get('pid')
+            if isinstance(pid, int):
+                try:
+                    os.kill(pid, 0)      # signal 0: "are you there?"
+                except OSError:
+                    continue             # stale file, the world is gone
+            web_port = info.get('web_port')
+            if not isinstance(web_port, int):
+                continue                 # nothing to link to
+            db = Path(info.get('database') or '')
+            out.append({
+                # The directory, not the file: "sfdev" reads better than
+                # "sf", and two worlds are far more likely to share a
+                # database name than a directory.
+                'name': db.parent.name or db.stem or 'world',
+                'database': str(db),
+                'web_port': web_port,
+                'game_port': info.get('game_port'),
+            })
+        return out
+
+    async def _serve_worlds(self, writer: asyncio.StreamWriter):
+        """
+        A page listing every world running on this machine.
+
+        **Loopback only.**  The web port commonly binds 0.0.0.0, so this
+        would otherwise tell anyone on the network which worlds exist
+        here, where each one listens and what its files are called -- a
+        map of the machine, handed out by a convenience page.  Answered
+        with 404 rather than 403 for anyone else, so the page's existence
+        is not advertised either.
+        """
+        peer = writer.get_extra_info('peername')
+        host = (peer[0] if isinstance(peer, tuple) and peer else '') or ''
+        if host not in ('127.0.0.1', '::1', ''):
+            await self._send_response(writer, 404, 'Not Found')
+            return
+
+        import html
+        rows = []
+        for w in self._running_worlds():
+            here = ' &nbsp;<span class="here">this one</span>' if (
+                w['web_port'] == self._port) else ''
+            game = (f"<span class=\"port\">telnet {w['game_port']}</span>"
+                    if w['game_port'] else '')
+            rows.append(
+                f'<li><a href="http://{html.escape(host or "127.0.0.1")}'
+                f':{w["web_port"]}/">{html.escape(w["name"])}</a>'
+                f'{here}<br><span class="path">{html.escape(w["database"])}'
+                f'</span> <span class="port">web {w["web_port"]}</span> '
+                f'{game}</li>')
+
+        listing = ('<ul>' + ''.join(rows) + '</ul>') if rows else (
+            '<p class="empty">No worlds are publishing themselves. A world '
+            'started with <code>megamoo --dev</code> appears here.</p>')
+
+        body = f"""<!doctype html>
+<meta charset="utf-8">
+<title>MegaMOO worlds</title>
+<style>
+  body {{ background:#0c0e11; color:#b6bcc6; font:14px ui-monospace,Menlo,monospace;
+         margin:0; padding:40px 24px; }}
+  h1 {{ font-size:12px; letter-spacing:.08em; text-transform:uppercase;
+        color:#7c8695; font-weight:700; margin:0 0 20px; }}
+  ul {{ list-style:none; margin:0; padding:0; max-width:640px; }}
+  li {{ padding:12px 0; border-bottom:1px solid #22262d; }}
+  a {{ color:#e8c15c; font-size:16px; text-decoration:none; }}
+  a:hover {{ text-decoration:underline; }}
+  .path {{ color:#4c5563; font-size:12px; }}
+  .port {{ color:#7c8695; font-size:12px; }}
+  .here {{ color:#63a95f; font-size:11px; text-transform:uppercase;
+           letter-spacing:.05em; }}
+  .empty {{ color:#7c8695; }}
+  code {{ color:#b6bcc6; }}
+</style>
+<h1>MegaMOO &mdash; worlds on this machine</h1>
+{listing}
+""".encode()
+
+        header = (
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/html; charset=utf-8\r\n"
             f"Content-Length: {len(body)}\r\n"
             "Cache-Control: no-store\r\n"
             "Connection: close\r\n"

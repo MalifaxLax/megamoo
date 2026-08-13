@@ -1286,6 +1286,16 @@ class ApiServer:
         game_port = getattr(self.server, 'port', None)
         if isinstance(game_port, int):
             info['game_port'] = game_port
+        # The browser client's port, when one is served.  Auto-selected
+        # like the others and worth recording for the same reason, only
+        # more so: this is the address a person actually opens, and with
+        # it missing the only ways to find a running world's client were
+        # to read the startup log or guess.  Left absent rather than null
+        # when --web is off, so a reader can tell "no client here" from
+        # "client on a port I do not know".
+        web_port = getattr(self.server, 'web_port', None)
+        if isinstance(web_port, int):
+            info['web_port'] = web_port
         try:
             path.write_text(json.dumps(info, indent=2) + '\n',
                             encoding='utf-8')

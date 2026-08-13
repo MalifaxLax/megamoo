@@ -455,6 +455,18 @@ class MegaMOOServer:
             await self._web_server.start()
             self.web_port = self._web_server.port
 
+            # Republish now the web port is known.  The API starts first
+            # and wrote its discovery file already, at which point this
+            # attribute did not exist -- so a reader saw every port but
+            # the one a person actually opens.  Rewriting is cheaper and
+            # far less disruptive than reordering two independent
+            # listeners around one field.
+            if self._api_server is not None:
+                try:
+                    self._api_server._write_info_file()
+                except Exception as e:      # discovery is never fatal
+                    logger.debug(f"Could not republish discovery file: {e}")
+
         # --- Phase 4: Ticker handler ---
         # Tickers fire periodic verb calls (heartbeats, weather cycles,
         # NPC AI, etc.).  restore() re-registers any tickers that were
