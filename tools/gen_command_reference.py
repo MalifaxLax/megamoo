@@ -282,7 +282,9 @@ works too.
 </div>
 
 <div class="pagenav">
-    <a href="shops.html"><span class="dir">Previous</span>Food, Drink &amp; Shops</a>
+    <!-- living-world.html is the page that names this one as its Next; the
+         footer said shops.html, which this guide has never had. -->
+    <a href="living-world.html"><span class="dir">Previous</span>A World That Moves</a>
     <a class="to-next" href="index.html"><span class="dir">Back to</span>MegaMOO Guide</a>
 </div>
 
