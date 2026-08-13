@@ -55,7 +55,7 @@ and edit.
 <div class="term"><code><span class="p">$</span> pip install megamoo
 <span class="p">$</span> megamoo init mygame
 <span class="o">Created /home/you/mygame</span>
-<span class="o">  191 verb files, a starter world, and an empty game/ package</span>
+<span class="o">  203 verb files, a starter world, and an empty game/ package</span>
 <span class="o"></span>
 <span class="o">  Wizard login:  Wizard  /  winter-timber-7382</span>
 <span class="o">  Shown once, and unique to this world -- write it down.</span></code></div>
@@ -85,7 +85,7 @@ README.md            <span class="c"># a reminder of the layout</span>
 <p>
 The starter world it copies in contains the base object library, an
 out-of-character lobby, a character generator, one in-character room, and
-a wizard account. Those 191 verb files are <em>yours</em> — edit them
+a wizard account. Those 203 verb files are <em>yours</em> — edit them
 freely. The engine keeps no copy you have to merge against, so upgrading
 is <code>pip install --upgrade megamoo</code> and nothing you wrote is
 touched.
@@ -225,6 +225,72 @@ works. Set your own password at the same time, with
        taking the login off them.</p>
     <p><code>@name</code> is still the right verb for rooms, objects and
        exits &mdash; everything that nobody logs in as.</p>
+</div>
+
+<h2 id="upgrading">Upgrading an existing world</h2>
+
+<p>
+<code>pip install --upgrade megamoo</code> upgrades the <em>engine</em>, and
+that part is genuinely painless: your verbs and your world are untouched,
+because the engine keeps no copy of them to merge against. Restart and you
+are running the new engine.
+</p>
+
+<p>
+The <em>starter world</em> is a different matter, and it is worth being
+plain about. A world is a copy taken the day you ran
+<code>megamoo init</code>. Later releases improve the starter — a fixed
+verb, a better default message, a new prototype — and <strong>none of that
+reaches a world that already exists</strong>. There is no
+<code>megamoo upgrade</code>. Bringing a world forward is a job you do by
+hand, and this is it:
+</p>
+
+<div class="term"><code><span class="c"># 1. See what the new starter has that your world does not.</span>
+<span class="c">#    Your world's verbs/ against the template inside the package:</span>
+<span class="p">$</span> python3 -c "import moo, pathlib; print(pathlib.Path(moo.__file__).parent / 'templates/starter/verbs')"
+<span class="p">$</span> diff -rq &lt;that path&gt; verbs/
+
+<span class="c"># 2. Copy in what is new or changed, and delete what the starter dropped.</span>
+<span class="c">#    Skip any file you have edited yourself -- that one is yours.</span>
+
+<span class="c"># 3. Restart. Verb files are loaded from disk on the way up.</span>
+<span class="p">$</span> megamoo world.db
+<span class="o">[autoreload] created #3:@alias from disk</span>
+<span class="o">[autoreload] updated #23:lock_ from disk</span></code></div>
+
+<div class="note">
+    <span class="label">Deleting a file does not delete the command</span>
+    <p>Step 3 creates and updates, and does nothing else. A command whose
+       file you removed is still in <code>world.db</code> and still
+       reachable, with no source on disk to read — the worst of both. Remove
+       it in-game as well:</p>
+    <div class="term"><code><span class="p">&gt;</span> @rmverb #23.lock</code></div>
+    <p>Until you do, that command survives every restart.</p>
+</div>
+
+<p>
+Those steps cover <em>verbs</em>, which is most of what changes. What they
+do not cover is <code>world.db</code> itself: a corrected default message
+on a prototype, a property added to <code>#3</code>, a fixed object in the
+player pool. Those live in the database, and there is no supported way to
+merge them into a world that is already running. If you want them, the
+honest answer today is to make a fresh world and move your own work into
+it.
+</p>
+
+<div class="note">
+    <span class="label">Why this is hard, and what changed in 0.10.0-beta13</span>
+    <p>The obstacle is telling a change apart from a customisation. If your
+       world's copy of a message differs from the new starter's, that is
+       either something you deliberately rewrote or simply the older
+       default — and those want opposite treatment while looking identical.</p>
+    <p>Answering it needs to know what the world <em>started</em> as. From
+       beta13 a world records that: <code>megamoo init</code> stamps the
+       release it copied into the database, so a future tool can compare
+       three things — the original, yours, and the new one — instead of
+       guessing between two. Worlds created before beta13 carry no stamp and
+       report none, which at least lets a tool know not to guess.</p>
 </div>
 
 <h2 id="tls">Encrypting connections</h2>

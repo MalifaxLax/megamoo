@@ -4,24 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Command Reference — MegaMOO Guide</title>
-<!-- seo:begin -->
-<meta name="description" content="Every MegaMOO staff command, grouped by purpose: building, objects, verbs, players and server operation.">
-<link rel="canonical" href="https://malifaxlax.github.io/megamoo/commands.html">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="MegaMOO">
-<meta property="og:title" content="Command Reference — MegaMOO Guide">
-<meta property="og:description" content="Every MegaMOO staff command, grouped by purpose: building, objects, verbs, players and server operation.">
-<meta property="og:url" content="https://malifaxlax.github.io/megamoo/commands.html">
-<meta property="og:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Command Reference — MegaMOO Guide">
-<meta name="twitter:description" content="Every MegaMOO staff command, grouped by purpose: building, objects, verbs, players and server operation.">
-<meta name="twitter:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
-<link rel="icon" href="https://malifaxlax.github.io/megamoo/favicon.ico" sizes="any">
-<link rel="apple-touch-icon" href="https://malifaxlax.github.io/megamoo/apple-touch-icon.png">
-<!-- seo:end -->
 <link rel="stylesheet" href="manual.css">
 </head>
 <body>
@@ -33,7 +15,7 @@
 <p class="tagline">Every staff command, grouped by what it is for.</p>
 
 <p>
-The 75 commands below are attached to <code>#3</code>, so every character
+The 78 commands below are attached to <code>#3</code>, so every character
 inherits them. What you may actually use depends on your
 <a href="verbs.html#auth">level</a> — the middle column. Without it, a command
 answers <code>Do what?</code>, exactly as if it did not exist.
@@ -72,10 +54,11 @@ works too.
 <tr><td><code>+verbs</code></td><td><code>gm3</code></td><td>List the commands attached to an object.</td></tr>
 <tr><td><code>+decompile</code> <span class="c">(+dec)</span></td><td><code>gm3</code></td><td>Print a verb's code exactly as stored — the ground truth for what is running.</td></tr>
 <tr><td><code>@list</code></td><td><code>gm3</code></td><td>List objects in a range of numbers.</td></tr>
-<tr><td><code>+pron</code></td><td><code>gm2</code></td><td>Show the substitution tokens for messages (&S, &d and the rest).</td></tr>
-<tr><td><code>@find <span class="c">&lt;text&gt;</span></code></td><td><code>gm2</code></td><td>Find objects anywhere in the database by name. <code>in &lt;room&gt;</code> and <code>isa &lt;parent&gt;</code> narrow the search; <code>/exact</code> and <code>/count</code> change what comes back.</td></tr>
-<tr><td><code>@audit <span class="c">[player]</span></code></td><td><code>gm2</code></td><td>Everything a player owns, grouped by location. <code>/rooms</code>, <code>/nowhere</code> to find orphans, <code>/count</code> for totals.</td></tr>
-<tr><td><code>@kids <span class="c">&lt;object&gt;</span></code></td><td><code>gm2</code></td><td>What inherits from an object, each with a count of its own children. <code>/all</code> draws the whole descendant tree.</td></tr>
+<tr><td><code>+pron</code></td><td><code>gm2</code></td><td>Show the substitution tokens for messages (&amp;S, &amp;d and the rest).</td></tr>
+<tr><td><code>@find</code></td><td><code>gm2</code></td><td>Find objects anywhere in the database by name.</td></tr>
+<tr><td><code>@vfind</code></td><td><code>gm3</code></td><td>Find which objects define a command.</td></tr>
+<tr><td><code>@kids</code></td><td><code>gm2</code></td><td>List the objects that inherit from another.</td></tr>
+<tr><td><code>@grep</code></td><td><code>gm3</code></td><td>Search the source of every command for a string.</td></tr>
 </tbody>
 </table>
 </div>
@@ -108,7 +91,9 @@ works too.
 <tr><td><code>@move</code></td><td><code>gm2</code></td><td>Move an object somewhere else.</td></tr>
 <tr><td><code>@parent</code> <span class="c">(@par)</span></td><td><code>gm3</code></td><td>Change what an object is built from.</td></tr>
 <tr><td><code>@renumber</code></td><td><code>gm5</code></td><td>Give an object a different number.</td></tr>
-<tr><td><code>@copy <span class="c">&lt;object&gt;</span></code></td><td><code>gm3</code></td><td>Duplicate an object's own properties. Verbs and contents are deliberately not copied — behaviour belongs on the parent.</td></tr>
+<tr><td><code>@copy</code></td><td><code>gm3</code></td><td>Duplicate an object: same parent, name parts and local properties.</td></tr>
+<tr><td><code>@dump</code></td><td><code>gm3</code></td><td>Write an object out as text, to move or keep it.</td></tr>
+<tr><td><code>@load</code></td><td><code>gm3</code></td><td>Build an object from a file written by <code>@dump</code>.</td></tr>
 </tbody>
 </table>
 </div>
@@ -173,7 +158,8 @@ works too.
 <tr><td><code>@verbauth</code> <span class="c">(@verba)</span></td><td><code>gm3</code></td><td>Set or read the level a command requires.</td></tr>
 <tr><td><code>@hideverb</code> <span class="c">(@hidev)</span></td><td><code>gm3</code></td><td>Hide a command so nobody can type it.</td></tr>
 <tr><td><code>@unhideverb</code> <span class="c">(@unhidev)</span></td><td><code>gm3</code></td><td>Reverse that.</td></tr>
-<tr><td><code>@grep <span class="c">&lt;text&gt;</span></code></td><td><code>gm3</code></td><td>Search verb code across the database.</td></tr>
+<tr><td><code>@alias</code> <span class="c">(@ali)</span></td><td><code>gm3</code></td><td>Show a command's names, or add one: <code>@alias #17.look = observe(3)</code>.</td></tr>
+<tr><td><code>@rmalias</code> <span class="c">(@rmal)</span></td><td><code>gm3</code></td><td>Remove one of those names, leaving the command itself.</td></tr>
 </tbody>
 </table>
 </div>
@@ -202,9 +188,9 @@ works too.
 <tr><td><code>hold</code> <span class="c">(hol)</span></td><td><code>gm1</code></td><td>Hold an object in a specific hand.</td></tr>
 <tr><td><code>unhold</code> <span class="c">(unh)</span></td><td><code>gm1</code></td><td>Stop holding it.</td></tr>
 <tr><td><code>@color</code></td><td><code>gm1</code></td><td>Show the colour palette.</td></tr>
-<tr><td><code>@checkpoint</code></td><td><code>gm4</code></td><td>Take a database snapshot now. <code>/list</code> shows the ones you have. Worth running before you copy the database file — SQLite keeps recent writes in a sidecar until a checkpoint folds them in, so a copy taken without one can be short of the last few minutes.</td></tr>
-<tr><td><code>@port <span class="c">&lt;object&gt;.&lt;verb&gt;</span></code></td><td><code>gm3</code></td><td>Paste LambdaMOO source and have it translated into Python for review before it is saved. Needs the separate <code>mooport</code> package; without it the command says so and does nothing.</td></tr>
-<tr><td><code>@quota <span class="c">[player]</span></code></td><td><code>gm2</code></td><td>How much of the database someone has built, split into rooms, exits and everything else. Reports only — MegaMOO does not enforce a quota.</td></tr>
+<tr><td><code>@rname</code></td><td><code>gm5</code></td><td>Rename an account, moving its login name with it.</td></tr>
+<tr><td><code>@audit</code></td><td><code>gm2</code></td><td>List everything a player owns.</td></tr>
+<tr><td><code>@quota</code></td><td><code>gm2</code></td><td>Report how much of the database a player has built.</td></tr>
 </tbody>
 </table>
 </div>
@@ -214,13 +200,13 @@ works too.
 <table>
 <thead><tr><th>Command</th><th>Level</th><th>Does</th></tr></thead>
 <tbody>
-<tr><td><code>eval</code></td><td><code>gm3</code></td><td>Run Python against the live world. Also <code>/</code>.</td></tr>
+<tr><td><code>eval</code></td><td><code>gm4</code></td><td>Run Python against the live world. Also <code>/</code>.</td></tr>
 <tr><td><code>@restart</code></td><td><code>gm5</code></td><td>Restart in place.</td></tr>
 <tr><td><code>@shutdown</code></td><td><code>gm5</code></td><td>Stop the server.</td></tr>
-<tr><td><code>@ps</code></td><td><code>gm3</code></td><td>List running and queued tasks.</td></tr>
-<tr><td><code>@kill <span class="c">&lt;task&gt;</span></code></td><td><code>gm3</code></td><td>Stop a running task.</td></tr>
-<tr><td><code>@dump <span class="c">&lt;object&gt;</span></code></td><td><code>gm3</code></td><td>Write an object out as text into <code>dumps/</code>. <code>/verbs</code> includes its code, <code>/screen</code> prints it.</td></tr>
-<tr><td><code>@load <span class="c">&lt;file&gt;</span></code></td><td><code>gm3</code></td><td>Build a new object from a dump. <code>/dry</code> reports without building, <code>/list</code> shows what is available.</td></tr>
+<tr><td><code>@ps</code></td><td><code>gm3</code></td><td>List the tasks the server is running.</td></tr>
+<tr><td><code>@kill</code></td><td><code>gm3</code></td><td>Abort a running or suspended task.</td></tr>
+<tr><td><code>@checkpoint</code></td><td><code>gm4</code></td><td>Take a database snapshot now, flushing memory to disk first.</td></tr>
+<tr><td><code>@port</code></td><td><code>gm3</code></td><td>Translate pasted MOO code into Python.</td></tr>
 </tbody>
 </table>
 </div>
@@ -234,8 +220,8 @@ works too.
 </div>
 
 <div class="pagenav">
-    <a href="living-world.html"><span class="dir">Previous</span>A World That Moves</a>
-    <a class="to-next" href="moo-compat.html"><span class="dir">Next</span>Coming from LambdaMOO</a>
+    <a href="shops.html"><span class="dir">Previous</span>Food, Drink &amp; Shops</a>
+    <a class="to-next" href="index.html"><span class="dir">Back to</span>MegaMOO Guide</a>
 </div>
 
 <div class="footer">
