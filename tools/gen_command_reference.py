@@ -34,7 +34,11 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_DB = REPO_ROOT / 'mm.db'
+#: The shipped starter world -- the one `megamoo init` copies, and so the
+#: one whose commands the guide documents. This used to name mm.db, which
+#: the starter template replaced; the tool then could not run without
+#: --db, so nobody ran it, so the page drifted sixteen commands behind.
+DEFAULT_DB = REPO_ROOT / 'moo' / 'templates' / 'starter' / 'world.db'
 DEFAULT_OUT = REPO_ROOT / 'docs' / 'guide' / 'commands.html'
 
 #: The object staff commands are defined on.
@@ -55,7 +59,11 @@ GROUPS = [
         ('+verbs', 'List the commands attached to an object.'),
         ('+decompile', "Print a verb's code exactly as stored — the ground truth for what is running."),
         ('@list', 'List objects in a range of numbers.'),
-        ('+pron', 'Show the substitution tokens for messages (%S, %d and the rest).'),
+        ('+pron', 'Show the substitution tokens for messages (&amp;S, &amp;d and the rest).'),
+        ('@find', 'Find objects anywhere in the database by name.'),
+        ('@vfind', 'Find which objects define a command.'),
+        ('@kids', 'List the objects that inherit from another.'),
+        ('@grep', 'Search the source of every command for a string.'),
     ]),
     ('rooms', 'Rooms and exits', [
         ('@dig', 'Create a room. <code>@dig/types</code> lists the types, <code>@dig/tel</code> puts you in it.'),
@@ -74,6 +82,9 @@ GROUPS = [
         ('@move', 'Move an object somewhere else.'),
         ('@parent', 'Change what an object is built from.'),
         ('@renumber', 'Give an object a different number.'),
+        ('@copy', 'Duplicate an object: same parent, name parts and local properties.'),
+        ('@dump', 'Write an object out as text, to move or keep it.'),
+        ('@load', 'Build an object from a file written by <code>@dump</code>.'),
     ]),
     ('naming', 'Naming and describing', [
         ('@name', 'Set the noun.'),
@@ -110,6 +121,8 @@ GROUPS = [
         ('@verbauth', 'Set or read the level a command requires.'),
         ('@hideverb', 'Hide a command so nobody can type it.'),
         ('@unhideverb', 'Reverse that.'),
+        ('@alias', "Show a command's names, or add one: <code>@alias #17.look = observe(3)</code>."),
+        ('@rmalias', 'Remove one of those names, leaving the command itself.'),
     ]),
     ('numbers', 'Object numbers', [
         ('@fon', 'Release your reserved block, or with <code>/set</code>, <code>/list</code>, <code>/clear</code> manage it. Also <code>@freeon</code>.'),
@@ -124,12 +137,18 @@ GROUPS = [
         ('hold', 'Hold an object in a specific hand.'),
         ('unhold', 'Stop holding it.'),
         ('@color', 'Show the colour palette.'),
-        ('@wearpos', 'Show the wearable positions.'),
+        ('@rname', 'Rename an account, moving its login name with it.'),
+        ('@audit', 'List everything a player owns.'),
+        ('@quota', 'Report how much of the database a player has built.'),
     ]),
     ('server', 'Running the server', [
         ('eval', 'Run Python against the live world. Also <code>/</code>.'),
         ('@restart', 'Restart in place.'),
         ('@shutdown', 'Stop the server.'),
+        ('@ps', 'List the tasks the server is running.'),
+        ('@kill', 'Abort a running or suspended task.'),
+        ('@checkpoint', 'Take a database snapshot now, flushing memory to disk first.'),
+        ('@port', 'Translate pasted MOO code into Python.'),
     ]),
 ]
 
