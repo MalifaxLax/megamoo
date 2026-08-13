@@ -537,8 +537,12 @@ class ApiConnection:
                     v.parent_type = args['parent_type']
                 # Recompile the verb bytecode
                 v.__post_init__()
-                # Invalidate cached verb lookups on this object and descendants
-                obj.invalidate_inheritance_cache()
+                # _mark_modified, not just invalidate: a save only writes the
+                # verbs table when the object is wholly dirty, and editing a
+                # verb in place leaves nothing else to notice. Without this
+                # the API answered {'saved': True} for a change that lived in
+                # memory and died at the next restart.
+                obj._mark_modified()
                 self.api.database.save_object(obj)
                 return {'saved': True, 'created': False}
 
@@ -550,8 +554,10 @@ class ApiConnection:
             perms=args.get('perms', 'rx'),
             parent_type=args.get('parent_type', 'moo.verb_types.MasterVerb'),
         )
-        obj.verbs.append(new_verb)
-        obj.invalidate_inheritance_cache()
+        # add_verb rather than appending by hand: it invalidates the cache
+        # *and* marks the object modified, which is what makes the save write
+        # the verbs table at all.
+        obj.add_verb(new_verb)
         self.api.database.save_object(obj)
         return {'saved': True, 'created': True}
 
@@ -577,14 +583,14 @@ class ApiConnection:
         verb_name = args['verb_name']
         obj = self.api.database.get_object(objnum)
 
-        for i, v in enumerate(obj.verbs):
-            if verb_name in v.names:
-                obj.verbs.pop(i)
-                obj.invalidate_inheritance_cache()
-                self.api.database.save_object(obj)
-                return {'deleted': True}
-
-        raise KeyError(f'Verb {verb_name!r} not found on #{objnum}')
+        # delete_verb rather than popping the list by hand: it marks the
+        # object modified, and a save that is not told the object changed
+        # structurally writes no verb rows -- so the deletion stayed in
+        # memory and the verb came back at the next restart. It raises
+        # KeyError on a missing name, which is this command's contract.
+        obj.delete_verb(verb_name)
+        self.api.database.save_object(obj)
+        return {'deleted': True}
 
     # ---- Property operations ------------------------------------------------
 
