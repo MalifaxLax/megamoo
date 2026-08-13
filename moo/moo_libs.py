@@ -545,21 +545,18 @@ class CodeUtils:
 
     @staticmethod
     def connected_players() -> List:
-        """Everyone with a live connection."""
+        """Everyone with a live connection, as objects.
+
+        The same function as the bare ``connected_players()`` builtin, and
+        deliberately a call to it rather than a second copy: these were two
+        implementations under one name returning different types, which is
+        a disagreement waiting to be found the hard way.
+        """
         try:
-            from .network import _player_connections
-            from .builtins import _database
+            from .builtins import connected_players as _cp
         except Exception:
             return []
-        out = []
-        for num in list(_player_connections):
-            try:
-                obj = _database.get_object(num)
-            except Exception:
-                continue
-            if obj is not None:
-                out.append(obj)
-        return out
+        return _cp()
 
     @staticmethod
     def task_valid(task_id) -> bool:

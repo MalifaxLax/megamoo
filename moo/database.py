@@ -1220,10 +1220,21 @@ class Database:
 
     def connected_players(self) -> List[int]:
         """
-        Get the object numbers of all currently connected players.
+        Registered players carrying the PLAYER flag, by object number.
+
+        The flag is a *mirror* of the connection table -- the engine sets it
+        at login and clears it at disconnect -- so in practice this answers
+        the same question as the connection table itself. It is not the same
+        source, though, and a mirror can drift where the table cannot.
+
+        **Ask ``builtins.connected_players()`` for who is attached.** It
+        reads ``_player_connections`` directly, covers telnet, the web
+        client and virtual bots alike, and hands back objects. This stays as
+        the database-layer flag query it has always been; nothing in the
+        engine now uses it to decide who is online.
 
         Returns:
-            list[int]: Object numbers of connected players.
+            list[int]: Object numbers of players with the PLAYER flag.
         """
         connected = []
         for objnum in self._players.values():

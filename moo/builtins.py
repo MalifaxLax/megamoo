@@ -2248,10 +2248,13 @@ def broadcast(message: str, exclude: Optional[List] = None):
         exclude_nums.add(objnum)
 
     if _database:
-        for player_num in _database.connected_players():
-            if player_num not in exclude_nums:
+        # connected_players() rather than the database's flag mirror, so a
+        # broadcast reaches exactly who is attached -- and so the two cannot
+        # answer differently about who that is.
+        for player in connected_players():
+            if player.objnum not in exclude_nums:
                 try:
-                    notify(player_num, message)
+                    notify(player, message)
                 except Exception:
                     pass
 
@@ -2372,21 +2375,40 @@ def checkpoint_db():
 # ============================================================================
 
 
-def connected_players() -> List[int]:
+def connected_players() -> List['MOOObject']:
     """
-    Get the object numbers of all currently connected players.
+    Every player with a live connection, as objects.
 
-    Returns:
-        list[int]: Object numbers of connected players.
+    Objects rather than numbers, because that is what the rest of the verb
+    API hands back -- ``contents``, the matchers, ``players()`` -- and a
+    verb that wanted to say anything had to call ``get_object`` on each
+    number first::
 
-    Example::
+        for p in connected_players():
+            p.msg("The bell tolls.")
 
-        players = connected_players()
-        notify(pobj, f"{len(players)} players online")
+    Read from ``_player_connections``, which is the connection table
+    itself: telnet, the web client and virtual bots all register there, so
+    it cannot disagree with who is actually attached. The PLAYER flag
+    mirrors it -- set at login, cleared at disconnect -- and
+    ``Database.connected_players()`` still reads that mirror, but a mirror
+    is a thing that can drift and the table cannot.
+
+    This used to exist twice under one name: here returning numbers, and
+    as ``cdu.connected_players()`` returning objects. Both are this one now.
     """
-    if _database:
-        return _database.connected_players()
-    return []
+    if not _database:
+        return []
+    from .network import _player_connections
+    out = []
+    for objnum in list(_player_connections):
+        try:
+            obj = _database.get_object(objnum)
+        except Exception:
+            continue
+        if obj is not None:
+            out.append(obj)
+    return out
 
 
 def find_player(name: str) -> Optional[int]:
