@@ -144,6 +144,38 @@ def _copy_tree(src: pathlib.Path, dst: pathlib.Path) -> int:
     return n
 
 
+def _stamp_template_version(db_path: pathlib.Path):
+    """
+    Record which release's template this world was copied from.
+
+    Nothing else does. `version` in the metadata is the schema's, and the
+    world is a byte copy of the template, so `created` is the template's
+    creation time and is identical in every world ever made from it. A
+    world therefore could not say what it started as.
+
+    That is the whole difficulty in upgrading one later. When a value in a
+    world differs from the current template's, "the owner changed this"
+    and "this is simply the older default" look exactly the same and want
+    opposite treatment. The starting point turns that guess into a
+    three-way comparison: unchanged from base takes the new value, changed
+    is the owner's and is left alone.
+
+    The template ships inside the package, so the release version names
+    the template revision exactly. The engine's own `_save_metadata`
+    rewrites only its six known keys, so this survives every later save.
+    """
+    from .globals import SERVER_VERSION
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+            ('template_version', json.dumps(SERVER_VERSION))
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def _point_at_own_verbs(db_path: pathlib.Path, verbs_dir: pathlib.Path):
     """
     Make the new world read its *own* verb tree.
@@ -246,6 +278,7 @@ def init_game(destination, name=None, port=6770, template=None) -> pathlib.Path:
     copied = _copy_tree(src / 'verbs', verbs)
     shutil.copy2(src / 'world.db', dest / 'world.db')
     _point_at_own_verbs(dest / 'world.db', verbs)
+    _stamp_template_version(dest / 'world.db')
 
     game_pkg = dest / 'game'
     game_pkg.mkdir()

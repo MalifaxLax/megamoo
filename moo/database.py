@@ -1318,9 +1318,34 @@ class Database:
             )
 
         self._save_metadata()
+
+        # Stamp which template this world was built from.
+        #
+        # Nothing else records it. `version` is the schema's, and `created`
+        # is copied off the template, so it is identical in every world ever
+        # made from it -- which means that until now a world could not say
+        # what it started as.
+        #
+        # That is the whole difficulty in upgrading one. When a shipped
+        # value differs from the template's, "the owner changed this" and
+        # "this is simply the older default" look exactly the same, and they
+        # want opposite treatment. Knowing the starting point makes it a
+        # three-way comparison instead of a guess: unchanged from base takes
+        # the new value, changed is the owner's and is left alone.
+        #
+        # The template ships inside the package, so the release version
+        # names the template revision exactly. _save_metadata only replaces
+        # its own six keys, so this survives every later save.
+        from .globals import SERVER_VERSION
+        self._conn.execute(
+            "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
+            ('template_version', json.dumps(SERVER_VERSION))
+        )
+
         self._conn.commit()
 
-        logger.info(f"Created database with {self._index.object_count} objects")
+        logger.info(f"Created database with {self._index.object_count} objects "
+                    f"from the {SERVER_VERSION} template")
 
     def _object_exists_in_sql(self, objnum: int) -> bool:
         """Check if an object exists in the SQLite database."""
@@ -1620,6 +1645,30 @@ class Database:
                 "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
                 (key, json.dumps(value))
             )
+
+    def template_version(self) -> Optional[str]:
+        """
+        The release whose template this world was built from, or None.
+
+        None means the world predates the stamp -- every world created
+        before it existed, which is most of them. Such a world can still be
+        upgraded additively (a new prototype lands in the reserved number
+        range, a new verb or property is simply absent), but a *changed*
+        value cannot be judged: without the starting point there is no way
+        to tell the owner's edit from the older default.
+
+        Returns:
+            str or None: e.g. ``'0.10.0-beta13'``.
+        """
+        row = self._conn.execute(
+            "SELECT value FROM metadata WHERE key = 'template_version'"
+        ).fetchone()
+        if not row:
+            return None
+        try:
+            return json.loads(row[0])
+        except (ValueError, TypeError):
+            return row[0]
 
     def _load_recycled_reserved(self):
         """Load recycled and reserved sets from their tables."""

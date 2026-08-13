@@ -91,3 +91,53 @@ def test_it_refuses_to_overwrite(tmp_path):
     init_game(tmp_path / 'twice')
     with pytest.raises(FileExistsError):
         init_game(tmp_path / 'twice')
+
+
+def test_the_world_records_which_template_it_came_from(game):
+    """A new world says which release's template it is a copy of.
+
+    Nothing else records it. ``version`` in the metadata is the schema's,
+    and the world is a byte copy of the template, so ``created`` is the
+    *template's* creation time and is identical in every world ever made
+    from it.
+
+    It matters for upgrading one later. When a value in a world differs
+    from the current template's, "the owner changed this" and "this is
+    the older default" look identical and want opposite treatment.
+    Knowing the starting point makes that a three-way comparison rather
+    than a guess.
+    """
+    from moo.database import Database
+    from moo.globals import SERVER_VERSION
+
+    db = Database(game / 'world.db', mode='readonly')
+    db.load()
+    try:
+        assert db.template_version() == SERVER_VERSION
+    finally:
+        db.close()
+
+
+def test_a_world_without_the_stamp_says_so_rather_than_guessing(tmp_path):
+    """Worlds created before the stamp existed report None, not a version.
+
+    They can still be upgraded additively -- a new prototype lands in the
+    reserved number range, a new verb or property is simply absent -- but
+    a *changed* value cannot be judged, and answering None is what lets a
+    tool know that.
+    """
+    import sqlite3
+    from moo.database import Database
+
+    game = init_game(tmp_path / 'unstamped')
+    conn = sqlite3.connect(game / 'world.db')
+    conn.execute("DELETE FROM metadata WHERE key = 'template_version'")
+    conn.commit()
+    conn.close()
+
+    db = Database(game / 'world.db', mode='readonly')
+    db.load()
+    try:
+        assert db.template_version() is None
+    finally:
+        db.close()
