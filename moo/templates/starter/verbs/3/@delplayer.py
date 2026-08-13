@@ -41,10 +41,28 @@ except Exception:
     pobj.msg(f"Object #{objnum} not found.")
     return
 
+# An account, or nothing. Without this the command read "erase the account
+# forever" over a character's name, took YES, and then died partway through
+# on `E_PROPNF: #N.characters is not defined` -- a raw engine error from the
+# one command in the game whose whole job is to be careful. Characters are
+# deleted from chargen; accounts are #4 children and own a login name.
+if account.parent != 4:
+    _kind = db.get_object(account.parent).name if account.parent else 'nothing'
+    pobj.msg(f"#{objnum}:{account.name} is not an account -- its parent is "
+             f"&<245>#{account.parent}:{_kind}&n, and accounts descend from "
+             f"&<245>#4:OCharacter&n.")
+    pobj.msg("To delete a character, use chargen's slot menu. @delplayer "
+             "removes the account and everything under it.")
+    return
+
 account_name = account.name or account.noun or f"#{objnum}"
 
 # Confirmation prompt — send colored text via msg, then yield plain prompt
-pobj.msg(f"&WThis action is irrevocable.&n It will erase the account forever.  Are you sure you want to delete &W{account_name}&n? Any response other than YES will abort.")
+# &<255>, not &W: a basic colour code is `&<letter>` *not followed by another
+# letter* -- the lookahead that stops "&sword" being eaten as a code. So &W
+# immediately before "This" and before a name never rendered, and the warning
+# on the one irrevocable command in the game arrived as literal "&WThis".
+pobj.msg(f"&<255>This action is irrevocable.&n It will erase the account forever.  Are you sure you want to delete &<255>{account_name}&n? Any response other than YES will abort.")
 answer = yield ""
 if answer.strip() != 'YES':
     pobj.msg("Aborted.")
