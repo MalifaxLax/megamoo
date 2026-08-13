@@ -1,0 +1,373 @@
+<title>Hidden Verbs in the MegaMOO Starter — Research Report</title>
+<style>
+  :root {
+    --ground:      #fbfbfd;
+    --surface:     #f3f4f8;
+    --ink:         #16191f;
+    --muted:       #5b6472;
+    --rule:        #e3e6ec;
+    --accent:      #9a6b1f;
+    --accent-soft: #f6efe0;
+    --struct:      #35566e;
+    --struct-soft: #eaeff4;
+    --code-bg:     #eef0f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #14161b;
+      --surface:     #1c1f26;
+      --ink:         #e6e8ee;
+      --muted:       #99a2b0;
+      --rule:        #2b303a;
+      --accent:      #d9a94e;
+      --accent-soft: #2c2418;
+      --struct:      #8fb4cd;
+      --struct-soft: #1b242c;
+      --code-bg:     #222630;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #14161b;
+    --surface:     #1c1f26;
+    --ink:         #e6e8ee;
+    --muted:       #99a2b0;
+    --rule:        #2b303a;
+    --accent:      #d9a94e;
+    --accent-soft: #2c2418;
+    --struct:      #8fb4cd;
+    --struct-soft: #1b242c;
+    --code-bg:     #222630;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 3.5rem 1.5rem 6rem;
+  }
+
+  .wrap { max-width: 46rem; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .eyebrow {
+    font: 600 0.72rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  h1 {
+    font: 400 2.4rem/1.15 Georgia, "Times New Roman", serif;
+    text-wrap: balance;
+    margin: 0.2rem 0 0;
+    letter-spacing: -0.01em;
+  }
+
+  .standfirst {
+    font: 400 1.12rem/1.6 Georgia, "Times New Roman", serif;
+    color: var(--muted);
+    margin: 0;
+    max-width: 40rem;
+  }
+
+  h2 {
+    font: 400 1.42rem/1.25 Georgia, "Times New Roman", serif;
+    text-wrap: balance;
+    margin: 2.2rem 0 0;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    align-items: baseline;
+    gap: 0.7rem;
+  }
+  h2 .num {
+    font: 600 0.78rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--struct);
+    letter-spacing: 0.06em;
+    flex: none;
+  }
+
+  h3 {
+    font: 600 0.95rem/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 1.5rem 0 0;
+    letter-spacing: 0.005em;
+  }
+
+  p { margin: 0; max-width: 42rem; }
+  .wrap > p, section > p { margin: 0; }
+  section { display: flex; flex-direction: column; gap: 0.85rem; }
+
+  code, .mono {
+    font: 0.875em/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--code-bg);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 0.9rem 1rem;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin: 0;
+    font: 0.82rem/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  pre code { background: none; padding: 0; }
+
+  .cite {
+    font: 0.78rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--muted);
+  }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 5px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.875rem; }
+  th, td { padding: 0.52rem 0.8rem; text-align: left; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th {
+    font: 600 0.72rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--surface);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+  tfoot td { font-weight: 600; background: var(--surface); border-top: 2px solid var(--rule); }
+
+  ul, ol { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.5rem; max-width: 42rem; }
+  li { padding-left: 0.15rem; }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 0.95rem 1.1rem;
+    border-radius: 0 5px 5px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+  .callout .label {
+    font: 600 0.7rem/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .entry {
+    border-left: 3px solid var(--struct);
+    background: var(--struct-soft);
+    padding: 0.95rem 1.1rem;
+    border-radius: 0 5px 5px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .entry h4 {
+    font: 600 0.95rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    margin: 0;
+    color: var(--struct);
+  }
+  .entry dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 0.28rem 0.75rem; font-size: 0.9rem; }
+  .entry dt { font-weight: 600; color: var(--muted); }
+  .entry dd { margin: 0; }
+  @media (max-width: 34rem) {
+    .entry dl { grid-template-columns: 1fr; gap: 0.1rem; }
+    .entry dt { margin-top: 0.4rem; }
+  }
+
+  .foot {
+    margin-top: 2.5rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Research · not implemented</p>
+    <h1>Hidden verbs in the MegaMOO starter</h1>
+  </header>
+
+  <p class="standfirst">A survey of the 81 hidden verbs the starter world ships, what a reference for them would need to contain, and how much of it a generator could keep honest. Nothing here was built — this is the research that precedes writing it.</p>
+
+  <div class="callout">
+    <span class="label">One finding corrected after the fact</span>
+    <p>The agent flagged <code>verbs.html</code> for listing exception verbs that "do not exist" — <code>eat_</code>, <code>drink_</code>, <code>wear_</code>, <code>remove_</code> — and read the five called-but-undefined hooks as an invisible gap. <strong>That reading is wrong and the page needs no fixing.</strong> Exception verbs are a <em>contract</em>: every typeable command should have a <code>verb_</code> exception after matching, so a developer can attach behaviour to an individual object. A name being called and never defined is the pattern working, not a hole in it. The rest of the report stands; this correction is Shan's.</p>
+  </div>
+
+  <section>
+    <h2><span class="num">01</span> Scope, measured</h2>
+    <p><code>moo/templates/starter/world.db</code> ships <strong>203 verbs in 203 files</strong>, and they agree exactly — checked in both directions, no drift. Of those, <strong>81 rows are <code>hidden=1</code></strong>, carrying <strong>107 distinct names</strong> once aliases are counted. Every one has a docstring and every one carries the <code>Hidden:&nbsp;&nbsp;yes</code> line.</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th class="n">#</th><th>Family</th><th class="n">Verbs</th><th class="n">Names</th><th>Objects</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="n">1</td><td>Exception <code>&lt;verb&gt;_</code> hooks</td><td class="n">14</td><td class="n">14</td><td>#7, #23 (6), #26, #27 (2), #30 (3), #51</td></tr>
+          <tr><td class="n">2</td><td>Container faces (<code>in_</code>/<code>on_</code>/<code>under_</code>/<code>behind_</code> × get/put/look)</td><td class="n">12</td><td class="n">12</td><td>#11 (9), #26 (3)</td></tr>
+          <tr><td class="n">3</td><td><code>do_&lt;effect&gt;</code> handlers</td><td class="n">13</td><td class="n">13</td><td>#53</td></tr>
+          <tr><td class="n">4</td><td>Effects API + dispatcher</td><td class="n">5</td><td class="n">5</td><td>#53</td></tr>
+          <tr><td class="n">5</td><td>Engine lifecycle hooks (via <code>fire_hook</code>)</td><td class="n">7</td><td class="n">7</td><td>#3, #5 (2), #17 (2), #26 (2)</td></tr>
+          <tr><td class="n">6</td><td>Ticker callbacks</td><td class="n">2</td><td class="n">9</td><td>#1</td></tr>
+          <tr><td class="n">7</td><td>Character-state helpers</td><td class="n">18</td><td class="n">37</td><td>#1 (5), #3 (4), #5 (9)</td></tr>
+          <tr><td class="n">8</td><td>Movement &amp; rendering internals</td><td class="n">10</td><td class="n">10</td><td>#15 (3), #20 (2), #21 (2), #22, #24, #25</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td class="n"></td><td>Total</td><td class="n">81</td><td class="n">107</td><td>18 objects</td></tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <p>Per object: <span class="mono">#53 → 18, #5 → 11, #11 → 9, #1 → 7, #23 → 6, #26 → 6, #3 → 5, #15 → 3, #30 → 3, #17/#20/#21/#27 → 2, #7/#22/#24/#25/#51 → 1</span>.</p>
+
+    <p>Aliases concentrate heavily: <code>#1:_afflict</code> answers to 14 names, <code>#1:_resource</code> and <code>#1:_tick_up</code> to 7 each, <code>#1:_td_rt</code> to 2 — four rows accounting for 30 of the 107 names.</p>
+
+    <p>Two outliers deserve their own entry. <strong><code>#5:rlook</code> is the only hidden verb carrying an auth level</strong> (<code>auth=3</code>), and <strong><code>#3:at_post_move</code> and <code>#7:go_</code> are the only two with non-default perms</strong> (<code>rxd</code>). Note <code>rlook</code> exists twice — <code>#5:rlook</code> hidden, <code>#15:rlook</code> not hidden but <code>auth=3</code>. Deliberate per its docstring, but confusing unless the reference says so.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span> What an entry must contain</h2>
+    <p>A command entry is <em>name / level / abbreviation</em>. None of those is the right axis here — 79 of 81 have no level and none has an abbreviation. Reading the implementations, five things carry the weight.</p>
+
+    <h3>a. How it gets called — five paths, five different absences</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Path</th><th>If the verb is absent</th><th>Cite</th></tr></thead>
+        <tbody>
+          <tr><td><code>call_verb(obj, 'name')</code></td><td>raises <code>KeyError</code></td><td class="cite">builtins.py:1806</td></tr>
+          <tr><td><code>obj.name()</code> method style</td><td>raises <code>PropertyNotFound</code> (an <code>AttributeError</code>) — <strong>not</strong> <code>KeyError</code></td><td class="cite">objects.py:1019</td></tr>
+          <tr><td><code>fire_hook(...)</code></td><td>silently returns <code>None</code></td><td class="cite">hooks.py:245</td></tr>
+          <tr><td>ticker callback</td><td><code>KeyError</code> caught and swallowed</td><td class="cite">ticker.py:397</td></tr>
+          <tr><td><code>$eu</code> effect dispatch</td><td><code>KeyError</code> → effect expired and dropped</td><td class="cite">53/_tick.py:54</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>That difference bites. <code>#17:get</code> is written defensively — <code>try: … except KeyError: pass</code> at <span class="cite">verbs/17/get.py:90</span> — but the same file calls <code>pobj.do_wait()</code> bare at line 20, a different exception on a different path. An author who removes <code>do_wait</code> from a custom character parent gets <code>PropertyNotFound</code>, not the <code>KeyError</code> their <code>except</code> is watching for.</p>
+
+    <h3>b. What arrives in the namespace</h3>
+    <p><code>build_verb_namespace</code> supplies <code>pobj</code>/<code>player</code>, <code>this</code>, <code>caller</code>, <code>location</code>, <code>db</code>, <code>verb</code>, <code>args</code>, <code>argstr</code>, <code>argv</code> to everything <span class="cite">(verb_namespace.py:534)</span>. What varies is the caller's extra kwargs, merged last and overriding <span class="cite">(builtins.py:1850)</span>:</p>
+    <ul>
+      <li><code>#53:do_*</code> — <code>tick</code>, <code>remaining</code>, <code>effect_args</code>, <code>effect_kwargs</code>; all 13 handlers read <code>remaining</code></li>
+      <li><code>#26:in_get</code>, <code>#11:on_get</code> — <code>dobj</code> as a kwarg <em>override</em> of the parsed one</li>
+      <li><code>#23:lock_</code>/<code>unlock_</code> — <code>iobj</code>, the key</li>
+      <li><code>#15:gmove</code> — <code>dest</code>, <code>succ</code>, <code>osucc</code>, <code>drop</code>, <code>odrop</code>, <code>rt</code></li>
+      <li><code>#53:trigger</code>/<code>cancel</code>/<code>list_active</code> — <code>_pyargs</code>, a sixth convention nothing else uses</li>
+    </ul>
+
+    <h3>c. What it must return</h3>
+    <ul>
+      <li><strong>Exception hooks:</strong> <code>return True</code> = handled, the shared verb stops.</li>
+      <li><strong>Cancellable engine hooks</strong> (<code>before_move</code>, <code>before_leave</code>, <code>before_enter</code>, <code>before_recycle</code>, <code>before_reparent</code>): <code>return False</code> cancels — and <strong>a raise is also read as <code>False</code></strong>, fail-closed <span class="cite">(builtins.py:322)</span>.</li>
+      <li><strong>Value-returning helpers:</strong> <code>#3:hands_free</code> returns a hand label or <code>None</code>; <code>#3:do_wait</code> returns True when the character <em>cannot</em> act — an easy polarity trap.</li>
+    </ul>
+
+    <h3>d. State it writes, and the idiom</h3>
+    <p>Several entries are useless without this. <code>do_stun</code> must reassign a <em>whole fresh dict</em> — an in-place mutation never reaches the database — and must use plain assignment, not <code>setattr</code>, because the effect runs in the character's non-wizard context. <code>#1:_td_rt</code> documents the same trap for <code>rt</code>.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span> Generated versus hand-written</h2>
+    <p>More can be generated here than for commands, because the docstrings are already richer than <code>#3</code>'s were.</p>
+
+    <h3>Machine-readable today, no new markup</h3>
+    <ul>
+      <li>Object, names, aliases, <code>hidden</code>, <code>auth</code>, <code>perms</code> — straight from the <code>verbs</code> table.</li>
+      <li><strong>The caller graph, with kwargs.</strong> An <code>ast</code> walk over all 203 verb bodies resolves callers and injected kwargs for <strong>36 of 37</strong> hook names. The highest-value column, and no hand table could keep up with it.</li>
+      <li><strong>Engine hooks come free.</strong> <code>moo/hooks.py</code> already holds name, aliases, <code>cancellable</code> and a human description <span class="cite">(hooks.py:326)</span> — family 5 generates entirely from engine source, sentence included.</li>
+    </ul>
+
+    <h3>Needs a human sentence</h3>
+    <ul>
+      <li>What each hook is <em>for</em> — the <code>GROUPS</code> equivalent.</li>
+      <li>Return semantics: <code>return True</code> means "handled" for family 1 and "cannot act" for <code>do_wait</code>. No parser distinguishes those.</li>
+      <li>Three dynamic dispatch sites the AST cannot resolve — <span class="cite">17/get.py:60, 17/look.py:105, 53/_tick.py:44</span>.</li>
+    </ul>
+
+    <div class="callout">
+      <span class="label">Do not invent new docstring fields</span>
+      <p><code>verb_meta.py</code> parses exactly four, and its own docstring explains why: a <code>Names:</code> line that looked declarative but was prose left thirteen timers wired to nothing. A fifth field would rot the same way unless the engine parses it. If a structured <code>Calls:</code> line is ever wanted, derive it and have the generator <em>write it back</em>.</p>
+    </div>
+
+    <p><strong>A normalisation problem first.</strong> Across the 81 docstrings, "who calls me" is spelled seven ways — <code>Called programmatically:</code> (18), <code>Called:</code> (3), <code>Called by</code>, <code>Called as</code>, <code>Called via</code>, <code>Method-call interface:</code> (4), <code>Usage:</code> (2). Section headers vary as widely. Any scraper needs these regularised: a one-time pass over 81 files, worth doing because the content is already there.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span> Where it should live</h2>
+    <p>A new generated guide page, <code>docs/guide/hooks.html</code>, between <code>verbs.html</code> and <code>living-world.html</code>.</p>
+    <p>The audience is a game author extending the starter — someone who has read <code>verbs.html</code>, understood the exception pattern, and now needs to know which hooks exist and what arrives in them. That is reference, not tutorial, and <code>verbs.html</code> is already the longest page in the guide at 30KB.</p>
+    <p><strong>Not in-game:</strong> <code>help</code> deliberately suppresses these and <code>may_invoke</code> refuses to dispatch them, so <code>help get_</code> cannot work by design. Discovery tools already exist for gm3+ — <code>+verbs/all</code> lists hidden verbs, <code>@vfind</code> annotates them.</p>
+    <p><strong>Worth a cross-link:</strong> <code>living-world.html</code> documents <code>$eu.trigger(...)</code> and <code>do_&lt;name&gt;</code> handlers <em>without ever mentioning that <code>tick</code> and <code>remaining</code> are injected</em> — despite all 13 shipped handlers being built around <code>remaining</code>.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span> Structure, with worked entries</h2>
+<pre><code>Hooks &amp; Internal Verbs
+  What a hidden verb is          (may_invoke, not find_verb)
+  How one gets called            (the 5 paths, with absent-verb behaviour)
+  What arrives in the namespace  (always-present vs per-hook kwargs)
+
+  1. Exception verbs               (14)
+  2. Container faces               (12)
+  3. Engine lifecycle hooks         (7)   generated from moo/hooks.py
+  4. Effects: do_&lt;name&gt; + $eu API  (13 + 5)
+  5. Ticker callbacks               (2)
+  6. Character-state helpers       (18)
+  7. Movement &amp; rendering          (10)
+
+  Writing your own</code></pre>
+
+    <div class="entry">
+      <h4>get_ — contract only</h4>
+      <dl>
+        <dt>Called by</dt><dd><code>#11:behind_get</code>, <code>#11:on_get</code>, <code>#11:under_get</code>, <code>#17:get</code>, <code>#26:in_get</code></dd>
+        <dt>Reached via</dt><dd><code>call_verb(item, 'get_')</code>, on the item that was matched</dd>
+        <dt>Receives</dt><dd>the standard namespace; <code>this</code> is the item, <code>pobj</code> the person picking it up</dd>
+        <dt>Return</dt><dd><code>True</code> to say you handled it — the shared verb stops before moving anything</dd>
+        <dt>Ships?</dt><dd>No, and by design. All five callers wrap the call in <code>try/except KeyError</code>, so an item without one is the ordinary case. Put a <code>get_</code> on the one cursed sword that refuses to be picked up.</dd>
+      </dl>
+    </div>
+
+    <div class="entry">
+      <h4>do_stun — #53 ($eu) · hidden · rx</h4>
+      <dl>
+        <dt>Started by</dt><dd><code>$eu.trigger(who, 'stun', ticks, interval)</code>, or <code>pobj._stun(duration)</code></dd>
+        <dt>Called by</dt><dd><code>#53:_tick</code>, once per interval, plus once more with <code>remaining=0</code> if cancelled early</dd>
+        <dt>Injected</dt><dd><code>pobj</code>, <code>tick</code> (1-based), <code>remaining</code>, <code>effect_args</code>, <code>effect_kwargs</code></dd>
+        <dt>Should set</dt><dd><code>pobj.status['stunned'] = remaining</code>, dropping the key at zero. Assign a <strong>fresh dict</strong> — in-place mutation never reaches the database, and <code>setattr</code> is refused.</dd>
+        <dt>Read by</dt><dd><code>#3:do_wait</code>, <code>#5:get_status</code>, <code>#5:make_postatus</code>, all via <code>.get('stunned', 0)</code></dd>
+        <dt>If absent</dt><dd>the effect is silently dropped from the registry on its first fire</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span> Open questions</h2>
+    <ol>
+      <li><strong>Starter only, or the whole contract surface?</strong> <code>moo/hooks.py</code> registers 12 hook points with 20 aliases; the starter defines verbs for 4. The other 16 — <code>at_before_move</code>, <code>at_object_creation</code>, <code>at_disconnect</code> and the rest — are real, engine-fired, and undocumented anywhere.</li>
+      <li><strong>Six invocation conventions.</strong> Documenting all six honestly makes the page look chaotic; recommending one implies the others are deprecated, which is a design decision rather than a doc decision.</li>
+      <li><strong>Verbs that ship dead.</strong> <code>#3:_allow</code> has an empty body and no caller; <code>#3:time_ok</code> has no caller either, superseded by <code>do_wait</code>. Documenting dead code as an extension point is worse than omitting it.</li>
+      <li><strong>Docstring normalisation touches 81 files.</strong> Acceptable churn, and before or as part of the generator?</li>
+      <li><strong>Where does the drift check run?</strong> <em>(Since resolved — <code>--check</code> is now three tests in the suite.)</em></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="num">07</span> Flagged in passing</h2>
+    <ul>
+      <li><strong>Broken link in a generated page</strong> — the footer pointed at <code>shops.html</code>, which never existed. <em>Fixed and republished.</em></li>
+      <li><strong><code>verbs/15/help.py</code> carries a stale comment and list.</strong> The comment describes the pre-<code>may_invoke</code> world. Of 35 names in <code>_INTERNAL_EXACT</code>, <strong>8 do not exist in the starter</strong> (Shadowfall leftovers), <strong>23 are already <code>hidden=1</code></strong> and dropped two lines above, and only <strong>3 are load-bearing</strong> — <code>mark</code>, <code>unmark</code>, <code>tt</code>.</li>
+      <li><strong><code>NOT_COMMANDS</code> in the generator is dead</strong> — all three names are <code>hidden=1</code>, and the filter already excludes hidden verbs.</li>
+      <li><strong><code>verbs/1/_tick_up.py</code> still carries a prose <code>Names:</code> line</strong> — the exact spelling that silently broke thirteen timers. Harmless here only because a correct <code>Aliases:</code> line sits below it.</li>
+    </ul>
+  </section>
+
+  <p class="foot">Research only — nothing in this report was implemented. Counts read from <code>moo/templates/starter/world.db</code> and the 203 verb files on 12 August 2026, against MegaMOO 0.10.0-beta13.</p>
+
+</div>
