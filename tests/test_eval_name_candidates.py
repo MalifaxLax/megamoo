@@ -177,3 +177,136 @@ def test_resolution_failure_leaves_the_expression_alone(monkeypatch):
     monkeypatch.setattr('moo.match_utils.bmatch', _explode)
 
     assert _b._resolve_bare_names('or', {}, player, db=object()) == 'or'
+
+
+# ------------------------------------------------------------------
+# A phrase with nothing after it
+# ------------------------------------------------------------------
+#
+# `2 door.latchable` answered and `2 door` did not, because the multi-word
+# pass was keyed on finding a dot. Asking what something *is* is the
+# shorter question, and it was the one that failed.
+
+
+def _phrase_world(monkeypatch, phrase='2 door'):
+    """A player near one object, reachable only by a multi-word *phrase*."""
+    obj = SimpleNamespace(name='a door', objnum=5013)
+    player = SimpleNamespace(contents=[obj], location=None)
+
+    def _bmatch(text, who, candidates, db):
+        return obj if (text or '').strip() == phrase else None
+
+    monkeypatch.setattr('moo.match_utils.bmatch', _bmatch)
+    return obj, player
+
+
+def test_a_bare_phrase_resolves(monkeypatch):
+    obj, player = _phrase_world(monkeypatch)
+    ns = {}
+
+    code = _b._resolve_bare_names('2 door', ns, player, db=object())
+
+    assert code != '2 door'
+    assert ns[code] is obj
+
+
+def test_a_bare_phrase_that_matches_nothing_is_reported(monkeypatch):
+    """The phrase comes back, so the caller can say what it looked for.
+
+    "invalid syntax" is a true but useless answer to `9 drapes` when there
+    are four: the question was about the room, not about Python.
+    """
+    _, player = _phrase_world(monkeypatch, phrase='2 door')
+    missed = []
+
+    code = _b._resolve_bare_names('9 door', {}, player, db=object(),
+                                  unmatched=missed)
+
+    assert code == '9 door'
+    assert missed == ['9 door']
+
+
+def test_a_dotted_phrase_that_matches_nothing_is_reported_too(monkeypatch):
+    _, player = _phrase_world(monkeypatch, phrase='2 door')
+    missed = []
+
+    _b._resolve_bare_names('9 door.latchable', {}, player, db=object(),
+                           unmatched=missed)
+
+    assert missed == ['9 door']
+
+
+def test_arithmetic_is_not_a_phrase(monkeypatch):
+    """`/ 2 + 2` is a sum, and stays one.
+
+    Nothing is offered to the matcher unless it fails to compile on its
+    own -- the same restraint the keyword pass shows for single tokens.
+    """
+    _, player = _phrase_world(monkeypatch, phrase='2 + 2')
+    missed = []
+
+    assert _b._resolve_bare_names('2 + 2', {}, player, db=object(),
+                                  unmatched=missed) == '2 + 2'
+    assert missed == []
+
+
+def test_valid_python_with_a_space_is_left_alone(monkeypatch):
+    """`not x` is word-shaped and compiles, so it is code, not a name."""
+    _, player = _phrase_world(monkeypatch, phrase='not x')
+    missed = []
+
+    assert _b._resolve_bare_names('not x', {}, player, db=object(),
+                                  unmatched=missed) == 'not x'
+    assert missed == []
+
+
+def test_a_real_syntax_error_keeps_its_own_message(monkeypatch):
+    """Broken code must not be reported as a thing that isn't here.
+
+    Anything carrying an operator, a bracket or a newline failed to
+    compile for its own reasons, and Python's message is the useful one.
+    """
+    _, player = _phrase_world(monkeypatch, phrase='anything')
+    missed = []
+    code = 'x = 1\ny = 2 +'
+
+    assert _b._resolve_bare_names(code, {}, player, db=object(),
+                                  unmatched=missed) == code
+    assert missed == []
+
+
+def test_unmatched_is_optional(monkeypatch):
+    """exec_python does not ask for the list, and must not have to."""
+    obj, player = _phrase_world(monkeypatch)
+    ns = {}
+
+    code = _b._resolve_bare_names('2 door', ns, player, db=object())
+
+    assert ns[code] is obj
+
+
+# ------------------------------------------------------------------
+# What the player actually sees
+# ------------------------------------------------------------------
+
+
+def _wizard(monkeypatch, phrase='2 door'):
+    _, player = _phrase_world(monkeypatch, phrase=phrase)
+    player.objnum = 52
+    player.has_flag = lambda flag: True
+    return player
+
+
+def test_eval_reports_a_miss_as_a_miss(monkeypatch):
+    player = _wizard(monkeypatch)
+
+    with pytest.raises(NameError, match=r"I don't see '9 door' here\."):
+        _b.eval_python('9 door', {'player': player, 'db': object()})
+
+
+def test_eval_still_reports_broken_code_as_broken(monkeypatch):
+    """A miss must not become the explanation for every syntax error."""
+    player = _wizard(monkeypatch)
+
+    with pytest.raises(SyntaxError):
+        _b.eval_python('2 +', {'player': player, 'db': object()})

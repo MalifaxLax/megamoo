@@ -2733,7 +2733,8 @@ def _eval_name_candidates(player) -> list:
     return candidates
 
 
-def _resolve_bare_names(code: str, ns: dict, player, db) -> str:
+def _resolve_bare_names(code: str, ns: dict, player, db,
+                        unmatched: list = None) -> str:
     """
     Bind bare object names in *code* to the objects around *player*.
 
@@ -2742,11 +2743,19 @@ def _resolve_bare_names(code: str, ns: dict, player, db) -> str:
     Returns the code to evaluate, which may have been rewritten where a
     name could not simply be bound to a variable of the same spelling.
 
-    Three passes, in order:
+    Four passes, in order:
 
     1. A multi-word reference before the first dot -- ``2 door.latchable``
        -- which is not a Python name at all, so the matched object is
        bound to a generated variable and spliced in.
+
+    1a. The same reference with nothing after it -- ``/ 2 door``.  Pass 1
+       is keyed on the dot, so a phrase the matcher understands perfectly
+       well came back as "invalid syntax" the moment you stopped short of
+       asking for an attribute: ``2 door.latchable`` answered and ``2
+       door`` did not.  Only word-shaped code that will not compile on
+       its own is offered to the matcher -- the same restraint pass 2
+       shows for single tokens, and what leaves ``2 + 2`` as arithmetic.
 
     2. A leading token Python cannot parse.  This is the ``/ or`` case:
        an object whose shortest unambiguous prefix happens to be a Python
@@ -2761,20 +2770,42 @@ def _resolve_bare_names(code: str, ns: dict, player, db) -> str:
 
     3. Every remaining single-word name, bound under its own spelling.
 
+    Args:
+        code (str): The already-objref-processed source.
+        ns (dict): The evaluation namespace; matched objects are bound
+            into it.
+        player: The caller, whose room and inventory are searched.
+        db: The database, for ``#N`` resolution inside :func:`bmatch`.
+        unmatched (list, optional): Collects any word-shaped phrase that
+            was offered to the matcher and found nothing.  The caller
+            uses it to answer "I don't see that here", rather than let a
+            Python syntax error stand in for a failed match -- a
+            confusing reply to what was a question about the room.
+
     Never raises: name resolution is a convenience, and a failure here
     must leave the expression to Python rather than break eval outright.
     """
     if not (db and player):
         return code
-    import keyword, tokenize, io
+    import keyword, tokenize, io, re
     try:
         from .match_utils import bmatch
         candidates = _eval_name_candidates(player)
+
+        # What a match phrase may be made of.  Anything carrying an
+        # operator, a bracket or a newline is code that failed to compile
+        # for its own reasons and must keep its own error message.
+        def phrase_shaped(s):
+            return bool(re.fullmatch(r"[A-Za-z0-9' -]+", s))
 
         def _bind(obj):
             name = f'_eval_obj_{id(obj)}'
             ns[name] = obj
             return name
+
+        def _missed(phrase):
+            if unmatched is not None and phrase_shaped(phrase):
+                unmatched.append(phrase)
 
         # 1. Multi-word prefix before the first dot.
         dot = code.find('.')
@@ -2784,6 +2815,21 @@ def _resolve_bare_names(code: str, ns: dict, player, db) -> str:
                 obj = bmatch(prefix, player, candidates, db)
                 if obj:
                     code = _bind(obj) + code[dot:]
+                else:
+                    _missed(prefix)
+
+        # 1a. The whole line as a reference, when nothing follows it.
+        elif ' ' in code.strip():
+            probe = code.strip()
+            if phrase_shaped(probe):
+                try:
+                    compile(probe, '<probe>', 'eval')
+                except SyntaxError:
+                    obj = bmatch(probe, player, candidates, db)
+                    if obj:
+                        code = _bind(obj)
+                    else:
+                        _missed(probe)
 
         # 2. A head token that is not a legal expression by itself.
         head, sep, rest = code.partition('.')
@@ -2866,7 +2912,9 @@ def eval_python(code: str, context: dict) -> Any:
     eval_globals = _build_eval_globals(context)
 
     db = context.get('db') or context.get('_db') or _database
-    processed_code = _resolve_bare_names(processed_code, eval_globals, player, db)
+    unmatched = []
+    processed_code = _resolve_bare_names(processed_code, eval_globals, player,
+                                         db, unmatched)
 
     # Set verb context so method-style verb calls work
     if not db:
@@ -2884,6 +2932,11 @@ def eval_python(code: str, context: dict) -> Any:
                 exec(compiled, eval_globals)
                 return None
             except SyntaxError as e:
+                # A phrase that found nothing is a question about the
+                # room, not about Python.  "invalid syntax" is a true but
+                # useless answer to "9 dra" when there are four drapes.
+                if unmatched:
+                    raise NameError(f"I don't see '{unmatched[0]}' here.")
                 raise SyntaxError(f"Invalid Python code: {e}")
     finally:
         clear_verb_context(token)
