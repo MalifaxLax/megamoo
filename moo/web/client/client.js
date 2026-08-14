@@ -808,6 +808,42 @@ form.addEventListener('submit', (event) => {
   input.submit(text);
 });
 
+// A pasted block is a block of commands, not one long line.  The command
+// line is an <input>, which is single-line by definition: the browser's
+// own value sanitisation folds every newline in a paste into a space, so
+// three @succ/@osucc/@odrop lines arrived as one command with the second
+// and third trailing off the end of the first.  Split the paste here and
+// send each line the way it would have been typed.
+cmdInput.addEventListener('paste', (event) => {
+  const pasted = event.clipboardData ? event.clipboardData.getData('text') : '';
+  if (!/[\r\n]/.test(pasted)) return;    // ordinary paste: let the browser do it
+  event.preventDefault();
+
+  const lines = pasted.split(/\r\n|\r|\n/);
+
+  // A masked line is a password.  Take the first line and stop: the rest
+  // of the clipboard must not be sent to the world as commands, and a
+  // password with a newline glued into it fails to log you in anyway.
+  if (input.masked) {
+    cmdInput.value = lines[0];
+    return;
+  }
+
+  // Splice the paste into whatever is already on the line, so a caret in
+  // the middle behaves the way it does anywhere else.
+  const start = cmdInput.selectionStart ?? cmdInput.value.length;
+  const end = cmdInput.selectionEnd ?? cmdInput.value.length;
+  const all = (cmdInput.value.slice(0, start) + pasted + cmdInput.value.slice(end))
+    .split(/\r\n|\r|\n/);
+
+  // A clipboard that ends in a newline leaves one empty string behind it;
+  // that is the terminator of the last command, not a command of its own.
+  if (all.length > 1 && all[all.length - 1] === '') all.pop();
+
+  cmdInput.value = '';
+  for (const line of all) input.submit(line);
+});
+
 cmdInput.addEventListener('keydown', (event) => {
   if (event.key === 'ArrowUp') {
     event.preventDefault();
