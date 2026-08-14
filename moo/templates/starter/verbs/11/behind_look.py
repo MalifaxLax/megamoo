@@ -1,37 +1,77 @@
 """
 behind_look verb on #11 (GenericObject).
 
-Shows what is behind this object. Called by the room-level look verb
-when the player uses: look behind <object>
+Shows what is behind this object. Called by the room-level look verb when
+the player uses: look behind <object>
 
-If behind_string is set (a string message or an object reference),
-displays that instead. Otherwise lists visible items from behind_contents.
+Three things can be behind something, and they are not exclusive:
 
-Arguments:
-    this - The object being looked behind.
+  behind_string    prose about the space -- shown first, when set
+  behind_exit      somewhere you can go -- looked at as a room
+  behind_contents  objects put there -- listed, when there is no exit
+
+behind_string used to `return` the moment it printed, so anything actually
+behind the object was unreachable: `put coin behind chest` then `look
+behind chest` described the gap and never mentioned the coin, while `get
+coin from behind chest` worked. The string sets the scene; it is not the
+whole answer.
+
+An exit takes precedence over a contents list: if there is somewhere to
+go, that is what is behind the thing, and loose objects are what you see
+when there is not.
+
+Returns True to indicate the action was handled.
 
 Hidden:  yes
 """
 
-behindstr = this.behind_string
-if behindstr and type(behindstr) == str:
-    pobj.msg(behindstr)
-    return True
-if behindstr and hasattr(behindstr, 'objnum'):
-    if behindstr.is_exit:
-        call_verb(behindstr, 'look_here', leader=True)
-    else:
-        call_verb(behindstr, 'look_')
-    return True
+shown = False
 
-raw = this.behind_contents or []
-if raw:
-    contents = [db.get_object(n.objnum if hasattr(n, 'objnum') else n) for n in raw if n]
-    names = [obj.name for obj in contents
-             if not obj.invis and not obj.hidden]
-    if names:
-        pobj.msg("Behind &d you see " + su.listtoenglish(names) + ".", dob=this)
-        return True
+# 1. The prose, when there is any.  No longer a full stop.
+behindstr = getattr(this, 'behind_string', None)
+if behindstr:
+    if isinstance(behindstr, str):
+        pobj.msg(behindstr)
+        shown = True
+    elif hasattr(behindstr, 'objnum'):
+        # An object standing in for the description -- an exit describes
+        # itself as a room, anything else through its own look_.
+        if behindstr.is_exit:
+            call_verb(behindstr, 'look_here', leader=False)
+        else:
+            call_verb(behindstr, 'look_')
+        shown = True
 
-pobj.msg("There's nothing behind there.")
+# 2. Somewhere to go, looked at the way a room is looked at.
+behind_exit = getattr(this, 'behind_exit', None)
+if behind_exit and behind_exit != 'none':
+    if isinstance(behind_exit, int):
+        behind_exit = db.get_object(behind_exit)
+    try:
+        # The destination if it has one, so you see the place rather than
+        # the doorway; the exit itself otherwise.
+        dest = getattr(behind_exit, 'destination', None)
+        if isinstance(dest, int):
+            dest = db.get_object(dest)
+        call_verb(dest or behind_exit, 'look_here', leader=False)
+        shown = True
+    except Exception:
+        pass
+
+# 3. Otherwise whatever has been put behind it.
+else:
+    raw = getattr(this, 'behind_contents', None) or []
+    if raw:
+        contents = [db.get_object(n.objnum if hasattr(n, 'objnum') else n)
+                    for n in raw if n]
+        names = [obj.name for obj in contents
+                 if obj and not obj.invis and not obj.hidden]
+        if names:
+            pobj.msg("Behind &d you see " + su.listtoenglish(names) + ".",
+                     dob=this)
+            shown = True
+
+if not shown:
+    pobj.msg("There's nothing behind there.")
+
 return True

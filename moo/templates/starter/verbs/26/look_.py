@@ -1,53 +1,30 @@
 """
-Override verb called by look when a player examines a container.
+look_ verb on #26 (BaseContainer).
 
-Called programmatically: call_verb(container, 'look_')
+What `look <container>` shows: the container itself. Its description, and
+whether it is shut -- which you can see from outside without opening it.
 
-Displays the container's description and name, then checks if the
-container is open. If closed, reports it as closed. If open, shows
-the visible contents inside (in_contents). If an in_string property
-is set, it is displayed instead of the contents list — this can be
-a text string or an object number referencing a room or object whose
-look verb is invoked.
+Deliberately **not** its contents. That is `look in <container>`, which is
+a different question and has its own hook, in_look, on this same object.
+This verb used to answer both: it repeated in_look's listing almost line
+for line, so `look chest` and `look in chest` printed the same thing and
+there was no way to look *at* a container.
+
+No name header, matching #17:look and #30:look_, which this hook returns
+before and would otherwise contradict.
+
+Returns True to indicate the action was handled.
 
 Hidden:  yes
 """
-# look_ verb on #26 (BaseContainer)
-# Called by look verb when player examines a container
 
 desc = this.description
-if desc:
-    pobj.msg(f"\n{this.name}")
-    pobj.msg(desc)
-else:
-    pobj.msg(f"\n{this.name}")
+pobj.msg(desc if desc else "You see nothing special.")
 
+# Shut-ness is visible from outside, so it belongs to looking at the
+# thing rather than into it.  Nothing is said when it is open: that is the
+# ordinary state, and a line per container adds up in a full room.
 if not this.open:
     pobj.msg("&D is closed.", dob=this)
-    return
 
-# Check for interior string/object (in_string)
-in_string = this.in_string
-if in_string:
-    if type(in_string) == int:
-        in_string = db.get_object(in_string)
-    if hasattr(in_string, 'objnum'):
-        if in_string.is_exit:
-            call_verb(in_string, 'look_here', leader=True)
-        else:
-            call_verb(in_string, '_look')
-        return
-    else:
-        pobj.msg(str(in_string))
-        return
-
-# Resolve in_contents objnums to objects
-raw = this.in_contents or []
-visible = [db.get_object(n.objnum if hasattr(n, 'objnum') else n) for n in raw if n]
-visible = [obj for obj in visible if not obj.invis and not obj.hidden]
-
-if visible:
-    names = [obj.name for obj in visible]
-    pobj.msg("In &d you see " + su.listtoenglish(names) + ".", dob=this)
-else:
-    pobj.msg("&D is empty.", dob=this)
+return True

@@ -209,6 +209,28 @@ def make_exit(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
     """
     new_exit = make_object(parent, db, pobj, noun=noun)
 
+    # Movement messages, naming the direction this exit actually goes.
+    #
+    # Step 4 of the list above, which the body did not do.  Every exit
+    # therefore inherited #20 BaseExit's literals -- "You walk out." going
+    # north, south and every other way -- and an osuccess still written in
+    # the %% sigil from before it moved to &, so the watching room got
+    # "%%S %%OMODE out." on every move through a created exit.
+    #
+    # The templates have been in globals.py as ESUCC/EOSUCC/EODROP all
+    # along; `&1` is the slot fname and rfname exist to fill.
+    #
+    # Only when there is a name to put in.  A go-exit created without one
+    # keeps whatever its parent says, which is right for `go archway`:
+    # there is no direction to announce.
+    _fname = fname or noun
+    if _fname:
+        from .globals import ESUCC, EOSUCC, EODROP
+        _rfname = rfname or _fname
+        new_exit.add_property('success', ESUCC.replace('&1', _fname), perms='rc')
+        new_exit.add_property('osuccess', EOSUCC.replace('&1', _fname), perms='rc')
+        new_exit.add_property('odrop', EODROP.replace('&1', _rfname), perms='rc')
+
     # Set destination
     if dest:
         new_exit.add_property('destination', dest.objnum, perms='rc')

@@ -1,7 +1,10 @@
 """
 See what you are holding.
 
-Usage: inventory  |  i
+Usage: inventory  |  inv
+
+Abbreviates to `inv`, not `i`: the minimum is 3.  The help said `i`
+and nothing answered to it -- there is no alias, only the length.
 
 Abbrev:  inventory=3
 """

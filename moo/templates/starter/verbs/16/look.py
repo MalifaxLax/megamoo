@@ -62,6 +62,6 @@ elif obj.is_char:
 elif not (obj.invis or obj.hidden):
     # See #17:look -- the description alone, no name header.
     desc = obj.description
-    pobj.msg(f"\n{desc}" if desc else "You see nothing special.")
+    pobj.msg(desc if desc else "You see nothing special.")
 else:
     pobj.msg("Look at what?")

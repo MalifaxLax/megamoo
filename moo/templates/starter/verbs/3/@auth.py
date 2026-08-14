@@ -45,10 +45,37 @@ if not dobj:
     pobj.msg(f"GM levels: {', '.join(GM_LEVELS)}")
     return
 
-candidates = list(pobj.contents) + list(pobj.location.contents)
-target = bmatch(dobj, pobj, candidates, db)
+# Not bmatch over the room: auth has nothing to do with where anybody is
+# standing.  Matching room contents meant granting to someone required
+# being next to them, and any object whose *name* contained a player's
+# name shadowed the player -- "a gem with Bramble" in your pack answered
+# to `@auth Bramble` and then raised E_PROPNF on its missing auth list.
+#
+# #N resolves directly; a bare name goes to the players table, which is
+# the register of who exists rather than of what is nearby.
+_spec = dobj.strip()
+target = None
+if _spec.startswith('#') and _spec[1:].isdigit():
+    try:
+        target = db.get_object(int(_spec[1:]))
+    except Exception:
+        target = None
+else:
+    _num = find_player(_spec)
+    if _num:
+        try:
+            target = db.get_object(_num)
+        except Exception:
+            target = None
+
 if not target:
-    pobj.msg(f"Player '{dobj}' not found.")
+    pobj.msg(f"No player named '{_spec}'.")
+    return
+
+# An auth list belongs to a character or an account.  Anything else that
+# happened to match is refused here rather than raising on the read.
+if 'auth' not in (target.properties or {}) and not hasattr(target, 'auth'):
+    pobj.msg(f"&<245>#{target.objnum}:{target.name}&n has no auth list.")
     return
 
 where = f"&<245>#{target.objnum}:{target.name}&n"

@@ -143,6 +143,6 @@ elif not (obj.invis or obj.hidden):
     # had just typed at and named it as the database holds it rather than
     # as the room reads, which is a builder's caption, not a look.
     desc = obj.description
-    pobj.msg(f"\n{desc}" if desc else "You see nothing special.")
+    pobj.msg(desc if desc else "You see nothing special.")
 else:
     pobj.msg("Look at what?")

@@ -17,10 +17,12 @@ Hidden:  yes
 item = this
 desc = item.description
 
-# The description alone, no name header -- the same as #17:look, which
-# this hook returns before and so would otherwise contradict.  It keeps
-# the leading blank line the header used to carry.
-pobj.msg(f"\n{desc}" if desc else "\nYou see nothing special.")
+# The description alone, no name header -- the same as #17:look and
+# #26:look_, which this hook returns before and would otherwise
+# contradict.  No leading blank either: that newline belonged to the
+# header line, and with the header gone it was a gap above nothing,
+# which object-look had and character-look did not.
+pobj.msg(desc if desc else "You see nothing special.")
 
 # Show occupants
 sitters = item.sitters or []
