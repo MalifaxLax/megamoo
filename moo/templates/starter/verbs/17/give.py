@@ -46,12 +46,19 @@ if not item:
     pobj.msg("You don't have that.")
     return
 
+# Yourself, by the words that mean it.  The candidate list below already
+# excludes pobj, but `me` is resolved by pmatch itself and arrives anyway.
+if iobj.strip().lower() in ('me', 'myself', 'self'):
+    pobj.msg("Seriously?")
+    return
+
 # Match recipient in room — must be a character
 candidates = [x for x in pobj.location.contents if x.objnum != pobj.objnum]
 recipient = pmatch(iobj, pobj, candidates)
 if not recipient:
     pobj.msg("You don't see them here.")
     return
+
 
 if not recipient.is_char:
     pobj.msg("You can't give things to that.")
