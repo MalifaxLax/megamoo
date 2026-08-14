@@ -87,7 +87,7 @@ while True:
 
     # Announce departure
     if not pobj.invis:
-        pobj.location.msg_room(f"{pobj.name} steps into the gate and vanishes.", exclude=[pobj], sub=pobj, dob=dobj, iob=iobj)
+        pobj.location.msg_room(f"{pobj.name} steps into the portal and vanishes.", exclude=[pobj], sub=pobj, dob=dobj, iob=iobj)
 
     puppet(ichar)
     result = True
