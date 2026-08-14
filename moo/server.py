@@ -484,9 +484,98 @@ class MegaMOOServer:
         if getattr(self.config, 'dev', None) and self.config.dev.autoreload_verbs:
             self._background_tasks.append(asyncio.create_task(self._watch_verbs()))
 
+        # --- Phase 5b: the world's own startup ---
+        self._run_startup_evals()
+
         # --- Phase 6: Wait for shutdown signal ---
         await self._shutdown_event.wait()
             
+    def _run_startup_evals(self):
+        """
+        Run ``$startup_evals``, once, after everything else is up.
+
+        A world needs somewhere to say "do this every time you start" --
+        register a ticker, prime a cache, open a gate -- that is not a
+        verb anybody types and is none of the engine's business.  ``#0``
+        holds a list of expressions and each is evaluated the way ``eval``
+        evaluates one, so what goes in the list is written in the same
+        language as everything else the world is made of.
+
+        Kept as strings rather than as verbs to call because the useful
+        entries are one-liners belonging to a *subsystem* rather than to
+        an object -- ``$trash_bin.dump_eval`` is the trash system's line,
+        stored next to the trash system, and the list is the order they
+        run in.
+
+        Run last on purpose.  The database, the listeners, the tickers and
+        the background tasks are all up by here, so an entry may register
+        a ticker or reach the network without needing ordering rules of
+        its own.
+
+        Never fatal, and each entry is isolated from the next.  These are
+        edited from inside a running game, where a syntax error is an
+        ordinary afternoon; a world that mistypes one should start with a
+        logged error, not refuse to start.  A server that will not boot
+        because of a line you can only fix from inside it is a trap.
+        """
+        # The whole body is guarded, not just each entry.  The first cut
+        # wrapped only the eval and left its own imports bare -- one of
+        # them named a class that had moved, and the ImportError came out
+        # of Phase 5b and stopped the server booting at all.  A method
+        # whose entire purpose is "run the world's code without letting it
+        # break startup" has no business being the thing that breaks
+        # startup.
+        try:
+            db = self.database
+            system = db.get_object(0)
+            entries = getattr(system, 'startup_evals', None) or []
+            if not entries:
+                return
+            if not isinstance(entries, (list, tuple)):
+                logger.error("$startup_evals is not a list; ignoring it.")
+                return
+
+            from .builtins import eval_python
+            from .verb_context import set_verb_context, clear_verb_context
+            from .objects import ObjectFlags
+            from .properties import MOOObjectRef
+
+            logger.info(
+                f"Running {len(entries)} startup eval(s) from $startup_evals")
+            for index, entry in enumerate(entries):
+                if not isinstance(entry, str) or not entry.strip():
+                    logger.error(f"$startup_evals[{index}] is not code; skipped.")
+                    continue
+                # A verb context, because these call the same builtins a
+                # verb calls and several of them read it.  #0 is the actor:
+                # there is no player at startup, and the system object is
+                # the one thing guaranteed to exist.
+                token = set_verb_context(system, db, 0)
+                try:
+                    # 'player' is #0 itself.  eval_python refuses a
+                    # non-wizard, and there is no player at startup -- the
+                    # authority for these is the system object's, which is
+                    # the right answer rather than a borrowed one: the
+                    # list lives on #0, and only a wizard can put anything
+                    # in it.  #0 therefore has to carry the WIZARD flag;
+                    # if it does not, the entries are refused and say so.
+                    eval_python(entry, {
+                        'player': system,
+                        'pobj': system,
+                        'db': db,
+                        'server': self,
+                        'ObjectFlags': ObjectFlags,
+                        'MOOObjectRef': MOOObjectRef,
+                    })
+                    logger.info(f"  startup_evals[{index}] ok: {entry[:70]}")
+                except Exception as e:
+                    logger.error(
+                        f"  startup_evals[{index}] failed: {entry[:70]} -- {e}")
+                finally:
+                    clear_verb_context(token)
+        except Exception as e:
+            logger.error(f"$startup_evals could not be run at all: {e}")
+
     async def shutdown(self, message: str = "Server shutting down"):
         """
         Gracefully shut down the server.
