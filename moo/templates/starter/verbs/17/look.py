@@ -108,14 +108,23 @@ if _prep:
         pobj.msg(f"You see nothing notable {_prep} {obj.name}.")
     return
 
-# Try object's look_ verb (rlook for staff)
+# Try object's look_ verb (rlook for staff, then look_)
+#
+# Nested, the way the room branch above already does it.  Flat, a staff
+# member's missing `rlook` raised straight past `look_` to the fallback --
+# and almost nothing but a room defines rlook, so staff never reached a
+# look_ hook on any object at all.  A container showed no contents and a
+# chair no occupants, for gm3+ only, which reads as one player being
+# unable to see things rather than as a dispatch bug.
 try:
     if is_staff:
-        call_verb(obj, 'rlook')
-        return
-    else:
-        call_verb(obj, 'look_')
-        return
+        try:
+            call_verb(obj, 'rlook')
+            return
+        except KeyError:
+            pass        # no builder view here; the ordinary hook still applies
+    call_verb(obj, 'look_')
+    return
 except KeyError:
     pass
 
@@ -130,8 +139,10 @@ elif obj.is_char:
         pass
     pobj.msg("You see nothing special.")
 elif not (obj.invis or obj.hidden):
+    # The description alone, no name header.  It repeated the thing you
+    # had just typed at and named it as the database holds it rather than
+    # as the room reads, which is a builder's caption, not a look.
     desc = obj.description
-    pobj.msg(f"\n{obj.name}")
-    pobj.msg(desc if desc else "You see nothing special.")
+    pobj.msg(f"\n{desc}" if desc else "You see nothing special.")
 else:
     pobj.msg("Look at what?")

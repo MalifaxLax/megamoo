@@ -1054,7 +1054,15 @@ window.MegaMOOCommands = {
         // Straight through \con, so the field and the command cannot drift
         // apart on the origin rule, the auto-login or the error wording.
         handlers.connect(parsed);
+        // Cleared, not left sitting there.  The field takes credentials --
+        // "anything after the address is passed on untouched" -- and
+        // refreshWorldUI only writes it when empty, so a typed password
+        // stayed legible in the top bar for the rest of the session, in
+        // screenshots and to anyone walking past.  The handle goes back in
+        // on the next refresh.
+        field.value = '';
         field.blur();                 // put the keyboard back on the game
+        refreshWorldUI();
       });
     }
 
@@ -1076,6 +1084,19 @@ window.MegaMOOCommands = {
         note(`*** Sent here for '${asked}', which is not saved on this page.`);
         note(`    Storage is per-world: ${PREFIX}con ${asked} <host> <port>`);
         note(`    [user] [pass] then ${PREFIX}save, and it will be next time.`);
+      } else if (String(arrived.host).toLowerCase() !== location.hostname.toLowerCase()
+                 || String(arrived.port) !== String(location.port)) {
+        // ?session= arrives in a link, so it names *which* saved session to
+        // replay.  Storage is per-origin, so a stranger cannot supply
+        // credentials -- but without this they could choose which of your
+        // own to send here: a link to this world carrying the handle of a
+        // session saved for another one would hand this world that world's
+        // password.  connectTo always navigates to a session's own
+        // host:port, so a mismatch is never something the client itself
+        // produced.
+        note(`*** Sent here for '${asked}', which is saved for `
+             + `${arrived.host}:${arrived.port}, not this world.`);
+        note('    Not logging in with it.');
       } else {
         current = Object.assign({}, arrived, { handle: asked });
         if (arrived.username) {

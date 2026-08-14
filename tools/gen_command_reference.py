@@ -130,7 +130,8 @@ GROUPS = [
         ('@reserve', 'Reserve a block outright; <code>/free</code> and <code>/list</code> too.'),
     ]),
     ('people', 'People and access', [
-        ('@auth', 'Grant or remove a staff level.'),
+        ('@auth', 'Show what a player is authorised for, or grant it.'),
+        ('@rmauth', 'Take an auth away, by `#obj = auth` or `auth from #obj`.'),
         ('@initchar', 'Give a character the full set of properties the game expects.'),
         ('@delplayer', 'Remove a player account.'),
         ('@tel', 'Teleport. Also <code>@telq</code>.'),

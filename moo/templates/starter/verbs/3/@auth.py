@@ -1,80 +1,105 @@
 """
-Usage: @auth <player> = add|remove <level>
+Shows what a player is authorised for, or grants it.
 
-Manages a player's auth list. Only usable by gm5.
+Usage: @auth <player>
+       @auth <player> = <auth>[, <auth> ...]
 
-Levels: gm1 (AssistantGM), gm2 (Builder), gm3 (Coder),
-        gm4 (Admin), gm5 (God)
+With no `= <auth>` it reports what the player currently holds, so asking
+is never one keyword away from changing something.
 
-Adding gm3+ syncs the PROGRAMMER flag. Adding gm4+ syncs WIZARD.
+GM levels: gm1 (AssistantGM), gm2 (Builder), gm3 (Coder),
+           gm4 (Admin), gm5 (God)
+
+Granting gm3+ syncs the PROGRAMMER flag; gm4+ syncs WIZARD.
+
+The auth list is not only gm levels. auth_level() picks out the highest
+`gmN` it finds and ignores the rest, which is what lets a world gate other
+things on tokens of its own -- a named area, a subsystem, a trial. Those
+are accepted here as typed. Anything that is not a gmN is called out when
+granted, because a mistyped `gm6` would otherwise be added in silence and
+grant nothing at all.
 
 Examples:
-    @auth bob = add gm2
-    @auth #100 = remove gm3
-    @auth bob = list
+    @auth bob
+    @auth bob = gm2
+    @auth #100 = gm3, gm4
+
+Several at once, comma-separated. Anything already held is reported and
+skipped rather than refused -- granting what someone has is not a mistake.
+
+Use @rmauth to take one away. The old `= add|remove|list <level>` spelling
+is gone: the keyword decided whether the command read, granted or revoked,
+so a typo in it did something other than what was meant.
+
+Auth: gm5 (auth_level 5)
 """
 
 if auth_level(pobj) < 5:
     pobj.msg("Do what?")
     return
 
-if not dobj or prep != '=' or not iobj:
-    pobj.msg('Usage: @auth <player> = add|remove|list <level>')
-    pobj.msg('Levels: gm1, gm2, gm3, gm4, gm5')
+GM_LEVELS = ['gm1', 'gm2', 'gm3', 'gm4', 'gm5']
+
+if not dobj:
+    pobj.msg("Usage: @auth <player> [= <auth>[, <auth> ...]]")
+    pobj.msg(f"GM levels: {', '.join(GM_LEVELS)}")
     return
 
-# Match target player
 candidates = list(pobj.contents) + list(pobj.location.contents)
 target = bmatch(dobj, pobj, candidates, db)
 if not target:
     pobj.msg(f"Player '{dobj}' not found.")
     return
 
-parts = iobj.strip().split(None, 1)
-action = parts[0].lower()
+where = f"&<245>#{target.objnum}:{target.name}&n"
+held = list(target.auth or [])
 
-if action == 'list':
-    auth = target.auth or []
-    if auth:
-        pobj.msg(f"Auth for &<245>#{target.objnum}:{target.name}&n: {', '.join(auth)}")
+# --- Report, when there is nothing to grant -------------------------------
+if prep != '=' or not iobj:
+    if held:
+        pobj.msg(f"Auth for {where}: &<255>{', '.join(held)}&n")
+        gm = [a for a in held if a in GM_LEVELS]
+        if gm:
+            pobj.msg(f"  &<245>gm level: {max(gm)}&n")
     else:
-        pobj.msg(f"&<245>#{target.objnum}:{target.name}&n has no auth.")
+        pobj.msg(f"{where} has &<245>no auth&n.")
     return
 
-if len(parts) < 2:
-    pobj.msg("Usage: @auth <player> = add|remove <level>")
+# --- Grant ----------------------------------------------------------------
+wanted = [w.strip() for w in iobj.replace(';', ',').split(',')]
+wanted = [w for w in wanted if w]
+if not wanted:
+    pobj.msg("Nothing specified to grant.")
     return
 
-level = parts[1].strip().lower()
-valid_levels = ['gm1', 'gm2', 'gm3', 'gm4', 'gm5']
-if level not in valid_levels:
-    pobj.msg(f"Invalid level '{level}'. Valid: {', '.join(valid_levels)}")
-    return
+added = []
+already = []
+for token in wanted:
+    # gm levels are matched case-insensitively; anything else is stored as
+    # typed, since a world's own gate may well be case-significant and this
+    # verb has no business deciding that.
+    tok = token.lower() if token.lower() in GM_LEVELS else token
+    if tok in held:
+        already.append(tok)
+        continue
+    held.append(tok)
+    added.append(tok)
 
-auth = list(target.auth or [])
-
-if action == 'add':
-    if level in auth:
-        pobj.msg(f"&<245>#{target.objnum}:{target.name}&n already has {level}.")
-        return
-    auth.append(level)
-    target.auth = auth
+if added:
+    # Appended in the order given, never re-sorted: sorting by gm level
+    # would have to decide where a world's own tokens go, and the obvious
+    # implementation -- keep the ones I recognise -- deletes them.
+    target.auth = held
     sync_auth_flags(target)
-    pobj.msg(f"Added {level} to &<245>#{target.objnum}:{target.name}&n.")
-    pobj.msg(f"Auth: {', '.join(auth)}")
+    db.save_object(target)
+    pobj.msg(f"Granted &<255>{', '.join(added)}&n to {where}.")
+    odd = [a for a in added if a not in GM_LEVELS]
+    if odd:
+        pobj.msg(f"&<208>Not a gm level: {', '.join(odd)} -- stored, but it "
+                 f"grants no gm access. A world's own gate reads it; a "
+                 f"mistyped level does nothing.&n")
 
-elif action == 'remove':
-    if level not in auth:
-        pobj.msg(f"&<245>#{target.objnum}:{target.name}&n doesn't have {level}.")
-        return
-    auth.remove(level)
-    target.auth = auth
-    sync_auth_flags(target)
-    pobj.msg(f"Removed {level} from &<245>#{target.objnum}:{target.name}&n.")
-    if auth:
-        pobj.msg(f"Auth: {', '.join(auth)}")
-    else:
-        pobj.msg("Auth is now empty.")
+if already:
+    pobj.msg(f"&<245>Already held: {', '.join(already)}&n")
 
-else:
-    pobj.msg("Usage: @auth <player> = add|remove|list <level>")
+pobj.msg(f"Auth is now: {', '.join(target.auth) if target.auth else 'empty'}")

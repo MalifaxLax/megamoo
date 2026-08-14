@@ -582,9 +582,28 @@ class WebServer:
         with 404 rather than 403 for anyone else, so the page's existence
         is not advertised either.
         """
+        # A dual-stack listener reports a localhost browser as
+        # ``::ffff:127.0.0.1``, so a plain membership test hid this page on
+        # exactly the setup it exists for.  The mapped prefix is stripped
+        # before comparing, and the whole 127/8 block counts, anchored so
+        # that a hostile ``127.0.0.1.example.com`` cannot pass -- a peer
+        # address is not attacker-chosen, but the same string being
+        # trustworthy in one place and not another is how these go wrong.
+        #
+        # An *absent* peername is refused rather than allowed.  It used to
+        # be on the allow-list, which made an unknown caller a local one:
+        # a gate whose failure mode is "open" is not a gate.
+        import re as _re
         peer = writer.get_extra_info('peername')
         host = (peer[0] if isinstance(peer, tuple) and peer else '') or ''
-        if host not in ('127.0.0.1', '::1', ''):
+        host = host.lower()
+        if host.startswith('::ffff:'):
+            host = host[7:]
+        loopback = (
+            host in ('::1', 'localhost')
+            or bool(_re.fullmatch(r'127\.\d{1,3}\.\d{1,3}\.\d{1,3}', host))
+        )
+        if not loopback:
             await self._send_response(writer, 404, 'Not Found')
             return
 

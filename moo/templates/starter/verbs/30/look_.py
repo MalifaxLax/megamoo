@@ -1,9 +1,9 @@
 """
 look_ verb on #30 (BaseFurniture).
 
-Displays the furniture's name, description, and lists any characters
-currently sitting or lying on it. Shows each occupant's position
-string and the furniture's sit_prep (e.g., "on", "at", "in").
+Displays the furniture's description, then anyone else sitting or lying
+on it -- "Sinda is sitting there." The looker is left out: they know
+where they are sitting.
 
 Called by the look verb: call_verb(furniture, 'look_')
 
@@ -17,9 +17,10 @@ Hidden:  yes
 item = this
 desc = item.description
 
-pobj.msg(f"\n{item.name}")
-if desc:
-    pobj.msg(desc)
+# The description alone, no name header -- the same as #17:look, which
+# this hook returns before and so would otherwise contradict.  It keeps
+# the leading blank line the header used to carry.
+pobj.msg(f"\n{desc}" if desc else "\nYou see nothing special.")
 
 # Show occupants
 sitters = item.sitters or []
@@ -28,7 +29,18 @@ if sitters and pobj.location:
     sitters = [s for s in sitters if s in here]
     item.sitters = sitters
 
+    # Grouped by position, so several people at one table read as a
+    # sentence -- "Sinda and Niclas are sitting at a rosewood table." --
+    # rather than as a line each.  Grouped by *position* and not simply
+    # all together, because someone lying down must not be described as
+    # sitting alongside them.
+    groups = {}
     for objnum in sitters:
+        # Not yourself: you are the one looking, and you know where you
+        # are sitting.  #15:look_here leaves the looker out of its
+        # furniture line for the same reason.
+        if objnum == pobj.objnum:
+            continue
         try:
             char = db.get_object(objnum)
             pos = char.position or 0
@@ -41,9 +53,21 @@ if sitters and pobj.location:
                 pstring = 'lying'
             else:
                 pstring = 'here'
-            prep = (item.sit_prep or 'on')
-            pobj.msg(f"{su.capitalise(char.name)} is {pstring} {prep} it.")
+            # esub here, as #15:look_here does: the position strings carry
+            # pronouns -- 'lying on &pp back' -- and printed raw the sigil
+            # reaches the player.  Per character, since the pronoun is
+            # theirs, before they are grouped by the result.
+            pstring = su.esub(pstring, sub=char)
+            groups.setdefault(pstring, []).append(su.capitalise(char.name))
         except Exception:
             pass
+
+    prep = (item.sit_prep or 'on')
+    for pstring, names in groups.items():
+        # &d rather than the name inline, so the furniture is substituted
+        # the way every other message in the world names an object.
+        verb = 'is' if len(names) == 1 else 'are'
+        pobj.msg(f"{su.listtoenglish(names)} {verb} {pstring} {prep} &d.",
+                 dob=item)
 
 return True

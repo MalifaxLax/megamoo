@@ -517,6 +517,15 @@ class MegaMOOServer:
         ordinary afternoon; a world that mistypes one should start with a
         logged error, not refuse to start.  A server that will not boot
         because of a line you can only fix from inside it is a trap.
+
+        On who may write the list, which is a fair question and a settled
+        one: ``#0.startup_evals`` is an ordinary property, so ``@set`` puts
+        it within reach of gm3, while the entries run as ``#0`` and ``#0``
+        carries WIZARD.  That is deliberate.  gm3 is Coder, and a coder can
+        already write verbs -- there is no line to hold here that they are
+        not already on the far side of.  The gate is gm3 in the first
+        place, and a world that hands out gm3 is handing out the ability to
+        run code in it.
         """
         # The whole body is guarded, not just each entry.  The first cut
         # wrapped only the eval and left its own imports bare -- one of

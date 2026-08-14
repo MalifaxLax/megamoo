@@ -96,7 +96,7 @@ which is the same spelling verbs already use for `moo.objects`. That is
 the whole extension mechanism — no plugin registry, no hooks, nothing
 new to learn.
 
-The starter world comes with 203 verbs: player commands, staff and
+The starter world comes with 204 verbs: player commands, staff and
 building tools (75 `@`-commands), rooms and exits, containers and
 furniture, and character generation. They are copied into your game, so
 they are yours to edit — the engine keeps no copy you have to merge

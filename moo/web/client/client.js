@@ -438,10 +438,66 @@ scrollback.addEventListener('click', (event) => {
  * Connection
  * ========================================================================= */
 
+/**
+ * Client commands whose tail may contain a password.
+ *
+ * `\con <handle> <host> <port> <user> <pass>` is the documented spelling,
+ * so the secret arrives on an ordinary input line rather than behind the
+ * server's password mask.  Matched on the command word plus the first two
+ * arguments -- everything after them is redacted, which covers the
+ * credentials without hiding which world you asked for.
+ *
+ * The prefix is configurable, so this matches any single non-word
+ * character rather than a literal backslash.
+ */
+const SECRET_COMMAND_RE =
+  /^\W(?:con|connect)(?:\s+\S+){3}(?=\s+\S)/i;
+
+/**
+ * Is `url` a socket this page may be pointed at?
+ *
+ * Same hostname, any port.  A socket's frames are written into the page
+ * with innerHTML -- that is safe only because the server at the other end
+ * is the one that escaped them -- and everything the page owns, including
+ * the session book and any password in it, belongs to *this* origin.  A
+ * socket somebody else controls is therefore script execution here, on a
+ * page whose URL bar still says your world.
+ *
+ * ?ws= arrives in a link, so it is attacker-chosen by definition: it is
+ * exactly the shape of "click here to fix your connection".  The server's
+ * own Origin check is no help, because the far end would be the
+ * attacker's server, happily accepting.
+ *
+ * The port is deliberately not compared, so a page on 8888 may still be
+ * pointed at a world on 8890.  Hostname cannot be forged by a link; a
+ * port on your own machine is your own world.
+ */
+function wsAllowed(url) {
+  try {
+    const u = new URL(url, location.href);
+    if (u.protocol !== 'ws:' && u.protocol !== 'wss:') return false;
+    return u.hostname.toLowerCase() === location.hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
 // ?ws= lets the page be served from somewhere other than the game (a dev
-// server, a static host) and still find the socket.  Read once rather
-// than per call, so \connect can re-point it within the same origin.
+// server on another port) and still find the socket.  Read once rather
+// than per call, so \connect can re-point it.
+//
+// Validated on the way in: an override naming another host is dropped and
+// the page falls back to its own origin, which is the safe direction to
+// fail.  A genuinely split deployment -- a client on a CDN, the game
+// elsewhere -- cannot be configured from the query string for this reason
+// and wants an endpoint served with the page instead.
 let wsOverride = new URLSearchParams(location.search).get('ws') || null;
+if (wsOverride && !wsAllowed(wsOverride)) {
+  console.error(
+    `[megamoo] refusing ?ws=${wsOverride} — not this host. `
+    + `A socket may only be pointed at ${location.hostname}.`);
+  wsOverride = null;
+}
 
 function socketUrl() {
   if (wsOverride) return wsOverride;
@@ -674,6 +730,32 @@ const input = {
       return;
     }
 
+    // A client command that carries a password is neither echoed nor
+    // remembered.  \con takes its credentials on the command line -- that
+    // is the documented syntax, printed by \help -- and echoing happens
+    // *before* the interceptors below, so without this the password went
+    // into the visible scrollback and into arrow-up recall for whoever
+    // sits down next.  Exactly what the masked branch above exists to
+    // prevent, reached by a door that branch does not cover.
+    //
+    // Redacted rather than hidden: dropping the line entirely would make
+    // typing \con look like the client had swallowed it.
+    const secret = SECRET_COMMAND_RE.exec(text.trimStart());
+    if (secret) {
+      const shown = text.trimStart().slice(0, secret[0].length) + ' ********';
+      term.note(shown, 'echo');
+      this.remember(shown);
+      bus.emit('input', shown);
+      for (const fn of Array.from(this.interceptors)) {
+        try {
+          if (fn(text) === true) return;   // the real line, not the redacted one
+        } catch (err) {
+          bus.emit('error', { source: 'interceptor', error: String(err) });
+        }
+      }
+      return;
+    }
+
     // Echo and record first, so a line an alias swallows still appears —
     // otherwise typing an alias looks like the client dropped the input.
     if (text) this.remember(text);
@@ -877,7 +959,17 @@ const api = {
    * buried in the transport.  \connect allows same-origin only.
    */
   reconnect(url) {
-    if (url) wsOverride = String(url);
+    if (url) {
+      // Checked here as well as at \connect, because this is on
+      // window.MegaMOO and a player script can call it.  The caller's
+      // vetting is not the transport's guarantee.
+      if (!wsAllowed(url)) {
+        term.note(`*** Refusing to point the socket at ${url} — not this host.`,
+                  'client');
+        return;
+      }
+      wsOverride = String(url);
+    }
     net.deliberate = false;
     if (net.socket) net.socket.close();   // 'close' schedules the retry
     else net.connect();
