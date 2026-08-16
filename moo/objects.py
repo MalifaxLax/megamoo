@@ -1214,7 +1214,22 @@ class MOOObject:
             self.add_property(name, value=value, perms=inherited_info.perms)
             return
 
-        # Brand-new property — check that the caller owns this object
+        # Brand-new property — the privileged-name gate, then ownership.
+        #
+        # `_check_privileged` first, so all three write paths agree. The
+        # other two reach it through `_check_write` (lines 1199 and 1213);
+        # this one checked ownership alone, which made creating a
+        # privileged name the one way into this class of property that
+        # skipped the auth check.
+        #
+        # Not reachable today -- a name like `auth` is declared on #3, so
+        # writing it to a character always takes the inherited-override
+        # path above, and creating one on an object that does *not*
+        # inherit it escalates nothing. This closes the asymmetry rather
+        # than a hole: three paths to the same decision should not be
+        # two-thirds guarded, because the next privileged name added may
+        # not have a declaration to fall back on.
+        self._check_privileged(name)
         from .verb_context import verb_ctx
         ctx = verb_ctx.get(None)
         if ctx is not None:

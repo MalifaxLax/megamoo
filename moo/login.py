@@ -599,8 +599,14 @@ class LoginHandler:
         # this with it. A terminal ignores it -- centring there would mean
         # padding to the window width, and the ASCII art it sits under is
         # left-aligned anyway.
-        await send(f"&<245>({_world_version(self.database) or SERVER_VERSION})&n",
-                   banner=True)
+        # The version line is not sent. A player arriving at the game is
+        # being greeted, and a build number under the splash is a fact
+        # about the server rather than a welcome -- the one thing on the
+        # screen that speaks to nobody who is about to log in.
+        #
+        # `_world_version` and $version are deliberately left in place:
+        # they are how a world states its own version, and are still read
+        # by anything that asks. Only this greeting stopped printing it.
         await send("")
 
         for _ in range(max_attempts):

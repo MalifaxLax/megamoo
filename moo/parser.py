@@ -692,14 +692,32 @@ class CommandParser:
 
         The behaviour depends on the ``ArgSpec``:
 
-        - ``NONE`` -- always returns 0 (no match attempted).
-        - ``ANY``  -- tries ``ObjectMatcher`` which checks ``#num``
-          references, ``"me"``, ``"here"``, and name/alias matches in
-          the player's vicinity.  If no object is found, returns 0
-          and the caller keeps the raw text as a string argument.
-        - ``THIS`` -- resolution is deferred to verb execution time (the
-          verb executor checks whether the resolved object is the same
-          as ``this``), so we return 0 here.
+        **This no longer matches anything, and returns 0 for every spec.**
+
+        It used to run a full ``ObjectMatcher`` pass for ``ANY`` -- which
+        walks the player's inventory and the room's contents doing
+        name and alias matching -- and the result went nowhere.  The
+        ``dobj``/``iobj`` verb code actually sees come from
+        ``MasterVerb.parse()``, harvested into the namespace by
+        ``_parse_verb_inst_into_namespace``; this class's own
+        ``ParseResult.dobj`` is read only if verb-type instantiation
+        fails, and every verb in the world is a ``MasterVerb``.  So the
+        matcher ran once here, was discarded, and the verb body matched
+        again with ``pmatch``.
+
+        That is one wasted walk of two object lists per command with
+        arguments, on the single shared event-loop thread -- paid by
+        every player, on every ``get``, ``look`` and ``put``.
+
+        The method is kept rather than deleted because the fallback path
+        still calls it, and something returning 0 is the honest shape of
+        "this parser does not resolve objects": callers keep the raw text
+        as a string argument, which is what ``dobj``/``iobj`` are anyway.
+
+        - ``NONE`` -- 0, as before.
+        - ``ANY``  -- 0, and the caller keeps the raw text.
+        - ``THIS`` -- 0; resolution belongs to verb execution time, where
+          the executor checks the resolved object against ``this``.
 
         Args:
             name (str): The text the player typed in the object position
@@ -715,13 +733,17 @@ class CommandParser:
             return 0
 
         if spec == ArgSpec.ANY:
-            # Attempt a match but gracefully fall back to string-only.
-            try:
-                matcher = ObjectMatcher(self.database, self.player)
-                obj = matcher.match(name)
-                return obj.objnum
-            except MatchError:
-                return 0
+            # Deliberately not matched. The objnum computed here was
+            # discarded on every command -- see the note on this method.
+            #
+            # It was also caught too narrowly. Matching walks the
+            # player's inventory and the room's contents asking each
+            # object its name, and an object that raises on being asked
+            # -- the bare-predicate-read failure -- escaped a
+            # MatchError-only guard, propagated out of parse(), and
+            # turned a valid command into "Do what?". Not doing the work
+            # removes that exposure along with the cost.
+            return 0
 
         if spec == ArgSpec.THIS:
             # Deferred to verb execution -- the executor validates
