@@ -1037,6 +1037,181 @@ class Database:
             logger.debug(f"Recycled object #{objnum}")
             self._mutation_gen += 1
 
+    #: Columns that hold an object number, as ``(table, column)``.  Moving
+    #: an object means moving its own rows and re-pointing every column
+    #: that named it -- which is the whole of what the schema knows about
+    #: references.  ``objects.parent`` and ``objects.location`` are how
+    #: children and contents are stored: neither is a column of its own,
+    #: both are derived by ``_load_object_from_sql`` from these, so
+    #: re-pointing them re-points the hierarchies for free.
+    _OBJNUM_COLUMNS = (
+        ('objects', 'objnum'),      # the object itself
+        ('properties', 'objnum'),   # its properties travel with it
+        ('verbs', 'objnum'),        # so do its verbs
+        ('objects', 'parent'),      # its children
+        ('objects', 'location'),    # its contents
+        ('objects', 'owner'),       # objects it owns
+        ('properties', 'owner'),    # properties it owns
+        ('verbs', 'owner'),         # verbs it owns
+        ('players', 'objnum'),      # its login name
+    )
+
+    def renumber_object(self, old_num: int, new_num: int) -> dict:
+        """
+        Move an object to a different number, in place.
+
+        The row is updated rather than deleted and rebuilt, so the live
+        instance stays the same Python object.  That matters because the
+        identity map hands out one instance per number: anything already
+        holding this object -- a running verb, a ticker subscription --
+        keeps a working reference rather than a discarded copy.
+
+        Nine columns name an object number, and all nine are re-pointed;
+        see :data:`_OBJNUM_COLUMNS`.  Between them they cover everything
+        the schema models: the object, its properties and verbs, its
+        children and contents, whatever it owns, and its login name.
+
+        What this does **not** do is rewrite object references stored
+        *inside* property values -- a room's ``exits`` list, an
+        ``in_contents``, a ``$``-ref parked in a system property.  The
+        schema does not know those are references, and no test on the
+        value can tell: ``#0`` through ``#9`` are live objects, so an
+        ordinary stat of ``0`` is indistinguishable from a reference to
+        the system object.  LambdaMOO's ``renumber()`` draws the line in
+        exactly the same place and says so; its cores fix a short
+        hand-written list of properties afterwards, and so must this.
+
+        Args:
+            old_num (int): The object to move.
+            new_num (int): The number to move it to.  Must be free.
+
+        Returns:
+            dict: ``{table.column: rows_changed}`` for each of the nine,
+            which is what a caller reports to whoever asked.
+
+        Raises:
+            KeyError: If *old_num* is not a valid object.
+            ValueError: If *new_num* is negative, occupied, or the same
+                number the object already has.
+        """
+        with self._lock:
+            if not self.valid(old_num):
+                raise KeyError(f"Object #{old_num} not found")
+            if new_num < 0:
+                raise ValueError("Object number must be non-negative")
+            if new_num == old_num:
+                raise ValueError(f"#{old_num} is already at that number")
+            if self.valid(new_num):
+                raise ValueError(f"#{new_num} is already in use")
+
+            # The live instance, before anything moves: fetching it after
+            # the update would look for a number the cache does not have
+            # yet and load a second copy from the row we just rewrote.
+            obj = self.get_object(old_num)
+
+            # Anything still only in memory has to reach SQL first, or the
+            # update moves a stale row and the pending write lands back on
+            # the old number afterwards.
+            self.save()
+
+            # A renumber is a commit point and cannot be part of a verb's
+            # all-or-nothing unit: it rewrites rows across every table and
+            # toggles a connection-level pragma, neither of which a later
+            # rollback_verb_txn could undo.  Ending the deferral here is
+            # honest about that -- the alternative is a rollback that
+            # silently leaves half a renumbered database behind.  The
+            # deferral resumes afterwards so the rest of the verb keeps
+            # its usual semantics.
+            deferring = self._deferring
+            if deferring:
+                self.commit_verb_txn()
+
+            # PRAGMA foreign_keys is a no-op inside a transaction, so the
+            # connection has to be settled before it is touched.  It has
+            # to come off at all because the constraints are declared ON
+            # DELETE CASCADE with no ON UPDATE clause: moving objects.objnum
+            # while properties and verbs still name the old one is exactly
+            # the violation they describe.
+            self._conn.commit()
+            self._conn.execute("PRAGMA foreign_keys=OFF")
+            counts = {}
+            try:
+                self._conn.execute("BEGIN")
+                for table, column in self._OBJNUM_COLUMNS:
+                    cur = self._conn.execute(
+                        f"UPDATE {table} SET {column} = ? WHERE {column} = ?",
+                        (new_num, old_num)
+                    )
+                    counts[f'{table}.{column}'] = cur.rowcount
+                self._conn.execute(
+                    "DELETE FROM recycled_objects WHERE objnum = ?", (new_num,)
+                )
+                self._conn.execute(
+                    "INSERT OR IGNORE INTO recycled_objects (objnum) VALUES (?)",
+                    (old_num,)
+                )
+                self._conn.commit()
+            except Exception:
+                self._conn.rollback()
+                raise
+            finally:
+                self._conn.execute("PRAGMA foreign_keys=ON")
+
+            # --- the same nine moves, in memory --------------------------
+            # Every instance currently alive was loaded before the update
+            # and still names the old number.  Objects not in memory will
+            # read the corrected rows when they are next loaded, so only
+            # the live ones need touching.
+            self._objects.pop(old_num, None)
+            self._live.pop(old_num, None)
+            obj.objnum = new_num
+            self._admit(new_num, obj)
+
+            for other in list(self._live.values()):
+                if other.parent == old_num:
+                    other.parent = new_num
+                if other._location_id == old_num:
+                    other._location_id = new_num
+                if other.owner == old_num:
+                    other.owner = new_num
+                if old_num in other.children:
+                    other.children.discard(old_num)
+                    other.children.add(new_num)
+                if old_num in other._content_ids:
+                    other._content_ids = [new_num if c == old_num else c
+                                          for c in other._content_ids]
+                for prop in other.properties.values():
+                    if prop.owner == old_num:
+                        prop.owner = new_num
+                for verb in other.verbs:
+                    if verb.owner == old_num:
+                        verb.owner = new_num
+
+            for name, pnum in list(self._players.items()):
+                if pnum == old_num:
+                    self._players[name] = new_num
+
+            # --- index bookkeeping ---------------------------------------
+            self._index.recycled_objects.discard(new_num)
+            self._index.recycled_objects.add(old_num)
+            if new_num >= self._index.next_objnum:
+                self._index.next_objnum = new_num + 1
+            self._index.max_object = self._conn.execute(
+                "SELECT MAX(objnum) FROM objects"
+            ).fetchone()[0] or 0
+            self._save_metadata()
+            self._conn.commit()
+
+            # Parentage may have moved under a cached lookup.
+            obj._inheritance_cache_valid = False
+            self._mutation_gen += 1
+
+            if deferring:
+                self.begin_verb_txn()
+
+            logger.info(f"Renumbered #{old_num} -> #{new_num}")
+            return counts
+
     def save_object(self, obj: MOOObject):
         """
         Persist a single object to SQLite.

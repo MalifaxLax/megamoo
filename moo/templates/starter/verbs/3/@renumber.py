@@ -1,70 +1,110 @@
 """
-Renumbers an object in the database, updating all references (parent,
-children, location, contents, owner, player registry). If no target
-number is given, uses the lowest available recycled object number.
+Renumbers an object, in place.
 
 Usage: @renumber <object> [= | to] [<new_number>]
 
 Arguments:
     object      - The object to renumber (matched in room and inventory).
-    new_number  - Optional target object number. Defaults to lowest available.
+    new_number  - Optional target number. Defaults to the lowest available.
+
+The object's rows are moved rather than deleted and rebuilt, so the live
+object keeps its identity -- anything already holding it, a running verb
+or a ticker subscription, keeps a working reference instead of a
+discarded copy. Nine columns in the schema name an object number and all
+nine follow it: the object, its properties, its verbs, its children, its
+contents, the objects, properties and verbs it owns, and its login name.
+
+Three kinds of reference live outside those columns, and are handled
+here:
+
+    verb files   <moo_verb_path>/<objnum>/ is renamed, or the object
+                 arrives at its new number with no source on disk and
+                 the watcher reloads it onto nothing.
+
+    "#N" values  a property whose value is the string "#<old>" is
+                 rewritten wherever it appears. That spelling is only
+                 ever an object reference, so it is always safe.
+
+    listed refs  the property names in $objref_props hold object numbers
+                 as bare integers. Those are rewritten too, at any depth.
+
+Everything else that still names the old number is reported, not guessed
+at. `obvexits` is the reason: it holds direction indices, so [1, 2, 3]
+there means north, south and east -- not #1, #2 and #3. Since #0 to #9
+are all real objects, no test on a value can tell a small number from a
+reference to a low object. This is the same line LambdaMOO's renumber()
+draws when it declines to touch property values at all, and its cores
+fix a short hand-written list afterwards exactly as $objref_props does.
 
 Auth: gm5 (auth_level 5)
-
-Note: If the target number is already occupied, prompts to delete the
-existing object first (refuses if it has children or contents). This
-command updates all cross-references across the entire database.
 """
 if auth_level(pobj) < 5:
     pobj.msg("Do what?")
     return
+
 if not dobj:
     pobj.msg('Usage: @renumber <object> [= | to] [<new number>]')
     pobj.msg('Example: @renumber #42 = #10')
     pobj.msg('Example: @renumber #42 to #10')
     pobj.msg('Example: @renumber #42')
     return
-# Resolve old object
+
+# Property names whose values hold object numbers as bare integers.
+# Overridable per world via $objref_props; this is the fallback, and it
+# deliberately leaves out anything whose numbers are not references --
+# obvexits (direction indices), every stat and skill list, and merchant
+# vessels, whose entries pair a prototype with a multiplier that a blind
+# rewrite would corrupt. What is left out is reported instead.
+DEFAULT_OBJREF_PROPS = [
+    'exits', 'dexits', 'destination', 'rexit', 'reverse',
+    'in_exit', 'on_exit', 'under_exit', 'behind_exit', 'through_exit',
+    'in_contents', 'on_contents', 'under_contents', 'behind_contents',
+    'characters', 'marks', 'wearing', 'plist', 'sitters', 'table',
+    'last_location', 'home',
+]
+
 candidates = list(pobj.contents) + list(pobj.location.contents)
 old_obj = bmatch(dobj, pobj, candidates, db)
 if not old_obj:
     pobj.msg(f"Object '{dobj}' not found.")
     return
 old_num = old_obj.objnum
-# Determine the lowest unassigned object number
+
+# Lowest unassigned number, which is also the default target.
 if db._index.recycled_objects:
     lowest_available = min(db._index.recycled_objects)
 else:
     lowest_available = db._index.next_objnum
-# Determine target number
+
 if iobj and prep in ('=', 'to'):
-    iobj_str = iobj.strip().lstrip('#')
     try:
-        new_num = int(iobj_str)
+        new_num = int(iobj.strip().lstrip('#'))
     except ValueError:
         pobj.msg(f"Invalid object number: {iobj}")
         return
 else:
     new_num = lowest_available
+
 if new_num < 0:
     pobj.msg("Object number must be non-negative.")
     return
 if new_num == old_num:
     pobj.msg(f"#{old_num} is already at that number.")
     return
-# Validation: if new_num is unassigned, not the lowest available, and
-# no assigned objects exist above it, reject to prevent gaps.
-if not db.valid(new_num):
-    if new_num != lowest_available:
-        has_objects_above = False
-        for n in range(new_num + 1, db._index.next_objnum):
-            if db.valid(n):
-                has_objects_above = True
-                break
-        if not has_objects_above:
-            pobj.msg(f"#{lowest_available} is the lowest unassigned number.")
-            return
-# Handle conflict: new_num is already assigned
+
+# Refuse to open a gap: an unassigned target is only allowed if it is the
+# lowest one free, or if something is already sitting above it.
+if not db.valid(new_num) and new_num != lowest_available:
+    has_objects_above = False
+    for n in range(new_num + 1, db._index.next_objnum):
+        if db.valid(n):
+            has_objects_above = True
+            break
+    if not has_objects_above:
+        pobj.msg(f"#{lowest_available} is the lowest unassigned number.")
+        return
+
+# An occupied target has to be cleared first, and only with permission.
 if db.valid(new_num):
     existing = db.get_object(new_num)
     answer = yield f"#{new_num} ({existing.name}) already exists. Delete it? [y/n] "
@@ -80,69 +120,122 @@ if db.valid(new_num):
     existing_name = existing.name
     recycle(existing)
     pobj.msg(f"Deleted &<245>#{new_num}:{existing_name}&n.")
-# --- Perform the renumber ---
-from moo.objects import MOOObject
-# 1. Serialize old object and change its objnum
-data = old_obj.to_dict()
-data['objnum'] = new_num
-# 2. Remove old object from SQL and cache
-db._conn.execute("DELETE FROM objects WHERE objnum = ?", (old_num,))
-if old_num in db._objects:
-    del db._objects[old_num]
-# 3. Create new object from modified data
-new_obj = MOOObject.from_dict(data)
-new_obj._database = db
-new_obj.enable_auto_save(db)
-# 4. Save new object to SQL and cache
-db._save_object_to_sql(new_obj)
-db._objects[new_num] = new_obj
-# 5. Update database index
-db._index.recycled_objects.discard(new_num)
-db._index.recycled_objects.add(old_num)
-if new_num >= db._index.next_objnum:
-    db._index.next_objnum = new_num + 1
-db._index.max_object = db._conn.execute(
-    "SELECT MAX(objnum) FROM objects"
-).fetchone()[0] or 0
-db._save_metadata()
-# Update recycled_objects table
-db._conn.execute("DELETE FROM recycled_objects WHERE objnum = ?", (new_num,))
-db._conn.execute("INSERT OR IGNORE INTO recycled_objects (objnum) VALUES (?)", (old_num,))
-db._conn.commit()
-# 6. Update parent's children set
-if new_obj.parent > 0 and db.valid(new_obj.parent):
-    parent_obj = db.get_object(new_obj.parent)
-    parent_obj.children.discard(old_num)
-    parent_obj.children.add(new_num)
-    db.save_object(parent_obj)
-# 7. Update each child's parent reference
-for child_num in list(new_obj.children):
-    if db.valid(child_num):
-        child = db.get_object(child_num)
-        child.parent = new_num
-        db.save_object(child)
-# 8. Update location's contents
-if new_obj._location_id > 0 and db.valid(new_obj._location_id):
-    loc = db.get_object(new_obj._location_id)
-    if old_num in loc._content_ids:
-        loc._content_ids.remove(old_num)
-    if new_num not in loc._content_ids:
-        loc._content_ids.append(new_num)
-    db.save_object(loc)
-# 9. Update contents' location reference
-for content_num in list(new_obj._content_ids):
-    if db.valid(content_num):
-        content = db.get_object(content_num)
-        content._location_id = new_num
-        db.save_object(content)
-# 10. Update player registry
-for name, pnum in list(db._players.items()):
-    if pnum == old_num:
-        db.remove_player(name)
-        db.add_player(name, new_num)
-# 11. Update owner references across all objects
-for obj in db.objects():
-    if obj.owner == old_num:
-        obj.owner = new_num
-        db.save_object(obj)
-pobj.msg(f"Renumbered #{old_num} to &<245>#{new_num}:{new_obj.name}&n.")
+
+# --- 1. Move the object ---------------------------------------------------
+try:
+    counts = db.renumber_object(old_num, new_num)
+except Exception as e:
+    pobj.msg(f"Renumber failed: {e}")
+    return
+
+moved = ', '.join(f'{k} x{v}' for k, v in counts.items() if v)
+pobj.msg(f"&<245>#{old_num}&n is now &<245>#{new_num}:{db.get_object(new_num).name}&n.")
+pobj.msg(f"&<245>Moved: {moved}&n")
+
+# --- 2. Move the verb source ----------------------------------------------
+import os
+
+try:
+    from moo.verb_loader import resolve_verb_base_path
+    base = resolve_verb_base_path(db)
+except Exception:
+    base = None
+
+if base:
+    src = os.path.join(base, str(old_num))
+    dst = os.path.join(base, str(new_num))
+    if os.path.isdir(src):
+        if os.path.exists(dst):
+            pobj.msg(f"&<245>Verb files: {dst} already exists -- left {src} alone.&n")
+        else:
+            try:
+                os.rename(src, dst)
+                n_files = len([f for f in os.listdir(dst) if f.endswith('.py')])
+                pobj.msg(f"&<245>Verb files: moved {n_files} file(s) to {new_num}/&n")
+            except Exception as e:
+                pobj.msg(f"&<245>Verb files: could not move {src}: {e}&n")
+
+# --- 3. Rewrite the references we can be sure about ------------------------
+objref_props = getattr(db.get_object(0), 'objref_props', None) or DEFAULT_OBJREF_PROPS
+old_ref = f'#{old_num}'
+new_ref = f'#{new_num}'
+
+
+def remap(value, listed):
+    """
+    Return (new_value, changed).
+
+    A whole-value "#N" string is a reference by construction and is always
+    rewritten. A bare integer is only a reference when the property was
+    named as one, so that rewrite is gated on `listed`.
+    """
+    if isinstance(value, str):
+        return (new_ref, True) if value == old_ref else (value, False)
+    if isinstance(value, bool):
+        return value, False
+    if isinstance(value, int):
+        if listed and value == old_num:
+            return new_num, True
+        return value, False
+    if isinstance(value, list):
+        out, hit = [], False
+        for item in value:
+            item, ch = remap(item, listed)
+            out.append(item)
+            hit = hit or ch
+        return (out, True) if hit else (value, False)
+    if isinstance(value, dict):
+        out, hit = {}, False
+        for k, item in value.items():
+            item, ch = remap(item, listed)
+            out[k] = item
+            hit = hit or ch
+        return (out, True) if hit else (value, False)
+    return value, False
+
+
+def mentions(value):
+    """Does this value still name the old number anywhere in it?"""
+    if isinstance(value, str):
+        return value == old_ref
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return value == old_num
+    if isinstance(value, list):
+        return any(mentions(v) for v in value)
+    if isinstance(value, dict):
+        return any(mentions(v) for v in value.values())
+    return False
+
+
+fixed = []
+for obj in list(db.objects()):
+    for pname in list(obj.properties.keys()):
+        info = obj.properties[pname]
+        value, changed = remap(info.value, pname in objref_props)
+        if changed:
+            obj.properties[pname].value = value
+            obj._all_dirty = True
+            db.save_object(obj)
+            fixed.append(f'#{obj.objnum}.{pname}')
+
+if fixed:
+    pobj.msg(f"&<245>Rewrote {len(fixed)}: {', '.join(fixed[:12])}"
+             + (' ...' if len(fixed) > 12 else '') + '&n')
+
+# --- 4. Report whatever is left -------------------------------------------
+left = []
+for obj in list(db.objects()):
+    for pname, info in obj.properties.items():
+        if mentions(info.value):
+            left.append(f'#{obj.objnum}.{pname} = {info.value}')
+
+if left:
+    pobj.msg(f"Still naming {old_num} -- check these by hand:")
+    for line in left[:20]:
+        pobj.msg(f"  {line}")
+    if len(left) > 20:
+        pobj.msg(f"  ... and {len(left) - 20} more")
+else:
+    pobj.msg(f"&<245>Nothing else names {old_num}.&n")
