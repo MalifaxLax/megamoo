@@ -31,13 +31,16 @@ shown = False
 behindstr = getattr(this, 'behind_string', None)
 if behindstr:
     if isinstance(behindstr, str):
-        pobj.msg(behindstr)
+        # A leading newline, the way look_here's leader does it: the
+        # object branch above already gets one from look_here itself, so
+        # without this the prose alone arrived flush against the command.
+        pobj.msg("\n" + behindstr)
         shown = True
     elif hasattr(behindstr, 'objnum'):
         # An object standing in for the description -- an exit describes
         # itself as a room, anything else through its own look_.
         if behindstr.is_exit:
-            call_verb(behindstr, 'look_here', leader=False)
+            call_verb(behindstr, 'look_here', leader=True)
         else:
             call_verb(behindstr, 'look_')
         shown = True
@@ -53,7 +56,7 @@ if behind_exit and behind_exit != 'none':
         dest = getattr(behind_exit, 'destination', None)
         if isinstance(dest, int):
             dest = db.get_object(dest)
-        call_verb(dest or behind_exit, 'look_here', leader=False)
+        call_verb(dest or behind_exit, 'look_here', leader=True)
         shown = True
     except Exception:
         pass
@@ -62,8 +65,19 @@ if behind_exit and behind_exit != 'none':
 else:
     raw = getattr(this, 'behind_contents', None) or []
     if raw:
-        contents = [db.get_object(n.objnum if hasattr(n, 'objnum') else n)
-                    for n in raw if n]
+        # A container's membership list is bare objnums it maintains itself,
+        # separate from the engine's own contents. Nothing scrubs it when an
+        # item is recycled, so a stale number outlived the object and this
+        # resolved it straight into a KeyError -- one @delete of a stashed item
+        # and the container was unusable. Skipped instead, which also covers
+        # the item having been moved out from under the list by hand.
+        def _live(_n):
+            try:
+                return db.get_object(_n.objnum if hasattr(_n, 'objnum') else _n)
+            except Exception:
+                return None
+
+        contents = [o for o in (_live(n) for n in raw if n) if o]
         names = [obj.name for obj in contents
                  if obj and not obj.invis and not obj.hidden]
         if names:

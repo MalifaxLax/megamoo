@@ -21,7 +21,19 @@ if not dobj:
 
 # Resolve objnums to objects
 raw = this.behind_contents or []
-contents = [db.get_object(n.objnum if hasattr(n, 'objnum') else n) for n in raw if n]
+# A container's membership list is bare objnums it maintains itself,
+# separate from the engine's own contents. Nothing scrubs it when an
+# item is recycled, so a stale number outlived the object and this
+# resolved it straight into a KeyError -- one @delete of a stashed item
+# and the container was unusable. Skipped instead, which also covers
+# the item having been moved out from under the list by hand.
+def _live(_n):
+    try:
+        return db.get_object(_n.objnum if hasattr(_n, 'objnum') else _n)
+    except Exception:
+        return None
+
+contents = [o for o in (_live(n) for n in raw if n) if o]
 item = pmatch(dobj, pobj, contents) if type(dobj) == str else dobj
 if not item:
     pobj.msg("There's nothing behind there.")

@@ -30,12 +30,27 @@ if in_string:
             call_verb(in_string, 'look_')
         return True
     else:
-        pobj.msg(str(in_string))
+        # A leading newline, the way look_here's leader does it: the
+        # object branch above already gets one from look_here itself, so
+        # without this the prose alone arrived flush against the command.
+        pobj.msg("\n" + str(in_string))
         return True
 
 # Resolve in_contents objnums to objects
 raw = this.in_contents or []
-visible = [db.get_object(n.objnum if hasattr(n, 'objnum') else n) for n in raw if n]
+# A container's membership list is bare objnums it maintains itself,
+# separate from the engine's own contents. Nothing scrubs it when an
+# item is recycled, so a stale number outlived the object and this
+# resolved it straight into a KeyError -- one @delete of a stashed item
+# and the container was unusable. Skipped instead, which also covers
+# the item having been moved out from under the list by hand.
+def _live(_n):
+    try:
+        return db.get_object(_n.objnum if hasattr(_n, 'objnum') else _n)
+    except Exception:
+        return None
+
+visible = [o for o in (_live(n) for n in raw if n) if o]
 visible = [obj for obj in visible if not obj.invis and not obj.hidden]
 
 if visible:

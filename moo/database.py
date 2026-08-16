@@ -905,6 +905,68 @@ class Database:
                     f"Cannot recycle #{objnum}: has contents {obj._content_ids}"
                 )
 
+            # Tickers first, because they are the one pointer at this
+            # object that the reuse guard cannot see.
+            #
+            # `_lingering_refs` blocks reuse of a number still mentioned
+            # in any property value, at any depth -- but it queries the
+            # properties table only, and the tickers table has no cascade.
+            # So a recycled object's subscriptions outlived it: the number
+            # was reissued to something unrelated, and on the next tick
+            # `_fire` found a live object at that number and ran the dead
+            # object's verb on it. `_fire` self-heals the deleted case
+            # (KeyError -> auto-remove); the reissued case fires blindly,
+            # because from its side nothing looks wrong.
+            #
+            # Removed here rather than in the `recycle()` builtin so that
+            # every path to recycling gets it -- @delete goes through the
+            # builtin, but this method is callable directly.
+            try:
+                from .builtins import ticker_remove_all
+                ticker_remove_all(obj)
+            except Exception:
+                # A stuck ticker must not block the recycle: the object is
+                # going either way, and a subscription left behind is the
+                # bug above rather than a reason to abandon the sweep.
+                logger.warning('could not clear tickers for #%s', objnum,
+                               exc_info=True)
+
+            # Containment lists next, for the same reason as the
+            # tickers: they name this object by bare integer, and
+            # `_clear_refs_to` below only nulls scalar "#N" refs.
+            #
+            # A container keeps its own membership -- in_contents,
+            # on_contents, under_contents, behind_contents -- alongside
+            # the engine's `_content_ids`, and recycling scrubbed the
+            # engine's copy and not the verb's. So `@delete` of a stashed
+            # item left the chest listing a dead number, and the next
+            # `look in` resolved it into a KeyError. `@renumber` already
+            # walks these lists; recycling should too.
+            for _prop in ('in_contents', 'on_contents', 'under_contents',
+                          'behind_contents'):
+                try:
+                    rows = self._conn.execute(
+                        "SELECT objnum, value FROM properties WHERE name = ?",
+                        (_prop,)).fetchall()
+                except Exception:
+                    continue
+                for holder, raw in rows:
+                    try:
+                        current = json.loads(raw) if raw else None
+                    except Exception:
+                        continue
+                    if not isinstance(current, list) or objnum not in current:
+                        continue
+                    kept = [n for n in current if n != objnum]
+                    self._conn.execute(
+                        "UPDATE properties SET value = ? "
+                        "WHERE objnum = ? AND name = ?",
+                        (json.dumps(kept), holder, _prop))
+                    cached = self._objects.get(holder)
+                    if cached is not None and _prop in cached.properties:
+                        cached.properties[_prop].value = kept
+                        cached._invalidate_local()
+
             # Past the guards, so nothing below can bail out and leave the
             # world half-swept.  Pointers *to* the object go before the
             # object does: reusing a number is fine, but reusing one that
