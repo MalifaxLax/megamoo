@@ -187,7 +187,13 @@ estr = ""
 for o in sorted_exits:
     nstr = f"{estr}, " if estr else ""
     if type(o) == int:
+        # A dexits slot is [dest, ...messages] -- or a bare destination
+        # int, which roommap._exits_of and match_exit both accept, so a
+        # ported or hand-@set world can hold one. Indexing [0] on that
+        # raised TypeError and took this command out for the room.
         dest_list = dexits[o] if o < len(dexits) else []
+        if isinstance(dest_list, int):
+            dest_list = [dest_list]
         dest = dest_list[0] if dest_list else None
         d = f"#{dest.objnum}" if dest and hasattr(dest, 'objnum') else (f"#{dest}" if dest else "")
         arrow = f" -> {d}" if d else ""

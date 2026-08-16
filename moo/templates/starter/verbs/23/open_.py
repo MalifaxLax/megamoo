@@ -38,7 +38,21 @@ if this.latched:
         _occupied = False
         if _dest:
             for _obj in _dest.contents:
-                if _obj.player:
+                # getattr(_obj, 'is_player'), not _obj.player.
+                #
+                # `player` is declared on #3 and nowhere else, so only
+                # characters have it -- and a missing property raises, so
+                # the first exit object in the destination room (and there
+                # is nearly always one) took this verb out with E_PROPNF.
+                # Opening a latched door from the outside simply failed.
+                #
+                # It was the wrong question as well as an unsafe one:
+                # #3.player is a static true, so it counted a character
+                # who was not connected. `is_player` is the PLAYER flag,
+                # set while puppeted and cleared on unpuppet, which is
+                # exactly "somebody is in there right now" -- and it is
+                # declared on #1, so every object can be asked.
+                if getattr(_obj, 'is_player', False):
                     _occupied = True
                     break
         if _occupied:

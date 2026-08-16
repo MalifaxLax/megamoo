@@ -65,7 +65,7 @@ if not obj:
         if type(result) == int:
             dexits = loc.dexits
             if result < len(dexits) and dexits[result]:
-                dest_num = dexits[result][0]
+                dest_num = (dexits[result][0] if isinstance(dexits[result], (list, tuple)) else dexits[result])
                 try:
                     dest = db.get_object(dest_num)
                     directions = loc.directions

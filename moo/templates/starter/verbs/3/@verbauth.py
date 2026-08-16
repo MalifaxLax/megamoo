@@ -82,6 +82,28 @@ if not found:
     return
 
 if setting:
+    # You cannot touch a verb gated above your own level.
+    #
+    # Not a containment boundary against gm3 -- gm3 can write arbitrary
+    # verb code, so anyone at that level can already do whatever any
+    # gm3-gated verb does, and no rule here changes that. What it stops is
+    # a gm3 *handing a higher-gated verb to everyone else*: lowering a
+    # gm5 verb to 0 is not using a power you have, it is granting one you
+    # do not, to the whole world.
+    #
+    # Only safe today because every shipped sensitive verb re-checks
+    # auth_level(pobj) in its own body, so the metadata is not the real
+    # gate. A world that writes a sensitive verb relying on the metadata
+    # alone -- which is the documented way to gate one -- would have had
+    # no protection at all.
+    #
+    # Raising is unrestricted: locking a verb further is not an escalation
+    # and a builder should not need a wizard to tighten something.
+    mylevel = auth_level(pobj)
+    if (found.auth or 0) > mylevel:
+        pobj.msg(f"'{verb_name}' is restricted to auth {found.auth}, above "
+                 f"your own ({mylevel}). You cannot change its auth.")
+        return
     found.auth = auth_val
     db.save_object(found_on)
     pobj.msg(f"Verb '{verb_name}' on &<245>#{found_on.objnum}:{found_on.name}&n auth set to {auth_val}.")

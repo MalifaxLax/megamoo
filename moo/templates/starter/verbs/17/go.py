@@ -92,6 +92,28 @@ if sub_prep:
         pobj.msg("You can't go there.")
     return
 
+# Past here it has to be an exit.
+#
+# The contents fallback above matches any object in the room, which is
+# deliberate -- chargen's #300 and the Orb Wars entry are reached that way
+# and are not in any room's exits list -- and the go_ hook has already had
+# its chance at it.  What is left below belongs to #20 BaseExit: climbable
+# and jumpable are its properties and invoke is its verb, so an ordinary
+# object reaching this line handed the player E_PROPNF on a missing flag
+# and then a raw KeyError from the missing verb.  `go drapes` reported
+# "Verb 'invoke' not found on some drapes (#5035)".
+#
+# getattr, not a bare read: is_exit is not declared on everything a room
+# can contain.
+if not getattr(exit, 'is_exit', False):
+    # The same answer whatever was named.  Not the object's own failure
+    # message: that belongs to the thing failing at what it is for -- a
+    # closed exit, a locked container -- and reading it here would answer
+    # "go chest" with "It is locked.", which invites another try at
+    # something that was never a way out.
+    pobj.msg("You can't go there.")
+    return
+
 # Climbable/jumpable checks
 if exit.climbable:
     pobj.msg("You have to climb that!")

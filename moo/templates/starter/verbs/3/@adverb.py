@@ -91,11 +91,28 @@ else:
                     if p == 'base':
                         ptype = 'moo.verb_types.BaseVerb'
                     elif p.startswith('min='):
+                        # Reported, not raised. An unguarded int() died on
+                        # the server's generic handler, so a typo answered
+                        # "Do what?" -- which reads as "no such command"
+                        # rather than "that is not a number".
+                        if not p[4:].isdigit():
+                            pobj.msg("min= wants a number, not '%s'." % p[4:])
+                            return
                         mn = int(p[4:])
                     elif p.startswith('auth='):
+                        if not p[5:].isdigit():
+                            pobj.msg("auth= wants a number, not '%s'." % p[5:])
+                            return
                         auth_val = int(p[5:])
-                    else:
+                    elif p and all(c in 'rwxdc' for c in p):
                         perms = p
+                    else:
+                        # Anything unrecognised used to become the perms
+                        # string in silence: `with rwx junk` set perms to
+                        # 'junk' and the verb looked fine until something
+                        # tried to honour it.
+                        pobj.msg("I don't know the option '%s'." % p)
+                        return
 
             # Add the verb to the target object
             is_hidden = 'hidden' in switches or 'hide' in switches

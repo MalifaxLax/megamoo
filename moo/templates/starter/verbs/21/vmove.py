@@ -40,6 +40,9 @@ if not dexits or enum >= len(dexits) or not dexits[enum]:
 
 # Unpack exit data: [dest, succ, osucc, drop, odrop, rtval]
 edata = dexits[enum]
+# Same bare-int tolerance as roommap and match_exit -- see rlook.
+if isinstance(edata, int):
+    edata = [edata]
 dest = edata[0]
 
 # Resolve destination from objnum to object

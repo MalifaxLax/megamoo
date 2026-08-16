@@ -18,7 +18,17 @@ Returns:
 Hidden:  yes
 """
 
-pstring = this.position_strings[this.position]
+# Bounds-checked, the way make_postatus guards the identical access.
+#
+# `position_strings` holds ten entries and `position` is only ever 0, 6 or
+# 8 today, so this cannot miss -- but the two readers of the same table
+# disagreed about whether it could, and the unguarded one raises where the
+# other degrades. A world adding an eleventh position (a combat "knocked
+# down" at 10) without extending the list would take `look` out for that
+# character, while make_postatus carried on returning ''.
+_pstrings = this.position_strings or []
+_position = this.position or 0
+pstring = _pstrings[_position] if 0 <= _position < len(_pstrings) else ''
 if args == 'first':
     pstring = pstring.replace('&pp', 'your')
 return pstring
