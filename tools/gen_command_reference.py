@@ -144,6 +144,7 @@ GROUPS = [
         ('@quota', 'Report how much of the database a player has built.'),
     ]),
     ('server', 'Running the server', [
+        ('@version', 'What the engine is, and what this world says it is. <code>@version/server</code> and <code>@version/db</code> ask separately.'),
         ('eval', 'Run Python against the live world. Also <code>/</code>.'),
         ('@restart', 'Restart in place.'),
         ('@shutdown', 'Stop the server.'),
