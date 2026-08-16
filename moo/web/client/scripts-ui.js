@@ -38,7 +38,10 @@ function fillLanguages() {
     option.textContent = host.label;
     return option;
   }));
-  // Lua leads: it is the one safe to run somebody else's script in.
+  // Lua leads: its isolation is a property of the interpreter rather
+  // than a maintained blocklist. It is not the safer choice in every
+  // respect -- see updateWarning -- but it is on the axis that matters
+  // for a script somebody else wrote.
   langEl.value = Scripting.hosts.some((h) => h.id === 'lua') ? 'lua'
     : (Scripting.hosts[0]?.id ?? '');
   updateWarning();
@@ -54,12 +57,25 @@ function fillLanguages() {
 function updateWarning() {
   if (langEl.value === 'js') {
     warningEl.textContent =
-      'JavaScript runs in a locked-down Worker — network access is removed, '
-      + 'but the isolation is a blocklist, not a guarantee. For a script '
-      + 'someone else wrote, prefer Lua.';
+      'JavaScript runs in a Worker with the network functions removed — '
+      + 'but that is a blocklist, not a guarantee, and a script can still '
+      + 'reach the network by other means. It cannot see your password or '
+      + 'this page. For a script someone else wrote, prefer Lua.';
     warningEl.hidden = false;
   } else {
-    warningEl.hidden = true;
+    // Lua is not silent. Its isolation is better -- a real interpreter
+    // with no network and no DOM, rather than a blocklist -- but it runs
+    // on the page's own thread, so a loop that never ends freezes the
+    // whole client rather than a worker you can switch off. Saying only
+    // "safe" was the reassurance that needed correcting: it is safer in
+    // the way that matters for someone else's code, and worse in the one
+    // way a player can actually be stuck.
+    warningEl.textContent =
+      'Lua runs in a real interpreter with no network and no access to '
+      + 'this page — the safer choice for a script someone else wrote. '
+      + 'It does run on the client\'s own thread, so a script that loops '
+      + 'forever will freeze the client until you reload.';
+    warningEl.hidden = false;
   }
 }
 

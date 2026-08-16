@@ -1229,6 +1229,133 @@ def send_inventory_gmcp(obj):
         logger.debug('send_inventory_gmcp failed', exc_info=True)
 
 
+def send_page(obj, page) -> bool:
+    """
+    Offer a rich page to a client that can render one.
+
+    Where ``inv_data`` and ``vitals_data`` are pulled by the engine after
+    every command, this is *pushed* by verb code when it has something to
+    show: a training screen, a skill table, anything whose layout the
+    reserved column leaves no room for.
+
+    ``page`` is a dict::
+
+        {'title': 'Training',
+         'widgets': [{'type': 'table', 'head': [...], 'rows': [[...]]}]}
+
+    ``widgets`` is the vocabulary the client already renders for script
+    panels -- text, bar, row, stack, table, gauge, space.  **Not HTML.**
+    The world describes what it wants shown and trusted page code decides
+    what elements exist; a verb that could send markup could inject script
+    into the page and read the player's session, and every builder with
+    ``@program`` would be able to.
+
+    Returns:
+        bool: True when the page was handed to a client that can show it.
+
+    That return value is the whole safety of the arrangement, and callers
+    are meant to use it::
+
+        if not send_page(pobj, page):
+            <print the plain-text version>
+
+    which keeps the fallback in the verb, where it is visible, instead of
+    in a capability check somewhere that can be wrong.  Telnet takes that
+    branch every time -- it never negotiates GMCP -- so its output is
+    identical to what it was before this existed, rather than merely
+    similar.  So does a web client whose socket has gone, and so does any
+    caller when something in here raises.
+    """
+    try:
+        if not isinstance(page, dict):
+            return False
+        widgets = page.get('widgets')
+        if not isinstance(widgets, list):
+            return False
+        from .network import get_connection_for_player
+        conn = get_connection_for_player(obj.objnum)
+        if not conn or 'gmcp' not in getattr(conn, 'protocols', set()):
+            return False
+        if not hasattr(conn, 'send_gmcp_sync'):
+            return False
+        # Every field the page is allowed to carry, listed once.
+        #
+        # This is a whitelist rather than `page` itself, so that a world
+        # cannot smuggle keys the client never agreed to read -- but the
+        # cost of a whitelist is that a field added to the vocabulary and
+        # not added *here* is silently dropped. That is exactly what
+        # happened to `input`: the verb asked for a keyboard buffer, this
+        # threw the request away, and the client rendered a page with no
+        # way to type into it and no reason to think anything was wrong.
+        # Anything new in the page vocabulary belongs in this dict.
+        conn.send_gmcp_sync('Client.Page', {
+            'title': str(page.get('title') or ''),
+            'widgets': widgets,
+            # A keyboard buffer, since a modal covers the main input row.
+            'input': bool(page.get('input')),
+        })
+        return True
+    except Exception:
+        logger.debug('send_page failed', exc_info=True)
+        return False
+
+
+def send_vitals_gmcp(obj):
+    """
+    Send GMCP ``Char.Vitals``, if this world says what a vital is.
+
+    The same bargain as ``inv_data`` next door, and for the same reason:
+    the engine has no opinion about what a character is made of.  One
+    world tracks hits and nothing else, another adds stamina, mana and
+    focus, another counts blood or sanity or heat.  So the character is
+    asked, through an optional ``vitals_data`` verb, and a world that
+    defines none simply has no bars -- the shipped starter is one of
+    those.
+
+    ``vitals_data`` returns a list, drawn top to bottom in the order
+    given::
+
+        [{'label': 'HP',  'value': 34, 'max': 40},
+         {'label': 'ST',  'value': 12, 'max': 20, 'tone': 'stamina'}]
+
+    ``label``, ``value`` and ``max`` are required; ``tone`` is an optional
+    name the client may colour by, and is ignored if it does not know it.
+    A ``max`` of zero or less is dropped rather than drawn, because a bar
+    with no scale can only mislead -- there is no honest length for it.
+
+    Sent only when it differs from what this connection was last told.
+    That matters more here than it does for inventory: vitals move on
+    regeneration tickers as well as on commands, so an unconditional send
+    would put a frame on the wire for every idle tick.
+
+    Never raises.  A stat bar is not worth a player's command.
+    """
+    try:
+        from .network import get_connection_for_player
+        conn = get_connection_for_player(obj.objnum)
+        if not conn or 'gmcp' not in getattr(conn, 'protocols', set()):
+            return
+        if not hasattr(conn, 'send_gmcp_sync'):
+            return
+        from .verb_context import set_verb_context, clear_verb_context
+        token = set_verb_context(obj, _database, 0)
+        try:
+            call = make_call_verb(obj, _database)
+            vitals = call(obj, 'vitals_data')
+        except KeyError:
+            return          # this world does not describe its vitals
+        finally:
+            clear_verb_context(token)
+        if not isinstance(vitals, list):
+            return
+        if getattr(conn, '_last_vitals', None) == vitals:
+            return
+        conn._last_vitals = vitals
+        conn.send_gmcp_sync('Char.Vitals', {'vitals': vitals})
+    except Exception:
+        logger.debug('send_vitals_gmcp failed', exc_info=True)
+
+
 def chparent(obj: Union[int, MOOObject], new_parent: int):
     """
     Change an object's parent (prototype).

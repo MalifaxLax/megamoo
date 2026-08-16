@@ -633,6 +633,11 @@ class InteractiveSession:
             send_inventory_gmcp(self.player_obj)
         except Exception:
             pass
+        try:
+            from .builtins import send_vitals_gmcp
+            send_vitals_gmcp(self.player_obj)
+        except Exception:
+            pass
 
     def cancel(self):
         """

@@ -413,7 +413,22 @@ function refreshWorldUI() {
  */
 function scheduleAutoLogin(creds) {
   if (!creds || !creds.username) return;
-  setTimeout(() => {
+  setTimeout(() => typeCredentials(creds), 1000);
+}
+
+/**
+ * Answer a login prompt: the name, then the password.
+ *
+ * Shared by the auto-login that follows \con, by \login, and by the
+ * \<handle> shortcut, so there is one account of how a login is typed
+ * rather than three that can drift on the echoing.
+ *
+ * The password is sent but never echoed -- see below -- so the only
+ * difference between the three callers is when they start.
+ */
+function typeCredentials(creds) {
+  if (!creds || !creds.username) return;
+  {
     if (!api.connected) return;
     // api.echo(_, 'echo'), not note(): 'echo' is what the input row uses
     // for a line you typed, and it goes *into* the prompt the server left
@@ -438,7 +453,7 @@ function scheduleAutoLogin(creds) {
       // clients get the same of it.
       api.echo('', 'echo');
     }, 500);
-  }, 1000);
+  }
 }
 
 /**
@@ -616,6 +631,71 @@ const handlers = {
       note('    world; think twice on a shared machine or a public server.');
     }
     note(`    ${PREFIX}con ${handle} connects to it from now on.`);
+  },
+
+  /**
+   * \login <handle> <uid> <pw> — answer the login prompt, and remember it.
+   *
+   * Types the two lines now, then files them under *handle* so that
+   * `\<handle>` types them again on any later connection. That is the
+   * whole feature: the second login onwards is one short word.
+   *
+   * Filed in the same session book \con and \save use, merged rather than
+   * replaced, so a handle that already names a world keeps its host and
+   * port and simply gains credentials -- after which \con <handle> logs
+   * in by itself too, and the two commands agree about what a handle is
+   * instead of keeping rival address books.
+   */
+  login(args) {
+    const [handle, username, ...rest] = args;
+    // The password takes the remainder rather than args[2], so one
+    // containing a space is not silently truncated to its first word.
+    const password = rest.join(' ');
+    if (!handle || !username || !password) {
+      note(`*** Usage: ${PREFIX}login <handle> <uid> <pw>`);
+      note(`    Sends the uid and password now, and saves them as <handle>.`);
+      note(`    Afterwards ${PREFIX}<handle> gets you in: it connects if it`);
+      note(`    has to, and logs in either way.`);
+      return;
+    }
+    if (Object.hasOwn(handlers, handle) ||
+        Object.hasOwn({ con: 1, def: 1, ses: 1 }, handle)) {
+      // \save would be a command before it was ever a handle, so a login
+      // filed under that name could never be typed. Refused rather than
+      // saved into a shortcut that will not work.
+      note(`*** '${handle}' is already a ${PREFIX}command, so ${PREFIX}${handle}`
+           + ` could never reach a saved login. Pick another handle.`);
+      return;
+    }
+
+    const existing = sessions[handle] || {};
+    const first = !existing.password;
+    // An address is not invented, and an existing one is not disturbed.
+    //
+    // \login is about credentials. Filling in host and port from wherever
+    // the socket happened to point was over-thinking it: the command
+    // exists so that sitting at a login prompt costs one word, and a
+    // prompt is somewhere you have already arrived. A handle that names a
+    // world as well gets its address from \con or \save, which are the
+    // commands whose business that is.
+    sessions[handle] = Object.assign({}, existing, { username, password });
+    save(STORE_SESSIONS, sessions);
+    refreshWorldUI();
+
+    if (!api.connected) {
+      note(`*** Saved login '${handle}' as ${username}, but not connected —`);
+      note(`    nothing was sent. ${PREFIX}${handle} will connect and log in.`);
+    } else {
+      note(`*** Logging in as ${username}, and saved as '${handle}'.`);
+      typeCredentials(sessions[handle]);
+    }
+    if (first) {
+      // The same warning \save gives, for the same reason and once per
+      // handle: "the browser remembers it" reads as safer than it is.
+      note('    Note: the password is kept in this browser\'s localStorage in');
+      note('    plain text, and ws:// sends it unencrypted. Fine for a local');
+      note('    world; think twice on a shared machine or a public server.');
+    }
   },
 
   forget(args) {
@@ -806,6 +886,8 @@ const handlers = {
   help() {
     const p = PREFIX;
     note(`  ${p}con [handle] [host] [port] [user] [pass] - Connect`);
+    note(`  ${p}login <handle> <uid> <pw>    - Log in now, and save it as <handle>`);
+    note(`  ${p}<handle>                     - Go to a saved world, logging in`);
     note(`  ${p}save                         - Remember the session in play`);
     note(`  ${p}sessions                     - List saved sessions`);
     note(`  ${p}default [handle]             - Where a bare ${p}con goes (- clears)`);
@@ -978,6 +1060,42 @@ function runCommand(line) {
 
   const handler = Object.hasOwn(handlers, canonical) ? handlers[canonical] : null;
   if (!handler) {
+    // \<handle> — a saved login, typed as its own command.
+    //
+    // Checked only after the real commands, so a handle can never shadow
+    // one; \login refuses to save a name that would land here anyway.
+    // The lookup uses the name as typed rather than the lowercased
+    // `canonical`, because a handle is a name the player chose and
+    // `\ML` should not quietly become a different one.
+    const typed = split === -1 ? trimmed : trimmed.slice(0, split);
+    const saved = Object.hasOwn(sessions, typed) ? sessions[typed] : null;
+    if (saved) {
+      // Connected? Then you are at a prompt, and typing the credentials
+      // is the entire job.
+      //
+      // This used to compare the saved address against the live socket
+      // and reconnect when they differed -- which got in the way of the
+      // one thing the command is for. A handle need not carry an address
+      // at all: \login stores a name and a password, nothing else, and
+      // "log me in here" is a complete request on its own.
+      if (api.connected) {
+        if (!saved.username) {
+          note(`*** '${typed}' has no saved login.`);
+          note(`    ${PREFIX}login ${typed} <uid> <pw> to add one.`);
+          return;
+        }
+        typeCredentials(saved);
+        return;
+      }
+      // Not connected. If the handle also names a world -- from \con or
+      // \save -- go there, and that path logs in on arrival.
+      if (saved.host === undefined || saved.port === undefined) {
+        note(`*** Not connected, and '${typed}' names no world to connect to.`);
+        return;
+      }
+      connectTo(saved, typed);
+      return;
+    }
     note(`*** Unknown command: ${name}. Type ${PREFIX}help for help.`);
     return;
   }

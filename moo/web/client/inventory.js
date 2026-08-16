@@ -51,17 +51,12 @@ function saveCollapsed() {
   }
 }
 
-/** Show or hide the panel, and keep the reserved column in step with it. */
+/* Show or hide the panel. The column it sits in is reserved by the
+ * stylesheet whether or not anything is showing, so there is nothing to
+ * keep in step -- see client.css. */
 function showPanel(visible) {
   if (!panel) return;
   panel.hidden = !visible;
-  const back = document.getElementById('scrollback');
-  // The column belongs to whichever of the two readouts is showing, so it
-  // stays reserved while either does. Asking the map's panel directly is
-  // simpler than the two of them tracking a shared count.
-  const map = document.getElementById('automap');
-  const wanted = visible || (map && !map.hidden);
-  if (back) back.classList.toggle('has-map', !!wanted);
 }
 
 /*

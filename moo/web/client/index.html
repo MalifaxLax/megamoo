@@ -12,7 +12,12 @@
 <div id="app">
 
   <header id="topbar">
-    <span class="brand">Mega<span class="brand-accent">MOO</span></span>
+    <!-- The engine's own name, replaced at runtime by the world's when it
+         has one (see WebServer._name_the_world, which rewrites <title>,
+         and the brand code in client.js which follows it). Left as real
+         markup rather than an empty placeholder so opening this file
+         straight off disk still shows a finished header. -->
+    <span class="brand" id="brand">Mega<span class="brand-accent">MOO</span></span>
 
     <!-- Shown when the files on disk change under a page that is still
          running the old ones. It lives in the header chrome, and stays
@@ -74,22 +79,33 @@
                 aria-label="Map of rooms you have visited"></canvas>
       </section>
 
-      <!-- What the player is carrying, from GMCP Char.Inventory. It sits
-           under the map so the column the map reserves is doing work all
-           the way down instead of holding empty space. Containers nest,
-           with a triangle to fold them shut. A world that defines no
-           inv_data verb sends nothing, and this stays hidden -- the
-           shipped starter world is one of those. -->
+      <!-- Condition bars, from GMCP Char.Vitals. Directly under the map,
+           where both are a fixed height and neither moves: these are read
+           at a glance mid-fight, and a readout that has drifted down the
+           column because a pack got fuller is one you have to find first.
+           A world that defines no vitals_data verb sends nothing and this
+           stays hidden -- the shipped starter is one of those. -->
+      <section id="vitals" class="automap vitals" aria-label="Condition" hidden>
+        <ul id="vitals-list" class="vit-list"></ul>
+      </section>
+
+      <!-- Panels declared by user scripts, rendered from a widget
+           vocabulary by panels.js. Scripts never produce markup. -->
+      <div id="script-panels" hidden></div>
+
+      <!-- What the player is carrying, from GMCP Char.Inventory. Last,
+           and given whatever height is left, because it is the one readout
+           with no natural size -- a pack of nested containers can be any
+           length. Its list scrolls inside itself rather than pushing the
+           column, so a long inventory costs the map and the bars nothing.
+           A world that defines no inv_data verb sends nothing, and this
+           stays hidden -- the shipped starter world is one of those. -->
       <section id="inventory" class="automap" aria-label="Inventory" hidden>
         <header class="automap-head">
           <span class="automap-room">carrying</span>
         </header>
         <ul id="inventory-list" class="inv-list"></ul>
       </section>
-
-      <!-- Panels declared by user scripts, rendered from a widget
-           vocabulary by panels.js. Scripts never produce markup. -->
-      <div id="script-panels" hidden></div>
 
     </aside>
 
@@ -123,6 +139,31 @@
     </div>
   </dialog>
 
+  <!-- A page pushed by verb code (GMCP Client.Page). A <dialog> so it can
+       use the whole window rather than the width the readout column
+       leaves, and so Escape and focus trapping come for free -- the same
+       reasoning as the script manager above. Contents are rendered from
+       the widget vocabulary by pages.js; nothing here is world markup. -->
+  <dialog id="page-dialog" class="page-dialog">
+    <form method="dialog" class="dialog-close-form">
+      <button class="dialog-close" aria-label="Close">&times;</button>
+    </form>
+    <h2 id="page-title" class="dialog-title"></h2>
+    <div id="page-body" class="page-body"></div>
+
+    <!-- Keyboard buffer. A modal covers the main input row, so without
+         this a page would be something you can only read and then close.
+         Shown only when the page asks for it; what you type goes to the
+         server exactly as the main input row would send it. -->
+    <form id="page-input-row" class="page-input-row" autocomplete="off" hidden>
+      <label for="page-cmd" class="page-prompt" aria-label="Prompt">&gt;</label>
+      <input id="page-cmd" type="text" name="page-cmd"
+             autocomplete="off" autocapitalize="off"
+             autocorrect="off" spellcheck="false"
+             aria-label="Command input">
+    </form>
+  </dialog>
+
   <form id="input-row" autocomplete="off">
     <label for="cmd" id="prompt" aria-label="Prompt">&gt;</label>
     <input id="cmd" type="text" name="cmd"
@@ -140,7 +181,9 @@
 <script src="commands.js"></script>
 <script src="automap.js"></script>
 <script src="inventory.js"></script>
+<script src="vitals.js"></script>
 <script src="panels.js"></script>
+<script src="pages.js"></script>
 <script src="scripting.js"></script>
 <script src="hosts/js-worker.js"></script>
 <script src="hosts/lua.js"></script>

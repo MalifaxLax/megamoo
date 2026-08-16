@@ -155,8 +155,45 @@ dofile = nil
 loadfile = nil
 load = nil
 loadstring = nil
-debug = nil
 collectgarbage = nil
+
+-- The watchdog, installed before debug is taken away.
+--
+-- wasmoon runs this VM synchronously on the page's own thread, so a
+-- script that loops forever freezes the whole client -- and because
+-- saved scripts auto-run at load, a bad one re-freezes it on every
+-- reload until storage is cleared. There is no way to interrupt
+-- synchronous wasm from outside, so the interrupt has to come from
+-- inside the VM.
+--
+-- A count hook fires every N virtual instructions; raising an error in
+-- it unwinds the script the same way any runtime error would, and the
+-- host reports it. sethook is captured into a local first, so the
+-- budget survives debug being cleared below, and a script cannot reach
+-- the hook to remove its own leash.
+--
+-- The budget is generous: 200 million instructions is far past any
+-- honest script and still trips in well under a second of spinning.
+local _sethook = debug.sethook
+debug = nil
+
+local function _watchdog()
+  error('script stopped: it ran too long without finishing '
+        .. '(possible infinite loop)', 2)
+end
+
+-- Re-armed at the start of every entry into the VM, not set once.
+--
+-- A count hook counts continuously, so setting it once would make this a
+-- *lifetime* budget: a perfectly well-behaved script with a timer would
+-- accumulate instructions over hours and eventually be killed for having
+-- run a long time rather than for hanging. Re-arming per call makes it
+-- what it should be -- a budget for one uninterrupted stretch of work.
+function __rearm()
+  _sethook(_watchdog, '', 200000000)
+end
+
+__rearm()
 os = {time = os_time, date = os_date, clock = os_clock, difftime = os_difftime}
 `;
 
@@ -175,7 +212,10 @@ const host = {
 
     await lua.doString(PRELUDE);
 
+    const rearm = lua.global.get('__rearm');
+
     try {
+      if (rearm) rearm();
       await lua.doString(source);
     } catch (err) {
       callbacks.error(String(err));
@@ -187,6 +227,9 @@ const host = {
       async dispatch(event, payload) {
         if (!dispatch) return;
         try {
+          // Fresh budget per event -- a trigger that hangs must not be
+          // charged for the work every earlier trigger did.
+          if (rearm) rearm();
           await dispatch(event, payload);
         } catch (err) {
           callbacks.error(String(err));

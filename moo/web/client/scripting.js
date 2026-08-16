@@ -39,6 +39,24 @@ const STORAGE_DATA_PREFIX = 'megamoo.scriptdata.';
 /** How long one script may block before we assume it has run away. */
 const CALL_BUDGET_MS = 2000;
 
+/**
+ * How many of each kind of registration one script may hold.
+ *
+ * Bounded because the cost is not paid by the script. Every output line
+ * is tested against every registered trigger, on the main thread, so a
+ * script holding 100k of them turns one line of game text into 100k
+ * regex evaluations and the client stops responding. Timers and aliases
+ * are the same shape of problem, and panels bound their own rendering
+ * but not their number.
+ *
+ * The figure is far past any honest script -- a large script pack runs to
+ * dozens -- and low enough that hitting the ceiling cannot hurt the page.
+ * Refused with an error rather than silently dropped: a script whose
+ * hundredth trigger vanished without a word would look like the client
+ * had lost it.
+ */
+const MAX_REGISTRATIONS = 200;
+
 /* =========================================================================
  * Host registry
  * ========================================================================= */
@@ -150,6 +168,9 @@ const API_METHODS = {
 
   /** trigger(pattern, ref) — fire `ref` on matching output lines. */
   trigger({ pattern, ref, regex, flags }) {
+    if (this.triggers.length >= MAX_REGISTRATIONS) {
+      throw new Error('too many triggers (limit ' + MAX_REGISTRATIONS + ')');
+    }
     this.triggers.push({
       re: this.compilePattern(pattern, regex, flags),
       ref,
@@ -159,6 +180,9 @@ const API_METHODS = {
 
   /** alias(pattern, ref) — claim matching input before it is sent. */
   alias({ pattern, ref, regex, flags }) {
+    if (this.aliases.length >= MAX_REGISTRATIONS) {
+      throw new Error('too many aliases (limit ' + MAX_REGISTRATIONS + ')');
+    }
     this.aliases.push({
       re: this.compilePattern(pattern, regex, flags),
       ref,
@@ -168,6 +192,9 @@ const API_METHODS = {
 
   /** timer(ms, ref) — repeating; returns a handle for cancel. */
   timer({ ms, ref }) {
+    if (this.timers.size >= MAX_REGISTRATIONS) {
+      throw new Error('too many timers (limit ' + MAX_REGISTRATIONS + ')');
+    }
     // Floor the period: a 0ms timer in a script would peg the main thread.
     const period = Math.max(50, Number(ms) || 0);
     const handle = this.nextTimer++;

@@ -1367,6 +1367,15 @@ class MegaMOOServer:
         except Exception:
             logger.debug('inventory announce failed', exc_info=True)
 
+        # Vitals ride alongside, on the same terms and for the same
+        # reason. Separately guarded so a world whose vitals_data throws
+        # still gets its inventory, and the reverse.
+        try:
+            from .builtins import send_vitals_gmcp
+            send_vitals_gmcp(player)
+        except Exception:
+            logger.debug('vitals announce failed', exc_info=True)
+
 
     # --------------------------------------------------------
     # Presentation helpers

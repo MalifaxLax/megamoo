@@ -419,6 +419,26 @@ scrollback.addEventListener('scroll', () => {
   term.pinned = distance < 40;
 });
 
+/*
+ * The left column is reserved unconditionally in the stylesheet, so there
+ * is nothing here to turn on and off any more.
+ *
+ * There used to be. The reservation followed the panels, which meant the
+ * scrollback's padding changed by 200px the moment a player walked from
+ * the OOC entry hall into the world -- every line of history re-wrapped,
+ * the content grew taller under a view that had already been scrolled to
+ * the bottom, and the scroll event that followed measured a distance past
+ * the pin threshold and stopped the client following output at all. That
+ * was fixed by re-asserting the scroll on the toggle; it is now fixed by
+ * there being no toggle. A measure that never moves cannot strand a
+ * reader on it.
+ *
+ * `reserveColumn` is kept on the API as a no-op rather than removed: it
+ * is documented, a script may call it, and "does nothing because the
+ * column is always there" is a better answer to that call than a
+ * TypeError.
+ */
+
 // Backtick-marked words are click targets, matching what telnet clients
 // get from MXP: moo/network.py wraps them in <send href="go NAME">, so
 // "go" is the verb here too.
@@ -443,15 +463,25 @@ scrollback.addEventListener('click', (event) => {
  *
  * `\con <handle> <host> <port> <user> <pass>` is the documented spelling,
  * so the secret arrives on an ordinary input line rather than behind the
- * server's password mask.  Matched on the command word plus the first two
+ * server's password mask.  Matched on the command word plus its leading
  * arguments -- everything after them is redacted, which covers the
- * credentials without hiding which world you asked for.
+ * credentials without hiding which world or name you asked for.
+ *
+ * Each command keeps a different number of arguments, which is why they
+ * are separate alternatives rather than one count:
+ *
+ *   \con   <handle> <host> <port> | <user> <pass>      3 kept
+ *   \login <handle> <uid>         | <pw>               2 kept
+ *
+ * A command that takes a password and is not listed here puts it in the
+ * scrollback, in screenshots, and in arrow-up recall for whoever sits
+ * down next -- so anything added later belongs in this pattern too.
  *
  * The prefix is configurable, so this matches any single non-word
  * character rather than a literal backslash.
  */
 const SECRET_COMMAND_RE =
-  /^\W(?:con|connect)(?:\s+\S+){3}(?=\s+\S)/i;
+  /^\W(?:(?:con|connect)(?:\s+\S+){3}|login(?:\s+\S+){2})(?=\s+\S)/i;
 
 /**
  * Is `url` a socket this page may be pointed at?
@@ -942,6 +972,12 @@ const api = {
   /** Empty the scrollback. */
   clear() { term.clear(); },
 
+  /**
+   * Historic: the left column is now always reserved, so this does
+   * nothing. Kept so a script that calls it still runs.
+   */
+  reserveColumn() {},
+
   /** Scroll the output: 'up', 'down', or 'end'. */
   scroll(direction) {
     if (direction === 'end') { term.toBottom(); return; }
@@ -1033,6 +1069,27 @@ installPalette();
 if (window.MegaMOOCommands) window.MegaMOOCommands.attach(api);
 if (window.Automap) window.Automap.attach(api);
 if (window.Inventory) window.Inventory.attach(api);
+if (window.Vitals) window.Vitals.attach(api);
+if (window.Pages) window.Pages.attach(api);
+
+/*
+ * The header carries whatever the tab is called.
+ *
+ * The server rewrites <title> to the world's own name on the way out, so
+ * reading it back is how the brand learns it -- one source, and the tab
+ * and the header cannot end up disagreeing about what the game is.
+ *
+ * textContent, not innerHTML: this string came from a world's database,
+ * and the two-tone "Mega|MOO" split it replaces was only ever meaningful
+ * for that one word. A world named anything else gets its name whole.
+ */
+(function nameTheHeader() {
+  const brand = document.getElementById('brand');
+  const title = (document.title || '').trim();
+  if (!brand || !title || title === 'MegaMOO') return;
+  brand.textContent = title;
+  brand.classList.add('brand--world');
+})();
 if (window.MegaMOOScripting) window.MegaMOOScripting.attach(api);
 
 input.disable();

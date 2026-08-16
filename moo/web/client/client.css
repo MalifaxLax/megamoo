@@ -94,19 +94,29 @@
      drift, and the drift shows as text under the map or a stripe of dead
      space.
 
-     These three are load-bearing together, so change them as a set:
+     These are load-bearing together, so change them as a set:
 
-       map drawn at  = --map-width - --map-inset * 2   (border-box)
+       map drawn at   = --map-width - (--map-inset + 1 + 5) * 2
        text starts at = --map-width + --map-gutter
 
-     The map keeps the width it has always had -- 268 - 6*2 = 256 -- while
-     the column around it lost the 12px inset it did not need and the strip
-     reserved beyond it went from --pad*2 to --map-gutter. The column is
-     26px narrower and the gap from the map's edge to the first character
-     went 36px -> 16px, without the drawing changing size. */
-  --map-width: min(268px, 42vw);
-  --map-inset: 6px;
-  --map-gutter: 10px;
+     (the 1 is .automap's border, the 5 its padding.)
+
+     204 - 20 = 184px of drawing inside 212px of reserved column. It was
+     268 reserving 278 to draw 242: the drawing was a quarter of the pane
+     on a 900px window, and 36 of those pixels were chrome around it
+     rather than map. The canvas is no longer a fixed pixel grid that has
+     to keep its size -- automap.js fits its cells to whatever width this
+     gives it -- so this number is free to be chosen for the text beside
+     it, which gets four more characters a line out of the change. */
+  --map-width: min(204px, 42vw);
+  --map-inset: 4px;
+  /* Width of the scrollbar channel that runs down the right of the
+     column -- see #terminal-pane::before. */
+  --map-gutter: 8px;
+  /* Clear air between that channel and the first character of game text.
+     Without it the two touch, and a rail hard against a column of prose
+     reads as part of the prose. */
+  --rail-gap: 8px;
 }
 
 /* ========================================================================
@@ -172,6 +182,29 @@ body {
 
 .brand-accent { color: var(--accent); }
 
+/* A world that carries its own name gets it set as a wordmark rather than
+   as a label: larger, wider-tracked, in a display face.
+
+   ON THE FACE. The 2003 client's lettering has not been identified, and
+   guessing at a webfont would mean shipping a file of unknown licence to
+   match a screenshot. This is a stack of faces macOS already has, chosen
+   for the same engraved, wide-set, all-caps feel -- Copperplate first,
+   which is the closest of them. It is an approximation and is meant to be
+   swapped: name the real font here, or drop a licensed @font-face above
+   this rule and put it at the head of the stack. */
+.brand--world {
+  font-family: Copperplate, 'Copperplate Gothic Light', 'Trajan Pro',
+               Optima, var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  /* The tracking is added *after* the last letter too, which pushes the
+     word visually left of centre against the controls beside it. */
+  padding-right: 0.22em;
+}
+
 .status {
   font-size: 11px;
   letter-spacing: 0.05em;
@@ -216,6 +249,22 @@ body {
 
 #terminal-pane { position: relative; }
 
+/* The scrollbar channel, painted rather than left to the real scrollbar.
+ *
+ * macOS defaults "Show scroll bars" to "When scrolling", and under that
+ * setting Safari paints no track at all while an element has nothing to
+ * scroll -- which the readout column usually does not, since the map, the
+ * inventory and the bars fit. So the channel asked for in place of the
+ * black gutter simply was not there, on the one browser that matters
+ * here. (It appeared in testing because the in-app browser is Chromium,
+ * which honours the styled track whether or not it is needed.)
+ *
+ * Drawn on #terminal-pane, which does not scroll, so it stays put: an
+ * ::after inside #corner would scroll away with the panels. #corner sits
+ * above this at z-index 2 with a transparent background, so when a real
+ * scrollbar *is* drawn -- content overflowing, or "Always" set -- its
+ * thumb lands in this same strip and reads as the channel filling. */
+
 #scrollback {
   height: 100%;
   overflow-y: auto;
@@ -243,8 +292,40 @@ body {
    A reserved column rather than a float, because the map has to stay put.
    A float is in-flow and would scroll away with the first screenful; this
    is the price of a map that is always where you left it. */
-#scrollback.has-map {
-  padding-left: calc(var(--map-width) + var(--map-gutter));
+/* Reserved unconditionally, not only while a readout is showing.
+ *
+ * It used to come and go with the panels, and the cost of that was a
+ * measure that moved: walking from the OOC entry hall into the world
+ * re-wrapped every line of history at the exact moment the player was
+ * reading a room description, and it changed back on the way out. The
+ * column is always there now. It costs the same 212px in the lobby, where
+ * nothing needs it, and the panels appear and disappear *inside* it
+ * instead of taking it with them.
+ *
+ * This also retires `has-map`. That class existed to make the reservation
+ * conditional, and once it is not, nothing is left for it to say -- so the
+ * scroll re-assertion that went with it is gone as well, along with the
+ * bug it was written for. */
+#scrollback {
+  padding-left: calc(var(--map-width) + var(--map-gutter) + var(--rail-gap));
+
+  /* The scrollbar channel, drawn as this element's own background.
+   *
+   * Not a pseudo-element on the pane, which is what this was: that
+   * depended on absolute positioning and a z-index landing above a
+   * sibling, and it never appeared in Safari however the numbers
+   * measured in Chromium. A background is painted by every engine the
+   * same way and has nothing to stack against.
+   *
+   * It does not scroll with the text. A scroll container's background is
+   * positioned against its padding box and stays put while the content
+   * moves under it -- which is the behaviour wanted here, and is why
+   * `background-attachment` is left at its default rather than set to
+   * `local`. */
+  background-image: linear-gradient(var(--border), var(--border));
+  background-repeat: no-repeat;
+  background-position: var(--map-width) 0;
+  background-size: var(--map-gutter) 100%;
 }
 
 .line { min-height: 1px; }
@@ -497,6 +578,97 @@ body {
   background: rgb(0 0 0 / 0.65);
 }
 
+/* A pushed page (GMCP Client.Page).
+   Wider than the script manager because its whole reason for existing is
+   that the reserved column leaves no room: a training table laid out
+   against a terminal's character cell needs the window. */
+.page-dialog {
+  width: min(980px, 94vw);
+  max-height: 88vh;
+  padding: 0 20px 20px;
+  color: var(--fg);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.page-dialog::backdrop {
+  background: rgb(0 0 0 / 0.72);
+}
+
+/* Scrolls on its own so the title stays put on a long screen, and
+   overflows sideways rather than re-wrapping: these are columns, and a
+   wrapped column is worse than a scrolled one. */
+.page-body {
+  max-height: calc(88vh - 90px);
+  overflow: auto;
+  font-size: var(--term-size);
+  line-height: var(--term-line-height);
+}
+
+/* The page's keyboard buffer. Styled as the main input row is, so that
+   typing into a page feels like typing into the game rather than into a
+   form that happens to be on top of it. */
+.page-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 7px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+}
+
+.page-prompt {
+  color: var(--accent);
+  font-size: var(--term-size);
+}
+
+.page-input-row input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--term-size);
+  color: var(--fg);
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+/* A row of columns, not a row of controls.
+ *
+ * `.panel-row` centres its children, which is right for the gauges and
+ * labels a script panel puts in one, and wrong here: these are parallel
+ * columns of a table, and columns of unequal length centred against each
+ * other have their headings at different heights. Scoped to the page so
+ * script panels keep the shared behaviour.
+ *
+ * The wider gap is the gutter the text layout gets from its GAP string. */
+.page-body .panel-row {
+  align-items: flex-start;
+  gap: 22px;
+}
+
+/* Each column takes an equal share, so the headings line up across them
+   the way fixed-width columns do in the terminal. */
+.page-body .panel-row > .panel-table {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* The break between one group of skills and the next.
+   Taller than a line, so the groups read as groups: at exactly one line
+   the gap is indistinguishable from the leading between rows, which is
+   the same as having no gap at all. */
+.panel-table tr.panel-table-gap td {
+  height: 26px;
+  padding: 0;
+  line-height: 0;
+  font-size: 0;
+}
+
 .dialog-close-form {
   display: flex;
   justify-content: flex-end;
@@ -666,20 +838,41 @@ body {
 /* Upper-left overlay stack: map, then inventory, then script panels. */
 #corner {
   grid-area: 1 / 1;
-  align-self: start;
+  /* Stretch, not start: the vitals panel is pushed to the foot of this
+     column with margin-top:auto, and a column only as tall as its own
+     contents has no foot to push it to. Nothing here is painted, so a
+     full-height box costs nothing visually -- and pointer-events:none
+     below means it does not swallow clicks meant for the terminal. */
+  align-self: stretch;
   justify-self: start;
   z-index: 2;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* Stops at --map-width, so the gutter beyond it belongs to the painted
+     channel alone (see #terminal-pane::before).
+
+     This column must NOT be widened to swallow the gutter and let a real
+     scrollbar fill it. That was tried and is why the channel was
+     invisible in Safari: macOS overlay scrollbars reserve no width, so
+     the content box stayed the full width and the panels -- which have
+     opaque backgrounds and stretch to the container -- painted straight
+     over the strip the channel was drawn in. It looked right only in
+     Chromium, which reserves the space. */
   width: var(--map-width);
   max-height: 100%;
-  overflow-y: auto;
+  /* The column itself never scrolls. Its one open-ended readout -- the
+     inventory -- scrolls inside its own panel instead, so the map and the
+     bars above it cannot be pushed off the top by a full pack. That also
+     leaves the channel beside this column purely graphical, which is what
+     it should be: it marks the edge of the readouts, and there is nothing
+     here to drag it against. */
+  overflow: hidden;
   /* No padding at the top: the map's own top edge lines up with the top of
      the text area rather than hanging below it. Sides and bottom keep a
      small inset so it does not touch the pane edge -- --map-inset rather
-     than --pad, because this one has to stay in step with --map-width to
-     keep the drawing the size it was. */
+     than --pad, because every pixel here is taken off the drawing inside
+     it, not off the column. */
   padding: 0 var(--map-inset) var(--map-inset);
   pointer-events: none;   /* overlays are readouts; don't block the terminal */
 }
@@ -717,12 +910,19 @@ body {
      inventory is a list, so the two fit in a strip that costs one map's
      worth of height instead of two. */
   #automap { flex: none; width: var(--map-width); }
+  /* Side by side in the strip, so the column order above does not apply;
+     the inventory still takes the slack and still scrolls itself. */
   #inventory { flex: 1; min-width: 0; }
+  #vitals { flex: none; width: 150px; }
 
   #terminal-pane { grid-area: 2 / 1; }
 
-  /* Nothing left to reserve: the readouts are above the text now. */
-  #scrollback.has-map { padding-left: var(--pad); }
+  /* Nothing left to reserve: the readouts are above the text now, so the
+     reservation and the channel that ran down its edge both go. */
+  #scrollback {
+    padding-left: var(--pad);
+    background-image: none;
+  }
 }
 
 /* --- automap --- */
@@ -732,7 +932,7 @@ body {
   background: color-mix(in srgb, var(--bg-raised) 92%, transparent);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 6px;
+  padding: 5px;
   box-shadow: 0 2px 12px rgb(0 0 0 / 0.4);
 }
 
@@ -740,9 +940,9 @@ body {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 5px;
-  padding: 0 2px;
+  gap: 6px;
+  margin-bottom: 4px;
+  padding: 0 1px;
 }
 
 .automap-room {
@@ -768,12 +968,139 @@ body {
 
 .automap-reset:hover { color: var(--foe); }
 
+/* Sized entirely by automap.js, which sets both the CSS box and a backing
+   store of that box times the device pixel ratio.
+
+   No `width: 100%; height: auto` here any more, and no `image-rendering`.
+   Those two between them were the reason the drawing looked rough: they
+   scaled a fixed 306x238 grid down to whatever the panel was, which on a
+   242px panel is 0.79x, so a 2px line landed on a fraction of a device
+   pixel and `pixelated` snapped it to one device pixel here and two there.
+   Drawn at the real ratio there is nothing to resample. */
 #automap-canvas {
   display: block;
-  width: 100%;
-  height: auto;
+  max-width: 100%;
   border-radius: 2px;
-  image-rendering: pixelated;
+}
+
+/* The inventory takes whatever height is left and scrolls inside itself.
+   It is the only readout with no natural size -- a pack of nested
+   containers can be any length -- so it is the one that gives, instead of
+   the map and the bars being pushed up the column by a full pack.
+
+   min-height:0 matters: a flex item will not shrink below its content
+   without it, which is the usual way an overflow:auto child ends up never
+   scrolling and stretching its parent instead. */
+#inventory {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The header stays; only the list scrolls. */
+#inventory-list {
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-bright) transparent;
+}
+
+/* WebKit needs its own vocabulary here, and needs it to draw a classic
+   scrollbar at all: macOS hides overlay scrollbars until you scroll, and
+   styling these pseudo-elements is what opts this one element out.
+   Appears only when the list outgrows its space, on the list's own right
+   edge rather than the column's. */
+#inventory-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+#inventory-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#inventory-list::-webkit-scrollbar-thumb {
+  background: var(--border-bright);
+  border-radius: 3px;
+}
+
+#inventory-list::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-faint);
+}
+
+/* --- vitals --- */
+
+/* Directly under the map, both a fixed height, so neither moves. These
+   are read at a glance mid-fight, and the inventory below them is the
+   one panel that changes size -- so it goes last and absorbs the change
+   rather than shunting these down the column. */
+.vitals {
+  flex: none;
+  padding: 7px 8px;
+}
+
+.vit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.vit-row {
+  display: grid;
+  /* A fixed label column, so the bars start on one line however wide the
+     labels are -- ragged bar starts read as four unrelated widgets. */
+  grid-template-columns: 1.6em 1fr;
+  align-items: center;
+  gap: 7px;
+}
+
+.vit-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  /* Brighter than any of the chrome tones. --fg-faint (#4c5563) is for
+     things you are meant to ignore and --fg-dim (#7c8695) still reads as
+     a caption; these four are labels you look *at*, so they sit just
+     under the body colour. */
+  color: #aab3bf;
+  text-transform: uppercase;
+}
+
+.vit-track {
+  height: 7px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--border) 55%, transparent);
+  overflow: hidden;
+}
+
+/* Transitioned, so regeneration reads as a bar filling rather than as a
+   row of numbers twitching. Width only -- nothing here animates layout. */
+.vit-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 220ms ease-out;
+}
+
+/* One colour per pool, saturated rather than tinted: these are read at a
+   glance mid-fight, and a pastel on a near-black panel is a bar you have
+   to look for.
+
+   They also differ in lightness, not only in hue, so the four stay
+   distinguishable to a colour-blind reader and in a greyscale
+   screenshot -- red darkest, grey lightest. */
+.vit-hits    { background: #b3392c; }        /* brick red */
+/* var(--accent), not the literal: this is the same gold the map paints
+   the room you are standing in with, and naming the token means the two
+   cannot drift apart if the accent is ever retuned. */
+.vit-stamina { background: var(--accent); }  /* the map square's gold */
+.vit-focus   { background: #237038; }        /* dark forest green */
+.vit-mana    { background: #2b579e; }        /* darker blue */
+
+@media (prefers-reduced-motion: reduce) {
+  .vit-fill { transition: none; }
 }
 
 .script-panel {

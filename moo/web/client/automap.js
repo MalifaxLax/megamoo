@@ -103,7 +103,7 @@ const STORAGE_KEY = 'megamoo.automap';
 const map = {
   /** num -> {num, name, exits:[dir], x, y} */
   rooms: new Map(),
-  /** "from>to" -> direction */
+  /** "from>to" -> {dir, door} */
   links: new Map(),
 
   load() {
@@ -116,11 +116,15 @@ const map = {
       for (const room of raw.rooms || []) {
         if (room.ic) this.rooms.set(room.num, room);
       }
-      for (const [key, dir] of raw.links || []) {
+      for (const [key, value] of raw.links || []) {
         const [from, to] = key.split('>').map(Number);
-        if (this.rooms.has(from) && this.rooms.has(to)) {
-          this.links.set(key, dir);
-        }
+        if (!this.rooms.has(from) || !this.rooms.has(to)) continue;
+        // Links used to be stored as a bare direction string. A map saved
+        // by an older client still loads; it simply has no door on it
+        // until those doorways are walked again.
+        this.links.set(key, typeof value === 'string'
+          ? { dir: value, door: false }
+          : { dir: (value && value.dir) || '', door: !!(value && value.door) });
       }
     } catch {
       // A corrupt map is not worth a broken client; start fresh.
@@ -176,7 +180,7 @@ const map = {
    * The path-based placement below is the fallback for a server that
    * does not send it.
    */
-  visit(num, name, exits, fromNum, direction, coords) {
+  visit(num, name, exits, fromNum, direction, coords, door) {
     let room = this.rooms.get(num);
 
     if (!room) {
@@ -196,8 +200,18 @@ const map = {
       room.exact = true;
     }
 
-    if (fromNum != null && fromNum !== num && direction) {
-      this.links.set(fromNum + '>' + num, direction);
+    // A walked move is a link whether or not we can name its direction.
+    //
+    // Requiring a direction here is what left the door between two rooms
+    // undrawn: `directionBetween` gives up on rooms more than one cell
+    // apart, so any pair the layout could not put side by side recorded
+    // no link at all, and the room you had just come from was rendered as
+    // an unconnected box. The bearing is decoration -- it picks the stub
+    // angle when one end runs off the panel. The connection is the fact,
+    // and the player just walked it.
+    if (fromNum != null && fromNum !== num) {
+      this.links.set(fromNum + '>' + num,
+                     { dir: direction || '', door: !!door });
     }
     return room;
   },
@@ -240,44 +254,86 @@ const panel  = document.getElementById('automap');
  * goes through here, so the two cannot get out of step -- a reserved column
  * with no map in it is a stripe of wasted width, and a map with no column
  * is text hidden behind a box. */
+/* The column itself is reserved by the stylesheet whether anything is in
+ * it or not, so this only has to show and hide the map. The panels used to
+ * negotiate the reservation between them; see client.css for why they no
+ * longer do, and what that cost when they did. */
 function showPanel(visible) {
   panel.hidden = !visible;
-  const back = document.getElementById('scrollback');
-  // The column belongs to whichever readout is showing, so it stays
-  // reserved while either does -- the mirror of the test in inventory.js.
-  // Both panels follow the same room rule and so normally appear and go
-  // together, but "normally" is how a stripe of dead space, or a line of
-  // text under a panel, survives a refactor.
-  const inv = document.getElementById('inventory');
-  const wanted = visible || (inv && !inv.hidden);
-  if (back) back.classList.toggle('has-map', !!wanted);
 }
 const canvas = document.getElementById('automap-canvas');
 const label  = document.getElementById('automap-room');
 const ctx    = canvas.getContext('2d');
 
-const CELL = 34;            // backing-store pixels per grid cell
-const VIEW_W = 9;           // cells shown across
-const VIEW_H = 7;           // cells shown down
-const ROOM = 18;            // room box size within a cell
+/**
+ * Cell size, in CSS pixels, and the bounds on how many fit.
+ *
+ * The panel's width is fixed by the stylesheet, because a readout that
+ * changed width would reflow every line of game text beside it on every
+ * move. So the width decides how many columns there are; TARGET_CELL only
+ * decides how big they are, and the actual cell is the width divided by
+ * the column count so no dead strip is left over.
+ *
+ * The height is not fixed, and that is the point: a 9x7 grid drawn for an
+ * inn whose rooms all sit on two rows spent two thirds of the panel on
+ * empty black.
+ */
+const TARGET_CELL = 26;
+const MIN_COLS = 5;
+const MAX_COLS = 11;
+const MIN_ROWS = 1;
+const MAX_ROWS = 9;
+
+/** Room box as a fraction of the cell. */
+const ROOM_FRACTION = 0.55;
+
+/**
+ * Breathing room above and below the drawing, in CSS pixels.
+ *
+ * Pixels rather than a spare row at each end, which is what this was. A
+ * row is a whole cell -- 26px -- and it sits on top of the 6px a room box
+ * already has inside its own cell, so the top of the panel carried 32px
+ * of black before the first room. That reads as the map having drifted
+ * down rather than as margin.
+ *
+ * It can be this small because nothing drawn ever leaves its room's cell:
+ * an unexplored-exit stub reaches 0.38 of a cell from the room's centre
+ * and the cell's own half-height is 0.5, so even eight stubs stay inside.
+ * The only thing this pad has to clear is the rounded corner of the
+ * canvas itself.
+ */
+const EDGE_PAD = 5;
+
+/** Half-length of a door's cross-bar, as a fraction of a cell. */
+const DOOR_TICK = 0.13;
 
 /**
  * Link lengths, in cells, and how each is drawn.
  *
- * A grid cannot embed the world exactly, so connections come in three
- * kinds and conflating them is what makes a map unreadable:
+ * A grid cannot embed the world exactly, so connections come in two kinds
+ * and conflating them is what makes a map unreadable:
  *
  *   1 cell        real adjacency        solid line
- *   2-3 cells     stretched by layout   dashed, dimmer
- *   beyond        different area        a stub at each end
+ *   further       stretched by layout   dashed, dimmer
  *
- * Drawing a stretched link solid claims a corridor that isn't there;
- * drawing it not at all leaves rooms looking severed from a map they are
- * genuinely part of. Dashed says "connected, but the geometry here is
- * approximate", which is the truth.
+ * Drawing a stretched link solid claims a corridor that isn't there.
+ * Dashed says "connected, but the geometry here is approximate", which is
+ * the truth.
+ *
+ * What is *not* a kind of link is "too far to draw". This used to drop the
+ * line entirely past three cells and mark each end with a stub instead,
+ * and the result was the bug that started this: a room you had just walked
+ * to sat at the edge of the panel as a bare grey box, with nothing to say
+ * it was the room you came from. A link with both ends on screen always
+ * gets a line now. Only a link running off the edge degrades to a stub,
+ * because there is genuinely nowhere on the canvas to draw its other end.
  */
 const ADJACENT = 1;
-const STRETCHED_MAX = 3;
+
+/** Geometry for the current draw, recomputed by fit(). */
+let cell = TARGET_CELL;
+let cols = 9;
+let rows = 7;
 
 /**
  * How far a link stops short of a room's centre, as a fraction of a cell.
@@ -289,9 +345,6 @@ const STRETCHED_MAX = 3;
  */
 const LINK_INSET = 0.30;
 
-canvas.width = CELL * VIEW_W;
-canvas.height = CELL * VIEW_H;
-
 const COLORS = {
   bg:       '#08090b',
   room:     '#2f3742',
@@ -301,29 +354,118 @@ const COLORS = {
   link:     '#55606f',
   farLink:  '#4a5262',   // a connection whose other end is off somewhere else
   stub:     '#39424e',
+  door:     '#8b96a6',   // the bar across a doorway; brighter than its line
   text:     '#0c0e11',
 };
 
 /** Current room number, or null before the first Room.Info. */
 let currentNum = null;
 
+/** The panel width and pixel ratio the canvas was last sized for. */
+let sizedFor = { width: 0, ratio: 0 };
+
+/** The canvas's content width in CSS pixels, or 0 while it is hidden. */
+function availableWidth() {
+  const style = getComputedStyle(panel);
+  return panel.clientWidth          // excludes the border, includes padding
+    - parseFloat(style.paddingLeft || 0)
+    - parseFloat(style.paddingRight || 0);
+}
+
+/**
+ * Size the canvas, and pick the window of cells to draw.
+ *
+ * Two separate jobs, both of which the fixed 306x238 backing store used to
+ * get wrong. The backing store is now the CSS box times the device pixel
+ * ratio, so lines land on whole device pixels instead of being resampled:
+ * the old canvas was 306 wide displayed at 242, a 0.79x downscale, with
+ * `image-rendering: pixelated` on top of it — below the resolution the
+ * display can show, and at a ratio that made a 2px line come out 1px in
+ * some places and 2px in others.
+ *
+ * And the vertical window is fitted to the rooms actually in the column,
+ * rather than being a fixed seven rows regardless of what is on them.
+ *
+ * Returns the top-left cell of the window.
+ */
+function fit(here) {
+  const width = availableWidth();
+  if (width <= 0) return null;      // hidden; nothing to size against
+
+  cols = Math.min(MAX_COLS, Math.max(MIN_COLS,
+                                     Math.round(width / TARGET_CELL)));
+  cell = width / cols;
+  const originX = here.x - Math.floor(cols / 2);
+
+  // How tall the rooms in this column actually stand. Only the ones that
+  // can be drawn count -- a room twenty cells east is off the side of the
+  // panel, and letting it stretch the height would add rows that draw
+  // nothing.
+  const level = here.z || 0;
+  let top = here.y;
+  let bottom = here.y;
+  for (const room of map.rooms.values()) {
+    if ((room.z || 0) !== level) continue;
+    if (room.x < originX || room.x >= originX + cols) continue;
+    if (room.y < top) top = room.y;
+    if (room.y > bottom) bottom = room.y;
+  }
+
+  const span = bottom - top + 1;
+  rows = Math.min(MAX_ROWS, Math.max(MIN_ROWS, span));
+
+  // Centre the rooms in the panel while they fit; once they outgrow it,
+  // centre on the player instead so walking pans the map rather than
+  // walking off it.
+  const originY = span <= rows
+    ? top - Math.floor((rows - span) / 2)
+    : here.y - Math.floor(rows / 2);
+
+  const ratio = window.devicePixelRatio || 1;
+  const cssWidth = cols * cell;
+  const cssHeight = rows * cell + EDGE_PAD * 2;
+  canvas.style.width = cssWidth + 'px';
+  canvas.style.height = cssHeight + 'px';
+  canvas.width = Math.round(cssWidth * ratio);
+  canvas.height = Math.round(cssHeight * ratio);
+  // Setting either dimension resets the context, so this has to come
+  // after: from here on every coordinate below is in CSS pixels.
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  sizedFor = { width: width, ratio: ratio };
+
+  return { x: originX, y: originY, width: cssWidth, height: cssHeight };
+}
+
 function draw() {
-  ctx.fillStyle = COLORS.bg;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (panel.hidden) return;
 
   const here = currentNum != null ? map.rooms.get(currentNum) : null;
-  if (!here) return;
+  const view = here ? fit(here) : null;
+  if (!view) return;
+
+  // Painted against the backing store, not the CSS box.
+  //
+  // The cell size is the panel width divided by the column count, so it is
+  // fractional, and so is the height built from it -- 36.2857px, whose
+  // backing store rounds *up* to 73 device pixels at 2x. Filling
+  // view.height covers 72.57 of them and leaves the last row transparent:
+  // a hairline of whatever is behind the canvas along the bottom edge.
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = COLORS.bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
 
   // One level at a time: with real z coordinates, stacked floors would
   // otherwise draw on top of each other.
   const level = here.z || 0;
   const onLevel = (room) => (room.z || 0) === level;
 
-  // Centre the view on the current room.
-  const originX = here.x - Math.floor(VIEW_W / 2);
-  const originY = here.y - Math.floor(VIEW_H / 2);
-  const px = (x) => (x - originX) * CELL + CELL / 2;
-  const py = (y) => (y - originY) * CELL + CELL / 2;
+  const originX = view.x;
+  const originY = view.y;
+  const px = (x) => (x - originX) * cell + cell / 2;
+  const py = (y) => (y - originY) * cell + cell / 2 + EDGE_PAD;
+  const ROOM = Math.round(cell * ROOM_FRACTION);
 
   // --- links, under the rooms ---
   // Only cells near the viewport are worth drawing. A room far outside it
@@ -331,11 +473,12 @@ function draw() {
   // corridor joining two areas the layout placed twenty cells apart would
   // otherwise drag a full-length line straight across the panel.
   const inView = (room) =>
-    room.x >= originX - 1 && room.x <= originX + VIEW_W &&
-    room.y >= originY - 1 && room.y <= originY + VIEW_H;
+    room.x >= originX - 1 && room.x <= originX + cols &&
+    room.y >= originY - 1 && room.y <= originY + rows;
 
   ctx.lineWidth = 2;
-  for (const [key, direction] of map.links.entries()) {
+  for (const [key, link] of map.links.entries()) {
+    const direction = link.dir;
     const [fromNum, toNum] = key.split('>').map(Number);
     const from = map.rooms.get(fromNum);
     const to = map.rooms.get(toNum);
@@ -343,10 +486,10 @@ function draw() {
     // A stair between floors has no line to draw on either floor; the
     // room's up/down badge is what marks it.
     if (!onLevel(from) || !onLevel(to)) continue;
-    if (!inView(from) && !inView(to)) continue;
 
     const span = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
-    if (span <= STRETCHED_MAX) {
+
+    if (inView(from) && inView(to)) {
       // Edge to edge, not centre to centre: leaves the box faces clean
       // and keeps eight exits from converging into a scribble.
       const ax = px(from.x);
@@ -354,8 +497,8 @@ function draw() {
       const bx = px(to.x);
       const by = py(to.y);
       const length = Math.hypot(bx - ax, by - ay) || 1;
-      const ix = ((bx - ax) / length) * CELL * LINK_INSET;
-      const iy = ((by - ay) / length) * CELL * LINK_INSET;
+      const ix = ((bx - ax) / length) * cell * LINK_INSET;
+      const iy = ((by - ay) / length) * cell * LINK_INSET;
 
       const stretched = span > ADJACENT;
       ctx.strokeStyle = stretched ? COLORS.farLink : COLORS.link;
@@ -365,12 +508,30 @@ function draw() {
       ctx.lineTo(bx - ix, by - iy);
       ctx.stroke();
       ctx.setLineDash([]);       // stubs below must not inherit the dash
+
+      // A door is the same line in the same direction with a bar across
+      // it -- the dungeon-mapper convention. Drawn rather than coloured
+      // so it survives a colour-blind reader and a greyscale screenshot,
+      // and across the line rather than as a gap in it so it cannot be
+      // mistaken for a rendering seam at small cell sizes.
+      if (link.door) {
+        const nx = -(by - ay) / length;
+        const ny = (bx - ax) / length;
+        const reach = cell * DOOR_TICK;
+        ctx.strokeStyle = COLORS.door;
+        ctx.beginPath();
+        ctx.moveTo((ax + bx) / 2 + nx * reach, (ay + by) / 2 + ny * reach);
+        ctx.lineTo((ax + bx) / 2 - nx * reach, (ay + by) / 2 - ny * reach);
+        ctx.stroke();
+      }
       continue;
     }
 
-    // Too far to draw honestly as a straight line. Mark it at whichever
-    // end is on screen with a stub pointing the way, so the connection
-    // still reads without a wire crossing everything between.
+    if (!inView(from) && !inView(to)) continue;
+
+    // One end is off the panel, so there is nowhere to draw it. Mark the
+    // end that is on screen with a stub pointing the way, so the
+    // connection still reads without a wire running to nothing.
     ctx.strokeStyle = COLORS.farLink;
     for (const [near, far] of [[from, to], [to, from]]) {
       if (!inView(near)) continue;
@@ -390,8 +551,8 @@ function draw() {
       }
       ctx.beginPath();
       ctx.moveTo(px(near.x), py(near.y));
-      ctx.lineTo(px(near.x) + ux * CELL * 0.44,
-                 py(near.y) + uy * CELL * 0.44);
+      ctx.lineTo(px(near.x) + ux * cell * 0.44,
+                 py(near.y) + uy * cell * 0.44);
       ctx.stroke();
     }
   }
@@ -407,13 +568,14 @@ function draw() {
       if (!offset) continue;
       // Skip exits we have already walked; those are drawn as links.
       const walked = Array.from(map.links.entries()).some(
-        ([key, d]) => d === dir && Number(key.split('>')[0]) === room.num);
+        ([key, other]) => other.dir === dir &&
+                          Number(key.split('>')[0]) === room.num);
       if (walked) continue;
       const [dx, dy] = offset;
       ctx.beginPath();
       ctx.moveTo(px(room.x), py(room.y));
-      ctx.lineTo(px(room.x) + dx * CELL * 0.38,
-                 py(room.y) + dy * CELL * 0.38);
+      ctx.lineTo(px(room.x) + dx * cell * 0.38,
+                 py(room.y) + dy * cell * 0.38);
       ctx.stroke();
     }
   }
@@ -424,7 +586,7 @@ function draw() {
     const x = px(room.x) - ROOM / 2;
     const y = py(room.y) - ROOM / 2;
     if (x < -ROOM || y < -ROOM ||
-        x > canvas.width || y > canvas.height) continue;
+        x > view.width || y > view.height) continue;
 
     const isHere = room.num === currentNum;
     ctx.fillStyle = isHere ? COLORS.current : COLORS.room;
@@ -439,7 +601,8 @@ function draw() {
       .filter(Boolean);
     if (badges.length) {
       ctx.fillStyle = isHere ? COLORS.text : COLORS.roomEdge;
-      ctx.font = '9px ui-monospace, Menlo, monospace';
+      ctx.font = Math.max(8, Math.round(cell * 0.34)) +
+                 'px ui-monospace, Menlo, monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(Array.from(new Set(badges)).join(''),
@@ -464,6 +627,21 @@ let pendingDirection = null;
 let previousNum = null;
 
 /**
+ * Whether the move in progress went through a named exit.
+ *
+ * A compass word moves you through a passage; anything else that moves
+ * you at all moved you through a thing -- a door, an arch, a stair. That
+ * is the whole distinction, and the client can see it without the server
+ * having to describe the room's topology.
+ *
+ * It is set from the input rather than from the server, so a move a
+ * script makes with no preceding command inherits whatever the last typed
+ * command implied. The cost of being wrong is a tick drawn on a passage,
+ * not a room in the wrong place.
+ */
+let pendingDoor = false;
+
+/**
  * The last command that wasn't `.`, mirroring the server's `last_command`.
  *
  * `.` repeats the previous command, and the expansion happens server-side
@@ -484,7 +662,8 @@ const Automap = {
       const effective = text === '.' ? lastCommand : text;
       if (text !== '.') lastCommand = text;
       const dir = directionOf(effective);
-      if (dir) pendingDirection = dir;
+      pendingDirection = dir;
+      pendingDoor = !dir;
     });
 
     // A map is a picture of where you are. Once the socket is gone it is a
@@ -504,7 +683,9 @@ const Automap = {
     api.on('gmcp:Room.Info', (room) => {
       if (!room || room.num == null) return;   // older server: no identity
       let direction = pendingDirection;
+      const door = pendingDoor;
       pendingDirection = null;
+      pendingDoor = false;
 
       // Two kinds of room are not part of the world map, and they are
       // handled the same way.
@@ -537,7 +718,7 @@ const Automap = {
       }
 
       const record = map.visit(room.num, room.name || '', room.exits,
-                               previousNum, direction, room.coords);
+                               previousNum, direction, room.coords, door);
       previousNum = room.num;
       currentNum = room.num;
 
@@ -568,6 +749,40 @@ const Automap = {
 
 document.getElementById('automap-reset')
   .addEventListener('click', () => Automap.reset());
+
+/* Redraw when the panel's width changes or the page moves to a display
+ * with a different pixel ratio -- both change what fit() would compute,
+ * and neither raises a Room.Info to trigger a redraw on its own.
+ * `--map-width` is `min(268px, 42vw)`, so a narrow window resizes it, and
+ * the 700px breakpoint relays it entirely.
+ *
+ * Guarded on the width rather than firing on every observed change: fit()
+ * sets the canvas height, which resizes the panel, which notifies the
+ * observer. Comparing against what the canvas was last sized for makes
+ * that second notification a no-op instead of a loop. */
+function refit() {
+  const width = availableWidth();
+  const ratio = window.devicePixelRatio || 1;
+  if (width > 0 &&
+      (Math.abs(width - sizedFor.width) > 0.5 || ratio !== sizedFor.ratio)) {
+    draw();
+  }
+}
+
+// Held in a variable rather than discarded as `new ResizeObserver(...)
+// .observe(panel)`. An observer nothing refers to is collectable, and one
+// that has been collected simply stops calling back -- which is not a
+// crash, just a panel that quietly keeps its old size until something
+// else redraws it.
+const panelObserver = typeof ResizeObserver === 'function'
+  ? new ResizeObserver(refit)
+  : null;
+if (panelObserver) panelObserver.observe(panel);
+
+// The observer alone is not enough: moving the window to a display with a
+// different pixel ratio changes what the backing store should be without
+// changing any element's size, so nothing is observed at all.
+window.addEventListener('resize', refit);
 
 window.Automap = Automap;
 
