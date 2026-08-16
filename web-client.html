@@ -37,6 +37,7 @@
     <ol>
         <li><a href="#running">Turning it on</a></li>
         <li><a href="#what">What players get</a></li>
+        <li><a href="#worlds">The worlds index</a></li>
         <li><a href="#files">The files</a></li>
         <li><a href="#wiring">Wiring it up</a></li>
         <li><a href="#protocol">The wire protocol</a></li>
@@ -115,6 +116,106 @@ levels.
 What the server does <em>not</em> send is where each exit leads. That would
 hand players the topology of rooms they have never visited, so unexplored
 exits draw as short stubs — a visible frontier rather than a spoiler.
+</p>
+
+<h3>Client commands</h3>
+
+<p>
+A line beginning with <code>\</code> is the client's own and never reaches
+the game. The set and its spelling follow MegaTerm's, so muscle memory
+carries between the native client and the browser.
+</p>
+
+<pre><code>\help                        every command
+\con [handle] [host] [port] [user] [pass]
+\save                        remember the session in play
+\sessions                    list saved worlds
+\default [handle]            where a bare \con goes
+\forget &lt;handle&gt;             delete one, password included
+\prefix [char]               change the \ itself
+\alias, \unalias, \trigger, \clear, \speech, \disconnect
+</code></pre>
+
+<p>
+The first five are a <strong>session book</strong>. Name a world once and it
+is a word from then on:
+</p>
+
+<pre><code>\con home localhost 8888     name it and connect
+\save                        remember it
+\con home                    from now on
+</code></pre>
+
+<p>
+The port is the <strong>web</strong> port, not the telnet one — the browser
+speaks WebSocket. A world serving telnet on 6777 and its client on 8890
+wants <code>8890</code> here.
+</p>
+
+<p>
+There is a <strong>World:</strong> field in the header doing the same thing
+without the keyboard. It takes a saved name, or <code>name host:port</code>
+to add one, and saved worlds autocomplete as you type.
+</p>
+
+<h3>Reaching another world</h3>
+
+<p>
+Naming a world on a different port does <em>not</em> re-point the socket —
+it opens that world's own page. The reason is not stylistic: the server
+answers <strong>403</strong> to a WebSocket whose <code>Origin</code> is not
+its <code>Host</code>, so that no page a logged-in player happens to visit
+can open a socket and drive their game as them. A world serves its own
+client, so arriving there makes the socket same-origin and the question
+stops existing.
+</p>
+
+<p>
+Only the handle travels, in <code>?session=</code>. A password never goes
+in a URL — query strings reach history, bookmarks, logs and referrers. The
+world you land on looks the name up in <em>its own</em> storage, so
+credentials are read on the origin that already had them.
+</p>
+
+<p>
+That has a consequence worth knowing: <code>localStorage</code> is
+per-origin, so <strong>each world's page keeps its own session book</strong>.
+Saving a world on one does not save it on another.
+</p>
+
+<p>
+Every world also serves <code><a href="#worlds">/worlds</a></code>, an index
+of everything running on that machine.
+</p>
+
+<h3 id="worlds">The worlds index</h3>
+
+<p>
+<code>http://localhost:8888/worlds</code> lists every MegaMOO running on the
+machine, each linked to its own client. It reads
+<code>~/.megamoo/run</code>, where a world started with
+<code>megamoo --dev</code> publishes itself, and checks each entry against
+its process before listing it, so a world that crashed is not still offered.
+One bookmark that needs no maintenance as worlds come and go.
+</p>
+
+<p>
+It is <strong>loopback only</strong>, and answers 404 to anything else
+rather than 403, so its existence is not advertised either. The web port
+commonly binds <code>0.0.0.0</code>; without that rule this page would hand
+anyone on the network a map of the machine — every world, its ports and its
+file paths.
+</p>
+
+<h3>Storing passwords</h3>
+
+<p>
+<code>\save</code> can store a username and password so a world logs you
+straight in. Both sit in <code>localStorage</code> in plain text, readable
+by any script on that origin, and <code>ws://</code> sends them
+unencrypted. Fine for a world on your own machine; think twice on a shared
+one or a public server. <code>\save</code> says so the first time it stores
+a password for a handle.
 </p>
 
 <h2 id="files">The files</h2>

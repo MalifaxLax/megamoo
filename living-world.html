@@ -38,6 +38,7 @@
         <li><a href="#tickers">Tickers — an object doing something repeatedly</a></li>
         <li><a href="#effects">Effects — a temporary state on a character</a></li>
         <li><a href="#which">Which one do I want?</a></li>
+        <li><a href="#startup">Running code when the world starts</a></li>
     </ol>
 </nav>
 
@@ -190,6 +191,51 @@ The character sees the effect arrive, repeat, and wear off on its own:
 <tr><td>You write the verb it calls, on the object.</td><td>You write the effect once on <code>$eu</code>, and anything can apply it.</td></tr>
 </tbody>
 </table>
+</div>
+
+<h2 id="startup">Running code when the world starts</h2>
+
+<p>
+A ticker has to be registered before it can fire, and registration does not
+survive being set up by hand once. Anything a world needs done on <em>every</em>
+start — register a ticker, prime a cache, open a gate — goes in
+<code>$startup_evals</code>, a list of expressions on <code>#0</code>:
+</p>
+
+<div class="term"><code>#0.startup_evals = ["ticker_add(60, 'sweep', $bin, 'sweep')"]</code></div>
+
+<p>
+Each entry is evaluated the way <code>eval</code> evaluates one, so what goes
+in the list is written in the same language as everything else in the world.
+They run after the database, the listeners, the tickers and the background
+tasks are all up, so an entry can register a ticker or reach the network
+without needing ordering rules of its own.
+</p>
+
+<p>
+Keep each subsystem's line <em>with</em> that subsystem rather than as a
+literal in the list — a property on the object it belongs to, gathered into
+<code>#0</code>:
+</p>
+
+<div class="term"><code>$bin.sweep_eval = "ticker_add(60, 'sweep', $bin, 'sweep')"
+#0.startup_evals = [$bin.sweep_eval]</code></div>
+
+<p>
+That stores the <em>value</em> of <code>$bin.sweep_eval</code>, not a live
+reference to it. Editing the property later does not change the list; the
+property is where the line lives, and the list is a snapshot of what runs.
+</p>
+
+<div class="note">
+    <span class="label">A broken entry cannot stop the server</span>
+    <p>Each entry is isolated, and so is the machinery around them: a failure
+       is logged and the next one runs. These are edited from inside a running
+       game, where a typo is an ordinary afternoon — and a server that will
+       not boot because of a line you can only fix from inside it is a trap.
+       Check the startup log to see what ran:</p>
+    <div class="term"><code>Running 1 startup eval(s) from $startup_evals
+  startup_evals[0] ok: ticker_add(60, 'sweep', ...)</code></div>
 </div>
 
 <div class="pagenav">
