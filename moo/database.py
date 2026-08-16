@@ -1408,12 +1408,29 @@ class Database:
 
         Yields:
             MOOObject: Each live object, in ascending objnum order.
+
+        Thread-safety:
+            The query runs under the database lock, which is what every
+            other method here does and this one did not.  The connection
+            is opened ``check_same_thread=False`` and is shared, so two
+            unsynchronised walks interleaved on it and rows came back
+            empty -- ``ValueError: not enough values to unpack`` out of
+            the loop below, then ``Error loading object #None``.  Not a
+            free-threading problem: it reproduces with the GIL on, and
+            ``roommap.build_layout`` calls this on every login.
+
+            The rows and the recycled set are taken together so the walk
+            sees one consistent view, and the yields happen *outside* the
+            lock: a caller that stops part-way through the generator
+            would otherwise hold the database for as long as it liked.
         """
-        rows = self._conn.execute(
-            "SELECT objnum FROM objects ORDER BY objnum"
-        ).fetchall()
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT objnum FROM objects ORDER BY objnum"
+            ).fetchall()
+            recycled = frozenset(self._index.recycled_objects)
         for (objnum,) in rows:
-            if objnum not in self._index.recycled_objects:
+            if objnum not in recycled:
                 try:
                     yield self.get_object(objnum)
                 except Exception as e:
@@ -1777,24 +1794,44 @@ class Database:
         # _mark_modified sets _all_dirty for everything else, so a save
         # this code did not anticipate still writes the lot.
         if not getattr(obj, '_all_dirty', True):
-            for name in getattr(obj, '_dirty_props', ()):
-                prop = obj.properties.get(name)
-                if prop is None:
-                    self._conn.execute(
-                        "DELETE FROM properties WHERE objnum = ? AND name = ?",
-                        (objnum, name)
-                    )
-                    continue
-                self._conn.execute(
-                    """INSERT INTO properties (objnum, name, value, owner, perms)
-                       VALUES (?, ?, ?, ?, ?)
-                       ON CONFLICT(objnum, name) DO UPDATE SET
-                           value = excluded.value,
-                           owner = excluded.owner,
-                           perms = excluded.perms""",
-                    (objnum, name, json.dumps(prop.value), prop.owner, prop.perms)
-                )
+            # Take the set and leave a fresh one behind before writing.
+            # Iterating the live set is a crash: a property assigned on
+            # another thread grows it mid-loop and the save dies with
+            # "Set changed size during iteration".  Not only a
+            # free-threading concern -- verbs are serialised by the baton,
+            # but this is reached from the loop's checkpoint and from the
+            # API thread too.
+            #
+            # Swapping, rather than clearing after the loop, is what keeps
+            # a mark made *while* we were writing: it lands in the new set
+            # and is saved next time, where a trailing reset dropped it.
+            taken = tuple(obj.__dict__.get('_dirty_props') or ())
             obj.__dict__['_dirty_props'] = set()
+            try:
+                for name in taken:
+                    prop = obj.properties.get(name)
+                    if prop is None:
+                        self._conn.execute(
+                            "DELETE FROM properties WHERE objnum = ? AND name = ?",
+                            (objnum, name)
+                        )
+                        continue
+                    self._conn.execute(
+                        """INSERT INTO properties (objnum, name, value, owner, perms)
+                           VALUES (?, ?, ?, ?, ?)
+                           ON CONFLICT(objnum, name) DO UPDATE SET
+                               value = excluded.value,
+                               owner = excluded.owner,
+                               perms = excluded.perms""",
+                        (objnum, name, json.dumps(prop.value), prop.owner, prop.perms)
+                    )
+            except Exception:
+                # Give back everything taken, merged with whatever arrived
+                # meanwhile, so a failed save retries instead of silently
+                # dropping the changes.  Rewriting a name that did land is
+                # harmless: the statement above is an upsert.
+                obj.__dict__['_dirty_props'].update(taken)
+                raise
             return
 
         # Replace all properties
