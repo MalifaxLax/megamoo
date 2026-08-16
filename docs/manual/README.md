@@ -174,7 +174,7 @@ with what it buys and what it costs.
 
 ## Versions and conventions used in this manual
 
-- **Engine version:** `0.10.0-beta14`, the single source of truth being
+- **Engine version:** `0.10.0-beta15`, the single source of truth being
   `SERVER_VERSION` in `moo/globals.py` (printed by the startup banner and
   `megamoo.py --version`). The engine has not yet been load- or play-tested, so
   it is pre-release by design.
