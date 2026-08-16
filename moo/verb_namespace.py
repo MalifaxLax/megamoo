@@ -281,6 +281,19 @@ def _parse_verb_inst_into_namespace(verb_inst, namespace: Dict[str, Any]) -> Non
 
     # Word list and regex match
     namespace['arglist'] = getattr(verb_inst, 'arglist', [])
+    # Published as `regex_match`, not `match`.
+    #
+    # `match` is also the name of an object-matching builtin, and layer 5
+    # (_inject_moo_builtins) runs after this one -- so the regex match
+    # object harvested here was overwritten every time, and a verb author
+    # following MasterVerb's docstring got a callable instead. It is the
+    # only harvested name that collides with a builtin.
+    #
+    # `match` is still set below for the docstring's sake, but *before*
+    # the builtins land, so the builtin continues to win and nothing that
+    # calls match(...) changes behaviour. Code that wants the regex asks
+    # for regex_match and gets it.
+    namespace['regex_match'] = getattr(verb_inst, 'match', None)
     namespace['match'] = getattr(verb_inst, 'match', None)
 
     # MUSH-style switches (e.g. @create/quiet)

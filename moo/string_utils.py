@@ -347,6 +347,27 @@ class StringUtils:
             text = _sub_token(text, 'U', cap_noun)
             text = _sub_token(text, 'u', noun)
 
+        def _protect(value):
+            """Keep a substituted name from being read as tokens itself.
+
+            Names go in over three passes -- subject, then direct object,
+            then indirect -- and each pass rescans the whole string. So a
+            name containing a sigil was substituted *again* by a later
+            pass: an object called "a &d" inserted at the subject step had
+            its "&d" replaced by the direct object's name at the next one,
+            and a name carrying "&<196>" put a colour code into a line
+            that never asked for one.
+
+            Neutralised with the escape this function already uses for a
+            deliberately doubled sigil, so the marker is turned back on
+            the way out and the name displays as it was written.
+
+            Names only. The %N raw-string slots are left alone: callers
+            there are documented as escaping their own values, and doing
+            it twice would show the doubling.
+            """
+            return value.replace(SUBST_SIGILS[0], _ESC) if value else value
+
         # --- Subject tokens: gender pronouns first, then %s / %S / $s / $S ---
         if sub is not None:
             # Replace gender pronouns (%ps, %po, etc.) via regex
@@ -355,22 +376,22 @@ class StringUtils:
             )
             sname = _getprop(sub, 'name', '')
             scap = self.capitalise(sname)
-            text = _sub_token(text, 's', sname)
-            text = _sub_token(text, 'S', scap)
+            text = _sub_token(text, 's', _protect(sname))
+            text = _sub_token(text, 'S', _protect(scap))
 
         # --- Direct object tokens: %d / %D / $d / $D ---
         if dob is not None:
             dname = _getprop(dob, 'name', '')
             dcap = self.capitalise(dname)
-            text = _sub_token(text, 'd', dname)
-            text = _sub_token(text, 'D', dcap)
+            text = _sub_token(text, 'd', _protect(dname))
+            text = _sub_token(text, 'D', _protect(dcap))
 
         # --- Indirect object tokens: %i / %I / $i / $I ---
         if iob is not None:
             iname = _getprop(iob, 'name', '')
             icap = self.capitalise(iname)
-            text = _sub_token(text, 'i', iname)
-            text = _sub_token(text, 'I', icap)
+            text = _sub_token(text, 'i', _protect(iname))
+            text = _sub_token(text, 'I', _protect(icap))
 
         return text.replace(_ESC, SUBST_SIGILS[0] * 2)
 
