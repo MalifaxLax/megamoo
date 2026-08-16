@@ -225,10 +225,22 @@ def make_exit(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
     # there is no direction to announce.
     _fname = fname or noun
     if _fname:
-        from .globals import ESUCC, EOSUCC, EODROP
+        from .globals import ESUCC, EOSUCC, EODROP, GESUCC, GEOSUCC
         _rfname = rfname or _fname
-        new_exit.add_property('success', ESUCC.replace('&1', _fname), perms='rc')
-        new_exit.add_property('osuccess', EOSUCC.replace('&1', _fname), perms='rc')
+        if fname:
+            # A direction was named, so the name belongs in the sentence:
+            # you go north, you do not go through north.
+            _succ, _osucc = (ESUCC.replace('&1', _fname),
+                             EOSUCC.replace('&1', _fname))
+        else:
+            # A named exit -- a door, an archway, drapes -- is a thing you
+            # go through, and &d reads its name at emit time so a later
+            # rename carries.  Only @open names a direction; the four
+            # named-exit builders pass none, which is what tells them
+            # apart here without make_exit having to know their parents.
+            _succ, _osucc = GESUCC, GEOSUCC
+        new_exit.add_property('success', _succ, perms='rc')
+        new_exit.add_property('osuccess', _osucc, perms='rc')
         new_exit.add_property('odrop', EODROP.replace('&1', _rfname), perms='rc')
 
     # Set destination

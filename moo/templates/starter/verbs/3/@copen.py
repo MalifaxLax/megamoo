@@ -10,6 +10,9 @@ Arguments:
     destination  - Optional room ID (#N) to link the exit to.
 
 Switches:
+    /noadd  - Do not place the exit in the room or list it among its
+              exits. It goes nowhere, and is reachable only through a
+              property that names it, such as <object>.behind_exit.
     /noret  - Do not create a return exit at the destination.
 
 Auth: gm2+ (auth_level 2)
@@ -56,7 +59,29 @@ elif dest_str:
 parent = db.get_object(24)
 new_exit = ou.make_exit(parent, db, pobj, noun=name, room=room, dest=dest)
 
+# /noadd -- an exit only something else can reach.
+#
+# make_exit does two things: it moves the exit into the room and it lists
+# the objnum in room.exits.  Both have to be undone, because either one on
+# its own still leaves the exit walkable by name.  room.exits is what
+# match_exit searches, and it resolves those numbers straight to objects
+# without ever looking at where they are -- an exit moved inside another
+# object went on answering to `go <name>` exactly as before.  And #17 go
+# falls back to matching room.contents when match_exit finds nothing, so
+# an exit merely dropped from the list is still reachable if it is lying
+# in the room.
+#
+# Out of both, the exit is reachable only from a property that names it:
+# <object>.behind_exit and its in_/on_/under_/through_ siblings.  gmove
+# only reads destination, so nowhere is a perfectly good place to be.
+if 'noadd' in switches:
+    room.exits = [n for n in (room.exits or []) if n != new_exit.objnum]
+    room._mark_modified()
+    new_exit.location = None
+
 pobj.msg(f"You created a new climbable exit &<245>#{new_exit.objnum}:{new_exit.name}&n.")
+if 'noadd' in switches:
+    pobj.msg("&<245>It is not in the room -- point something at it, e.g. @set #N.behind_exit = #%d&n" % new_exit.objnum)
 
 if dest:
     pobj.msg(f"Exit linked to: &<245>#{dest.objnum}:{dest.name}&n")

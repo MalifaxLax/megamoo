@@ -602,6 +602,20 @@ ESUCC = "You &MODE &1."
 EOSUCC = "&S &OMODE &1."
 EODROP = "&S &OMODE in from the &1."
 
+# Default messages for a *named* exit -- a door, an archway, drapes.
+#
+# You go through one of those, where you simply go north, so these cannot
+# share the templates above: "You walk through north." is not a sentence
+# anybody wants. make_exit picks between the two on whether the caller
+# named a direction.
+#
+# &d rather than a &1 slot, so the name is read off the exit at the
+# moment the line is emitted. A directional exit is called north for
+# good, but a door gets renamed, and a message with the noun baked in at
+# creation went on announcing whatever it was called that day.
+GESUCC = "You &MODE through &d."
+GEOSUCC = "&S &OMODE through &d."
+
 # Default directional exit failure messages
 DIRECTIONAL_EXIT_FAILURES = {
     'succ': "You &MODE &dir.",
