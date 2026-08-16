@@ -651,6 +651,21 @@ class Database:
             # Create object
             obj = MOOObject(objnum=objnum, parent=parent, owner=owner)
 
+            # Fertile from birth.
+            #
+            # LambdaMOO makes objects infertile by default and expects
+            # `@chmod +f` before anyone may descend from one. That is a
+            # permission model for a world with untrusted programmers; the
+            # gate on writing a verb here is already gm3, so all the
+            # default actually bought was "Object #N is not fertile" the
+            # first time a builder used something they had just made as a
+            # prototype.
+            #
+            # Set as a flag rather than by rewriting `is_fertile`, so the
+            # flag keeps meaning what it says and clearing it on something
+            # you genuinely want left childless still works.
+            obj.set_flag(ObjectFlags.FERTILE)
+
             # Set database reference and enable auto-save
             obj._database = self
             obj.enable_auto_save(self)
