@@ -94,5 +94,11 @@ room._mark_modified()
 pobj.msg(f"You created a new exit &<245>#{new_exit.objnum}:{name}&n.")
 if dest:
     pobj.msg(f"Exit linked to: &<245>#{dest.objnum}:{dest.name}&n")
+    # See the same block in @vopen: the direction is known here, so the
+    # destination gets coordinated now rather than never.
+    from moo.roommap import place_relative
+    changed, note = place_relative(room, name, dest, db)
+    if note:
+        pobj.msg(note)
 else:
     pobj.msg("Exit not linked.")

@@ -15,7 +15,7 @@
 <p class="tagline">Every staff command, grouped by what it is for.</p>
 
 <p>
-The 79 commands below are attached to <code>#3</code>, so every character
+The 80 commands below are attached to <code>#3</code>, so every character
 inherits them. What you may actually use depends on your
 <a href="verbs.html#auth">level</a> — the middle column. Without it, a command
 answers <code>Do what?</code>, exactly as if it did not exist.
@@ -71,12 +71,13 @@ works too.
 <tr><td><code>@dig</code></td><td><code>gm2</code></td><td>Create a room. <code>@dig/types</code> lists the types, <code>@dig/tel</code> puts you in it.</td></tr>
 <tr><td><code>@vopen</code></td><td><code>gm2</code></td><td>A compass exit with no object behind it. The usual choice.</td></tr>
 <tr><td><code>@open</code></td><td><code>gm2</code></td><td>A compass exit as a real object, which can carry behaviour.</td></tr>
-<tr><td><code>@gopen</code></td><td><code>gm2</code></td><td>A named exit you walk through — a gate, an arch.</td></tr>
+<tr><td><code>@gopen</code></td><td><code>gm2</code></td><td>A named exit you walk through — a gate, an arch. A trailing direction (<code>@gopen door east</code>) is what lets the map draw it.</td></tr>
 <tr><td><code>@dopen</code></td><td><code>gm2</code></td><td>A door: it opens, closes and locks.</td></tr>
 <tr><td><code>@copen</code></td><td><code>gm2</code></td><td>A climbable exit — stairs, a ladder.</td></tr>
 <tr><td><code>@jopen</code></td><td><code>gm2</code></td><td>A jumpable exit — a gap or chasm.</td></tr>
 <tr><td><code>@rmexit</code> <span class="c">(@rme)</span></td><td><code>gm2</code></td><td>Remove an exit.</td></tr>
 <tr><td><code>@virtualize</code> <span class="c">(@virt)</span></td><td><code>gm2</code></td><td>Turn an exit object into a virtual one, keeping its messages.</td></tr>
+<tr><td><code>@coord</code></td><td><code>gm2</code></td><td>Say where a room is, so the map draws it there rather than deriving it. <code>@coord/fill</code> works outward from one room to the rest.</td></tr>
 </tbody>
 </table>
 </div>

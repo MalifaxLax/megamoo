@@ -110,3 +110,15 @@ if enum not in obvexits:
 
 room._mark_modified()
 pobj.msg(f"You created a new virtual &<245>{name}&n exit to &<245>#{dest.objnum}:{dest.name}&n.")
+
+# Coordinate the destination while we are standing next to it.
+#
+# Linking two rooms in a stated direction is exactly the fact the mapper
+# needs, and it is known here and nowhere else -- asking the builder to
+# run @coord afterwards means a world that is coordinated only where
+# somebody remembered.  Nothing is written unless the answer is
+# unambiguous; place_relative reports instead of guessing.
+from moo.roommap import place_relative
+changed, note = place_relative(room, name, dest, db)
+if note:
+    pobj.msg(note)
