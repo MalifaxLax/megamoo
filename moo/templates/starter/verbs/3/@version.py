@@ -9,6 +9,7 @@ Switches:
     /server - The engine build alone.
     /db     - What the world declares, and which template it came from.
 
+Abbrev:  @version=4
 Auth: gm1+ (auth_level 1)
 
 Two different facts, and a bug report wants both. The engine build says
