@@ -57,6 +57,52 @@ from .connection import WebSocketConnection
 # a splash the client is told about and the server refuses to serve.
 from ..login import SPLASH_IMAGE_NAMES
 
+#: Content-Security-Policy for everything this server hands the browser.
+#:
+#: The reason it exists is player scripts. The JS script host runs
+#: untrusted, shareable code in a Worker and deletes the network globals
+#: -- fetch, XMLHttpRequest, WebSocket, EventSource -- to keep it from
+#: phoning home. That blocklist cannot cover dynamic `import()`, which is
+#: an operator rather than a deletable property, so a shared script could
+#: register a catch-all trigger and stream a player's entire session to a
+#: third party. Deleting globals is whack-a-mole; a policy the browser
+#: enforces is not.
+#:
+#: What each directive is for, since tightening one can silently break the
+#: client:
+#:   default-src 'self'      nothing loads from anywhere else by default
+#:   connect-src 'self'      the game socket only -- this is the egress
+#:                           stop, and it covers ws:// to the same origin
+#:   script-src              'self' for the client's own files; blob: for
+#:                           the Worker the JS host builds; and
+#:                           'wasm-unsafe-eval' because the Lua host runs
+#:                           a real Lua 5.4 VM compiled to wasm (wasmoon),
+#:                           which will not start without it
+#:   worker-src 'self' blob: the script hosts are blob-URL Workers
+#:   img-src 'self' data:    a world's splash, and data: URIs in art
+#:   style-src               'unsafe-inline' because the readouts set
+#:                           element .style directly (bar widths, canvas
+#:                           sizing); this is inline *attributes*, not
+#:                           injected markup, and every string reaching
+#:                           the DOM still goes through textContent
+#:   frame-ancestors 'none'  nothing embeds this page in a frame
+#:   base-uri 'self'         a <base> tag cannot re-point relative URLs
+#:   form-action 'self'      no form posts off-origin
+_CSP = (
+    "default-src 'self'; "
+    "connect-src 'self'; "
+    "script-src 'self' blob: 'wasm-unsafe-eval'; "
+    "worker-src 'self' blob:; "
+    "img-src 'self' data:; "
+    "style-src 'self' 'unsafe-inline'; "
+    "font-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'; "
+    "frame-ancestors 'none'"
+)
+
+
 if TYPE_CHECKING:
     from ..server import MegaMOOServer
 
@@ -571,6 +617,49 @@ class WebServer:
             })
         return out
 
+    #: The literal the shipped client carries, swapped for the world's own
+    #: name on the way out. A literal rather than a template placeholder so
+    #: that index.html stays a file you can open directly from disk and see
+    #: a working page, which is worth more than saving this constant.
+    _DEFAULT_TITLE_TAG = b'<title>MegaMOO</title>'
+
+    def _name_the_world(self, data: bytes) -> bytes:
+        """
+        Put this world's name in the served page's title.
+
+        The name is already established: ``$title`` on #0, falling back to
+        the config's ``server_name`` -- the same answer the login splash
+        gives, so the tab and the banner cannot disagree about what the
+        game is called.
+
+        Substituted here rather than written into the client, because the
+        client is the engine's and the name is the world's. A world that
+        has not renamed itself answers "MegaMOO Server"; close enough to
+        the shipped literal that the swap is invisible, and honest.
+
+        Escaped, and only ever into a <title>, whose content is text --
+        but escaped anyway, because "it can only be text" is exactly the
+        assumption that stops being true when someone later reuses this.
+        Any failure leaves the page alone: a wrong tab title is a nuisance
+        and an unservable client is an outage.
+        """
+        try:
+            if self._DEFAULT_TITLE_TAG not in data:
+                return data
+            from ..login import _world_name
+            title = _world_name(self.server.database, self.server.config)
+            if not title or title == 'MegaMOO':
+                return data
+            import html
+            safe = html.escape(title.strip()[:60], quote=True)
+            return data.replace(
+                self._DEFAULT_TITLE_TAG,
+                f'<title>{safe}</title>'.encode('utf-8'))
+        except Exception:
+            logger.debug('could not name the world in index.html',
+                         exc_info=True)
+            return data
+
     async def _serve_worlds(self, writer: asyncio.StreamWriter):
         """
         A page listing every world running on this machine.
@@ -729,11 +818,14 @@ class WebServer:
         # Read the file and send it with appropriate headers
         try:
             data = file_path.read_bytes()
+            if name == 'index.html':
+                data = self._name_the_world(data)
             header = (
                 f"HTTP/1.1 200 OK\r\n"
                 f"Content-Type: {content_type}\r\n"
                 f"Content-Length: {len(data)}\r\n"
                 f"Cache-Control: no-cache\r\n"
+                f"Content-Security-Policy: {_CSP}\r\n"
                 f"Connection: close\r\n"
                 f"\r\n"
             )
