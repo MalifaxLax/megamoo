@@ -16,6 +16,17 @@ rather than a hand-written one. The check that shipped the compass bug
 compared verb *code* and passed, because the code was identical -- the
 names disagreed. Any check that is not literally the server's will drift
 away from it again, so this imports the real thing.
+
+The same rule applies to deciding which verb a *file* is, and it took a
+Python upgrade to notice it had been broken here. These tests used to
+walk `rglob('*.py')` and read the name off `Path.stem`; the loader walks
+`scan_verb_files` and takes `fname[:-3]`. Those agreed on every ordinary
+name and disagreed on exactly one: `#15`'s `.`, whose file is `..py`.
+Python 3.14 changed `Path('..py').stem` from `'.'` to `'..py'`, so on
+3.14 these tests reported the `.` verb as having no file at all while
+the server loaded it perfectly well. The test was wrong, not the engine.
+So the scan is imported too, and there is now no second opinion about
+what a verb file is called.
 """
 import json
 import pathlib
@@ -24,6 +35,7 @@ import sqlite3
 import pytest
 
 from moo.server import _verb_matches_file
+from moo.verb_loader import scan_verb_files
 
 STARTER = pathlib.Path(__file__).resolve().parent.parent / 'moo' / 'templates' / 'starter'
 
@@ -61,17 +73,14 @@ def _stored_verbs():
 def test_no_shipped_verb_disagrees_with_its_file():
     stored = _stored_verbs()
     drift = []
-    for path in sorted((STARTER / 'verbs').rglob('*.py')):
-        try:
-            objnum = int(path.parent.name)
-        except ValueError:
-            continue
-        verb = stored.get((objnum, path.stem))
+    for objnum, name, filepath in scan_verb_files(str(STARTER / 'verbs')):
+        verb = stored.get((objnum, name))
         if verb is None:
-            drift.append(f'{objnum}/{path.stem}: no such verb in world.db')
+            drift.append(f'{objnum}/{name}: no such verb in world.db')
             continue
-        if not _verb_matches_file(verb, path.read_text(), path.stem):
-            drift.append(f'{objnum}/{path.stem}')
+        if not _verb_matches_file(verb, pathlib.Path(filepath).read_text(),
+                                  name):
+            drift.append(f'{objnum}/{name}')
     assert not drift, (
         'these ship disagreeing with world.db, so a new world rewrites them '
         'on first boot: ' + ', '.join(drift))
@@ -111,19 +120,15 @@ def test_no_shipped_verb_stores_the_wrong_auth_level():
     db = sqlite3.connect(STARTER / 'world.db')
     try:
         wrong = []
-        for path in sorted((STARTER / 'verbs').rglob('*.py')):
-            try:
-                objnum = int(path.parent.name)
-            except ValueError:
-                continue
+        for objnum, name, filepath in scan_verb_files(str(STARTER / 'verbs')):
             row = db.execute(
                 'SELECT auth FROM verbs WHERE objnum=? AND names LIKE ?',
-                (objnum, f'%"{path.stem}"%')).fetchone()
+                (objnum, f'%"{name}"%')).fetchone()
             if row is None:
                 continue
-            declared = auth_level_required(path.read_text())
+            declared = auth_level_required(pathlib.Path(filepath).read_text())
             if row[0] != declared:
-                wrong.append(f'{objnum}/{path.stem}: stored {row[0]}, '
+                wrong.append(f'{objnum}/{name}: stored {row[0]}, '
                              f'file declares {declared}')
         assert not wrong, '; '.join(wrong)
     finally:
@@ -144,15 +149,17 @@ def test_no_shipped_verb_is_missing_its_file():
     A verb with no file is worse than out of date: it is not in git, an
     editor cannot open it, and `megamoo init` ships it as source nobody
     can read. `.` is the awkward case that proves the rule -- its file is
-    `..py`, a dotfile `ls` hides and rglob still finds.
+    `..py`, a dotfile `ls` hides, and the name it maps to is whatever the
+    loader says it is rather than whatever `pathlib` says this year.
     """
-    files = {(p.parent.name, p.stem) for p in (STARTER / 'verbs').rglob('*.py')}
+    files = {(objnum, name)
+             for objnum, name, _ in scan_verb_files(str(STARTER / 'verbs'))}
     db = sqlite3.connect(STARTER / 'world.db')
     try:
         orphans = [
             f'#{objnum}:{json.loads(names)[0]}'
             for objnum, names in db.execute('SELECT objnum, names FROM verbs')
-            if (str(objnum), json.loads(names)[0]) not in files
+            if (objnum, json.loads(names)[0]) not in files
         ]
     finally:
         db.close()
