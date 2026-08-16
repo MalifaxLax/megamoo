@@ -699,7 +699,7 @@ def puppet(target: Union[int, MOOObject]) -> bool:
     return True
 
 
-def unpuppet(obj: Union[int, MOOObject, None] = None):
+def unpuppet(obj: Union[int, MOOObject, None] = None, conn=None):
     """
     Store an active object back into #2 (PlayerObjectDB) on disconnect.
 
@@ -725,6 +725,21 @@ def unpuppet(obj: Union[int, MOOObject, None] = None):
 
     from .network import _player_connections, _pc_lock
 
+    def _drop(objnum):
+        """Remove the registry entry, respecting *conn* when given.
+
+        A disconnecting transport passes the connection it is cleaning up,
+        and then only *its own* entry is removed. Without that, the
+        cleanup of a stale duplicate login evicted whichever connection
+        happened to be registered -- including a newer, live one, which
+        was left running but unreachable. Callers with no connection in
+        hand (a verb storing a player away) keep the unconditional pop,
+        which is right for them: there is no session to protect.
+        """
+        with _pc_lock:
+            if conn is None or _player_connections.get(objnum) is conn:
+                _player_connections.pop(objnum, None)
+
     if obj is None:
         from .verb_context import verb_ctx
         ctx = verb_ctx.get(None)
@@ -739,8 +754,7 @@ def unpuppet(obj: Union[int, MOOObject, None] = None):
     # Guard: skip if already stored in #2 (e.g. shutdown + disconnect double-call)
     if obj_instance._location_id == 2:
         # Just clean up the connection mapping
-        with _pc_lock:
-            _player_connections.pop(obj_instance.objnum, None)
+        _drop(obj_instance.objnum)
         return
 
     # Fire on_unpuppet hook (set up verb context if needed)
@@ -806,8 +820,7 @@ def unpuppet(obj: Union[int, MOOObject, None] = None):
         logger.debug('unpuppet: could not announce room', exc_info=True)
 
     # Unregister connection
-    with _pc_lock:
-        _player_connections.pop(obj_instance.objnum, None)
+    _drop(obj_instance.objnum)
 
 
 # ============================================================================

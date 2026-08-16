@@ -184,6 +184,19 @@ class WebSocketConnection:
             logger.error(f"Web connection error: {e}", exc_info=True)
         finally:
             await self._cleanup()
+            # Belt and braces: _cleanup() only unregisters when there is an
+            # authenticated player_obj to unregister, so a connection that
+            # dies mid-login -- or one whose cleanup throws -- could exit
+            # this coroutine still sitting in the registry. Nothing would
+            # ever read its socket again, and every message for that player
+            # would be written into it.
+            self._disconnected = True
+            self._executing = False
+            try:
+                from ..network import unregister_connection
+                unregister_connection(self)
+            except Exception:
+                logger.debug("post-cleanup unregister failed", exc_info=True)
 
     # ------------------------------------------------------------------
     # Login
@@ -796,14 +809,17 @@ class WebSocketConnection:
             # Unpuppet: remove from active connections and clear PLAYER flag
             try:
                 from ..builtins import unpuppet
-                unpuppet(active)
+                # `conn=self` so this only ever unregisters its own session.
+                # Three browser tabs on one character share a registry slot,
+                # and without this an older tab's cleanup evicted the entry
+                # belonging to a newer, still-running one.
+                unpuppet(active, conn=self)
             except Exception as exc:
                 # Fallback cleanup if unpuppet fails
-                from ..network import _player_connections, _pc_lock
+                from ..network import unregister_connection
                 from ..objects import ObjectFlags
                 logger.error(f"unpuppet() failed during web cleanup for #{active.objnum}: {exc}")
-                with _pc_lock:
-                    _player_connections.pop(active.objnum, None)
+                unregister_connection(self)
                 active.clear_flag(ObjectFlags.PLAYER)
                 try:
                     db.save_object(active)

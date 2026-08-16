@@ -220,8 +220,62 @@ def get_connection_for_player(objnum: int) -> Optional['PlayerConnection']:
     Returns:
         The ``PlayerConnection`` for that player, or ``None`` if the
         player is not currently connected.
+
+    A connection that is no longer being read is not "connected".  Its
+    socket can stay open long after the task driving it has gone -- that
+    is what a dying command loop leaves behind -- and handing one out
+    means every ``msg()`` for that player is written into a socket with
+    no reader.  The player sees a live-looking client that answers
+    nothing, which is a far worse failure than being told they are
+    offline.  So a dead entry is reaped here rather than returned.
     """
-    return _player_connections.get(objnum)
+    conn = _player_connections.get(objnum)
+    if conn is None or not _is_live(conn):
+        if conn is not None:
+            logger.warning("Reaping dead connection for #%s", objnum)
+            unregister_connection(conn)
+        return None
+    return conn
+
+
+def _is_live(conn) -> bool:
+    """Whether *conn* can still be written to and is still being read."""
+    if getattr(conn, '_disconnected', False):
+        return False
+    writer = getattr(conn, 'writer', None)
+    if writer is not None and hasattr(writer, 'is_closing'):
+        try:
+            if writer.is_closing():
+                return False
+        except Exception:
+            return False
+    return True
+
+
+def unregister_connection(conn) -> bool:
+    """
+    Drop *conn* from the registry -- but only if it is still the live one.
+
+    The identity check is the whole point.  Cleanup used to pop by object
+    number alone, so when the same character was connected twice (three
+    browser tabs will do it), the *older* connection's cleanup evicted the
+    *newer* one's entry on its way out.  The survivor kept running and
+    reading input, but nothing could reach it: every lookup returned None
+    or a corpse, so its output went nowhere while its socket stayed open
+    and its client went on cheerfully echoing keystrokes.
+
+    Returns:
+        True if this call removed the entry.
+    """
+    player = getattr(conn, 'player_obj', None)
+    objnum = getattr(player, 'objnum', None)
+    if objnum is None:
+        return False
+    with _pc_lock:
+        if _player_connections.get(objnum) is conn:
+            del _player_connections[objnum]
+            return True
+    return False
 
 
 def find_connection_for_account(objnum: int) -> Optional['PlayerConnection']:
@@ -939,14 +993,16 @@ class PlayerConnection:
             # Store active object back into #2 with last_location saved
             try:
                 from .builtins import unpuppet
-                unpuppet(active)
+                # `conn=self`: only ever unregister this session. See
+                # unregister_connection() for what popping by objnum alone
+                # did to a character connected from more than one client.
+                unpuppet(active, conn=self)
             except Exception as exc:
                 # Fallback: manual cleanup if unpuppet fails — ensures
                 # the registry and flag are cleaned up even if the
                 # normal path throws.
                 logger.error(f"unpuppet() failed during cleanup for #{active.objnum}: {exc}")
-                with _pc_lock:
-                    _player_connections.pop(active.objnum, None)
+                unregister_connection(self)
                 active.clear_flag(ObjectFlags.PLAYER)
                 try:
                     db.save_object(active)
