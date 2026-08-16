@@ -85,7 +85,8 @@ _RE_MXP_COLOR = re.compile(r'<color\s+fore="([^"]+)">([^<]+)</color>', re.IGNORE
 # --- Stripping patterns (same dialects, but used to *remove* codes) ---
 
 _RE_STRIP_MOO_EXTENDED = re.compile(SIGIL_CLASS + r'<[^>]+>')
-_RE_STRIP_MOO_BASIC = re.compile(SIGIL_CLASS + r'[a-zA-Z](?![a-zA-Z])')
+# _RE_STRIP_MOO_BASIC is defined below MOO_COLOR_CODES -- it is built from
+# that map so stripping removes exactly what processing would convert.
 _RE_STRIP_ANSI_NAMED = re.compile(r'\{[a-zA-Z]+\}')
 # Matches raw ANSI escape sequences already in the string (ESC[...m)
 _RE_STRIP_ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*m')
@@ -167,7 +168,8 @@ class ANSICode(IntEnum):
 # Convention:
 #   - Lowercase letter = normal-intensity colour
 #   - Uppercase letter = bright/bold colour
-#   - Special letters: n=reset, h=bold, u=underline, f=blink, i=reverse
+#   - Special letters: n=reset, h=bold, f=blink
+#   - Attributes with no letter: &<underline>, &<reverse> (see below)
 
 MOO_COLOR_CODES = {
     # --- Normal-intensity foreground colours ---
@@ -193,10 +195,66 @@ MOO_COLOR_CODES = {
     # --- Special formatting codes ---
     'n': ANSICode.RESET,          # Normal/reset -- clears all attributes
     'h': ANSICode.BOLD,            # Highlight/bold
-    'u': ANSICode.UNDERLINE,       # Underline
     'f': ANSICode.BLINK,           # Flash/blink (rarely supported)
-    'i': ANSICode.REVERSE,         # Inverse/reverse video
+
+    # `i` and `u` are deliberately absent.  They belong to substitution:
+    # `&i` is the indirect object and `&u` the noun.  The sigil is shared
+    # between the two dialects, so the letter after it was the only thing
+    # telling them apart -- and substitution fills a token only when it
+    # was given something to fill it with.  An `&i` in a message sent
+    # without an iobj therefore reached the colour pass intact and was
+    # read as reverse video, inverting the rest of the line.  Authors
+    # branched around it: `verbs/23/unlock_.py` carried a comment
+    # explaining why it must not emit `&i` unless it has an iobj.
+    #
+    # The two transports did not even agree what the letter meant.  This
+    # map made `&i` ANSI 7 (reverse) while the browser's `_BASIC_CLASSES`
+    # made it `.ci` (italic), so identical text rendered differently
+    # depending on how the player had connected.
+    #
+    # Nothing is lost: `&<underline>` and `&<reverse>` spell the
+    # attributes out, and the extended form cannot collide with
+    # substitution because substitution has no `<...>` token.
 }
+
+
+#: Attributes named in the extended form -- ``&<underline>``, ``&<reverse>``.
+#:
+#: Single letters cover colour, where brevity is worth a narrow
+#: namespace.  Attributes are rare enough in game text that spelling them
+#: out costs nothing, and it leaves `i` and `u` to substitution.  The
+#: names match the ``{underline}`` dialect in ``process_ansi_colors`` so
+#: there is one vocabulary rather than two.
+#:
+#: Every name here renders on *both* transports.  ANSI 2 (dim) is left
+#: out for that reason: client.css defines no dim rule, so the browser
+#: would have had to borrow another -- and a name that means dim on
+#: telnet and bold in a tab is the disagreement this change exists to
+#: end.
+MOO_ATTR_NAMES = {
+    'normal': ANSICode.RESET,
+    'reset': ANSICode.RESET,
+    'bold': ANSICode.BOLD,
+    'italic': ANSICode.ITALIC,
+    'underline': ANSICode.UNDERLINE,
+    'blink': ANSICode.BLINK,
+    'reverse': ANSICode.REVERSE,
+    'inverse': ANSICode.REVERSE,
+}
+
+
+#: Strip the codes this module would actually convert, and nothing else.
+#:
+#: Built from ``MOO_COLOR_CODES`` rather than a blanket ``[a-zA-Z]``.  A
+#: blanket class made stripping disagree with processing: `process` left
+#: an unrecognised letter alone while `strip` removed it, so the same
+#: text lost characters when colour was off, in screen-reader mode, or
+#: when its width was measured for word-wrapping.  That is how an
+#: unfilled `&i` -- and Shadowfall's verb-local `&l` -- vanished on one
+#: path and survived on the other.
+_RE_STRIP_MOO_BASIC = re.compile(
+    SIGIL_CLASS + '[' + re.escape(''.join(sorted(MOO_COLOR_CODES)))
+    + r'](?![a-zA-Z])')
 
 
 # ============================================================================
@@ -329,6 +387,15 @@ class ColorProcessor:
         def replace_extended(match):
             """Callback for _RE_MOO_EXTENDED: resolve &<...> tokens."""
             inner = match.group(1)
+
+            # Named attribute: &<underline>, &<reverse>, &<bold>.  Read
+            # before the 'bg' prefix is stripped -- an attribute has no
+            # background form, and testing the raw text keeps a future
+            # name beginning "bg" from losing its first two letters.
+            attr = MOO_ATTR_NAMES.get(inner.lower())
+            if attr is not None:
+                return self.ansi_escape(attr)
+
             # Check for 'bg' prefix indicating a background colour
             bg = inner.startswith('bg')
             if bg:

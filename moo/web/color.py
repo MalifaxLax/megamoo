@@ -74,13 +74,34 @@ import html as _html
 
 # Maps single-character MOO color codes to CSS class names.
 # Lowercase = normal intensity, uppercase = bright/bold.
-# Special codes: h=highlight, u=underline, f=flash, i=italic.
+# Special codes: h=highlight, f=flash.
+#
+# `i` and `u` are absent, matching moo/color.py: they are substitution
+# tokens (indirect object, noun), and an unfilled one used to be read as
+# markup by whichever colour pass saw it.  The two transports disagreed
+# about `&i` besides -- telnet made it ANSI 7 (reverse), this map made it
+# `.ci` (italic) -- so the same line rendered differently depending on
+# how the player connected.  Attributes are spelled out now:
+# `&<underline>`, `&<reverse>`.  See _EXTENDED_CLASSES below.
 _BASIC_CLASSES = {
     'x': 'cx',   'r': 'cr',   'g': 'cg',   'y': 'cy',
     'b': 'cb',   'm': 'cm',   'c': 'cc',   'w': 'cw',
     'X': 'cX',   'R': 'cR',   'G': 'cG',   'Y': 'cY',
     'B': 'cB',   'M': 'cM',   'C': 'cC',   'W': 'cW',
-    'h': 'ch',   'u': 'cu',   'f': 'cf',   'i': 'ci',
+    'h': 'ch',   'f': 'cf',
+}
+
+#: Named attributes in the extended form, as CSS classes.  The names are
+#: moo/color.py's ``MOO_ATTR_NAMES``; the classes are the ones
+#: client.css already defines for the equivalent ANSI parameters, so
+#: `&<reverse>` and a raw ESC[7m land on the same rule.
+_EXTENDED_CLASSES = {
+    'bold': 'ch',
+    'italic': 'ci',
+    'underline': 'cu',
+    'blink': 'cf',
+    'reverse': 'cv',
+    'inverse': 'cv',
 }
 
 
@@ -147,6 +168,15 @@ def moo_colors_to_html(text: str) -> str:
             close = text.find('>', pos + 2)
             if close != -1:
                 inner = text[pos + 2:close]
+                # &<normal> / &<reset> is a reset, and a reset closes
+                # spans rather than opening one -- the same thing `&n`
+                # does.  It cannot go through _extended_to_span, which
+                # can only answer with an opening tag.
+                if inner.lower() in ('normal', 'reset'):
+                    result.append('</span>' * open_spans)
+                    open_spans = 0
+                    pos = close + 1
+                    continue
                 tag = _extended_to_span(inner)
                 if tag:
                     result.append(tag)
@@ -224,6 +254,14 @@ def _extended_to_span(inner: str) -> str | None:
         HTML ``<span>`` opening tag string, or ``None`` if *inner*
         is not a recognised color code format.
     """
+    # Named attribute: &<underline>, &<reverse>.  Read before the 'bg'
+    # prefix is stripped -- an attribute has no background form, and
+    # testing the raw text keeps a future name beginning "bg" from
+    # losing its first two letters.
+    cls = _EXTENDED_CLASSES.get(inner.lower())
+    if cls:
+        return f'<span class="{cls}">'
+
     # Check for background prefix
     bg = inner.startswith('bg')
     value = inner[2:] if bg else inner

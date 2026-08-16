@@ -38,9 +38,10 @@ if _door_key:
 this.set_property('locked', False, db)
 
 # Whether a key was used picks the sentence, rather than one sentence
-# naming a key that might not exist. &i is only emitted when there is an
-# iobj to fill it: an unfilled &i is not left as text -- the colour pass
-# reads it as ANSI reverse video and inverts the rest of the line.
+# naming a key that might not exist. That is a choice about wording now:
+# `&i` is no longer a colour code, so an unfilled one is simply left as
+# text. It used to be read as ANSI reverse video and invert the rest of
+# the line, which made this branch load-bearing rather than tidy.
 if iobj:
     player.msg(getattr(this, 'ulockk', None) or 'You unlock &d with &i.',
                dob=this, iob=iobj)
