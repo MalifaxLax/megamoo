@@ -160,9 +160,45 @@ def test_both_transports_know_the_same_attribute_names():
 
 
 def test_an_unknown_attribute_name_is_left_as_text(cp):
-    """Neither transport may invent a rendering for a name it lacks."""
-    assert cp.process('&<dim>x', 'moo') == '&<dim>x'
-    assert 'span' not in moo_colors_to_html('&<dim>x')
+    """Neither transport may invent a rendering for a name it lacks.
+
+    The example here used to be `dim`, chosen because no such name
+    existed.  One does now -- as a *colour*, an alias for 245, not as the
+    ANSI 2 attribute this file is otherwise about -- so this check needs a
+    name that is still genuinely absent.  See the two tests below.
+    """
+    assert cp.process('&<mauve>x', 'moo') == '&<mauve>x'
+    assert 'span' not in moo_colors_to_html('&<mauve>x')
+
+
+@pytest.mark.parametrize('named, numeric', [
+    ('&<dim>x&n',   '&<245>x&n'),
+    ('&<DIM>x&n',   '&<245>x&n'),      # names are case-insensitive
+    ('&<bgdim>x&n', '&<bg245>x&n'),    # and the bg prefix composes
+])
+def test_a_named_colour_renders_as_its_number(cp, named, numeric):
+    """`&<dim>` is an alias, so it may not render as a thing of its own.
+
+    Both transports resolve the name to its index and then take the
+    ordinary xterm-256 path, which is what stops the two spellings
+    drifting the way `&i` did.
+    """
+    assert cp.process(named, 'moo') == cp.process(numeric, 'moo')
+    assert moo_colors_to_html(named) == moo_colors_to_html(numeric)
+
+
+def test_dim_is_a_colour_and_not_the_ansi_attribute():
+    """ANSI 2 is still absent, and still deliberately.
+
+    client.css defines no rule for it and a fair share of terminals draw
+    it as ordinary text, so this name means one specific grey rather than
+    "whatever colour you were using, fainter".  Anything that later wants
+    the composable attribute has to add the CSS first.
+    """
+    from moo.color import MOO_ATTR_NAMES, MOO_COLOR_NAMES
+
+    assert MOO_COLOR_NAMES['dim'] == 245
+    assert 'dim' not in MOO_ATTR_NAMES
 
 
 def test_an_attribute_name_is_not_read_as_a_background():

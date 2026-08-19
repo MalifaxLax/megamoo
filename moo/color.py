@@ -243,6 +243,24 @@ MOO_ATTR_NAMES = {
 }
 
 
+#: Colours that answer to a name as well as a number -- ``&<dim>``.
+#:
+#: A readability alias, resolved to its index before the numeric branch
+#: runs, so the name costs nothing the number did not already cost and
+#: ``&<bgdim>`` works without a second entry.
+#:
+#: `dim` is 245 rather than ANSI 2, and the note above is why. 245 is the
+#: grey the worlds already use for chrome and it renders on both
+#: transports today -- the browser builds `.c245` at load from the xterm
+#: cube -- while ANSI 2 has no rule in client.css and is drawn as ordinary
+#: text by a good share of the terminals that receive it. So this name
+#: means one specific grey, not "whatever colour you were using, fainter".
+#: The composable attribute is still unavailable, and still deliberately.
+MOO_COLOR_NAMES = {
+    'dim': 245,
+}
+
+
 #: Strip the codes this module would actually convert, and nothing else.
 #:
 #: Built from ``MOO_COLOR_CODES`` rather than a blanket ``[a-zA-Z]``.  A
@@ -400,6 +418,14 @@ class ColorProcessor:
             bg = inner.startswith('bg')
             if bg:
                 inner = inner[2:]  # strip the 'bg' prefix
+
+            # Named colour: &<dim>, and &<bgdim> for the background form.
+            # Resolved to its number here so the branch below does the
+            # actual work -- one code path, so a name and its index can
+            # never render differently.
+            named = MOO_COLOR_NAMES.get(inner.lower())
+            if named is not None:
+                inner = str(named)
 
             # Hex RGB: #RRGGBB (exactly 7 chars including '#')
             if inner.startswith('#') and len(inner) == 7:

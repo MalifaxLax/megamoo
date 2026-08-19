@@ -95,6 +95,10 @@ _BASIC_CLASSES = {
 #: moo/color.py's ``MOO_ATTR_NAMES``; the classes are the ones
 #: client.css already defines for the equivalent ANSI parameters, so
 #: `&<reverse>` and a raw ESC[7m land on the same rule.
+#: Named colours, imported rather than restated: two copies of this map
+#: is exactly how the transports drifted over `&i` before.
+from ..color import MOO_COLOR_NAMES
+
 _EXTENDED_CLASSES = {
     'bold': 'ch',
     'italic': 'ci',
@@ -265,6 +269,13 @@ def _extended_to_span(inner: str) -> str | None:
     # Check for background prefix
     bg = inner.startswith('bg')
     value = inner[2:] if bg else inner
+
+    # Named colour: &<dim>, and &<bgdim>.  Resolved to its number so the
+    # xterm-256 branch below does the work, which is what keeps a name and
+    # its index rendering identically here and on telnet.
+    named = MOO_COLOR_NAMES.get(value.lower())
+    if named is not None:
+        value = str(named)
 
     # Hex color: #RRGGBB (exactly 7 chars including #)
     if value.startswith('#') and len(value) == 7:
