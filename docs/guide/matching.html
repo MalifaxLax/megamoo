@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matching — MegaMOO Guide</title>
+<!-- seo:begin -->
+<meta name="description" content="Turning what a player typed into an object: pmatch and bmatch, articles, ordinals, adjectives, prefix rules, and the keywords me, here, my and #N.">
+<link rel="canonical" href="https://malifaxlax.github.io/megamoo/matching.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MegaMOO">
+<meta property="og:title" content="Matching — MegaMOO Guide">
+<meta property="og:description" content="Turning what a player typed into an object: pmatch and bmatch, articles, ordinals, adjectives, prefix rules, and the keywords me, here, my and #N.">
+<meta property="og:url" content="https://malifaxlax.github.io/megamoo/matching.html">
+<meta property="og:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Matching — MegaMOO Guide">
+<meta name="twitter:description" content="Turning what a player typed into an object: pmatch and bmatch, articles, ordinals, adjectives, prefix rules, and the keywords me, here, my and #N.">
+<meta name="twitter:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
+<link rel="icon" href="https://malifaxlax.github.io/megamoo/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="https://malifaxlax.github.io/megamoo/apple-touch-icon.png">
+<!-- seo:end -->
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<p class="crumb"><a href="index.html">← MegaMOO Guide</a></p>
+
+<h1 class="wordmark" style="font-size:clamp(1.8rem,6vw,2.4rem)">Matching</h1>
+<p class="tagline">Turning <code>the 2nd blue sword</code> into an object.</p>
+
+<nav class="toc">
+    <span class="kicker">On this page</span>
+    <ol>
+        <li><a href="#what">What a matcher is for</a></li>
+        <li><a href="#two">The two you will call</a></li>
+        <li><a href="#reading">How the input is read</a></li>
+        <li><a href="#noun">Matching the noun</a></li>
+        <li><a href="#adjectives">Adjectives</a></li>
+        <li><a href="#ordinals">Ordinals</a></li>
+        <li><a href="#keywords">Keywords and references</a></li>
+        <li><a href="#result">What comes back</a></li>
+        <li><a href="#toolkit">The rest of the toolkit</a></li>
+        <li><a href="#traps">Traps</a></li>
+    </ol>
+</nav>
+
+<h2 id="what">What a matcher is for</h2>
+
+<p>
+Your verb is handed strings. <code>dobj</code>, <code>iobj</code> and
+<code>args</code> are all text — whatever the player typed, split around the
+preposition, nothing more. Turning <code>"the 2nd blue sword"</code> into the
+actual object in the room is a separate step, and it is yours to make.
+</p>
+
+<p>
+That step is a matcher. You give it the string and a list of candidates; it
+gives you back one object, or <code>None</code>.
+</p>
+
+<div class="term"><code>target = pmatch(dobj, pobj, list(pobj.location.contents) + list(pobj.contents))
+if not target or not target.existent:
+    pobj.msg("Examine what?")
+    return</code></div>
+
+<p>
+The candidate list is the important half and it is never chosen for you. A verb
+that should only reach what you are carrying passes
+<code>pobj.contents</code>; one that reaches inside a chest passes
+<code>chest.contents</code>; the pair above is the ordinary "in the room or in
+my hands" search. Matching cannot find what you did not offer it, which is the
+whole of its access control.
+</p>
+
+<h2 id="two">The two you will call</h2>
+
+<p>
+There are two entry points, and choosing between them is a permissions
+decision rather than a stylistic one.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th></th><th><code>pmatch</code></th><th><code>bmatch</code></th></tr></thead>
+<tbody>
+<tr><td>For</td><td>player commands</td><td>staff verbs</td></tr>
+<tr><td>Lives on</td><td>the room parents, <code>#16</code> and <code>#17</code></td><td><code>#3</code>, the character base</td></tr>
+<tr><td><code>me</code>, <code>here</code></td><td>yes</td><td>yes</td></tr>
+<tr><td><code>my sword</code></td><td>yes, filtered from your candidates</td><td>yes, straight from <code>pobj.contents</code></td></tr>
+<tr><td><code>#4711</code></td><td><strong>no</strong></td><td>yes</td></tr>
+<tr><td><code>$name</code></td><td><strong>no</strong></td><td>yes</td></tr>
+<tr><td>Signature</td><td><code>pmatch(inp, pobj, candidates)</code></td><td><code>bmatch(inp, pobj, candidates, db)</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+The difference that matters is the third row. <code>bmatch</code> resolves
+<code>#4711</code> by going to the database directly — it never consults your
+candidate list, so the object need not be in the room, in your hands, or
+anywhere near you. That is exactly right for <code>@tel</code> and exactly
+wrong for <code>get</code>.
+</p>
+
+<div class="warn">
+    <span class="label">Use <code>pmatch</code> in anything a player can type</span>
+    <p>A player command written with <code>bmatch</code> hands every player a
+       working <code>#N</code> syntax against the whole database, whatever
+       candidate list you carefully assembled. The candidate list stops being a
+       boundary the moment <code>#</code> is legal.</p>
+</div>
+
+<p>
+The <code>my</code> handling differs too, in a way that is easy to miss.
+<code>bmatch("my key", pobj, [])</code> searches <code>pobj.contents</code> and
+<strong>ignores the candidates entirely</strong>. <code>pmatch</code> instead
+<em>filters</em> the candidates down to those whose location is the player. If
+you curated a list for a reason — only what is visible, only what is not worn —
+<code>pmatch</code> respects it and <code>bmatch</code> does not.
+</p>
+
+<h2 id="reading">How the input is read</h2>
+
+<p>
+Both matchers eventually reach the same parser, which takes the string apart in
+a fixed order:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Step</th><th>Does what</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>1. Article</td><td>a leading <code>the</code>, <code>a</code>, <code>an</code> or <code>some</code> is dropped</td><td><code>the big red ball</code> → <code>big red ball</code></td></tr>
+<tr><td>2. Ordinal</td><td>if the first token left is an ordinal, it is consumed</td><td><code>2nd blue sword</code> → index 1</td></tr>
+<tr><td>3. Noun</td><td>the <em>last</em> token</td><td><code>sword</code></td></tr>
+<tr><td>4. Adjectives</td><td>everything between</td><td><code>["big", "red"]</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+The candidates are then walked in the order you gave them, keeping every object
+whose noun matches and whose adjectives match, and the ordinal-th survivor is
+returned. Candidate order is your ordering — the list you passed — which is why
+<code>2 door</code> means "the second door as the room lists them".
+</p>
+
+<h2 id="noun">Matching the noun</h2>
+
+<p>
+The noun is tested against three things, in this order: each non-article word
+of <code>obj.name</code>, then every entry in <code>obj.aliases</code>, then
+<code>obj.noun</code>. A hit on any of them is a match.
+</p>
+
+<p>
+Matching is by <strong>prefix</strong>, case-insensitively, with one size rule:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Token</th><th>Rule</th><th>Against "a silver sword"</th></tr></thead>
+<tbody>
+<tr><td>2+ characters</td><td>prefix</td><td><code>swo</code>, <code>sw</code>, <code>sil</code> all match</td></tr>
+<tr><td>1 character</td><td>exact whole word</td><td><code>s</code> does <strong>not</strong> match</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+The single-character rule exists because prefix-matching one letter matches
+nearly everything in the room. If you want a one-letter handle, give the object
+an alias of that letter — an alias is compared the same way, so a one-character
+alias matches a one-character token exactly.
+</p>
+
+<div class="note">
+    <span class="label">Name words, not the whole name</span>
+    <p>The name is split on spaces and each word tried separately, so
+       <code>silver</code> reaches "a silver sword" without <code>a</code> or
+       <code>sword</code> being involved. Articles inside the name are skipped
+       while doing it, which is why <code>a</code> does not match every object
+       in the game.</p>
+</div>
+
+<h2 id="adjectives">Adjectives</h2>
+
+<p>
+Every adjective must appear <strong>in the order typed</strong>, and at a word
+boundary. <code>big blue ball</code> matches "a big blue ball";
+<code>blue big ball</code> does not. Word boundaries are what keep
+<code>blue</code> out of "a blueberry tart".
+</p>
+
+<p>
+If scanning the name fails, there is a second pass: an <code>adjectives</code>
+property, a list of strings, is matched by prefix and also in order. That is how
+you make an object answer to a word that does not appear in its name.
+</p>
+
+<div class="term"><code>@set drape.adjectives = ["blue", "velvet", "heavy"]</code></div>
+
+<p>
+With that set, <code>blue drape</code> finds it even though the name says
+"a drape". The two passes are independent: the name is tried whole first, and
+only a complete failure falls through to the property.
+</p>
+
+<h2 id="ordinals">Ordinals</h2>
+
+<p>
+Three spellings are accepted, and all of them are converted to a 0-based index:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Form</th><th>Examples</th><th>Index</th></tr></thead>
+<tbody>
+<tr><td>Words</td><td><code>first</code> … <code>twentieth</code></td><td><code>first</code> → 0</td></tr>
+<tr><td>Suffixed</td><td><code>1st</code>, <code>2nd</code>, <code>3rd</code>, <code>21st</code></td><td><code>2nd</code> → 1</td></tr>
+<tr><td>Bare integer</td><td><code>1</code>, <code>2</code>, <code>5</code></td><td><code>2</code> → 1</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="warn">
+    <span class="label">A bare number is always an ordinal</span>
+    <p><code>parse_ordinal</code> claims any all-digit token, so an object whose
+       name is a number cannot be matched by typing that number —
+       <code>get 7</code> means "get the seventh thing", not "get the 7". Give
+       such an object a word alias.</p>
+</div>
+
+<p>
+An ordinal with nothing after it — a bare <code>2nd</code> — matches nothing
+rather than defaulting to a noun, and an ordinal past the end of the matches
+returns <code>None</code> rather than the last one.
+</p>
+
+<h2 id="keywords">Keywords and references</h2>
+
+<p>
+Before any name matching happens, four special forms are tried. Which ones are
+honoured depends on the matcher, per the table
+<a href="#two">above</a>.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Input</th><th>Resolves to</th><th><code>pmatch</code></th><th><code>bmatch</code></th></tr></thead>
+<tbody>
+<tr><td><code>me</code></td><td>the acting player</td><td>yes</td><td>yes</td></tr>
+<tr><td><code>here</code></td><td><code>pobj.location</code></td><td>yes</td><td>yes</td></tr>
+<tr><td><code>my &lt;x&gt;</code></td><td>your own possessions</td><td>yes</td><td>yes</td></tr>
+<tr><td><code>#4711</code></td><td>that object number</td><td>no</td><td>yes</td></tr>
+<tr><td><code>$name</code></td><td>a property of <code>#0</code></td><td>no</td><td>yes</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+<code>$name</code> reads the property <code>name</code> off object <code>#0</code>
+and resolves it — so <code>$trash_bin</code> follows whatever
+<code>#0.trash_bin</code> currently holds. It is the way to name a fixed object
+without writing its number into a verb, and a shipped world defines a couple of
+dozen of them: <code>$item</code>, <code>$chair</code>, <code>$wearable</code>,
+<code>$trainer</code> and so on.
+</p>
+
+<h2 id="result">What comes back</h2>
+
+<p>
+One object, or <code>None</code>. Matchers do not raise, and there is no
+ambiguity error: two equally good candidates means the earlier one in your list
+wins, silently. If you need to know that the input was ambiguous, ask
+<code>match_all</code> and count.
+</p>
+
+<p>
+<code>None</code> is not the only failure. An object mid-destruction is still in
+the room and still matches its own name, so <strong>every unhidden player verb
+must check <code>existent</code></strong> after a match:
+</p>
+
+<div class="term"><code>target = pmatch(dobj, pobj, candidates)
+
+# An object that has stopped existing is not a match, however well its
+# name fits: pmatch searches what is in the room, and something mid-
+# destruction is still there to be found.
+if not target or not target.existent:
+    pobj.msg("Examine what?")
+    return</code></div>
+
+<p>
+Staff verbs on <code>#3</code> deliberately skip the check — reaching a
+half-destroyed object is sometimes the point of a staff command.
+</p>
+
+<h2 id="toolkit">The rest of the toolkit</h2>
+
+<p>
+<code>pmatch</code> and <code>bmatch</code> are assembled out of smaller pieces,
+all of which are available to verb code in their own right.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Function</th><th>Does</th></tr></thead>
+<tbody>
+<tr><td><code>match(inp, candidates, ordinal=0)</code></td><td>the name/adjective/ordinal engine, with no keywords at all</td></tr>
+<tr><td><code>match_all(inp, candidates)</code></td><td>every match as a list; the ordinal is ignored</td></tr>
+<tr><td><code>omatch(inp, pobj, db)</code></td><td>only the keywords: <code>me</code>, <code>here</code>, <code>#N</code>, <code>$name</code></td></tr>
+<tr><td><code>name_match(obj, token)</code></td><td>would this one token match this one object</td></tr>
+<tr><td><code>adj_match(adjectives, obj)</code></td><td>would these adjectives match this object</td></tr>
+<tr><td><code>parse_ordinal(word)</code></td><td>a 0-based index, or <code>None</code> if it is not an ordinal</td></tr>
+<tr><td><code>strip_articles(text)</code></td><td>text without a leading article</td></tr>
+<tr><td><code>smatch(target, query, minlen=0)</code></td><td>plain prefix comparison of two strings; no objects involved</td></tr>
+<tr><td><code>prep_match(word)</code></td><td>a word to its canonical preposition: <code>onto</code> → <code>on</code></td></tr>
+<tr><td><code>split_on_prep(text)</code></td><td><code>text</code> → <code>(dobj, prep, iobj)</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+<code>match_all</code> is what you want for "get all the coins" and for detecting
+ambiguity. <code>prep_match</code> is what a verb uses to check that the
+preposition it got is the one it wanted — <code>prep_match(prep) != 'from'</code>
+accepts <code>from</code> however the player abbreviated it.
+</p>
+
+<h2 id="traps">Traps</h2>
+
+<div class="warn">
+    <span class="label"><code>match</code> is not the regex match</span>
+    <p>In a verb namespace, <code>match</code> is the <em>matcher function</em>
+       above. If your verb has a custom parser and you want the regular
+       expression's match object, the name for it is <code>regex_match</code>.
+       Both names are set, and the builtins are injected afterwards, so
+       <code>match</code> ends up as the matcher whatever the parser did.</p>
+</div>
+
+<div class="note">
+    <span class="label">Matching is not permission</span>
+    <p>Everything a matcher can reach is decided by the list you pass, and
+       nothing else — no visibility test, no reachability test, no ownership
+       test. If a verb should not touch worn items, filter them out of the
+       candidates; do not expect the matcher to.</p>
+</div>
+
+<div class="note">
+    <span class="label">The order you pass is the order it searches</span>
+    <p><code>pobj.contents + pobj.location.contents</code> and
+       <code>pobj.location.contents + pobj.contents</code> answer differently
+       when both hold a sword. Neither is wrong; pick the one that suits the
+       verb, and be aware that ordinals count in that order.</p>
+</div>
+
+<div class="note">
+    <span class="label">Aliases and <code>noun</code> are native attributes</span>
+    <p>They are read straight off the object, not through
+       <code>add_property</code>. Adding a property with either name shadows
+       nothing and does not change matching.</p>
+</div>
+
+<div class="pagenav">
+    <a href="verbs.html"><span class="dir">Previous</span>Verbs</a>
+    <a class="to-next" href="text.html"><span class="dir">Next</span>Text, Substitution &amp; Colour</a>
+</div>
+
+<div class="footer">
+    <span><a href="index.html">← MegaMOO Guide</a></span>
+</div>
+
+</div>
+</body>
+</html>
