@@ -2345,14 +2345,20 @@ def notify(player, message, sub=None, dob=None, iob=None, uob=None, svals=None):
         return
     # Apply emit substitution if any context objects OR raw-string slots
     # (svals -> %sN) are provided.
+    player_obj = player if isinstance(player, MOOObject) else _database.get_object(player)
     if sub or dob or iob or uob or svals:
         from .string_utils import su
         try:
+            # The recipient goes in as `viewer`, which is what lets one
+            # string read "you smile" to the actor and "Malifax smiles"
+            # to everyone else.  Substitution already happened once per
+            # recipient -- msg_room calls msg on each listener in turn --
+            # so this is only telling esub something it was standing next
+            # to and never being handed.
             message = su.esub(message, sub=sub, dob=dob, iob=iob, uob=uob,
-                              svals=svals)
+                              svals=svals, viewer=player_obj)
         except Exception:
             pass
-    player_obj = player if isinstance(player, MOOObject) else _database.get_object(player)
     from .network import get_connection_for_player
     conn = get_connection_for_player(player_obj.objnum)
     # Fall back to the player's account connection if the character
@@ -2735,6 +2741,39 @@ def raise_error(error_code: str, message: str = ''):
 # ``@exec``) and scheduling primitives (``pause``, ``delay``, ``fork``).
 
 
+def _make_moo_type():
+    """``type()`` as a verb sees it: a saver answers as the kind it stands for.
+
+    ``type(x) == list`` is False for a list subclass, and sixteen verbs in
+    the shipped worlds ask exactly that way about a message property.  Rather
+    than convert them -- and leave the next author who writes ``type() ==``
+    with a silently wrong branch -- the namespaces hand out a ``type`` that
+    reports ``list`` for a SaverList and ``dict`` for a SaverDict.
+
+    This is the more faithful answer for this language besides.  MOO's own
+    ``typeof()`` already reports ``LIST`` for a saver, because it asks with
+    ``isinstance``; a ``type()`` that disagreed inside the same verb would be
+    the real inconsistency.  ``x.__class__`` still tells the literal truth,
+    and the three-argument class-creation form is passed straight through.
+
+    Engine code under ``moo/`` is untouched: only the verb and eval
+    namespaces install this.
+    """
+    from .savers import SaverList, SaverDict
+    _real = type
+
+    def moo_type(*args):
+        if len(args) == 1:
+            obj = args[0]
+            if isinstance(obj, SaverList):
+                return list
+            if isinstance(obj, SaverDict):
+                return dict
+        return _real(*args)
+
+    return moo_type
+
+
 def _build_eval_globals(context: dict) -> dict:
     """
     Build the globals dict for ``eval_python()`` / ``exec_python()``.
@@ -2804,8 +2843,12 @@ def _build_eval_globals(context: dict) -> dict:
         'range': range, 'enumerate': enumerate, 'zip': zip,
         'print': print, 'sorted': sorted, 'sum': sum, 'min': min, 'max': max,
         'isinstance': isinstance, 'hasattr': hasattr, 'getattr': getattr,
-        'setattr': setattr, 'type': type, 'repr': repr, 'abs': abs,
+        'setattr': setattr, 'repr': repr, 'abs': abs,
     })
+
+    # After the common-types update, not before: that dict carries a 'type'
+    # of its own, and setting the override first only had it put back.
+    ns['type'] = _make_moo_type()
 
     # Bind search() + find() to the database (if available in context)
     db = context.get('db') or context.get('_db') or _database

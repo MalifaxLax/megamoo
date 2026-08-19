@@ -749,7 +749,7 @@ class MOOObject:
                     for k, v in value.items()}
         return value
 
-    def _resolve_objref(self, value):
+    def _resolve_objref(self, value, _prop=None, _root=None):
         """Auto-resolve ``'#N'`` string values to live MOOObject instances.
 
         Property values stored as ``'#123'`` are treated as object
@@ -793,10 +793,33 @@ class MOOObject:
         # whether an entry is a direction or an exit.  Handing back an
         # integer where the source had an object silently takes the wrong
         # branch.
+        # A container read *from a property* comes back as a saver, so that
+        # `obj.wear_list.insert(0, [])` stores the change instead of mutating
+        # a copy and discarding it.  See moo/savers.py for why the copy has
+        # to stay.  `_prop` is the property's name and is only passed by the
+        # three read sites in __getattr__; every other caller -- and any
+        # nested resolve without a binding -- still gets plain containers.
         if isinstance(value, list):
-            return [self._resolve_objref(v) for v in value]
+            if _prop is None:
+                return [self._resolve_objref(v) for v in value]
+            from .savers import SaverList
+            out = SaverList()._bind(self, _prop, _root)
+            root = _root if _root is not None else out
+            for v in value:
+                # list.append, not out.append: filling the container is not
+                # a mutation of the property and must not write it back
+                # forty-nine times on the way out.
+                list.append(out, self._resolve_objref(v, _prop, root))
+            return out
         if isinstance(value, dict):
-            return {k: self._resolve_objref(v) for k, v in value.items()}
+            if _prop is None:
+                return {k: self._resolve_objref(v) for k, v in value.items()}
+            from .savers import SaverDict
+            out = SaverDict()._bind(self, _prop, _root)
+            root = _root if _root is not None else out
+            for k, v in value.items():
+                dict.__setitem__(out, k, self._resolve_objref(v, _prop, root))
+            return out
         return value
 
     def msg(self, message: str = '', sub=None, dob=None, iob=None,
@@ -969,14 +992,14 @@ class MOOObject:
             # Check local properties
             props = self.__dict__['properties']
             if name in props:
-                return self._resolve_objref(props[name].value)
+                return self._resolve_objref(props[name].value, name)
 
             # Check the flattened inheritance cache
             if self.__dict__.get('_inheritance_cache_valid') and self.__dict__.get('_resolved_properties'):
                 resolved = self.__dict__['_resolved_properties']
                 if name in resolved:
                     prop_info, _defining_objnum = resolved[name]
-                    return self._resolve_objref(prop_info.value)
+                    return self._resolve_objref(prop_info.value, name)
             else:
                 # Try to build cache if we have a database reference
                 db = self.__dict__.get('_database')
@@ -985,7 +1008,7 @@ class MOOObject:
                     resolved = self.__dict__.get('_resolved_properties')
                     if resolved and name in resolved:
                         prop_info, _defining_objnum = resolved[name]
-                        return self._resolve_objref(prop_info.value)
+                        return self._resolve_objref(prop_info.value, name)
         
         # --- Verb lookup (walks inheritance) ---
         db = self.__dict__.get('_database')

@@ -671,6 +671,9 @@ def build_verb_namespace(
 
     # --- Layer 2b: Permission-checking getattr/setattr ---
     namespace['getattr'] = _make_safe_getattr(pobj, db)
+    # And a type() that agrees with typeof() about a saver.
+    from .builtins import _make_moo_type
+    namespace['type'] = _make_moo_type()
     namespace['setattr'] = _make_safe_setattr(pobj, db)
     # hasattr checks existence only (no permission enforcement) — knowing a
     # property exists is not the same as reading its value.
