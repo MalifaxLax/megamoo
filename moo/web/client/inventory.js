@@ -100,7 +100,10 @@ function renderItem(item, showWhere, depth) {
   row.className = 'inv-row';
 
   const kids = Array.isArray(item.contents) ? item.contents : null;
-  const num = typeof item.num === 'number' ? item.num : null;
+  // A string key as well as a number: the worn group is synthetic and has
+  // no objnum, but it still has to remember whether you closed it.
+  const num = (typeof item.num === 'number' || typeof item.num === 'string')
+    ? item.num : null;
   const open = kids && kids.length && !(num !== null && collapsed.has(num));
 
   if (kids && kids.length && depth < 8) {
@@ -151,6 +154,38 @@ function renderItem(item, showWhere, depth) {
   return li;
 }
 
+/**
+ * Fold everything worn into one collapsible node.
+ *
+ * A dozen garments and their `worn` labels crowd out the two or three
+ * things you are actually holding, which is what the panel is mostly
+ * consulted for. Grouped, the clothes are one line until you want them.
+ *
+ * The group sits where the first worn item sat, so nothing else moves,
+ * and it carries a string `num` because the collapsed set is keyed by
+ * that and a synthetic node has no object number of its own.
+ */
+const WORN_KEY = 'worn';
+
+function groupWorn(items) {
+  const worn = items.filter((it) => it && it.where === 'worn');
+  if (!worn.length) return items;
+
+  const out = [];
+  let placed = false;
+  for (const it of items) {
+    if (it && it.where === 'worn') {
+      if (!placed) {
+        placed = true;
+        out.push({ num: WORN_KEY, name: 'worn', contents: worn });
+      }
+      continue;
+    }
+    out.push(it);
+  }
+  return out;
+}
+
 function render(items) {
   current = items;
   list.textContent = '';
@@ -161,7 +196,9 @@ function render(items) {
     list.appendChild(li);
     return;
   }
-  for (const item of items) list.appendChild(renderItem(item, true, 0));
+  for (const item of groupWorn(items)) {
+    list.appendChild(renderItem(item, true, 0));
+  }
 }
 
 const Inventory = {

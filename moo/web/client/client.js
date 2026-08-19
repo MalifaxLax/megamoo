@@ -838,6 +838,66 @@ form.addEventListener('submit', (event) => {
   input.submit(text);
 });
 
+// Split a pasted block the way a script would read it.
+//
+// A newline is a command boundary everywhere except inside a triple-quoted
+// string, where it is content.  Splitting unconditionally is right for a
+// block of @succ/@osucc/@odrop lines and wrong for a multi-line value: a
+// pasted sign arrived as `/sign.read_string = """` on its own, which is an
+// unterminated string literal, followed by twenty-odd lines of ASCII art
+// each dispatched as a command of its own and each answered "Do what?".
+//
+// Only the `/` eval branch of the parser keeps newlines meaningful -- an
+// ordinary command splits on any whitespace, newlines included -- but the
+// transport carries them either way: a WebSocket frame is one command, and
+// nothing between the frame and the parser breaks it up.
+//
+// An unterminated fence runs to the end of the paste and is submitted as
+// one command.  That is deliberate: the server then reports the same
+// syntax error it would have given had you typed it, instead of the
+// splitter guessing where the string was supposed to stop.
+function splitPasteIntoCommands(text) {
+  const commands = [];
+  let current = '';
+  let fence = null;                       // '"""' or "'''" while one is open
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+
+    if (fence) {
+      if (text.startsWith(fence, i)) {
+        current += fence;
+        i += 2;
+        fence = null;
+        continue;
+      }
+    } else {
+      if (text.startsWith('"""', i) || text.startsWith("'''", i)) {
+        fence = text.substr(i, 3);
+        current += fence;
+        i += 2;
+        continue;
+      }
+      if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        commands.push(current);
+        current = '';
+        continue;
+      }
+    }
+
+    current += ch;                        // inside a fence, newlines land here
+  }
+
+  commands.push(current);
+
+  // A clipboard that ends in a newline leaves one empty string behind it;
+  // that is the terminator of the last command, not a command of its own.
+  if (commands.length > 1 && commands[commands.length - 1] === '') commands.pop();
+
+  return commands;
+}
+
 // A pasted block is a block of commands, not one long line.  The command
 // line is an <input>, which is single-line by definition: the browser's
 // own value sanitisation folds every newline in a paste into a space, so
@@ -863,12 +923,8 @@ cmdInput.addEventListener('paste', (event) => {
   // the middle behaves the way it does anywhere else.
   const start = cmdInput.selectionStart ?? cmdInput.value.length;
   const end = cmdInput.selectionEnd ?? cmdInput.value.length;
-  const all = (cmdInput.value.slice(0, start) + pasted + cmdInput.value.slice(end))
-    .split(/\r\n|\r|\n/);
-
-  // A clipboard that ends in a newline leaves one empty string behind it;
-  // that is the terminator of the last command, not a command of its own.
-  if (all.length > 1 && all[all.length - 1] === '') all.pop();
+  const all = splitPasteIntoCommands(
+    cmdInput.value.slice(0, start) + pasted + cmdInput.value.slice(end));
 
   cmdInput.value = '';
   for (const line of all) input.submit(line);
