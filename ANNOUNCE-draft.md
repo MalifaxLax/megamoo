@@ -74,7 +74,7 @@ That last command prints a URL. Opening it puts you in the world — the
 browser client ships with the server, so there's nothing else to
 install.
 
-MegaMOO is at 0.10.0-beta14 and it's one person, so temper your
+MegaMOO is at 0.10.0-beta16 and it's one person, so temper your
 expectations accordingly. It runs though, it's documented, and I'd
 genuinely like to know what you think.
 
