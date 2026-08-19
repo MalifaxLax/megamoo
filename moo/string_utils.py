@@ -148,6 +148,45 @@ def _getprop(obj, name, default=None):
         return default
 
 
+#: Verbs whose third-person singular the spelling rules below get wrong.
+#:
+#: Deliberately two entries.  Evennia ports a large conjugation table
+#: because it inflects every tense; an emit needs one -- present, second
+#: person against third singular -- and English forms that by adding -s.
+#: "do" and "go" are covered by the -o rule, leaving only these.
+_IRREGULAR_3S = {'be': 'is', 'have': 'has'}
+
+#: Determiners that make a *thing* take a plural verb: "some drapes hang".
+#:
+#: "a pair of" is absent on purpose -- a pair is singular ("a pair of
+#: boots is slung over..."), which is also how the three real wearables
+#: in Shadowfall read.  A bare article is absent too: an item with no
+#: article is more often proper-named ("Excalibur gleams") than plural,
+#: and `plural` overrides either way.
+_PLURAL_ARTICLES = frozenset((
+    'some', 'several', 'many', 'a few', 'both', 'two', 'three', 'four',
+))
+
+
+def _has_family_token(text: str, prefix: str) -> bool:
+    """Whether *text* carries a viewer-aware token of *prefix*'s family.
+
+    A cheap guard, so the overwhelmingly common emit that uses none of
+    them does no work at all.
+    """
+    lower, upper = prefix, prefix.upper()
+    return any(sig + lower in text or sig + upper in text
+               for sig in SUBST_SIGILS)
+
+
+def _same_object(a, b):
+    """Whether two references name the same object, by number."""
+    if a is None or b is None:
+        return False
+    an, bn = getattr(a, 'objnum', None), getattr(b, 'objnum', None)
+    return an is not None and an == bn
+
+
 def _pronoun_map(obj):
     """
     Return the pronoun dictionary for *obj* based on its ``gender`` property.
@@ -247,7 +286,72 @@ class StringUtils:
     # Emit substitution (used by msg / notify)
     # ----------------------------------------------------------------
 
-    def esub(self, text, sub=None, dob=None, iob=None, uob=None, svals=None):
+    def conjugate(self, verb, plural=False):
+        """
+        Put *verb* into the form a subject takes, present tense.
+
+        Args:
+            verb (str): The bare form, as an author writes it -- "smile",
+                "dangle", "have".
+            plural (bool): True when the subject takes the bare form --
+                a second-person "you", a "they", or a plural thing.
+
+        Returns:
+            str: "smile" or "smiles", matching the case of what came in.
+
+        Examples::
+
+            su.conjugate('smile')                # => 'smiles'
+            su.conjugate('smile', plural=True)   # => 'smile'
+            su.conjugate('have')                 # => 'has'
+            su.conjugate('brush')                # => 'brushes'
+            su.conjugate('carry')                # => 'carries'
+        """
+        if not verb or plural:
+            return verb
+        low = verb.lower()
+        if low in _IRREGULAR_3S:
+            out = _IRREGULAR_3S[low]
+            return self.capitalise(out) if verb[:1].isupper() else out
+        if low.endswith(('s', 'x', 'z', 'ch', 'sh', 'o')):
+            return verb + 'es'
+        if len(low) > 1 and low.endswith('y') and low[-2] not in 'aeiou':
+            return verb[:-1] + 'ies'
+        return verb + 's'
+
+    def takes_plural_verb(self, obj, viewer=None):
+        """
+        Whether *obj* takes the bare verb form rather than the -s form.
+
+        Four ways to be bare, checked in this order:
+
+        1. *obj* is the one reading the line -- "you smile", never "you
+           smiles".
+        2. An explicit ``plural`` property, which settles it either way.
+        3. A thing whose article is a plural determiner: "some drapes
+           hang".
+
+        Gender is deliberately not consulted.  A they/them character does
+        take the bare form behind the *pronoun* -- "they smile" -- but not
+        behind their *name*, and "Robin smiles" is what English wants.
+        ``&y`` renders a name in the third person, so keying agreement on
+        gender got that backwards every time it fired.  A sentence built
+        on ``&ps`` instead of ``&y`` has to say ``&v()``'s answer itself,
+        or set ``plural``.
+        """
+        if obj is None:
+            return False
+        if _same_object(obj, viewer):
+            return True
+        explicit = _getprop(obj, 'plural', None)
+        if explicit is not None:
+            return bool(explicit)
+        nml = _getprop(obj, 'name_mod_list', None) or []
+        article = (nml[0] or '').strip().lower() if nml else ''
+        return article in _PLURAL_ARTICLES
+
+    def esub(self, text, sub=None, dob=None, iob=None, uob=None,
+             svals=None, viewer=None):
         """
         Emit substitution -- replace placeholder tokens in *text* with
         object names and pronouns.
@@ -392,6 +496,86 @@ class StringUtils:
             icap = self.capitalise(iname)
             text = _sub_token(text, 'i', _protect(iname))
             text = _sub_token(text, 'I', _protect(icap))
+
+        # --- Viewer-aware tokens and verb agreement -------------------
+        #
+        # These exist so one string serves both audiences.  Everything
+        # above renders the same text for everybody, which is why a verb
+        # has always had to write the line twice -- msg() saying "your
+        # ear" and msg_room() saying "his ear" -- with nothing checking
+        # that the two stay in step.
+        #
+        # Substitution already runs once per recipient (msg_room walks
+        # the room calling msg on each listener), so the only thing that
+        # was missing is knowing who is reading.  That is `viewer`.
+        #
+        # The family is `y` plus the same five cases the pronoun tokens
+        # use, so &ys sits beside &ps and nothing new has to be learned:
+        #
+        #        viewer is sub   otherwise
+        #   &ys  you             the name
+        #   &yo  you             him / her / them
+        #   &yp  your            his / her / their
+        #   &ya  yours           his / hers / theirs
+        #   &yr  yourself        himself / herself / themself
+        #   &v(smile)    agrees with sub
+        #   &vd(dangle)  agrees with dob
+        #
+        # &ys renders the *name* rather than "he" on purpose.  Subject
+        # position is where a line says who it is about, and "He smiles
+        # at Bramble" arriving cold has no antecedent; the other cases
+        # take pronouns because by then the name has been said.
+        #
+        # Capitalise by upper-casing the token's first letter, the rule
+        # the pronoun tokens already use: &Ys, &Yp, &Ps.
+        # An emit has three audiences, not two -- "You attack Bramble",
+        # "Malifax attacks you", "Malifax attacks Bramble" -- so the
+        # target needs the same treatment the subject gets.  &t is that
+        # family, keyed on dob:
+        #
+        #        viewer is dob   otherwise
+        #   &ts  you             the name
+        #   &to  you             the name
+        #   &tp  your            her / his / their
+        #   &ta  yours           hers / his / theirs
+        #   &tr  yourself        herself / himself / themself
+        #
+        # &ts and &to give the same text on purpose: "you" is caseless,
+        # and the third-person form is the name for the same reason &ys
+        # uses one -- "Malifax attacks her" arriving cold names nobody.
+        # Both are kept so the two families are learned once and an
+        # author never has to remember which of the five coincide.
+        for _who, _prefix in ((sub, 'y'), (dob, 't')):
+            if _who is None or not _has_family_token(text, _prefix):
+                continue
+            if _same_object(_who, viewer):
+                _vals = {'s': 'you', 'o': 'you', 'p': 'your',
+                         'a': 'yours', 'r': 'yourself'}
+                if _prefix == 'y':
+                    _vals['o'] = 'you'
+            else:
+                _pm = _pronoun_map(_who)
+                _name = _getprop(_who, 'name', '')
+                # The subject reads as a pronoun in object position -- its
+                # name has just been said by &ys.  The target has not been
+                # named yet at that point, so it reads as a name.
+                _vals = {'s': _name,
+                         'o': _pm['po'] if _prefix == 'y' else _name,
+                         'p': _pm['pp'], 'a': _pm['pa'], 'r': _pm['pr']}
+            for _case, _v in _vals.items():
+                _tok = _prefix + _case
+                text = _sub_token(text, _prefix.upper() + _case,
+                                  _protect(self.capitalise(_v)))
+                text = _sub_token(text, _tok, _protect(_v))
+
+        # &vd() before &v(), or the shorter pattern eats the longer one.
+        for _sigil in SUBST_SIGILS:
+            for _name, _agrees_with in (('vd', dob), ('v', sub)):
+                _plural = self.takes_plural_verb(_agrees_with, viewer)
+                text = re.sub(
+                    re.escape(_sigil + _name) + r'\(([^)]*)\)',
+                    lambda m, p=_plural: self.conjugate(m.group(1), p),
+                    text)
 
         return text.replace(_ESC, SUBST_SIGILS[0] * 2)
 
@@ -921,6 +1105,80 @@ class StringUtils:
             return parts.index(str(target))
         except ValueError:
             return -1
+
+    def collapse(self, block):
+        """
+        A pasted block of text as one storable string, lines joined by ``\\n``.
+
+        Written for signs, menus and anything else whose shape matters. A
+        sign is authored as a picture -- indented inside a triple-quoted
+        string, or pasted out of the world it came from -- and stored as a
+        single value that ``msg`` can send in one call, because ``msg``
+        keeps embedded newlines. This is the step between those two forms.
+
+        Four things happen, all of them about the difference between how
+        text is *written* and how it must be *stored*:
+
+        * Trailing whitespace goes. It is invisible in the source and
+          counts toward the wrap width at the far end, where a line pushed
+          past ``WRAP_WIDTH`` folds and takes the border with it.
+        * The blank lines a triple-quoted string opens and closes with go.
+          They are an artefact of where the quotes sit, not content.
+        * The indentation every line shares goes, so a box written four
+          levels deep inside a verb still arrives flush left. Only the
+          *common* indent -- a line inset further than its neighbours stays
+          inset, which is the whole point for centred text.
+        * What is left is joined with ``\\n``.
+
+        A list of lines is accepted as well as a string, since text
+        arriving from a file or an editor is usually already split.
+
+        Args:
+            block (str or iterable): The text, as one string with newlines
+                or as a sequence of lines.
+
+        Returns:
+            str: One string, ready for a property. Empty in, empty out.
+
+        Example::
+
+            this.read_string = su.collapse('''
+                ==============
+                ||  Menu    ||
+                ==============
+            ''')
+            pobj.msg(this.read_string)
+
+        Note that nothing here escapes anything. Substitution does not run
+        unless ``msg`` is given ``sub=``/``dob=``/etc., so a sign holding
+        ``R&D`` needs no protection -- but colour codes still resolve,
+        which is deliberate: a sign may want them.
+        """
+        if isinstance(block, str):
+            lines = block.split('\n')
+        elif block is None:
+            return ''
+        else:
+            lines = [str(line) for line in block]
+
+        lines = [line.rstrip() for line in lines]
+
+        while lines and not lines[0]:
+            lines.pop(0)
+        while lines and not lines[-1]:
+            lines.pop()
+
+        if not lines:
+            return ''
+
+        # Blank lines are excluded from the measurement: a run of empty
+        # rows inside a box would otherwise report an indent of zero and
+        # cancel the dedent for everything else.
+        indents = [len(line) - len(line.lstrip()) for line in lines if line]
+        cut = min(indents) if indents else 0
+
+        return '\n'.join(line[cut:] for line in lines)
+
 
 # ============================================================================
 # MODULE-LEVEL SINGLETON
