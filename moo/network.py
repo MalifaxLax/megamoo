@@ -383,6 +383,60 @@ def resolve_repeat(player_obj, command: str) -> Optional[str]:
     return command
 
 
+#: How many extra lines an unterminated eval may swallow before the server
+#: gives up and sends what it has.  A pasted sign is twenty-odd; the cap is
+#: here so a client that opens a quote and then goes quiet cannot park a
+#: connection in the continuation loop forever.  Hitting it produces the
+#: syntax error the eval would have given anyway.
+EVAL_CONTINUATION_MAX_LINES = 200
+
+
+def open_fence(text: str) -> Optional[str]:
+    """
+    The triple-quote delimiter still open at the end of *text*, or ``None``.
+
+    Both spellings count and they do not nest: inside a ``\"\"\"`` block an
+    ``'''`` is ordinary text, so only the delimiter that opened the block
+    can close it.
+
+    Args:
+        text: Source to scan.
+
+    Returns:
+        ``'\"\"\"'``, ``\"'''\"``, or ``None`` when every fence is closed.
+    """
+    fence = None
+    i, n = 0, len(text)
+    while i < n:
+        if fence:
+            if text.startswith(fence, i):
+                fence = None
+                i += 3
+                continue
+        elif text.startswith('"""', i) or text.startswith("'''", i):
+            fence = text[i:i + 3]
+            i += 3
+            continue
+        i += 1
+    return fence
+
+
+def is_eval_command(command: str) -> bool:
+    """
+    Whether *command* is a Python eval, the only kind that may continue.
+
+    ``/`` is the shortcut the parser special-cases, and ``eval`` is the
+    verb's primary name.  It carries no abbreviations -- checked, its
+    ``min_lengths`` is empty -- so an exact match is the whole test, and
+    deliberately so: this decides whether a line ending stops being a
+    command boundary, which is not a decision to make on a fuzzy match.
+    """
+    if command.startswith('/'):
+        return True
+    head = command.split(None, 1)
+    return bool(head) and head[0].lower() == 'eval'
+
+
 # ---------------------------------------------------------------------------
 #   PlayerConnection — one per connected socket
 # ---------------------------------------------------------------------------
@@ -891,6 +945,20 @@ class PlayerConnection:
 
                     command = command.strip()
 
+                    # An eval with a triple-quote still open is not a
+                    # finished command, however the line ended.
+                    #
+                    # Telnet delimits on newline -- `reader.readline()`
+                    # above -- so a client cannot send a multi-line
+                    # command at all: paste a sign into MegaTerm or
+                    # TinTin++ and the server reads back one command per
+                    # row, the first an unterminated string literal and
+                    # the rest twenty lines of ASCII art each answered
+                    # "Do what?". There is no envelope to put them in the
+                    # way a WebSocket frame is one message, so the join
+                    # has to happen here.
+                    command = await self._continue_open_eval(command)
+
                 # A verb may be parked waiting for this line -- MOO's
                 # read().  It is offered the line before anything else
                 # looks at it, including the quit check, because a verb
@@ -1257,6 +1325,43 @@ class PlayerConnection:
     # -------------------------------------------------------------------
     #   Input: read_line
     # -------------------------------------------------------------------
+
+    async def _continue_open_eval(self, command: str) -> str:
+        """
+        Keep reading while an eval's triple-quote is still open.
+
+        Only evals continue, and only while a fence is open. Everything
+        else returns on the first line, so a stray ``\"\"\"`` in ``say``
+        cannot strand anybody: the rule is narrow because it suspends the
+        one thing a player relies on -- that pressing Enter runs what they
+        typed.
+
+        A blank line is *content* here, not a terminator. A sign may well
+        contain one, and ``read_line`` returns ``''`` for both a blank line
+        and a lost connection, so the disconnect flag is what ends the loop
+        rather than the empty string.
+
+        Args:
+            command: The first line, already stripped.
+
+        Returns:
+            The lines joined with ``\\n``, ready for the parser -- which
+            keeps them, since the ``/`` branch does not split on
+            whitespace the way an ordinary command does.
+        """
+        if not is_eval_command(command) or not open_fence(command):
+            return command
+
+        lines = [command]
+        while len(lines) < EVAL_CONTINUATION_MAX_LINES:
+            more = await self.read_line()
+            if getattr(self, '_disconnected', False):
+                break
+            lines.append(more.rstrip('\r\n'))
+            if not open_fence('\n'.join(lines)):
+                break
+
+        return '\n'.join(lines)
 
     async def read_line(self) -> str:
         """
