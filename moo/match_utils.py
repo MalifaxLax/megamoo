@@ -194,9 +194,19 @@ def name_match(obj: MOOObject, token: str) -> bool:
     3. The ``obj.noun`` property (the atomic/base name, e.g. "sword").
 
     Matching rules:
-        - Tokens of 2+ characters use prefix matching (e.g. "swo"
-          matches "sword").
-        - Single-character tokens require an exact full-word match.
+        Prefix, case-insensitively, down to a single character.  There is
+        no minimum length: "s" matches "a silver sword" exactly as "swo"
+        does, and will match every other object in the room with a word
+        beginning in "s" besides.  ``match()`` then returns whichever of
+        them came first in the candidate list, silently.
+
+        This docstring used to claim a single character required an exact
+        full-word match, and the guide copied that claim out of here.  It
+        was never true of the code: ``min_prefix`` is 1 for a
+        one-character token, so the guard below can only ever reject the
+        empty string.  Left as it stands rather than "fixed" -- callers
+        have relied on one-letter matching for as long as it has worked,
+        and a minimum would change what players can type.
 
     Args:
         obj (MOOObject): The candidate game object.
@@ -210,11 +220,15 @@ def name_match(obj: MOOObject, token: str) -> bool:
 
         name_match(sword_obj, 'swo')    # True  (prefix of "sword")
         name_match(sword_obj, 'sword')  # True  (exact match)
+        name_match(sword_obj, 's')      # True  (prefix, one character)
         name_match(sword_obj, 'sh')     # False (no word starts with "sh")
+        name_match(sword_obj, '')       # False (the only thing rejected)
     """
     tok = token.casefold()
-    # Single-char tokens need exact match; 2+ chars allow prefix matching.
-    # Tokens shorter than 1 char never match.
+    # The empty string is the only token this rejects: min_prefix is 1
+    # whenever the token is one character or shorter, so `len(tok) <
+    # min_prefix` is only ever true for ''.  Everything else goes to the
+    # prefix comparisons below, one-character tokens included.
     min_prefix = 1 if len(tok) <= 1 else 2
 
     if len(tok) < min_prefix:
