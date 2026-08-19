@@ -56,6 +56,16 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://malifaxlax.github.io/megamoo/text.html</loc>
+    <lastmod>2026-08-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://malifaxlax.github.io/megamoo/hooks.html</loc>
+    <lastmod>2026-08-19</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://malifaxlax.github.io/megamoo/moo-compat.html</loc>
     <lastmod>2026-08-04</lastmod>
     <priority>0.8</priority>

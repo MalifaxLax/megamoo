@@ -79,7 +79,7 @@ IC room in your world has it. Put it on one room, and only that room does.
 <h2 id="auth">Staff verbs and the auth system</h2>
 
 <p>
-Staff commands are the exception. All 75 of them live on <code>#3</code>, the
+Staff commands are the exception. All 81 of them live on <code>#3</code>, the
 base character object, so every character inherits them — and they are kept in
 check by an authority level rather than by where you are standing. They are
 listed in full in the <a href="commands.html">Command Reference</a>.
@@ -249,11 +249,19 @@ would.
 
 <p>
 The engine ships exceptions for most everyday actions:
-<code>go_</code>, <code>look_</code>, <code>get_</code>, <code>drop_</code>,
-<code>eat_</code>, <code>drink_</code>, <code>open_</code>, <code>close_</code>,
-<code>lock_</code>, <code>wear_</code>, <code>remove_</code>, and the
+<code>look_</code>, <code>go_</code>, <code>get_</code>, <code>put_</code>,
+<code>drop_</code>, <code>give_</code>, <code>examine_</code>,
+<code>open_</code>, <code>close_</code>, <code>latch_</code>,
+<code>unlatch_</code>, <code>lock_</code>, <code>unlock_</code>,
+<code>sit_</code>, <code>lay_</code>, and the
 <code>in_</code>/<code>on_</code>/<code>under_</code>/<code>behind_</code>
 container variants.
+</p>
+
+<p>
+A world of your own adds its own. Shadowfall carries <code>eat_</code>,
+<code>drink_</code>, <code>wear_</code> and <code>remove_</code>, for instance,
+because it has the commands to call them; the shipped world has neither.
 </p>
 
 <h2 id="parsing">Verb types and parsing</h2>
@@ -521,8 +529,10 @@ can walk its round without anyone else noticing:
 
 <p>
 A single <code>suspend</code> is capped at 300 seconds. For anything longer,
-schedule a fresh task with <code>delay(n, code)</code> instead of holding a
-parked verb open for an hour.
+schedule a fresh task with <code>delay(seconds, code, context)</code> instead of
+holding a parked verb open for an hour. All three arguments are required —
+<code>context</code> is the namespace the code runs in, usually
+<code>globals()</code>.
 </p>
 
 <h3>request</h3>

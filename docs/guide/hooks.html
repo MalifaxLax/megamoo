@@ -323,12 +323,15 @@ _d = <span class="k">dict</span>(pobj.status <span class="k">or</span> {})
 pobj.status = _d</code></div>
 
 <div class="warn">
-    <span class="label">Assign a fresh dict, and do not use setattr</span>
-    <p>Two traps in three lines. Changing the dict in place never reaches the
-       database — you must build a new one and assign it. And plain assignment is
-       required: <code>setattr</code> goes through the permission check, and the
-       effect is running as the character, who does not own their own
-       <code>status</code>. It would be refused.</p>
+    <span class="label">Do not use setattr</span>
+    <p>Plain assignment is required here: <code>setattr</code> goes through the
+       permission check, and the effect is running as the character, who does not
+       own their own <code>status</code>. It would be refused.</p>
+    <p>Building a fresh dict, as above, is no longer <em>necessary</em> — a list
+       or dict read from a property comes back bound to where it came from, and
+       mutating it writes the whole container back. It is still a clear way to
+       write it, and on an inherited property the write lands as a local copy
+       either way.</p>
 </div>
 
 <h3>The thirteen shipped effects</h3>
@@ -424,7 +427,7 @@ people differently.
 <tr><td><code>postring</code></td><td>#5</td><td>That number as words — "sitting", "lying down".</td></tr>
 <tr><td><code>make_postatus</code></td><td>#5</td><td>Position and status combined, as the room sees it.</td></tr>
 <tr><td><code>look_self</code></td><td>#5</td><td>What a character looks like to somebody else.</td></tr>
-<tr><td><code>rlook</code></td><td>#5</td><td>The same, for staff, with the numbers shown.</td></tr>
+<tr><td><code>rlook</code></td><td>#5, #15</td><td>The same, for staff, with the numbers shown.</td></tr>
 <tr><td><code>_afflict</code></td><td>#1</td><td>Applies an affliction by name. Answers to thirteen: <code>_stun</code>, <code>_blind</code>, <code>_sleep</code>, <code>_web</code> and the rest — each one hands off to <code>$eu</code>.</td></tr>
 <tr><td><code>_resource</code></td><td>#1</td><td>Drains a resource. Answers to <code>_hits</code>, <code>_stamina</code>, <code>_mana</code>, <code>_focus</code>, <code>_adrenalin</code>, <code>_fabric</code>.</td></tr>
 <tr><td><code>_rt</code></td><td>#1</td><td>Applies roundtime and starts it counting down.</td></tr>
@@ -480,9 +483,11 @@ things are worth keeping in mind:
     <li><strong>Return <code>True</code> only if you handled it.</strong> For an
         exception verb that stops the shared command. Return nothing and it
         continues, which is what you want if you only added a message.</li>
-    <li><strong>Assign whole values, not parts of them.</strong> Changing a dict
-        or list in place does not reach the database. Build a new one and assign
-        it.</li>
+    <li><strong>Assign, do not <code>setattr</code>.</strong> Mutating a list
+        or dict read from a property now writes it back, so
+        <code>obj.prop.append(x)</code> persists. What still matters is how you
+        assign: <code>setattr</code> is permission-checked, plain assignment is
+        not.</li>
     <li><strong>Put the name in the file, not just the database.</strong> If you
         give your verb an alias, add it to the <code>Aliases:</code> line —
         <code>@alias</code> does this for you. A name that exists only in the

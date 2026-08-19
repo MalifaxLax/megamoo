@@ -410,6 +410,7 @@ is the small English machinery that message-building needs.
 <tr><td><code>su.listtomenu([…])</code></td><td>a numbered menu</td></tr>
 <tr><td><code>su.columnize([…])</code></td><td>two side-by-side numbered columns</td></tr>
 <tr><td><code>su.wrapstringlist([…], width)</code></td><td>wrap each string and join with newlines</td></tr>
+<tr><td><code>su.collapse(block)</code></td><td>a pasted block — a sign, a menu board — as one newline-joined string</td></tr>
 <tr><td><code>su.find_prefix(p, candidates)</code></td><td>index of the one candidate <code>p</code> matches, else −1</td></tr>
 <tr><td><code>su.index_delimited(s, target)</code></td><td>index of a word within a delimited string, else −1</td></tr>
 <tr><td><code>su.msg_list(text, targets)</code></td><td>send one string to every object in a list</td></tr>
@@ -442,6 +443,7 @@ bright:
 <tr><td><code>&amp;n</code></td><td>reset — clears everything</td></tr>
 <tr><td><code>&amp;h</code> <code>&amp;f</code></td><td>bold, blink</td></tr>
 <tr><td><code>&amp;&lt;245&gt;</code></td><td>xterm-256 index, foreground</td></tr>
+<tr><td><code>&amp;&lt;dim&gt;</code></td><td>a name for 245, the house grey; <code>&amp;&lt;bgdim&gt;</code> behind</td></tr>
 <tr><td><code>&amp;&lt;bg21&gt;</code></td><td>xterm-256 index, background</td></tr>
 <tr><td><code>&amp;&lt;#FF0000&gt;</code></td><td>hex RGB, and <code>&amp;&lt;bg#FF0000&gt;</code> behind</td></tr>
 <tr><td><code>&amp;&lt;underline&gt;</code> <code>&amp;&lt;reverse&gt;</code></td><td>attributes, spelled out</td></tr>
@@ -451,8 +453,17 @@ bright:
 
 <p>
 Always close with <code>&amp;n</code>. For interface chrome — labels, borders,
-anything that should recede — <code>&amp;&lt;245&gt;</code> is the house grey;
+anything that should recede — <code>&amp;&lt;245&gt;</code> is the house grey,
+and <code>&amp;&lt;dim&gt;</code> is a readable name for exactly that index;
 <code>&amp;&lt;240&gt;</code> is too dark to read on some terminals.
+</p>
+
+<p>
+<code>&amp;&lt;dim&gt;</code> is a <em>colour</em>, not the ANSI faint attribute.
+It sets the foreground to one specific grey rather than fading whatever colour
+you were already using, so it cannot be layered over another colour. The
+composable attribute is deliberately unavailable: the browser client defines no
+rule for it, and a fair share of terminals draw it as ordinary text.
 </p>
 
 <p>

@@ -88,7 +88,7 @@ decision rather than a stylistic one.
 <thead><tr><th></th><th><code>pmatch</code></th><th><code>bmatch</code></th></tr></thead>
 <tbody>
 <tr><td>For</td><td>player commands</td><td>staff verbs</td></tr>
-<tr><td>Lives on</td><td>the room parents, <code>#16</code> and <code>#17</code></td><td><code>#3</code>, the character base</td></tr>
+<tr><td>Used by</td><td>the room parents <code>#16</code> and <code>#17</code>, and <code>#11</code>, <code>#15</code>, <code>#26</code></td><td><code>#3</code>, the character base</td></tr>
 <tr><td><code>me</code>, <code>here</code></td><td>yes</td><td>yes</td></tr>
 <tr><td><code>my sword</code></td><td>yes, filtered from your candidates</td><td>yes, straight from <code>pobj.contents</code></td></tr>
 <tr><td><code>#4711</code></td><td><strong>no</strong></td><td>yes</td></tr>
@@ -158,25 +158,22 @@ of <code>obj.name</code>, then every entry in <code>obj.aliases</code>, then
 </p>
 
 <p>
-Matching is by <strong>prefix</strong>, case-insensitively, with one size rule:
+Matching is by <strong>prefix</strong>, case-insensitively, down to a single
+character. Against "a silver sword", <code>swo</code>, <code>sw</code>,
+<code>sil</code> and plain <code>s</code> all match.
 </p>
 
-<div class="tablewrap">
-<table>
-<thead><tr><th>Token</th><th>Rule</th><th>Against "a silver sword"</th></tr></thead>
-<tbody>
-<tr><td>2+ characters</td><td>prefix</td><td><code>swo</code>, <code>sw</code>, <code>sil</code> all match</td></tr>
-<tr><td>1 character</td><td>exact whole word</td><td><code>s</code> does <strong>not</strong> match</td></tr>
-</tbody>
-</table>
+<div class="warn">
+    <span class="label">One letter matches broadly</span>
+    <p>There is no minimum length. <code>s</code> matches every object with a
+       word starting in "s" — the sword, the sack, the stranger — and
+       the first in your candidate list wins, silently. That is worth knowing
+       before you write a verb whose argument is often one character.</p>
+    <p><code>name_match</code>'s own docstring in <code>match_utils.py</code>
+       claims a single character needs an exact whole-word match. It does not;
+       the guard it describes can only ever reject the empty string. The code
+       is the authority.</p>
 </div>
-
-<p>
-The single-character rule exists because prefix-matching one letter matches
-nearly everything in the room. If you want a one-letter handle, give the object
-an alias of that letter — an alias is compared the same way, so a one-character
-alias matches a one-character token exactly.
-</p>
 
 <div class="note">
     <span class="label">Name words, not the whole name</span>
@@ -192,8 +189,13 @@ alias matches a one-character token exactly.
 <p>
 Every adjective must appear <strong>in the order typed</strong>, and at a word
 boundary. <code>big blue ball</code> matches "a big blue ball";
-<code>blue big ball</code> does not. Word boundaries are what keep
-<code>blue</code> out of "a blueberry tart".
+<code>blue big ball</code> does not.
+</p>
+
+<p>
+Only the <em>leading</em> boundary is checked, so <code>berry</code> does not
+reach "a blueberry tart" — but <code>blue</code> does. An adjective has to
+start a word; it does not have to finish one.
 </p>
 
 <p>
@@ -202,7 +204,13 @@ property, a list of strings, is matched by prefix and also in order. That is how
 you make an object answer to a word that does not appear in its name.
 </p>
 
-<div class="term"><code>@set drape.adjectives = ["blue", "velvet", "heavy"]</code></div>
+<div class="term"><code>@adprop drape.adjectives = ["blue", "velvet", "heavy"]</code></div>
+
+<p>
+<code>@adprop</code>, not <code>@set</code>: no object ships with an
+<code>adjectives</code> property, and <code>@set</code> refuses a property that
+does not already exist locally or by inheritance.
+</p>
 
 <p>
 With that set, <code>blue drape</code> finds it even though the name says
@@ -320,7 +328,7 @@ all of which are available to verb code in their own right.
 <tr><td><code>strip_articles(text)</code></td><td>text without a leading article</td></tr>
 <tr><td><code>smatch(target, query, minlen=0)</code></td><td>plain prefix comparison of two strings; no objects involved</td></tr>
 <tr><td><code>prep_match(word)</code></td><td>a word to its canonical preposition: <code>onto</code> → <code>on</code></td></tr>
-<tr><td><code>split_on_prep(text)</code></td><td><code>text</code> → <code>(dobj, prep, iobj)</code></td></tr>
+<tr><td><code>split_on_prep(text)</code></td><td><code>text</code> → <code>(before, prep, after)</code>; <code>before</code> keeps the command word</td></tr>
 </tbody>
 </table>
 </div>
