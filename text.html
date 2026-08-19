@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text, Substitution &amp; Colour — MegaMOO Guide</title>
+<!-- seo:begin -->
+<meta name="description" content="Writing what players read: msg and msg_room, the substitution tokens, viewer-aware emits and verb agreement, and the colour codes.">
+<link rel="canonical" href="https://malifaxlax.github.io/megamoo/text.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MegaMOO">
+<meta property="og:title" content="Text, Substitution & Colour — MegaMOO Guide">
+<meta property="og:description" content="Writing what players read: msg and msg_room, the substitution tokens, viewer-aware emits and verb agreement, and the colour codes.">
+<meta property="og:url" content="https://malifaxlax.github.io/megamoo/text.html">
+<meta property="og:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Text, Substitution & Colour — MegaMOO Guide">
+<meta name="twitter:description" content="Writing what players read: msg and msg_room, the substitution tokens, viewer-aware emits and verb agreement, and the colour codes.">
+<meta name="twitter:image" content="https://malifaxlax.github.io/megamoo/og-image.png">
+<link rel="icon" href="https://malifaxlax.github.io/megamoo/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="https://malifaxlax.github.io/megamoo/apple-touch-icon.png">
+<!-- seo:end -->
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<div class="wrap">
+
+<p class="crumb"><a href="index.html">← MegaMOO Guide</a></p>
+
+<h1 class="wordmark" style="font-size:clamp(1.8rem,6vw,2.4rem)">Text, Substitution &amp; Colour</h1>
+<p class="tagline">Writing one line that reads correctly to everybody who sees it.</p>
+
+<nav class="toc">
+    <span class="kicker">On this page</span>
+    <ol>
+        <li><a href="#layers">Two layers, one sigil</a></li>
+        <li><a href="#sending">Sending text: msg and msg_room</a></li>
+        <li><a href="#esub">The substitution tokens</a></li>
+        <li><a href="#slots">Raw slots, and escaping</a></li>
+        <li><a href="#viewer">Viewer-aware emits</a></li>
+        <li><a href="#conj">Verb agreement</a></li>
+        <li><a href="#psub">psub1 and psub2</a></li>
+        <li><a href="#su">The rest of su</a></li>
+        <li><a href="#colour">Colour</a></li>
+        <li><a href="#wrapping">Wrapping</a></li>
+    </ol>
+</nav>
+
+<h2 id="layers">Two layers, one sigil</h2>
+
+<p>
+Everything a player reads passes through two passes, in this order:
+<strong>substitution</strong>, which replaces <code>&amp;s</code> and friends with
+names and pronouns, and then <strong>colour</strong>, which turns
+<code>&amp;r</code> and <code>&amp;&lt;245&gt;</code> into escape codes. Both use
+the same prefix character, <code>&amp;</code>, so the letter after it is the only
+thing that decides which pass claims a token.
+</p>
+
+<p>
+That sharing has one consequence worth knowing before you write anything.
+Substitution only fills a token when it was <em>given</em> something to fill it
+with — send a message with no indirect object and its <code>&amp;i</code> survives
+untouched, reaches the colour pass, and is read as a colour code. This is why
+<code>i</code> and <code>u</code> are deliberately absent from the colour table:
+<code>&amp;i</code> is the indirect object and <code>&amp;u</code> the noun, and
+before they were removed an <code>&amp;i</code> without an iobj inverted the rest
+of the line. Nothing was lost — <code>&amp;&lt;underline&gt;</code> and
+<code>&amp;&lt;reverse&gt;</code> spell those attributes unambiguously.
+</p>
+
+<div class="note">
+    <span class="label">Why <code>&amp;</code> and not <code>%</code></span>
+    <p><code>%</code> is Python's string-formatting operator, so
+       <code>"%&lt;245&gt;%s" % name</code> raises <code>ValueError</code> — the
+       most common formatting idiom in the language collided with the most
+       common display idiom in the engine. Counted across 5,217 literal output
+       strings in a real world, <code>%</code> appeared 1,132 times,
+       <code>|</code> 14, and <code>&amp;</code> zero. It is the Diku/Merc
+       convention besides, so MUD authors arrive already knowing it.</p>
+</div>
+
+<h2 id="sending">Sending text: msg and msg_room</h2>
+
+<p>
+Two calls cover almost everything. Use them rather than the raw
+<code>notify()</code> builtin:
+</p>
+
+<div class="term"><code>pobj.msg("You pick up &amp;d.", dob=item)
+pobj.location.msg_room("&amp;S picks up &amp;d.", exclude=[pobj], sub=pobj, dob=item)</code></div>
+
+<p>
+<code>msg</code> sends to one object. <code>msg_room</code> sends to every player
+in a location, and <code>exclude</code> is how you keep the actor from hearing
+the third-person version of their own action.
+</p>
+
+<p>
+Both are native methods on every object, which matters for speed: as a method
+<code>msg</code> costs about 1.7µs against 168µs for the same thing written as a
+verb, and because <code>msg_room</code> calls <code>msg</code> once per listener,
+a forty-person room emit went from 6.7ms to 70µs when it stopped being a verb.
+</p>
+
+<p>
+They are still overridable. Define a <code>msg</code> verb on any object — a
+deafened character, a filtered channel — and <code>msg</code> dispatches to it
+instead. The lookup happens per call, so a <code>set_verb</code> at runtime takes
+effect immediately. Every <code>msg_room</code> implementation deliberately
+delivers through <code>msg</code> rather than <code>notify</code> for exactly this
+reason.
+</p>
+
+<div class="note">
+    <span class="label">Substitution runs once per recipient</span>
+    <p><code>msg_room</code> walks the room and calls <code>msg</code> on each
+       listener, so the tokens are resolved separately for every player. That is
+       what makes <a href="#viewer">viewer-aware emits</a> possible, and it is
+       also why <code>&amp;S</code> capitalises correctly for everyone rather than
+       being baked once and shared.</p>
+</div>
+
+<h2 id="esub">The substitution tokens</h2>
+
+<p>
+Three objects can be named in a message, plus a noun: the
+<strong>subject</strong> (who acted), the <strong>direct object</strong> (what
+they acted on), and the <strong>indirect object</strong> (what they used or whom
+they acted toward). Pass them as <code>sub</code>, <code>dob</code> and
+<code>iob</code>.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Token</th><th>Fills with</th><th>Needs</th></tr></thead>
+<tbody>
+<tr><td><code>&amp;s</code> / <code>&amp;S</code></td><td>the subject's name</td><td><code>sub=</code></td></tr>
+<tr><td><code>&amp;d</code> / <code>&amp;D</code></td><td>the direct object's name</td><td><code>dob=</code></td></tr>
+<tr><td><code>&amp;i</code> / <code>&amp;I</code></td><td>the indirect object's name</td><td><code>iob=</code></td></tr>
+<tr><td><code>&amp;u</code> / <code>&amp;U</code></td><td>a noun, not a full name</td><td><code>uob=</code></td></tr>
+<tr><td><code>&amp;ps</code></td><td>he / she / they / it</td><td><code>sub=</code></td></tr>
+<tr><td><code>&amp;po</code></td><td>him / her / them / it</td><td><code>sub=</code></td></tr>
+<tr><td><code>&amp;pp</code></td><td>his / her / their / its</td><td><code>sub=</code></td></tr>
+<tr><td><code>&amp;pa</code></td><td>his / hers / theirs / its</td><td><code>sub=</code></td></tr>
+<tr><td><code>&amp;pr</code></td><td>himself / herself / themself / itself</td><td><code>sub=</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+<strong>Capitalise by upper-casing the token's first letter.</strong> One rule,
+everywhere: <code>&amp;S</code>, <code>&amp;D</code>, <code>&amp;Ps</code>,
+<code>&amp;Pp</code>. There is no separate set of capitalised tokens to learn.
+</p>
+
+<p>
+Pronouns come from the subject's <code>gender</code> property —
+<code>male</code>, <code>female</code>, <code>neutral</code> or
+<code>ambiguous</code>. Anything else, including an object with no gender at
+all, falls back to <code>ambiguous</code>: they/them/their.
+</p>
+
+<h2 id="slots">Raw slots, and escaping</h2>
+
+<p>
+Numbers, coin words and any other plain string go in through numbered slots
+rather than as objects. The keyword keeps its <code>s</code>; the token drops it:
+</p>
+
+<div class="term"><code>pobj.msg("You pay &amp;1 for &amp;d.", dob=item, s1="three silver")</code></div>
+
+<p>
+The convention is worth following: <strong>objects go through
+<code>&amp;d</code>/<code>&amp;i</code>, strings through
+<code>&amp;1</code>/<code>&amp;2</code></strong>. Slots are numbered from
+<code>&amp;0</code>, and higher indices are replaced first so <code>&amp;1</code>
+can never clobber <code>&amp;10</code>.
+</p>
+
+<p>
+Two escaping rules matter, and they pull in opposite directions.
+</p>
+
+<p>
+<strong>Names are protected for you.</strong> A name containing a sigil would
+otherwise be re-read by a later pass — an object called <code>a &amp;d</code>
+inserted at the subject step had its <code>&amp;d</code> replaced by the direct
+object's name at the next one. Names inserted through
+<code>&amp;s</code>/<code>&amp;d</code>/<code>&amp;i</code> are neutralised
+automatically, so you never think about this.
+</p>
+
+<p>
+<strong>Raw slots are not.</strong> Slot values are inserted verbatim and are
+never rescanned, which is deliberate — but it also means a slot is the right
+place for text you do not control, and the wrong place for text you want
+substituted. If a verb echoes something a player typed, double the sigil
+yourself:
+</p>
+
+<div class="term"><code>spoken = args.replace('&amp;', '&amp;&amp;')
+pobj.msg('You say, "%s"' % spoken)</code></div>
+
+<p>
+That is what <code>say</code> and <code>act</code> do. Without it, anybody could
+put colour codes — or a stray <code>&amp;S</code> naming somebody else — into a
+line attributed to them. A doubled <code>&amp;&amp;</code> survives substitution
+intact so the colour pass still has its own half of the escape to consume.
+</p>
+
+<div class="note">
+    <span class="label">Raw-display verbs</span>
+    <p>A verb that prints a property's literal value — <code>@examine</code>,
+       a decompiler, anything showing you what is stored — has to double
+       <code>&amp;</code> on the way out, or a message template stored in a
+       property will render instead of being displayed.</p>
+</div>
+
+<h2 id="viewer">Viewer-aware emits</h2>
+
+<p>
+An emit has three audiences: the one who acted, the one it happened to, and
+everybody watching. A combat line needs all three —
+</p>
+
+<div class="term"><code><span class="o">You attack Bramble.</span>
+<span class="o">Malifax attacks you.</span>
+<span class="o">Malifax attacks Bramble.</span></code></div>
+
+<p>
+— and writing that as three strings means three things to keep in step, with
+nothing checking that they agree. Two token families collapse it into one
+string. Because substitution runs once per recipient, each of them can ask
+<em>who is reading this</em>.
+</p>
+
+<p>
+<code>&amp;y…</code> is the subject, <code>&amp;t…</code> the target, and both
+take the same five cases as the pronoun tokens:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Token</th><th>To that person</th><th>To anyone else</th></tr></thead>
+<tbody>
+<tr><td><code>&amp;ys</code></td><td>you</td><td>Malifax <em>(the name)</em></td></tr>
+<tr><td><code>&amp;yo</code></td><td>you</td><td>him</td></tr>
+<tr><td><code>&amp;yp</code></td><td>your</td><td>his</td></tr>
+<tr><td><code>&amp;ya</code></td><td>yours</td><td>his</td></tr>
+<tr><td><code>&amp;yr</code></td><td>yourself</td><td>himself</td></tr>
+<tr><td><code>&amp;ts</code> <code>&amp;to</code></td><td>you</td><td>Bramble <em>(the name)</em></td></tr>
+<tr><td><code>&amp;tp</code></td><td>your</td><td>her</td></tr>
+<tr><td><code>&amp;ta</code></td><td>yours</td><td>hers</td></tr>
+<tr><td><code>&amp;tr</code></td><td>yourself</td><td>herself</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+So the three lines above are one string:
+</p>
+
+<div class="term"><code>here.msg_room("&amp;Ys &amp;v(attack) &amp;to.", sub=pobj, dob=target)</code></div>
+
+<p>
+Capitalisation is the same rule as everywhere else: <code>&amp;Ys</code>,
+<code>&amp;Tp</code>.
+</p>
+
+<div class="note">
+    <span class="label">Two deliberate asymmetries</span>
+    <p><code>&amp;ys</code> renders the <em>name</em> in the third person, not
+       "he". Subject position is where a line says who it is about, and "He
+       smiles at Bramble" arriving cold has no antecedent. The other cases take
+       pronouns because by then the name has been said.</p>
+    <p>For the same reason <code>&amp;to</code> renders the name while
+       <code>&amp;yo</code> renders "him" — nothing has named the target yet at
+       that point. <code>&amp;ts</code> and <code>&amp;to</code> are identical,
+       since "you" is caseless; both exist so the two families are learned
+       once.</p>
+</div>
+
+<h2 id="conj">Verb agreement</h2>
+
+<p>
+Once one string serves both "you" and "Malifax", the verb has to move with it —
+"you smile" but "Malifax smiles". Wrap the bare verb:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Token</th><th>Agrees with</th></tr></thead>
+<tbody>
+<tr><td><code>&amp;v(smile)</code></td><td>the subject (<code>sub</code>)</td></tr>
+<tr><td><code>&amp;vd(dangle)</code></td><td>the direct object (<code>dob</code>)</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+<code>&amp;vd</code> exists because the two are not always the same. In
+<code>"&amp;D &amp;vd(dangle) from &amp;yp ear."</code> the possessive belongs to
+the wearer and the verb to the earring, so <code>sub</code> stays the character
+while <code>dob</code> drives the agreement.
+</p>
+
+<p>
+The bare form is used when any of these is true, and the <code>-s</code> form
+otherwise:
+</p>
+
+<ul>
+<li>the reader <em>is</em> that object — "you smile", never "you smiles";</li>
+<li>the object has a <code>plural</code> property set true;</li>
+<li>the object's article is a plural determiner — <code>some</code>,
+    <code>several</code>, <code>many</code> — so "some drapes hang".</li>
+</ul>
+
+<p>
+Spelling follows the ordinary rules: add <code>-s</code>, <code>-es</code> after
+<em>s x z ch sh o</em>, <code>y</code> becomes <code>-ies</code> after a
+consonant. Only <strong>be</strong> and <strong>have</strong> are table entries;
+<em>do</em> and <em>go</em> come out right from the <code>-o</code> rule.
+</p>
+
+<div class="note">
+    <span class="label">Two things the article rule gets right on purpose</span>
+    <p><code>a pair of</code> is <em>singular</em> — "a pair of boots is slung
+       over your shoulder" — and an item with no article at all is singular too,
+       because it is more often proper-named ("Excalibur gleams") than plural.
+       Set <code>plural</code> where the article misleads.</p>
+    <p>Gender is not consulted. A they/them character takes the bare form behind
+       the <em>pronoun</em> — "they smile" — but not behind their name, and
+       "Robin smiles" is what English wants. A sentence built on
+       <code>&amp;ps</code> rather than <code>&amp;ys</code> has to set
+       <code>plural</code> or write its own agreement.</p>
+</div>
+
+<p>
+Both are available directly when a verb is assembling text rather than emitting
+it:
+</p>
+
+<div class="term"><code>su.conjugate('smile')                  <span class="c"># smiles</span>
+su.conjugate('smile', plural=True)     <span class="c"># smile</span>
+su.takes_plural_verb(obj, viewer)      <span class="c"># True / False</span></code></div>
+
+<h2 id="psub">psub1 and psub2</h2>
+
+<p>
+Where <code>esub</code> thinks in terms of subject and objects,
+<code>psub1</code> and <code>psub2</code> think in terms of an
+<strong>enactor</strong> and a <strong>target</strong>. They are the right tool
+for a message template stored on an object — a social, a weapon's hit line —
+where there is no verb call supplying <code>sub=</code> and <code>dob=</code>.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Token</th><th>Fills with</th><th>Function</th></tr></thead>
+<tbody>
+<tr><td><code>&amp;N</code> / <code>&amp;CN</code></td><td>the enactor's name</td><td>psub1</td></tr>
+<tr><td><code>&amp;EPS</code> <code>&amp;EPO</code> <code>&amp;EPP</code> <code>&amp;EPR</code></td><td>the enactor's pronouns</td><td>psub1</td></tr>
+<tr><td><code>&amp;CEPS</code> <code>&amp;CEPO</code> <code>&amp;CEPP</code> <code>&amp;CEPR</code></td><td>the same, capitalised</td><td>psub1</td></tr>
+<tr><td><code>&amp;T</code> / <code>&amp;CT</code></td><td>the target's name</td><td>psub2</td></tr>
+<tr><td><code>&amp;OPS</code> <code>&amp;OPO</code> <code>&amp;OPP</code> <code>&amp;OPR</code></td><td>the target's pronouns</td><td>psub2</td></tr>
+<tr><td><code>&amp;COPS</code> <code>&amp;COPO</code> <code>&amp;COPP</code> <code>&amp;COPR</code></td><td>the same, capitalised</td><td>psub2</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="term"><code>su.psub1("&amp;CN draws &amp;EPP sword.", eobj=player)
+su.psub2("&amp;CN bows to &amp;T.", eobj=player, tobj=other)</code></div>
+
+<p>
+These families spell capitalisation with a <code>C</code> prefix rather than by
+upper-casing the first letter, which is the one place the two conventions
+differ. Replacement runs longest-token-first — reflexive, then possessive, then
+objective, then subjective — so <code>&amp;EPS</code> cannot match inside a
+longer token.
+</p>
+
+<p>
+<code>psub1a</code> and <code>psub2a</code> are the same with three positional
+strings, filling <code>&amp;1</code>, <code>&amp;2</code> and
+<code>&amp;3</code>.
+</p>
+
+<h2 id="su">The rest of su</h2>
+
+<p>
+<code>su</code> is available in every verb without importing anything. Most of it
+is the small English machinery that message-building needs.
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Call</th><th>Does</th></tr></thead>
+<tbody>
+<tr><td><code>su.listtoenglish([…])</code></td><td>"a sword, a shield and a helm" from a list of strings</td></tr>
+<tr><td><code>su.tlisttoenglish([…])</code></td><td>the same from a list of objects, using their names</td></tr>
+<tr><td><code>su.english_list(…)</code></td><td>as above with the separators spelled out, and a word for the empty case</td></tr>
+<tr><td><code>su.capitalise(s)</code></td><td>upper-case the first character, leave the rest alone</td></tr>
+<tr><td><code>su.a_or_an(word)</code></td><td>"a" or "an", by what the word starts with</td></tr>
+<tr><td><code>su.pluralise(word, count)</code></td><td>naive English plural</td></tr>
+<tr><td><code>su.ordinal(n)</code></td><td>1 → "1st", 2 → "2nd"</td></tr>
+<tr><td><code>su.listtomenu([…])</code></td><td>a numbered menu</td></tr>
+<tr><td><code>su.columnize([…])</code></td><td>two side-by-side numbered columns</td></tr>
+<tr><td><code>su.wrapstringlist([…], width)</code></td><td>wrap each string and join with newlines</td></tr>
+<tr><td><code>su.collapse(block)</code></td><td>a pasted block — a sign, a menu board — as one newline-joined string</td></tr>
+<tr><td><code>su.find_prefix(p, candidates)</code></td><td>index of the one candidate <code>p</code> matches, else −1</td></tr>
+<tr><td><code>su.index_delimited(s, target)</code></td><td>index of a word within a delimited string, else −1</td></tr>
+<tr><td><code>su.msg_list(text, targets)</code></td><td>send one string to every object in a list</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="note">
+    <span class="label">Use <code>su.capitalise</code>, never <code>.capitalize()</code></span>
+    <p>Python's <code>str.capitalize()</code> lower-cases everything after the
+       first letter, so "a LOOT sack" becomes "A loot sack".
+       <code>su.capitalise</code> raises the first character and leaves the rest
+       alone. <code>su.capitalize</code> is spelled both ways and does the same
+       correct thing.</p>
+</div>
+
+<h2 id="colour">Colour</h2>
+
+<p>
+Single letters for the basic sixteen, lower-case for normal and upper-case for
+bright:
+</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Code</th><th>Colour</th></tr></thead>
+<tbody>
+<tr><td><code>&amp;x &amp;r &amp;g &amp;y &amp;b &amp;m &amp;c &amp;w</code></td><td>black, red, green, yellow, blue, magenta, cyan, white</td></tr>
+<tr><td><code>&amp;X &amp;R &amp;G &amp;Y &amp;B &amp;M &amp;C &amp;W</code></td><td>the bright variants</td></tr>
+<tr><td><code>&amp;n</code></td><td>reset — clears everything</td></tr>
+<tr><td><code>&amp;h</code> <code>&amp;f</code></td><td>bold, blink</td></tr>
+<tr><td><code>&amp;&lt;245&gt;</code></td><td>xterm-256 index, foreground</td></tr>
+<tr><td><code>&amp;&lt;dim&gt;</code></td><td>a name for 245, the house grey; <code>&amp;&lt;bgdim&gt;</code> behind</td></tr>
+<tr><td><code>&amp;&lt;bg21&gt;</code></td><td>xterm-256 index, background</td></tr>
+<tr><td><code>&amp;&lt;#FF0000&gt;</code></td><td>hex RGB, and <code>&amp;&lt;bg#FF0000&gt;</code> behind</td></tr>
+<tr><td><code>&amp;&lt;underline&gt;</code> <code>&amp;&lt;reverse&gt;</code></td><td>attributes, spelled out</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>
+Always close with <code>&amp;n</code>. For interface chrome — labels, borders,
+anything that should recede — <code>&amp;&lt;245&gt;</code> is the house grey,
+and <code>&amp;&lt;dim&gt;</code> is a readable name for exactly that index;
+<code>&amp;&lt;240&gt;</code> is too dark to read on some terminals.
+</p>
+
+<p>
+<code>&amp;&lt;dim&gt;</code> is a <em>colour</em>, not the ANSI faint attribute.
+It sets the foreground to one specific grey rather than fading whatever colour
+you were already using, so it cannot be layered over another colour. The
+composable attribute is deliberately unavailable: the browser client defines no
+rule for it, and a fair share of terminals draw it as ordinary text.
+</p>
+
+<p>
+Codes are stripped rather than rendered for clients that cannot show colour, and
+width calculations strip them before measuring, so a coloured line still boxes
+and centres correctly.
+</p>
+
+<h2 id="wrapping">Wrapping</h2>
+
+<p>
+Long lines are wrapped at <code>WRAP_WIDTH</code>, 121 characters, <strong>on the
+telnet path only</strong>. The browser client never wraps server-side — it wraps
+in CSS, so the same text reflows when the window changes size. Setting
+<code>WRAP_WIDTH</code> to 0 turns server-side wrapping off entirely.
+</p>
+
+<p>
+This is why anything drawn as art — a banner, a box, a map — should be sent as a
+grid rather than as prose, and why the browser client lays text out on a
+character cell instead of leaving it to the font.
+</p>
+
+<div class="pagenav">
+    <a href="matching.html"><span class="dir">Previous</span>Matching</a>
+    <a class="to-next" href="hooks.html"><span class="dir">Next</span>Hooks &amp; Internal Verbs</a>
+</div>
+
+<div class="footer">
+    <span><a href="index.html">← MegaMOO Guide</a></span>
+    <span>Text, Substitution &amp; Colour</span>
+</div>
+
+</div>
+</body>
+</html>
