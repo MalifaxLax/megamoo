@@ -143,6 +143,9 @@ class WebSocketConnection:
         self.authenticated = False
         self.protocols: set = {'gmcp'}  # Web clients always support GMCP
         self.color_enabled = True
+        # Replaced by the client's own measurement as soon as it connects
+        # (``type: "naws"``, below).  These are only what a client that
+        # never reports is assumed to have.
         self.width = 120
         self.height = 50
         self._msg_queue: deque = deque()
@@ -682,6 +685,9 @@ class WebSocketConnection:
                         msg = json.loads(text)
                         if msg.get('type') == 'input':
                             return msg.get('data', '')
+                        if msg.get('type') == 'naws':
+                            self._set_naws(msg)
+                            continue
                         # Client GMCP messages (Core.Hello, etc.) -- ignored for now
                         if msg.get('type') == 'gmcp':
                             continue
@@ -718,6 +724,33 @@ class WebSocketConnection:
                 logger.error(f"Error reading from web client: {e}")
                 self._disconnected = True
                 return ''
+
+    def _set_naws(self, msg: dict) -> None:
+        """Record the terminal size the client just measured for itself.
+
+        The browser's equivalent of telnet's NAWS.  A web client measures
+        its own scrollback -- in the font the machine actually resolved,
+        minus the padding the map column reserves -- and sends the result
+        on connect and on resize.  Verbs that draw in columns read
+        ``conn.width`` and size themselves to it, instead of every client
+        being assumed to have the same terminal.
+
+        Ignored unless both numbers are sane.  This arrives from the
+        browser, so it is input: a client that reports nonsense, or a
+        stale field, must leave the last good size standing rather than
+        replace it with something no screen can be drawn in.
+        """
+        try:
+            width = int(msg.get('width', 0))
+            height = int(msg.get('height', 0))
+        except (TypeError, ValueError):
+            return
+        # Twenty columns is narrower than any screen the game draws and
+        # five hundred is wider than any real terminal; outside that the
+        # number is wrong rather than unusual.
+        if 20 <= width <= 500 and 5 <= height <= 500:
+            self.width = width
+            self.height = height
 
     # ------------------------------------------------------------------
     # GMCP (Generic MUD Communication Protocol)

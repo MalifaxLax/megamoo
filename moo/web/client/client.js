@@ -13,6 +13,7 @@
  *                      {type:"gmcp",   package:"Room.Info", data:{...}}
  *
  *   client -> server   {type:"input",  data:"look"}
+ *                      {type:"naws",   width:117, height:44}
  *                      {type:"gmcp",   package:"...", data:{...}}
  *
  * Out-of-band data
@@ -625,6 +626,11 @@ const net = {
     socket.addEventListener('open', () => {
       this.retryDelay = 1000;
       setStatus('online', 'connected');
+      // Before anything is drawn, and before the player can ask for a
+      // screen that needs the number. A reconnect re-reports, since
+      // lastReportedSize belongs to a socket that is gone.
+      lastReportedSize = null;
+      reportTerminalSize();
       bus.emit('connect', null);
       input.enable();
       checkForNewBuild();
@@ -666,6 +672,73 @@ const net = {
     return true;
   },
 };
+
+/* -------------------------------------------------------------------------
+ * Terminal metrics (NAWS)
+ * -------------------------------------------------------------------------
+ * How wide this client actually is, told to the server the way a telnet
+ * client tells it over NAWS.
+ *
+ * The server used to assume 120 columns for every browser, because the
+ * browser had no way to say otherwise -- and 120 is wrong for most windows
+ * once the reserved map column has taken its 220px. A screen drawn in
+ * columns then folds its last field onto the next line, which does not read
+ * as a wrap; it reads as missing data. The training table lost its cost
+ * column that way.
+ *
+ * Measured rather than calculated. The font is a stack (--term-family falls
+ * through Monaco, PT Mono, Menlo, ui-monospace) and we do not know which
+ * entry the machine resolved, so a run of characters is laid out in the
+ * scrollback's own computed font and divided back out. That also survives
+ * page zoom for free, since zoom moves the resolved pixel size and the
+ * measurement follows it.
+ *
+ * The padding is subtracted, not ignored: padding-left is the map
+ * reservation, and those columns genuinely are not available to text.
+ */
+function measureTerminal() {
+  const cs = getComputedStyle(scrollback);
+  const probe = document.createElement('span');
+  probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;';
+  probe.style.font = cs.font;
+  // A run, not one character: sub-pixel advance widths only divide out
+  // accurately in bulk, and a single glyph rounds badly enough to cost a
+  // column.
+  probe.textContent = 'M'.repeat(100);
+  scrollback.appendChild(probe);
+  const charW = probe.getBoundingClientRect().width / 100;
+  probe.remove();
+  if (!(charW > 0)) return null;          // font not loaded, or pane hidden
+
+  const inner = scrollback.clientWidth
+              - (parseFloat(cs.paddingLeft) || 0)
+              - (parseFloat(cs.paddingRight) || 0);
+  const lineH = parseFloat(cs.lineHeight) || charW * 2;
+  return {
+    width: Math.max(20, Math.floor(inner / charW)),
+    height: Math.max(5, Math.floor(scrollback.clientHeight / lineH)),
+  };
+}
+
+let lastReportedSize = null;
+
+function reportTerminalSize() {
+  const m = measureTerminal();
+  if (!m) return;
+  // Only on change. A resize drags through hundreds of intermediate widths
+  // and the server has no use for any of them but the last.
+  if (lastReportedSize
+      && lastReportedSize.width === m.width
+      && lastReportedSize.height === m.height) return;
+  if (!net.send({ type: 'naws', width: m.width, height: m.height })) return;
+  lastReportedSize = m;
+}
+
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(reportTerminalSize, 250);
+});
 
 /* -------------------------------------------------------------------------
  * Inbound dispatch
