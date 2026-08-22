@@ -30,6 +30,19 @@ The cost is a thread per suspended verb, so the pool bounds how many verbs
 may be suspended at once.  Exceed it and new commands wait for a worker
 rather than failing, which is the right way round.
 
+What happens to a verb that never finishes
+------------------------------------------
+
+Serialising on one semaphore means a verb that never returns takes the
+whole server with it: it holds the baton, nothing else can take it, and
+the command timeout only ever ended the *waiting*.  A builder who typed
+``while True:`` used to need a restart.
+
+:func:`abandon` closes that, and does it without ever touching the
+semaphore -- the runaway is interrupted and unwinds through its own
+``finally``, releasing the baton and rolling its transaction back.  The
+reasoning, and the cases it still cannot reach, are documented there.
+
 What a suspend point means
 --------------------------
 
@@ -40,6 +53,7 @@ care applies: re-read what matters after suspending, rather than trusting
 what was read before.
 """
 
+import ctypes
 import logging
 import threading
 import time
@@ -51,11 +65,32 @@ logger = logging.getLogger('megamoo.baton')
 __all__ = [
     'Execution', 'acquire', 'release', 'run_guarded', 'suspend',
     'running_seconds', 'suspended_seconds', 'holder', 'suspended_count',
-    'MAX_SUSPEND',
+    'holder_thread', 'abandon', 'VerbAbandoned', 'MAX_SUSPEND',
 ]
+
+
+class VerbAbandoned(BaseException):
+    """
+    Raised *into* a verb that has outrun the command timeout.
+
+    Deliberately a :class:`BaseException` and not an :class:`Exception`:
+    verb code is full of ``try: ... except Exception:`` and a runaway loop
+    wrapped in one would otherwise swallow its own eviction notice and
+    keep the baton.  Nothing in the engine catches BaseException except
+    :func:`_verb_txn`, which rolls the verb's transaction back and
+    re-raises -- which is exactly the unwinding this is for.
+    """
+
 
 #: The baton itself.  Whoever holds it may run verb code; nobody else may.
 _baton = threading.Semaphore(1)
+
+#: Which thread holds the baton right now, or None.  Written only by
+#: :func:`acquire` and :func:`release`, and safe without a lock of its own
+#: because the semaphore already serialises them: the holder clears it
+#: *before* releasing, so the next holder cannot be overwritten by the
+#: previous one.
+_holder_thread: Optional[threading.Thread] = None
 
 #: Per-thread bookkeeping, so the command timeout can charge a verb for
 #: time it spent *running* and not for time it spent parked.
@@ -72,19 +107,33 @@ MAX_SUSPEND = 300.0
 
 def acquire() -> None:
     """Take the baton, blocking until it is free."""
+    global _holder_thread
     _baton.acquire()
     _local.holding = True
+    _holder_thread = threading.current_thread()
 
 
 def release() -> None:
     """Give the baton back."""
+    global _holder_thread
     _local.holding = False
+    _holder_thread = None
     _baton.release()
 
 
 def holder() -> bool:
     """Whether this thread currently holds the baton."""
     return getattr(_local, 'holding', False)
+
+
+def holder_thread() -> Optional[threading.Thread]:
+    """
+    The thread holding the baton, or None if it is free.
+
+    Visible from *outside* that thread, which :func:`holder` is not, so
+    the event loop enforcing the command timeout can tell who to blame.
+    """
+    return _holder_thread
 
 
 def suspended_count() -> int:
@@ -114,17 +163,147 @@ class Execution:
     *running*, and thread-locals are invisible from outside the thread.
     """
 
-    __slots__ = ('started', 'parked')
+    __slots__ = ('started', 'parked', 'thread', 'abandoned')
 
     def __init__(self):
         self.started: Optional[float] = None
         self.parked: float = 0.0
+        #: The thread this verb is running on, set once it holds the
+        #: baton and cleared when it gives it back.  This is what lets
+        #: :func:`abandon` interrupt *this* verb and not whichever one
+        #: happens to be running by the time the deadline is noticed.
+        self.thread: Optional[threading.Thread] = None
+        #: Whether this execution has already been sent a VerbAbandoned.
+        self.abandoned: bool = False
 
     def running_seconds(self) -> float:
         """Seconds spent executing, not counting time parked."""
         if not self.started:
             return 0.0
         return (time.time() - self.started) - self.parked
+
+
+#: ``PyThreadState_SetAsyncExc``, bound once with explicit types.  A
+#: NULL second argument -- ``ctypes.py_object()`` with no value -- is how
+#: CPython is told to *clear* a pending async exception, which is the
+#: documented undo for the "more than one thread affected" case below.
+_set_async_exc = ctypes.pythonapi.PyThreadState_SetAsyncExc
+_set_async_exc.argtypes = (ctypes.c_ulong, ctypes.py_object)
+_set_async_exc.restype = ctypes.c_int
+
+
+def abandon(record: 'Execution', verb_name: str = '<unknown>') -> bool:
+    """
+    Evict a verb that has outrun the command timeout, and get the baton
+    back by making the verb itself hand it over.
+
+    Why not simply release the semaphore
+    ------------------------------------
+
+    Because the runaway is still running.  ``COMMAND_TIMEOUT`` abandons
+    the *wait*, not the work: the player is told the command timed out
+    and the event loop moves on, but the thread is still spinning inside
+    the verb body.  Releasing the baton on its behalf would let a second
+    verb start while the first one is mid ``d = dict(obj.p); d[k] = v;
+    obj.p = d``, which is precisely the interleaving this module exists
+    to prevent -- and it would do it while the loser's verb transaction
+    is still open, so the second verb's commit would flush the first
+    one's half-written state.  A stolen baton trades a wedged server for
+    a corrupted one.
+
+    So the baton is never taken from the holder.  Instead the holder is
+    interrupted, and gives it back the ordinary way: an asynchronous
+    :class:`VerbAbandoned` is set on its thread, CPython delivers it at
+    the next bytecode boundary, and the exception unwinds out through
+    :func:`run_guarded`'s ``finally`` -- which rolls the verb
+    transaction back and calls :func:`release`.  One code path, the same
+    one a verb that raises ``ZeroDivisionError`` takes.
+
+    What this can and cannot interrupt
+    ----------------------------------
+
+    ``PyThreadState_SetAsyncExc`` is an unsupported corner of CPython
+    and its reach is exactly the interpreter's:
+
+    * A pure-Python loop -- ``while True: n += 1``, the way a builder
+      wedges a server by accident -- is interrupted at the next
+      bytecode, i.e. immediately.
+    * A thread blocked in a C call (``time.sleep``, a socket read) does
+      not check for pending exceptions, so delivery *waits*; it is
+      queued, not lost.  Measured: a verb in ``sleep(3)`` that the
+      caller gave up on at 0.51s died and returned the baton at 3.01s.
+      The server is wedged for the remainder of the C call and then
+      recovers on its own.
+    * A C call that never returns is still unrecoverable.  That is no
+      worse than the behaviour this replaces, in which *every* runaway
+      was unrecoverable.
+
+    There is also a race that cannot be closed, only made small: the
+    exception is delivered asynchronously, so if the verb finishes
+    between the checks below and delivery, ``VerbAbandoned`` lands
+    somewhere in ``run_guarded``'s cleanup instead.  The cleanup is
+    nested so that ``release()`` still runs from anywhere inside it; the
+    remaining window is the two statements of ``release`` itself, against
+    a verb that has by then been running for ``COMMAND_TIMEOUT``.
+
+    Args:
+        record: The :class:`Execution` for the verb to evict.  It is the
+            record and not the thread that identifies the victim, so a
+            deadline noticed late cannot interrupt whichever verb has
+            since taken the baton.
+        verb_name: Name to log.  This is logged at ERROR: a verb being
+            evicted mid-flight is a bug in that verb, and somebody has
+            to be able to find out which one.
+
+    Returns:
+        True if the interrupt was delivered to the verb's thread.  False
+        means there was nothing to interrupt -- the verb finished on its
+        own, or is parked in ``suspend()`` and so is not holding
+        anything, or has already been sent one.
+    """
+    if record is None:
+        return False
+
+    thread = record.thread
+    # started is cleared in run_guarded's finally, so a None here means
+    # the verb got out by itself between the deadline and this call.
+    if thread is None or record.started is None:
+        return False
+    if record.abandoned:
+        return False                        # one notice is enough
+    # The holder check is what makes this safe to call late.  If this
+    # record's thread is not the current holder then either the verb has
+    # moved on or it is parked inside suspend(), where it holds nothing
+    # and interrupting it would kill a verb that is behaving.
+    if _holder_thread is not thread:
+        return False
+    ident = thread.ident
+    if ident is None:
+        return False
+
+    record.abandoned = True
+    logger.error(
+        "Abandoning runaway verb '%s' after %.1fs on thread %s; "
+        "the baton is reclaimed by unwinding it",
+        verb_name, record.running_seconds(), thread.name)
+
+    affected = _set_async_exc(ctypes.c_ulong(ident),
+                              ctypes.py_object(VerbAbandoned))
+    if affected > 1:
+        # Documented CPython contract: more than one thread state was
+        # touched, which means we cannot say whose, so undo it with a
+        # NULL exception rather than leave strangers holding a pending
+        # raise.
+        _set_async_exc(ctypes.c_ulong(ident), ctypes.py_object())
+        logger.error("Abandon of '%s' affected %d threads; undone",
+                     verb_name, affected)
+        return False
+    if affected == 0:
+        # No such thread state -- it exited between the checks above and
+        # here, which is a race we lose harmlessly.
+        logger.error("Abandon of '%s' found no thread %s", verb_name, ident)
+        return False
+    return True
 
 
 def run_guarded(compiled, namespace, record: Optional['Execution'] = None):
@@ -145,6 +324,9 @@ def run_guarded(compiled, namespace, record: Optional['Execution'] = None):
     # behind another verb is not charged to this one.
     rec.started = time.time()
     rec.parked = 0.0
+    # Whose thread to interrupt if this one never comes back.  See
+    # abandon(); it is set after acquire() so it always names the holder.
+    rec.thread = threading.current_thread()
     _local.record = rec
 
     # Push the outermost call frame, so callers() and caller_perms() see a
@@ -168,14 +350,20 @@ def run_guarded(compiled, namespace, record: Optional['Execution'] = None):
         with _verb_txn(namespace.get('db')):
             exec(compiled, namespace)
     finally:
-        if framed:
-            try:
-                pop_frame()
-            except Exception:
-                pass
-        _local.record = None
-        rec.started = None
-        release()
+        # Nested, so that a VerbAbandoned delivered asynchronously in the
+        # middle of the cleanup -- the narrow race abandon() documents --
+        # still gives the baton back on its way past.
+        try:
+            if framed:
+                try:
+                    pop_frame()
+                except Exception:
+                    pass
+            _local.record = None
+            rec.started = None
+            rec.thread = None
+        finally:
+            release()
 
 
 @contextmanager
@@ -296,14 +484,19 @@ def guarded(record: Optional['Execution'] = None, db=None):
     # queueing behind another verb is not charged to this one.
     rec.started = time.time()
     rec.parked = 0.0
+    rec.thread = threading.current_thread()
     _local.record = rec
     try:
         with _verb_txn(db):
             yield rec
     finally:
-        _local.record = None
-        rec.started = None
-        release()
+        # Nested for the same reason as run_guarded: see abandon().
+        try:
+            _local.record = None
+            rec.started = None
+            rec.thread = None
+        finally:
+            release()
 
 
 def suspend(seconds: float = 0.0) -> None:

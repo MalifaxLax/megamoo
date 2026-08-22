@@ -88,6 +88,25 @@ from . import verb_baton
 logger = logging.getLogger('megamoo.server')
 
 
+def _swallow_abandoned(future):
+    """
+    Take delivery of an evicted verb's exception so asyncio does not
+    report it as unhandled.
+
+    Attached to the future of a verb the command timeout has abandoned:
+    the coroutine that was awaiting it has already raised TimeoutError and
+    told the player, so nothing else will ever call ``.result()``, and an
+    asyncio future whose exception is never retrieved logs an error of its
+    own when it is collected.  Anything that is *not* the eviction still
+    gets a line, because that would be news.
+    """
+    if future.cancelled():
+        return
+    exc = future.exception()
+    if exc is not None and not isinstance(exc, verb_baton.VerbAbandoned):
+        logger.error("Abandoned verb ended with %r", exc)
+
+
 # ============================================================
 # SERVER STATE
 # ============================================================
@@ -1101,7 +1120,7 @@ class MegaMOOServer:
                     await self._await_verb(loop.run_in_executor(
                         self._verb_thread_pool, ctx.run,
                         verb_baton.run_guarded, compiled, context, record),
-                        record)
+                        record, '<delayed code>')
                 finally:
                     clear_verb_context(token)
                 get_task_queue().complete_task(task)
@@ -1167,7 +1186,7 @@ class MegaMOOServer:
     # --------------------------------------------------------
 
 
-    async def _await_verb(self, future, record):
+    async def _await_verb(self, future, record, verb_name='<unknown>'):
         """
         Wait for verb code, charging it only for the time it actually ran.
 
@@ -1177,15 +1196,27 @@ class MegaMOOServer:
         from parked time, so a verb is only timed out for work it is
         genuinely doing.
 
-        Note that the timeout abandons the *wait*, not the thread -- Python
-        cannot kill a running thread.  That was already true before, and is
-        why COMMAND_TIMEOUT has always been a report rather than a kill.
+        Giving up on the wait is not enough by itself.  The verb we stop
+        waiting for still holds the baton, and until it lets go every
+        command from every player queues behind it forever -- the server
+        answers the network and executes nothing.  So the deadline evicts
+        it too: :func:`verb_baton.abandon` raises inside its thread, and it
+        unwinds through its own ``finally``, which rolls its transaction
+        back and hands the baton over.  See that function for what this
+        does and does not reach.
         """
         while True:
             done, _ = await asyncio.wait({future}, timeout=1.0)
             if done:
                 return future.result()
             if record.running_seconds() > COMMAND_TIMEOUT:
+                verb_baton.abandon(record, verb_name)
+                # Nobody is left to read the VerbAbandoned this future is
+                # about to carry, and an unretrieved future exception is
+                # reported as an unhandled error when it is collected.
+                # Take delivery here, so the eviction reads as the single
+                # ERROR abandon() already logged and not as a crash.
+                future.add_done_callback(_swallow_abandoned)
                 raise asyncio.TimeoutError(
                     f"verb ran for more than {COMMAND_TIMEOUT}s "
                     f"(excluding {record.parked:.1f}s suspended)")
@@ -1330,7 +1361,8 @@ class MegaMOOServer:
                     await self._await_verb(loop.run_in_executor(
                         self._verb_thread_pool, ctx.run,
                         verb_baton.run_guarded, compiled, namespace, record),
-                        record)
+                        record,
+                        f"{verb_def.names[0]} on #{verb_obj.objnum}")
                 run_at_post_cmd(namespace, namespace.get('result'))
             except Exception as e:
                 run_at_post_cmd(namespace, error=e)
