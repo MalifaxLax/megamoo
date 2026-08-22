@@ -1190,6 +1190,9 @@ class MegaMOOServer:
         """
         Wait for verb code, charging it only for the time it actually ran.
 
+        Shared by every dispatch site that puts verb code in the pool:
+        typed commands, delayed code, and the ticker.
+
         ``asyncio.wait_for`` cannot be used directly any more: a verb that
         calls ``suspend(60)`` is not a runaway, and a fixed deadline would
         kill it for sleeping.  The Execution record separates running time

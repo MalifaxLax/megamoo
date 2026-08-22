@@ -54,9 +54,13 @@ Thread Safety Note
 ------------------
 The ``run()`` coroutine executes on the asyncio event loop but dispatches
 ``_fire()`` to the server's ``ThreadPoolExecutor`` via
-``loop.run_in_executor()``, wrapped in ``asyncio.wait_for()`` to enforce
-a wallclock timeout.  This ensures that a slow or runaway ticker verb
-never blocks the event loop.  The ``add()``, ``remove()``, and
+``loop.run_in_executor()``, awaited through ``MegaMOOServer._await_verb``
+-- the same deadline a typed command gets.  So a runaway ticker verb
+neither blocks the event loop nor keeps the baton: it is charged only for
+time it spent running, and at the deadline it is evicted and unwinds,
+handing the baton back.  That last part is why tickers use the server's
+awaiter rather than a bare ``asyncio.wait_for``; see
+``verb_baton.abandon``.  The ``add()``, ``remove()``, and
 ``remove_all()`` methods are called from verb code (on the worker
 thread), so mutations to ``_subscriptions`` are effectively serialised.
 
@@ -326,20 +330,44 @@ class TickerHandler:
         """
         Fire a batch of due subscriptions, one after another.
 
+        Awaited through the server's own ``_await_verb`` rather than
+        ``asyncio.wait_for``, for two reasons that both matter more here
+        than for a typed command.
+
+        A ticker that runs away is the likeliest way the baton is ever
+        lost in play: combat, spawning and bleed-out all live on tickers,
+        they fire without anybody typing anything, and ``wait_for``
+        abandoned the *wait* while leaving the runaway holding the baton
+        -- so the world stopped executing verbs and no player command was
+        anywhere near the blame.  ``_await_verb`` evicts the holder as
+        well as giving up on it.
+
+        It also charges the ticker only for the time it was running.  A
+        fixed deadline counted the seconds a ticker spent queued behind
+        somebody else's command, so a busy world timed out tickers that
+        had barely started -- and a ticker that calls ``suspend()`` was
+        timed out for sleeping.
+
         Args:
             due: list of ``((objnum, idstring), subscription)`` pairs,
                 each already marked ``_in_flight`` by the caller.
         """
         from .globals import COMMAND_TIMEOUT
+        from . import verb_baton
 
         loop = asyncio.get_running_loop()
         for (objnum, idstring), sub in due:
+            # One record per firing, watched from here and written by the
+            # worker thread once it has the baton.  It is what names the
+            # thread to interrupt if this ticker never comes back.
+            record = verb_baton.Execution()
             try:
-                await asyncio.wait_for(
+                await self._server._await_verb(
                     loop.run_in_executor(
                         self._server._verb_thread_pool,
-                        self._fire, objnum, sub['verb']),
-                    timeout=COMMAND_TIMEOUT)
+                        self._fire, objnum, sub['verb'], record),
+                    record,
+                    f"ticker {sub['verb']} on #{objnum}")
             except asyncio.TimeoutError:
                 logger.error(
                     f"Ticker verb '{sub['verb']}' on #{objnum} timed out "
@@ -357,13 +385,20 @@ class TickerHandler:
     # Verb invocation
     # -----------------------------------------------------------------
 
-    def _fire(self, objnum: int, verb_name: str):
+    def _fire(self, objnum: int, verb_name: str, record=None):
         """
         Call a verb on an object as a ticker callback.
 
         Args:
             objnum: Object number to call the verb on.
             verb_name: Name of the verb to invoke.
+            record: Optional :class:`verb_baton.Execution` the caller
+                watches.  Handed to ``guarded()``, which stamps it with
+                this thread once the baton is taken -- so a ticker that
+                never returns can be evicted and the baton reclaimed.
+                Nothing before that point is charged or interruptible,
+                which is right: a ticker queued behind another verb is
+                waiting, not running away.
         """
         from .verb_context import set_verb_context, clear_verb_context
         from .builtins import make_call_verb
@@ -391,7 +426,7 @@ class TickerHandler:
         # the things that fire while a player is mid-command.
         token = set_verb_context(obj, self._db, depth=0)
         try:
-            with verb_baton.guarded(db=self._db):
+            with verb_baton.guarded(record=record, db=self._db):
                 call_verb = make_call_verb(obj, self._db, _depth=0)
                 call_verb(obj, verb_name)
         except KeyError:
