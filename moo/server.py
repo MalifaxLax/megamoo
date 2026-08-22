@@ -827,6 +827,34 @@ class MegaMOOServer:
                 except Exception as e:
                     logger.error(f"Checkpoint failed: {e}")
 
+                # Say so, hourly, if the .db on disk has stopped being the
+                # world.  On 2026-08-22 a restart came back 38 hours stale:
+                # the backup copies were perfect the whole time, because
+                # Connection.backup() reads the source connection and so
+                # sees that connection's own uncommitted writes -- while
+                # the .db they were supposed to be landing in had not moved
+                # since the last commit.  Nothing logged, for 38 hours.
+                #
+                # Two ways for that to happen, both worth shouting about:
+                # a reader pinning the log so no frame can fold, or a verb
+                # transaction that opened and never closed, leaving every
+                # write since uncommitted and due to be rolled back at
+                # close.  The checks are cheap and run once an hour.
+                try:
+                    if getattr(self.database, '_deferring', False):
+                        logger.error(
+                            "A verb transaction has been open across a "
+                            "checkpoint: every write since it began is "
+                            "uncommitted and will be rolled back when this "
+                            "server closes.")
+                    elif not self.database.checkpoint_wal():
+                        logger.error(
+                            "The write-ahead log will not fold: the .db on "
+                            "disk is not the world, and a restart would come "
+                            "back without recent work.")
+                except Exception as e:
+                    logger.warning(f"Persistence check failed: {e}")
+
     async def _watch_verbs(self):
         """
         Developer convenience: hot-reload verbs from on-disk edits.
