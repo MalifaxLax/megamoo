@@ -429,6 +429,45 @@ def _instantiate_verb_type(verb_def, pobj, this_obj, location, db,
 # Internal Helpers -- MOO Builtin Injection
 # =============================================================================
 
+_STATIC_VERB_NS: Optional[Dict[str, Any]] = None
+
+
+def _get_static_verb_ns() -> Dict[str, Any]:
+    """
+    The part of the verb namespace that is identical on every call.
+
+    Built once, then copied in.  Everything bound here is a module, a
+    plain function, or a sentinel -- none of it closes over the player,
+    the database, or anything else about a particular call.
+
+    This exists because it was measured.  ``build_verb_namespace`` was
+    69.75us of an 81.52us verb dispatch, and 74% of *that* was this
+    function: the two ``__all__`` loops below issue one ``getattr`` per
+    name, which came to 117 attribute lookups and 13 module-import
+    lookups on every verb the server ran.  Of the 337 names a namespace
+    ends up holding, 315 are the same object from one call to the next.
+
+    Cached at module scope for the same reason ``_get_builtin_ns_template``
+    is: a Python module change needs a server restart regardless -- verb
+    reloading reads verb source from disk and never re-imports these --
+    so there is no staleness window a caller could observe.
+    """
+    global _STATIC_VERB_NS
+    if _STATIC_VERB_NS is not None:
+        return _STATIC_VERB_NS
+
+    from . import builtins as moo_builtins
+    namespace: Dict[str, Any] = {}
+
+    # Cached template of all public MOO builtins (avoids rebuilding
+    # the dict on every verb execution)
+    namespace.update(moo_builtins._get_builtin_ns_template())
+
+    _fill_static_verb_ns(namespace)
+    _STATIC_VERB_NS = namespace
+    return namespace
+
+
 def _inject_moo_builtins(namespace: Dict[str, Any], pobj, db) -> None:
     """
     Add MOO builtins, search/find helpers, string utilities, and the
@@ -451,10 +490,12 @@ def _inject_moo_builtins(namespace: Dict[str, Any], pobj, db) -> None:
     """
     from . import builtins as moo_builtins
 
-    # Cached template of all public MOO builtins (avoids rebuilding
-    # the dict on every verb execution)
-    namespace.update(moo_builtins._get_builtin_ns_template())
+    # Everything that does not vary per call, built once.
+    namespace.update(_get_static_verb_ns())
 
+    # The three bindings that genuinely do vary: each closes over the
+    # calling player or this database instance.
+    #
     # Verb-calling-verb support: call_verb(obj, 'verb_name', ...)
     namespace['call_verb'] = moo_builtins.make_call_verb(pobj, db)
 
@@ -462,6 +503,10 @@ def _inject_moo_builtins(namespace: Dict[str, Any], pobj, db) -> None:
     namespace['search'] = lambda *a, _db=db, **kw: moo_builtins._search_fn(*a, db=_db, **kw)
     namespace['find'] = lambda *a, _db=db, **kw: moo_builtins._find_fn(*a, db=_db, **kw)
 
+
+def _fill_static_verb_ns(namespace: Dict[str, Any]) -> None:
+    """Bind every call-invariant name into *namespace*. See
+    :func:`_get_static_verb_ns` -- this runs once, not per verb."""
     # String utilities (su.wrap, su.center, su.table, etc.)
     #
     # Bound under both names: `su` is the MegaMOO spelling, `string_utils`
