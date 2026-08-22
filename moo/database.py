@@ -65,6 +65,21 @@ from .properties import MOOObjectRef, MOOError
 logger = logging.getLogger('megamoo.database')
 
 
+# Property names whose integer contents are never object references.
+#
+# The reuse guard below cannot tell a stored objnum from any other bare
+# integer, so a property holding plain numbers reads as a live reference
+# and keeps its number out of circulation.  Normally that costs nothing:
+# the guard only runs on recycled candidates, so an ordinary numeric list
+# has to collide with a freed number by coincidence.
+#
+# `free_obj` is not a coincidence.  @freeon/set stores the very range it
+# is about to free, so `@freeon/set #60 to #60` writes [60, 60] and then
+# blocks exactly the one number it was asked to hand back -- the narrower
+# the range, the more certainly it defeats itself.
+NON_REF_PROPERTIES = frozenset({'free_obj'})
+
+
 # ============================================================================
 # SQL SCHEMA
 # ============================================================================
@@ -847,6 +862,9 @@ class Database:
         rejects almost everything before any JSON is parsed, and this
         only runs for numbers that are actually being reused.
 
+        Properties named in ``NON_REF_PROPERTIES`` are skipped: their
+        integers are known not to be object references.
+
         Args:
             objnum (int): The candidate number.
 
@@ -859,6 +877,8 @@ class Database:
         ).fetchall()
         hits = []
         for owner_num, name, raw in rows:
+            if name in NON_REF_PROPERTIES:
+                continue
             try:
                 decoded = json.loads(raw) if raw is not None else None
             except (ValueError, TypeError):
