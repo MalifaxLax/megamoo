@@ -453,11 +453,32 @@ class Database:
         try:
             with self._lock:
                 self._conn.commit()
-                self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            return True
+                row = self._conn.execute(
+                    "PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
         except sqlite3.Error as e:
             logger.warning("WAL checkpoint failed: %s", e)
             return False
+
+        # A refused checkpoint is not an error, which is the whole problem.
+        # PRAGMA wal_checkpoint answers (busy, log_frames, frames_folded)
+        # and returns busy=1 when a reader held it off; it does not raise.
+        # Reading the row is the only way to tell the two apart, and the
+        # difference matters more here than almost anywhere: the caller
+        # before a restart takes True to mean the .db on disk is now the
+        # world, and acts on it.
+        if row is None:
+            logger.warning(
+                "WAL checkpoint gave no result; treating it as not run")
+            return False
+        busy, log_frames, folded = row
+        if busy:
+            logger.warning(
+                "WAL checkpoint refused -- a reader is holding it off; "
+                "%s of %s frames folded in, the rest are still in the "
+                "sidecar and the .db on disk is NOT the world",
+                folded, log_frames)
+            return False
+        return True
 
     def close(self):
         """

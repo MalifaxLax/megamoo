@@ -1666,7 +1666,28 @@ def run_server(database_path: str, port: Optional[int] = None,
         # not the world, which is the trap behind having to checkpoint by
         # hand before committing one.
         try:
-            server.database.checkpoint_wal()
+            # Retry rather than accept the first refusal.  The API and
+            # WebSocket servers are stopped by this point, but "stopped"
+            # has timed out before -- the two warnings that precede this
+            # in the log on 2026-08-22 -- and a connection outliving its
+            # server still holds a TRUNCATE checkpoint off.
+            #
+            # If it never lands, say so at ERROR.  The next statement
+            # replaces this process, so a miss here is invisible: the
+            # restart looks clean and comes back serving whatever the
+            # .db last had, which may be days old.
+            folded = server.database.checkpoint_wal()
+            for _ in range(10):
+                if folded:
+                    break
+                time.sleep(0.2)
+                folded = server.database.checkpoint_wal()
+            if not folded:
+                logger.error(
+                    "Restarting with the write-ahead log unfolded -- the .db "
+                    "on disk is not the world.  If the restart comes back "
+                    "missing recent work, recover from the newest file in "
+                    "the checkpoint directory.")
             server.database.close()
         except Exception as e:                  # never block a restart
             logger.warning("Pre-restart database close failed: %s", e)
