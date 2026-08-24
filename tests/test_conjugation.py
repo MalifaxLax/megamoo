@@ -261,3 +261,25 @@ def test_the_old_tokens_are_untouched(text, expected):
     """Adoption is opt-in: new letters, so nothing already written moves."""
     me, them = person(), person('Bramble', 'female', objnum=7)
     assert su.esub(text, sub=me, dob=them, viewer=me) == expected
+
+
+def test_the_empty_word_takes_a():
+    """`'' in 'aeiou'` is True -- the empty string is a substring of every
+    string -- so the slice that was chosen to survive an empty word survived
+    it by answering wrongly.  Found by tools/equivalence.py, comparing the
+    Python against a straightforward in-game port."""
+    from moo.string_utils import su
+    assert su.a_or_an('') == 'a'
+    assert su.a_or_an('   ') == 'a'
+    assert su.a_or_an(None) == 'a'      # str(None) -> 'None'
+
+
+def test_a_or_an_still_uses_the_simple_vowel_rule():
+    """Deliberately wrong for 'hour' and 'unicorn'; the naming code stores the
+    article explicitly rather than deriving it.  Pinned so a well-meaning fix
+    does not quietly change what every ported MOO verb expects."""
+    from moo.string_utils import su
+    assert su.a_or_an('hour') == 'a'
+    assert su.a_or_an('unicorn') == 'an'
+    assert su.a_or_an('apple') == 'an'
+    assert su.a_or_an('sword') == 'a'

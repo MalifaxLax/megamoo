@@ -163,6 +163,8 @@ _IRREGULAR_3S = {'be': 'is', 'have': 'has'}
 #: in Shadowfall read.  A bare article is absent too: an item with no
 #: article is more often proper-named ("Excalibur gleams") than plural,
 #: and `plural` overrides either way.
+_VOWELS = frozenset('aeiou')
+
 _PLURAL_ARTICLES = frozenset((
     'some', 'several', 'many', 'a few', 'both', 'two', 'three', 'four',
 ))
@@ -1040,9 +1042,16 @@ class StringUtils:
         uses; it is wrong for "a unicorn" and "an hour", which is why the
         engine's own naming code stores the article explicitly rather than
         deriving it.
+
+        The empty string takes "a".  It used to take "an": the test was
+        ``w[:1].lower() in 'aeiou'``, and ``'' in 'aeiou'`` is True, because
+        the empty string is a substring of every string.  Slicing was chosen
+        over indexing precisely to survive an empty word, and it did -- by
+        answering wrongly instead of raising.  Comparing against a set has no
+        such edge.
         """
         w = str(word).lstrip()
-        return 'an' if w[:1].lower() in 'aeiou' else 'a'
+        return 'an' if w[:1].lower() in _VOWELS else 'a'
 
     def ordinal(self, n):
         """
