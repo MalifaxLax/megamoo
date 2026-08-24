@@ -43,24 +43,31 @@ STARTER = pathlib.Path(__file__).resolve().parent.parent / 'moo' / 'templates' /
 class _StoredVerb:
     """The shape `_verb_matches_file` reads, built from a database row."""
 
-    def __init__(self, names, code, perms, min_lengths, hidden):
+    def __init__(self, names, code, perms, min_lengths, hidden, parent_type):
         self.names = names
         self.code = code
         self.perms = perms
         self.min_lengths = min_lengths
         self.hidden = hidden
+        # Read from the row rather than defaulted.  The double exists to be
+        # whatever the shipped database actually holds; a field it invents a
+        # value for is a field this test cannot detect drift in, which is the
+        # one job it has.
+        self.parent_type = parent_type
 
 
 def _stored_verbs():
     db = sqlite3.connect(STARTER / 'world.db')
     try:
         out = {}
-        for objnum, names, code, perms, min_lengths, hidden in db.execute(
-                'SELECT objnum, names, code, perms, min_lengths, hidden '
-                'FROM verbs'):
+        for objnum, names, code, perms, min_lengths, hidden, parent_type \
+                in db.execute(
+                'SELECT objnum, names, code, perms, min_lengths, hidden, '
+                'parent_type FROM verbs'):
             parsed = json.loads(names)
             verb = _StoredVerb(parsed, code, perms,
-                               json.loads(min_lengths or '{}'), bool(hidden))
+                               json.loads(min_lengths or '{}'), bool(hidden),
+                               parent_type)
             for name in parsed:
                 out[(objnum, name)] = verb
         return out
@@ -101,9 +108,37 @@ def test_the_check_would_notice_a_metadata_only_difference():
     assert _verb_matches_file(verb, code, name)
 
     tampered = _StoredVerb(list(verb.names) + ['a_name_the_file_never_declares'],
-                           code, verb.perms, verb.min_lengths, verb.hidden)
+                           code, verb.perms, verb.min_lengths, verb.hidden,
+                           verb.parent_type)
     assert not _verb_matches_file(tampered, code, name), (
         'a names-only difference must be caught; code equality is not enough')
+
+
+@pytest.mark.skipif(not (STARTER / 'world.db').is_file(),
+                    reason='starter template not present')
+def test_the_check_would_notice_a_type_only_difference():
+    """The same guard for `Type:`, because it has already been got wrong.
+
+    When `Type:` was added, seventy-four verb files were rewritten while a
+    server that did not know the field was still running.  Its watcher pushed
+    the new code, the code then matched, and the restart onto the engine that
+    *did* know the field found every verb current and read none of them --
+    seventy-four verbs declaring themselves functions on disk while the
+    database called them commands, silently.
+
+    Every field a verb file can declare has to be a field this comparison
+    knows about, or the next one added repeats it.
+    """
+    stored = _stored_verbs()
+    (objnum, name), verb = next(iter(stored.items()))
+    code = verb.code or ''
+    assert _verb_matches_file(verb, code, name)
+
+    tampered = _StoredVerb(verb.names, code, verb.perms, verb.min_lengths,
+                           verb.hidden, 'moo.verb_types.FunctionVerb')
+    assert not _verb_matches_file(tampered, code, name), (
+        'a type-only difference must be caught: the file says command and '
+        'the database says function, and nothing else differs')
 
 
 @pytest.mark.skipif(not (STARTER / 'world.db').is_file(),

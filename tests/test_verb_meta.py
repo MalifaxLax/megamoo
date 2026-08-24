@@ -18,11 +18,59 @@ def _file(body):
 # ------------------------------------------------------------------
 
 def test_a_plain_verb_file_declares_an_ordinary_verb():
-    """The common case: no metadata means no aliases, visible, rx."""
+    """The common case: no metadata means no aliases, visible, rx, command."""
     meta = parse_verb_meta(_file('Does a thing.\n'), 'look')
 
     assert meta == {'names': ['look'], 'min_lengths': {},
-                    'hidden': False, 'perms': 'rx'}
+                    'hidden': False, 'perms': 'rx',
+                    'parent_type': 'moo.verb_types.MasterVerb'}
+
+
+# ------------------------------------------------------------------
+# Type
+# ------------------------------------------------------------------
+
+def test_type_function_names_the_verb_type():
+    meta = parse_verb_meta(_file('Type: function\n'), 'capitalise')
+    assert meta['parent_type'] == 'moo.verb_types.FunctionVerb'
+
+
+def test_type_accepts_a_dotted_path_for_a_world_s_own_type():
+    """A world with a custom verb type must be able to name it without this
+    module having heard of it."""
+    meta = parse_verb_meta(_file('Type: mygame.verbs.SpellVerb\n'), 'cast')
+    assert meta['parent_type'] == 'mygame.verbs.SpellVerb'
+
+
+def test_command_is_the_default_and_is_never_written():
+    """A line saying the default is a line that will be copied around and
+    eventually be wrong.  Omitting it keeps one spelling of ordinary."""
+    code = _file('Does a thing.\n')
+    out = render_verb_meta(code, ['look'])
+    assert 'Type:' not in out
+    out = render_verb_meta(code, ['look'],
+                           parent_type='moo.verb_types.MasterVerb')
+    assert 'Type:' not in out
+
+
+def test_type_round_trips_through_render_and_parse():
+    code = _file('Capitalises a word.\n')
+    out = render_verb_meta(code, ['capitalise'], hidden=True,
+                           parent_type='moo.verb_types.FunctionVerb')
+    assert 'Type:    function' in out
+    back = parse_verb_meta(out, 'capitalise')
+    assert back['parent_type'] == 'moo.verb_types.FunctionVerb'
+    assert back['hidden'] is True
+
+
+def test_rendering_a_type_back_to_default_removes_the_line():
+    """Same rule as Hidden: un-declaring takes the line out rather than
+    leaving a `Type: command` behind to be misread later as deliberate."""
+    code = render_verb_meta(_file('x.\n'), ['x'],
+                            parent_type='moo.verb_types.FunctionVerb')
+    assert 'Type:' in code
+    code = render_verb_meta(code, ['x'])
+    assert 'Type:' not in code
 
 
 def test_aliases_follow_the_primary_name():

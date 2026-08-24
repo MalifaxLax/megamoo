@@ -239,6 +239,15 @@ class BaseVerb:
     min: int = 0
     rexp: Optional[re.Pattern] = None
     parent_type: str = ''          # filled by register_verb_type
+
+    #: Whether the engine builds an instance of this class per call.
+    #: True for anything that parses a command line -- the instance is
+    #: what ``at_pre_cmd()`` vetoes through and what ``parse()`` fills
+    #: in.  A verb that is a *function* rather than a command has
+    #: nothing to parse and nothing to veto, and setting this False
+    #: lets ``build_verb_namespace`` skip the construction entirely.
+    #: See :class:`FunctionVerb`.
+    needs_instance: bool = True
     help_text: str = ''
     perms: str = 'rx'
 
@@ -747,3 +756,43 @@ def define_verb(key: str, *,
     verb_cls = type(class_name, (parent_cls,), attrs)
     verb_cls.parent_type = parent
     return verb_cls
+
+
+# =============================================================================
+# FunctionVerb -- a verb that is called, never typed
+# =============================================================================
+
+@register_verb_type
+class FunctionVerb(BaseVerb):
+    """
+    A verb invoked from code, not from a command line.
+
+    Utility verbs and hooks -- ``$string_utils:capitalise``, ``look_here``,
+    ``_rt`` -- receive their arguments positionally from ``call_verb``.
+    There is no command line behind them, so there is nothing for
+    ``parse()`` to split and nothing for ``at_pre_cmd()`` to veto: the veto
+    exists to stop a *typed* command before its body runs.
+
+    Measured against ``MasterVerb`` on the same verb, the command-parsing
+    lifecycle was **2.06us of a 6.02us call** -- 34%, spent deciding that an
+    empty argument string contains no direct object.  Declaring the verb a
+    function skips it.
+
+    Nothing here is a new execution path.  A namespace with no verb-type
+    instance was always legal and is already documented as such:
+    ``verb_body_vetoed`` says a namespace without one "is never vetoed", and
+    the parsed names fall back to the plain string-splitting of
+    ``_set_parse_fallbacks``.  This reaches that state on purpose rather
+    than by a verb type failing to build.
+
+    Declared in the verb file itself, as ``Type: function``.
+
+    **When not to use it.**  If the verb reads ``dobj``, ``iobj``, ``prep``,
+    ``lhs``/``rhs``, ``switches`` or ``regex_match``, it wants the parse and
+    must stay a ``MasterVerb``.  That includes a hook called as
+    ``call_verb(npc, 'react', args='angry')``: ``MasterVerb`` sets ``dobj``
+    to ``'angry'`` and the fallback sets it to ``''``.  The difference is
+    silent, which is why it is worth stating twice.
+    """
+
+    needs_instance = False

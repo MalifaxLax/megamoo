@@ -344,6 +344,30 @@ def _set_parse_fallbacks(namespace: Dict[str, Any], *,
 # Internal Helpers -- Verb Type Instantiation
 # =============================================================================
 
+def _verb_type_needs_instance(verb_def) -> bool:
+    """Whether this verb's type wants an instance built for the call.
+
+    A verb that is called rather than typed has no command line to parse and
+    no typed command to veto, so ``FunctionVerb`` declares
+    ``needs_instance = False`` and the construction is skipped -- 2.06us of a
+    6.02us call, measured.
+
+    Fails *towards* building one.  An unresolvable ``parent_type`` is already
+    survivable (``_instantiate_verb_type`` logs and returns None, and the
+    namespace falls back to string splitting); deciding to skip on the
+    strength of a type we could not load would turn a recoverable
+    misconfiguration into a silently different parse.
+    """
+    path = getattr(verb_def, 'parent_type', None)
+    if not path:
+        return True
+    try:
+        from .verb_types import resolve_verb_type
+        return bool(getattr(resolve_verb_type(path), 'needs_instance', True))
+    except Exception:
+        return True
+
+
 def _instantiate_verb_type(verb_def, pobj, this_obj, location, db,
                            verb_name: str, args: str,
                            injected_switches=None):
@@ -911,7 +935,7 @@ def build_verb_namespace(
     # only engine-called hook a verb type gets.  So the instance is built
     # here and only *harvesting its results into names* is deferred.
     verb_inst = None
-    if verb_def is not None:
+    if verb_def is not None and _verb_type_needs_instance(verb_def):
         verb_inst = _instantiate_verb_type(
             verb_def, pobj, this, location, db, verb_name, argstr,
             injected_switches=injected_switches,

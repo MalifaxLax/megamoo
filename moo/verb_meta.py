@@ -15,13 +15,25 @@ abbreviation tables, one hidden flag and two permission strings.
 The fix is the one the engine already uses for ``auth``: let the file
 describe itself.  ``auth_level_required()`` reads the level out of the
 verb's own guard, so a staff verb arrives from disk still being staff.
-This module does the same for the rest, reading and writing four lines in
+This module does the same for the rest, reading and writing five lines in
 the docstring::
 
     Aliases: @create
     Abbrev:  @make=3, @create=3
     Hidden:  yes
     Perms:   rxd
+    Type:    function
+
+``Type`` names the verb's ``parent_type`` -- what decides whether the engine
+parses a command line before the body runs.  ``command`` is the default and
+is never written; ``function`` is a verb that is called rather than typed,
+and skips the parse.  A full dotted path is accepted for a custom type.
+
+It is here for the same reason the other four are.  ``parent_type`` lives in
+the database, ``verb_loader`` kept whatever was already there, and a verb
+*created* from disk got the default -- so a utility verb rebuilt into a fresh
+world came back as a command, parsing an argument string nobody typed, with
+nothing reporting it.  That is the ``auth`` bug again, in a different column.
 
 Only ``Aliases`` names the *other* names; the primary is the filename and
 is never repeated.  Lines are omitted when they carry nothing --  no
@@ -44,6 +56,18 @@ _ALIASES = re.compile(r'^[ \t]*Aliases:[ \t]*(.*)$', re.M | re.I)
 _ABBREV = re.compile(r'^[ \t]*Abbrev:[ \t]*(.*)$', re.M | re.I)
 _HIDDEN = re.compile(r'^[ \t]*Hidden:[ \t]*(\S+)', re.M | re.I)
 _PERMS = re.compile(r'^[ \t]*Perms:[ \t]*(\S+)', re.M | re.I)
+_TYPE = re.compile(r'^[ \t]*Type:[ \t]*(\S+)', re.M | re.I)
+
+#: Short spellings for the two types a verb file normally wants.  Anything
+#: else is taken as a dotted path, so a world with its own verb type can name
+#: it without this module knowing about it.
+DEFAULT_VERB_TYPE = 'moo.verb_types.MasterVerb'
+_TYPE_ALIASES = {
+    'command': DEFAULT_VERB_TYPE,
+    'master': DEFAULT_VERB_TYPE,
+    'function': 'moo.verb_types.FunctionVerb',
+    'base': 'moo.verb_types.BaseVerb',
+}
 
 #: ``@create`` or ``@create(3)`` -- @adverb's spelling, accepted here too
 #: so a name copied from an @adverb command line parses.
@@ -100,7 +124,8 @@ def parse_verb_meta(code: str, primary: str) -> Dict:
             in the resulting name list and never declared in ``Aliases``.
 
     Returns:
-        ``{'names', 'min_lengths', 'hidden', 'perms'}``.  Fields the file
+        ``{'names', 'min_lengths', 'hidden', 'perms', 'parent_type'}``.
+        Fields the file
         does not declare come back as their defaults, so a verb file with
         no metadata at all describes an ordinary, visible, ``rx`` verb
         with no aliases -- which is what the great majority of them are.
@@ -140,16 +165,23 @@ def parse_verb_meta(code: str, primary: str) -> Dict:
     m = _PERMS.search(doc)
     perms = m.group(1).strip() if m else 'rx'
 
+    m = _TYPE.search(doc)
+    if m:
+        declared = m.group(1).strip()
+        parent_type = _TYPE_ALIASES.get(declared.lower(), declared)
+    else:
+        parent_type = DEFAULT_VERB_TYPE
+
     # An abbreviation for a name the verb does not have is noise, and
     # would otherwise travel from file to file by copy-paste forever.
     min_lengths = {k: v for k, v in min_lengths.items() if k in names}
 
     return {'names': names, 'min_lengths': min_lengths,
-            'hidden': hidden, 'perms': perms}
+            'hidden': hidden, 'perms': perms, 'parent_type': parent_type}
 
 
 def render_verb_meta(code: str, names, min_lengths=None, hidden=False,
-                     perms='rx') -> str:
+                     perms='rx', parent_type=DEFAULT_VERB_TYPE) -> str:
     """
     Write metadata into *code*'s docstring, replacing any already there.
 
@@ -182,13 +214,18 @@ def render_verb_meta(code: str, names, min_lengths=None, hidden=False,
         lines.append('Hidden:  yes')
     if (perms or 'rx') != 'rx':
         lines.append('Perms:   %s' % perms)
+    if (parent_type or DEFAULT_VERB_TYPE) != DEFAULT_VERB_TYPE:
+        short = {v: k for k, v in _TYPE_ALIASES.items()
+                 if v != DEFAULT_VERB_TYPE}.get(parent_type, parent_type)
+        lines.append('Type:    %s' % short)
 
     # Strip whatever is there now, including the blank line that followed
     # a block, so repeated renders do not accumulate spacing.
     kept = []
     for line in doc.split('\n'):
         if (_ALIASES.match(line) or _ABBREV.match(line)
-                or _HIDDEN.match(line) or _PERMS.match(line)):
+                or _HIDDEN.match(line) or _PERMS.match(line)
+                or _TYPE.match(line)):
             continue
         kept.append(line)
     doc = '\n'.join(kept)

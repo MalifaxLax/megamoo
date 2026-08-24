@@ -227,19 +227,31 @@ def _verb_matches_file(verb_def, code: str, verb_name: str) -> bool:
 
     The seed scan skips verbs that are already current, and used to decide
     that on the code alone.  Since a file now also declares its aliases,
-    abbreviations, hidden flag and permissions, a change to any of those
-    leaves the code identical and would have been skipped -- so an alias
-    added on disk while the server was down would not arrive until
+    abbreviations, hidden flag, permissions and type, a change to any of
+    those leaves the code identical and would have been skipped -- so an
+    alias added on disk while the server was down would not arrive until
     somebody touched the body as well.
+
+    ``parent_type`` is checked here for a reason worth recording.  When
+    ``Type:`` was added, the files were rewritten while a server *without*
+    the field was still running: its watcher pushed the new code, which then
+    matched, so the restart onto the engine that understood ``Type:`` found
+    every verb already current and read none of them.  Seventy-four verbs sat
+    on disk declaring themselves functions while the database called them
+    commands, and nothing anywhere said so.  Every field this file can
+    declare has to be a field this comparison knows about, or the next one
+    added repeats it.
     """
-    from .verb_meta import parse_verb_meta
+    from .verb_meta import parse_verb_meta, DEFAULT_VERB_TYPE
     if (verb_def.code or '') != code:
         return False
     meta = parse_verb_meta(code, verb_name)
     return (list(verb_def.names) == list(meta['names'])
             and dict(verb_def.min_lengths or {}) == meta['min_lengths']
             and bool(verb_def.hidden) == meta['hidden']
-            and (verb_def.perms or 'rx') == meta['perms'])
+            and (verb_def.perms or 'rx') == meta['perms']
+            and (getattr(verb_def, 'parent_type', None)
+                 or DEFAULT_VERB_TYPE) == meta['parent_type'])
 
 
 class MegaMOOServer:

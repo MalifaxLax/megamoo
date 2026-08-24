@@ -221,7 +221,7 @@ def reload_verb_code(obj, verb_name: str, code: str, *, create: bool = True) -> 
             code=code,
             owner=existing.owner,
             perms=meta['perms'],
-            parent_type=existing.parent_type,
+            parent_type=meta['parent_type'],
             min_lengths=dict(meta['min_lengths']),
             hidden=meta['hidden'],
             auth=existing.auth,
@@ -240,6 +240,7 @@ def reload_verb_code(obj, verb_name: str, code: str, *, create: bool = True) -> 
         existing.min_lengths = dict(meta['min_lengths'])
         existing.hidden = meta['hidden']
         existing.perms = meta['perms']
+        existing.parent_type = meta['parent_type']
         obj._mark_modified()
         if renamed:
             # A name cached under the old set would go on answering, or
@@ -262,7 +263,8 @@ def reload_verb_code(obj, verb_name: str, code: str, *, create: bool = True) -> 
     # deliberately with @verbauth.
     new_verb = VerbDef(names=list(meta['names']), code=code, owner=obj.owner,
                        perms=meta['perms'], min_lengths=dict(meta['min_lengths']),
-                       hidden=meta['hidden'], auth=auth_level_required(code))
+                       hidden=meta['hidden'], auth=auth_level_required(code),
+                       parent_type=meta['parent_type'])
     new_verb.compile()  # validate before attaching; raises on syntax error
     obj.add_verb(new_verb)
     return 'created'
