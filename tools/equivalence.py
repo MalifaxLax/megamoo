@@ -277,7 +277,9 @@ CASES: List[Case] = [
     Case('moo.object_utils:locations', ('$obj_utils', 'locations'),
          [(Obj(5024),), (Obj(1),)]),
 
-    # --- not yet migrated; the rig reports these as pending, not failing ---
+    # --- $match_utils.  Still has a Python side: `match` and `omatch` are on
+    # the command-parsing path, so the module was shrunk rather than deleted,
+    # and what is left can still be diffed. ---
     Case('moo.match_utils:parse_ordinal', ('$match_utils', 'parse_ordinal'),
          [('first',), ('2nd',), ('third',), ('sword',), ('',), ('21st',)]),
     Case('moo.match_utils:strip_articles', ('$match_utils', 'strip_articles'),
@@ -285,6 +287,15 @@ CASES: List[Case] = [
           ('some rocks',), ('',)]),
     Case('moo.match_utils:prep_match', ('$match_utils', 'prep_match'),
          [('in',), ('into',), ('with',), ('sword',), ('',), ('on',)]),
+
+    # --- moo_libs is gone, and its cases with it ---
+    #
+    # $list_utils, $command_utils, $code_utils and $perm_utils were diffed
+    # here first: 27 cases, 104 inputs, all green, run immediately before
+    # `moo/moo_libs.py` was deleted.  That run is the record.  The cases are
+    # retired rather than kept for the reason the $string_utils ones were --
+    # there is no Python side left to import, so they could only report an
+    # error forever, and a rig that always prints errors stops being read.
 ]
 
 

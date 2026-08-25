@@ -531,11 +531,11 @@ def _inject_moo_builtins(namespace: Dict[str, Any], pobj, db) -> None:
 def _fill_static_verb_ns(namespace: Dict[str, Any]) -> None:
     """Bind every call-invariant name into *namespace*. See
     :func:`_get_static_verb_ns` -- this runs once, not per verb."""
-    # String utilities (su.wrap, su.center, su.table, etc.)
-    #
-    # Bound under both names: `su` is the MegaMOO spelling, `string_utils`
-    # is what code ported from a MOO already says, so `$string_utils`
-    # resolves without an object behind it. Same instance either way.
+    # The utility objects -- `su`, `lu`, `cu`, `cdu`, `pu`, `_effects` and
+    # their MOO spellings -- are not here.  They are objects in the world
+    # now, so which object a name means depends on the database, and a
+    # call-invariant namespace is exactly the wrong place for that.  They
+    # are resolved per call through their $refs; see _REF_UTILS.
 
     # Object utilities (ou.make_object, ou.make_room, etc.)
     #
@@ -546,24 +546,6 @@ def _fill_static_verb_ns(namespace: Dict[str, Any]) -> None:
     namespace['ou'] = ou
     namespace['object_utils'] = ou
 
-    # The other LambdaMOO utility objects, ported far enough to carry the
-    # calls a real core makes.  Same trick: the MOO spelling is an alias,
-    # so ported code needs no rewriting beyond dropping the $.
-    from .moo_libs import (lu, cu, cdu, pu, moo_match, moo_rmatch,
-                           moo_substitute, FAILED_MATCH, AMBIGUOUS_MATCH)
-    namespace['lu'] = lu
-    namespace['list_utils'] = lu
-    namespace['cu'] = cu
-    namespace['command_utils'] = cu
-    namespace['cdu'] = cdu
-    namespace['code_utils'] = cdu
-    namespace['pu'] = pu
-    namespace['perm_utils'] = pu
-
-    # MOO's regex builtins, under names that cannot collide.  `match` is
-    # already taken here by object matching, and a ported verb calling the
-    # wrong one of those would compile and then quietly misbehave, so MOO's
-    # regex keeps the moo_ prefix rather than fighting for the short name.
     # MOO's read(), which parks the verb until the player types a line.
     # Bound here rather than in moo_builtins because it is engine
     # machinery -- it takes the baton off this thread -- not a
@@ -571,14 +553,10 @@ def _fill_static_verb_ns(namespace: Dict[str, Any]) -> None:
     from .verb_read import read as _moo_read
     namespace['read'] = _moo_read
 
-    namespace['moo_match'] = moo_match
-    namespace['moo_rmatch'] = moo_rmatch
-    namespace['moo_substitute'] = moo_substitute
-
-    # MOO's several ways of saying "no object".  $nothing and $no_one are
-    # None here; the two matcher outcomes are sentinels -- see moo_libs.
-    namespace['FAILED_MATCH'] = FAILED_MATCH
-    namespace['AMBIGUOUS_MATCH'] = AMBIGUOUS_MATCH
+    # `moo_match`, `moo_rmatch`, `moo_substitute` and the two match
+    # sentinels used to be listed here by hand.  They live in moo_builtins
+    # now and arrive with the rest of its __all__ below, which is also how
+    # the eval and API namespaces get them -- one list, three builders.
 
     # LambdaMOO builtins that exist only for ported code.  Kept in their
     # own module rather than added to moo.builtins: several of them, most
@@ -653,6 +631,10 @@ _LAZY_COMPAT = 6     # layer 6b -- tell / pass_ / E_*
 _LAZY_GLOBALS = 7    # layer 7  -- the globals module
 _LAZY_SU = 8         # layer 5  -- $string_utils, resolved per database
 _LAZY_EU = 9         # layer 5  -- $effects_utils, likewise
+_LAZY_LU = 10        # layer 5  -- $list_utils
+_LAZY_CU = 11        # layer 5  -- $command_utils
+_LAZY_CDU = 12       # layer 5  -- $code_utils
+_LAZY_PU = 13        # layer 5  -- $perm_utils
 
 # What layer 3 publishes, by either route.  _parse_verb_inst_into_namespace
 # harvests one name _set_parse_fallbacks does not (``regex_match``); a verb
@@ -664,15 +646,56 @@ _PARSE_NAMES = (
     'regex_match', 'match', 'switches',
 )
 _BOUND_NAMES = ('call_verb', 'search', 'find')
-#: `su` used to be the StringUtils *instance*, bound once into the static
-#: namespace.  It names the $string_utils *object* now, which depends on the
-#: database and so cannot be call-invariant.  Both spellings resolve to it:
-#: `su` is the MegaMOO one, `string_utils` is what ported MOO code says.
-_STRING_UTILS_NAMES = ('su', 'string_utils')
-#: `_effects` was the Python EffectsManager instance.  Its state was already
-#: on the object -- fx_registry and tickers are #53's properties, and the
-#: class read and wrote them -- so only the code was ever in Python.
-_EFFECTS_NAMES = ('_effects',)
+#: The utility objects, and the names each answers to.
+#:
+#: Every one of these used to be a Python module or instance bound once into
+#: the static namespace.  They are objects in the world now, so the value a
+#: name has depends on the database -- resolved through the $ref on #0 the
+#: first time a verb reads it.  Both spellings reach the same object: the
+#: short one is the MegaMOO spelling, the long one is what ported MOO code
+#: already says, so `$list_utils` works with nothing but the `$` dropped.
+#:
+#: **This table is the list all three namespace builders read.**  `su` and
+#: `_effects` each went missing from eval and from the API when they moved
+#: in-game, because each builder had its own copy of the names; the fix is
+#: that there is one copy and :func:`bind_ref_utils` applies it.  Adding a
+#: seventh object here reaches all three without anyone remembering to.
+_REF_UTILS = (
+    (_LAZY_SU,  'string_utils',  ('su', 'string_utils')),
+    (_LAZY_EU,  'effects_utils', ('_effects',)),
+    (_LAZY_LU,  'list_utils',    ('lu', 'list_utils')),
+    (_LAZY_CU,  'command_utils', ('cu', 'command_utils')),
+    (_LAZY_CDU, 'code_utils',    ('cdu', 'code_utils')),
+    (_LAZY_PU,  'perm_utils',    ('pu', 'perm_utils')),
+)
+
+#: group -> (ref, names), for the lazy namespace's one branch.
+_REF_UTIL_BY_GROUP = {g: (ref, names) for g, ref, names in _REF_UTILS}
+
+
+def bind_ref_utils(namespace, db) -> None:
+    """Bind every utility object into *namespace*, resolved in *db*.
+
+    For the eager builders -- the eval globals and the API's exec namespace.
+    A verb's namespace binds them one at a time on first read instead; see
+    :meth:`_LazyVerbNS._bind_group`.
+
+    A ref that does not resolve is left unbound rather than bound to None:
+    an unbound name raises NameError, which says "this world has no
+    $list_utils", where None would say "it has one and it is nothing".
+    """
+    if db is None:
+        return
+    from .object_utils import system_ref
+    for _group, ref, names in _REF_UTILS:
+        try:
+            obj = system_ref(db, ref)
+        except Exception:
+            continue
+        if obj is None:
+            continue
+        for name in names:
+            namespace[name] = obj
 _PERM_NAMES = ('getattr', 'setattr', 'hasattr', 'type')
 
 _GROUP_OF: Optional[Dict[str, int]] = None
@@ -702,10 +725,9 @@ def _get_group_map() -> Dict[str, int]:
         groups[name] = _LAZY_STATIC
     for name in _BOUND_NAMES:                               # layer 5
         groups[name] = _LAZY_BOUND
-    for name in _STRING_UTILS_NAMES:                        # layer 5
-        groups[name] = _LAZY_SU
-    for name in _EFFECTS_NAMES:                             # layer 5
-        groups[name] = _LAZY_EU
+    for group, _ref, names in _REF_UTILS:                    # layer 5
+        for name in names:
+            groups[name] = group
     # Layer 6b is probed rather than listed: moo_compat owns the set, and
     # ``pass_`` only appears when there is enough context to build it, so the
     # probe supplies that context to learn the name exists.
@@ -805,19 +827,13 @@ class _LazyVerbNS(dict):
             dict.update(self, build_compat_namespace(
                 this=self._this, verb_name=self._verb_name,
                 call_verb=self['call_verb'], db=self._db))
-        elif group == _LAZY_SU:
+        elif group in _REF_UTIL_BY_GROUP:
             from .object_utils import system_ref
-            obj = system_ref(self._db, 'string_utils')
+            ref, names = _REF_UTIL_BY_GROUP[group]
+            obj = system_ref(self._db, ref)
             if obj is None:
                 return      # leave unbound -> NameError, which is the truth
-            for nm in _STRING_UTILS_NAMES:
-                dict.__setitem__(self, nm, obj)
-        elif group == _LAZY_EU:
-            from .object_utils import system_ref
-            obj = system_ref(self._db, 'effects_utils')
-            if obj is None:
-                return
-            for nm in _EFFECTS_NAMES:
+            for nm in names:
                 dict.__setitem__(self, nm, obj)
         elif group == _LAZY_GLOBALS:
             try:

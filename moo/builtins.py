@@ -2856,26 +2856,22 @@ def _build_eval_globals(context: dict) -> dict:
         if callable(attr) or isinstance(attr, (str, int, type)):
             ns[name] = attr
 
-    # $string_utils, under both spellings.  `su` used to be a Python instance
-    # in the static verb namespace, so this function picked it up for free by
-    # scanning module attributes.  It is an object in the world now, resolved
-    # per database, and this function stopped seeing it -- so `su` was
+    # The utility objects -- $string_utils, $list_utils and the rest, under
+    # both spellings each.  `su` used to be a Python instance in the static
+    # verb namespace, so this function picked it up for free by scanning
+    # module attributes.  They are objects in the world now, resolved per
+    # database, and this function stopped seeing them -- so `su` was
     # undefined in eval while working perfectly in verbs.
     #
     # That is the third time these two namespaces have disagreed, and the
     # note below already says why: eval is assembled by a different function
-    # from the one that assembles a verb.  Rather than remember again, the
-    # names are taken from the verb side's own group map, so a fourth
-    # addition there arrives here without anyone deciding to bring it.
+    # from the one that assembles a verb.  So the list is not repeated here.
+    # bind_ref_utils reads the verb side's own table, and an object added
+    # there arrives here without anyone deciding to bring it.
     try:
-        from .verb_namespace import _STRING_UTILS_NAMES
-        from .object_utils import system_ref
+        from .verb_namespace import bind_ref_utils
         _db = context.get('db') if isinstance(context, dict) else None
-        _db = _db or _database
-        _suobj = system_ref(_db, 'string_utils') if _db is not None else None
-        if _suobj is not None:
-            for _n in _STRING_UTILS_NAMES:
-                ns[_n] = _suobj
+        bind_ref_utils(ns, _db or _database)
     except Exception:
         pass
 
@@ -2941,20 +2937,6 @@ def _build_eval_globals(context: dict) -> dict:
     # Server config
     if _config is not None:
         ns['config'] = _config
-
-    # $effects_utils, for the same reason $string_utils is above: an object
-    # now, so resolved rather than imported.
-    try:
-        from .verb_namespace import _EFFECTS_NAMES
-        from .object_utils import system_ref
-        _db2 = context.get('db') if isinstance(context, dict) else None
-        _euobj = (system_ref(_db2 or _database, 'effects_utils')
-                  if (_db2 or _database) is not None else None)
-        if _euobj is not None:
-            for _n in _EFFECTS_NAMES:
-                ns[_n] = _euobj
-    except Exception:
-        pass
 
     # Caller context wins (merged last so it can override everything)
     ns.update(context)

@@ -1,89 +1,164 @@
 """
-Tests for the ported LambdaMOO utility objects.
+Tests for the compatibility layer ported code runs on.
 
 Every expectation here comes from the original MOO definitions -- JHCore's
 and LambdaCore's, which agree on the contracts even where their
 implementations differ.  The indices are 1-based on purpose: @port shifts
 subscripts but not call arguments, so a shim counting from zero would put
 every ported call off by one.
+
+`lu`, `cu`, `cdu` and `pu` were Python instances in `moo/moo_libs.py` when
+these tests were written.  They are objects in the world now -- $list_utils,
+$command_utils, $code_utils, $perm_utils -- and the fixtures below hand each
+test a proxy that calls the verb.  The test bodies are unchanged on purpose:
+saying the same thing about the verbs that they said about the Python is the
+claim the migration has to keep making.
 """
+
+import os
+import sqlite3
+import pathlib
 
 import pytest
 
-from moo.moo_libs import cdu, cu, lu
+STARTER = (pathlib.Path(__file__).resolve().parent.parent
+           / 'moo' / 'templates' / 'starter' / 'world.db')
+
+
+class _Util:
+    """One utility object, called the way verb code calls it."""
+
+    def __init__(self, obj, call_verb):
+        self._obj = obj
+        self._call = call_verb
+
+    def __getattr__(self, name):
+        def call(*args, **kwargs):
+            return self._call(self._obj, name, *args, **kwargs)
+        return call
+
+
+@pytest.fixture(scope='module')
+def _utils_world(tmp_path_factory):
+    """The starter world on a throwaway copy, with a context to call in.
+
+    Copied with SQLite's backup API rather than the filesystem: the template
+    is checkpointed but carries a -wal, and half a copy is a world whose
+    verbs are missing for no reason a reader would guess.
+    """
+    if not STARTER.exists():
+        pytest.skip('starter template not present')
+    copy = str(tmp_path_factory.mktemp('utils') / 'world.db')
+    srcdb = sqlite3.connect('file:%s?mode=ro' % STARTER, uri=True)
+    dstdb = sqlite3.connect(copy)
+    with dstdb:
+        srcdb.backup(dstdb)
+    srcdb.close()
+    dstdb.close()
+
+    from moo.testing import world
+    from moo.builtins import make_call_verb
+    from moo.verb_context import clear_verb_context, set_verb_context
+    w = world(copy)
+    db = w.db
+    pobj = db.get_object(100)
+    token = set_verb_context(pobj, db, depth=0)
+    try:
+        yield db, make_call_verb(pobj, db)
+    finally:
+        clear_verb_context(token)
+        db.close()
+
+
+def _utility(ref):
+    def fixture(_utils_world):
+        db, call_verb = _utils_world
+        from moo.object_utils import system_ref
+        obj = system_ref(db, ref)
+        if obj is None:
+            pytest.skip('this world has no $%s' % ref)
+        return _Util(obj, call_verb)
+    fixture.__name__ = ref
+    return pytest.fixture(fixture)
+
+
+lu = _utility('list_utils')
+cu = _utility('command_utils')
+cdu = _utility('code_utils')
+pu = _utility('perm_utils')
 
 
 # --------------------------------------------------------------------------
 # $list_utils -- 1-based, per the originals
 # --------------------------------------------------------------------------
 
-def test_assoc_returns_the_matching_element():
+def test_assoc_returns_the_matching_element(lu):
     # "returns the first element of `list' whose own index-th element is
     # target.  Index defaults to 1."
     assert lu.assoc('y', [['z', 1], ['y', 2], ['x', 5]]) == ['y', 2]
 
 
-def test_assoc_returns_empty_when_absent():
+def test_assoc_returns_empty_when_absent(lu):
     # "returns {} if no such element is found"
     assert lu.assoc('q', [['z', 1]]) == []
 
 
-def test_assoc_index_is_one_based():
+def test_assoc_index_is_one_based(lu):
     assert lu.assoc(2, [['z', 1], ['y', 2]], 2) == ['y', 2]
 
 
-def test_assoc_skips_elements_too_short():
+def test_assoc_skips_elements_too_short(lu):
     # LambdaCore guards this with `t[indx] ! E_RANGE => 0'
     assert lu.assoc('x', [['a'], ['x', 1]], 2) == []
 
 
-def test_iassoc_is_a_one_based_position():
+def test_iassoc_is_a_one_based_position(lu):
     assert lu.iassoc('y', [['z', 1], ['y', 2]]) == 2
 
 
-def test_iassoc_returns_zero_when_absent():
+def test_iassoc_returns_zero_when_absent(lu):
     # Zero, not -1: ported code tests it for truth.
     assert lu.iassoc('q', [['z', 1]]) == 0
 
 
-def test_slice_takes_the_nth_of_each():
+def test_slice_takes_the_nth_of_each(lu):
     # JHCore: slice({{"z",1},{"y",2},{"x",5}},2) => {1,2,5}
     assert lu.slice([['z', 1], ['y', 2], ['x', 5]], 2) == [1, 2, 5]
 
 
-def test_slice_defaults_to_the_first():
+def test_slice_defaults_to_the_first(lu):
     assert lu.slice([['z', 1], ['y', 2]]) == ['z', 'y']
 
 
-def test_slice_with_a_list_index_reorders():
+def test_slice_with_a_list_index_reorders(lu):
     # JHCore: slice({{"z",1,3},{"y",2,4}},{2,1}) => {{1,"z"},{2,"y"}}
     assert lu.slice([['z', 1, 3], ['y', 2, 4]], [2, 1]) == [[1, 'z'], [2, 'y']]
 
 
-def test_remove_duplicates_keeps_first_order():
+def test_remove_duplicates_keeps_first_order(lu):
     assert lu.remove_duplicates([3, 1, 3, 2, 1]) == [3, 1, 2]
 
 
-def test_setadd_only_adds_when_absent():
+def test_setadd_only_adds_when_absent(lu):
     assert lu.setadd([1, 2], 2) == [1, 2]
     assert lu.setadd([1, 2], 3) == [1, 2, 3]
 
 
-def test_setremove_removes_one():
+def test_setremove_removes_one(lu):
     assert lu.setremove([1, 2, 2], 2) == [1, 2]
 
 
-def test_find_insert_is_one_based():
+def test_find_insert_is_one_based(lu):
     assert lu.find_insert([1, 3, 5], 4) == 3
     assert lu.find_insert([1, 3, 5], 9) == 4
 
 
-def test_make_repeats_a_value():
+def test_make_repeats_a_value(lu):
     assert lu.make(3, 'x') == ['x', 'x', 'x']
     assert lu.make(0) == []
 
 
-def test_sort_with_parallel_keys():
+def test_sort_with_parallel_keys(lu):
     assert lu.sort(['c', 'a', 'b'], [3, 1, 2]) == ['a', 'b', 'c']
 
 
@@ -91,24 +166,24 @@ def test_sort_with_parallel_keys():
 # $code_utils
 # --------------------------------------------------------------------------
 
-def test_parse_verbref_splits_object_and_verb():
+def test_parse_verbref_splits_object_and_verb(cdu):
     assert cdu.parse_verbref('#3:look') == ['#3', 'look']
 
 
-def test_parse_verbref_returns_empty_without_a_colon():
+def test_parse_verbref_returns_empty_without_a_colon(cdu):
     assert cdu.parse_verbref('nothing') == []
 
 
-def test_parse_propref_splits_object_and_property():
+def test_parse_propref_splits_object_and_property(cdu):
     assert cdu.parse_propref('#3.name') == ['#3', 'name']
 
 
-def test_tonum_is_zero_for_nonsense():
+def test_tonum_is_zero_for_nonsense(cdu):
     assert cdu.tonum('12') == 12
     assert cdu.tonum('banana') == 0
 
 
-def test_prepositions_round_trip():
+def test_prepositions_round_trip(cdu):
     assert cdu.short_prep('at/to') == 'at'
     assert cdu.full_prep('to') == 'at/to'
     assert cdu.full_prep('with') == 'with/using'
@@ -126,25 +201,25 @@ class _Spy:
         self.said.append(text)
 
 
-def test_object_match_failed_reports_and_returns_true():
+def test_object_match_failed_reports_and_returns_true(cu):
     who = _Spy()
     assert cu.object_match_failed(-1, 'sword', who) is True
     assert 'sword' in who.said[0]
 
 
-def test_object_match_failed_is_false_on_a_real_match():
+def test_object_match_failed_is_false_on_a_real_match(cu):
     who = _Spy()
     assert cu.object_match_failed(object(), 'sword', who) is False
     assert who.said == []
 
 
-def test_ambiguous_match_says_so():
+def test_ambiguous_match_says_so(cu):
     who = _Spy()
     cu.object_match_failed(-2, 'door', who)
     assert 'which' in who.said[0]
 
 
-def test_yes_or_no_refuses_rather_than_pretending():
+def test_yes_or_no_refuses_rather_than_pretending(cu):
     # It blocks for input in MOO; a verb cannot block without stopping the
     # world, so this must not quietly return a guess.
     with pytest.raises(NotImplementedError):
@@ -160,45 +235,45 @@ def test_yes_or_no_refuses_rather_than_pretending():
 # not have; mooR supplies those and then runs $code_utils unchanged.
 # --------------------------------------------------------------------------
 
-def test_get_prep_finds_the_longest_phrase():
+def test_get_prep_finds_the_longest_phrase(cdu):
     # LambdaCore: get_prep("in","front","of",...) => {"in front of",...}
     assert cdu.get_prep('in', 'front', 'of', 'box') == ['in front of', 'box']
 
 
-def test_get_prep_matches_a_single_word():
+def test_get_prep_matches_a_single_word(cdu):
     assert cdu.get_prep('inside', 'box')[0] == 'in/inside/into'
 
 
-def test_get_prep_returns_empty_when_not_a_preposition():
+def test_get_prep_returns_empty_when_not_a_preposition(cdu):
     # LambdaCore: get_prep("frabulous",...) => {"", "frabulous",...}
     assert cdu.get_prep('frabulous', 'x') == ['', 'frabulous', 'x']
 
 
-def test_parse_argspec_full_form():
+def test_parse_argspec_full_form(cdu):
     # LambdaCore: {{"this","in front of","any"},{"foo"}}
     assert cdu.parse_argspec('this', 'in', 'front', 'of', 'any', 'foo') == \
         [['this', 'in front of', 'any'], ['foo']]
 
 
-def test_parse_argspec_bare_specifier():
+def test_parse_argspec_bare_specifier(cdu):
     assert cdu.parse_argspec('any') == [['any', 'none', 'none'], []]
 
 
-def test_parse_argspec_reports_a_bad_specifier():
+def test_parse_argspec_reports_a_bad_specifier(cdu):
     # The original returns a string rather than a list on failure.
     assert isinstance(cdu.parse_argspec('wibble'), str)
 
 
-def test_substitute_respects_word_boundaries():
+def test_substitute_respects_word_boundaries(cdu):
     # "avoiding substitution inside words"
     assert cdu.substitute('cat cathode', [['cat', 'dog']]) == 'dog cathode'
 
 
-def test_substitute_of_punctuation_is_not_delimited():
+def test_substitute_of_punctuation_is_not_delimited(cdu):
     assert cdu.substitute('a%b', [['%', '-']]) == 'a-b'
 
 
-def test_find_verb_named_is_one_based_and_zero_when_absent():
+def test_find_verb_named_is_one_based_and_zero_when_absent(cdu):
     class _V:
         def __init__(self, names, perms='rx'):
             self.names, self.perms = names, perms
@@ -211,7 +286,7 @@ def test_find_verb_named_is_one_based_and_zero_when_absent():
     assert cdu.find_verb_named(_O(), 'nope') == 0
 
 
-def test_verb_documentation_reads_the_docstring():
+def test_verb_documentation_reads_the_docstring(cdu):
     class _V:
         names = ['look']
         perms = 'rx'
@@ -300,83 +375,80 @@ def test_set_task_perms_is_accepted_and_does_nothing():
 # $perm_utils, the match sentinels, and MOO's regexes
 # --------------------------------------------------------------------------
 
-def test_apply_edits_permission_strings():
-    from moo.moo_libs import pu
+def test_apply_edits_permission_strings(pu):
     assert pu.apply('rw', '+x') == 'rwx'
     assert pu.apply('rwx', '-w') == 'rx'
     assert pu.apply('rw', '+x-r') == 'wx'
 
 
-def test_apply_without_a_sign_replaces():
-    from moo.moo_libs import pu
+def test_apply_without_a_sign_replaces(pu):
     assert pu.apply('rw', 'rx') == 'rx'
 
 
-def test_apply_is_idempotent():
-    from moo.moo_libs import pu
+def test_apply_is_idempotent(pu):
     assert pu.apply('rw', '+r') == 'rw'
 
 
 def test_moo_parens_are_literal():
     # The whole reason MOO patterns cannot go straight to `re`: this must
     # match the bracket characters, not capture foo.
-    from moo.moo_libs import moo_regex_to_python, moo_match
+    from moo.moo_builtins import moo_regex_to_python, moo_match
     assert moo_regex_to_python('(foo)') == r'\(foo\)'
     assert moo_match('a (foo) b', '(foo)')[:2] == [3, 7]
     assert moo_match('a foo b', '(foo)') == []
 
 
 def test_percent_paren_is_a_group():
-    from moo.moo_libs import moo_regex_to_python
+    from moo.moo_builtins import moo_regex_to_python
     assert moo_regex_to_python('%(foo%)') == '(foo)'
 
 
 def test_match_offsets_are_one_based_and_inclusive():
-    from moo.moo_libs import moo_match
+    from moo.moo_builtins import moo_match
     assert moo_match('abcdef', 'cd')[:2] == [3, 4]
 
 
 def test_match_folds_case_by_default():
     # Opposite of Python's default, and quietly wrong if not handled.
-    from moo.moo_libs import moo_match
+    from moo.moo_builtins import moo_match
     assert moo_match('HELLO', 'hello') != []
     assert moo_match('HELLO', 'hello', 1) == []
 
 
 def test_match_reports_nine_slots():
-    from moo.moo_libs import moo_match
+    from moo.moo_builtins import moo_match
     reps = moo_match('hello', '%(h%)%(e%)')[2]
     assert len(reps) == 9
     assert reps[0] == [1, 1] and reps[2] == [0, -1]
 
 
 def test_rmatch_takes_the_last_one():
-    from moo.moo_libs import moo_match, moo_rmatch
+    from moo.moo_builtins import moo_match, moo_rmatch
     assert moo_match('a1 a2 a3', 'a[0-9]')[0] == 1
     assert moo_rmatch('a1 a2 a3', 'a[0-9]')[0] == 7
 
 
 def test_substitute_fills_from_a_match():
-    from moo.moo_libs import moo_match, moo_substitute
+    from moo.moo_builtins import moo_match, moo_substitute
     m = moo_match('hello world', '%(w%w+%)')
     assert moo_substitute('got %1!', m) == 'got world!'
     assert moo_substitute('[%0]', m) == '[world]'
 
 
 def test_substitute_of_a_failed_match_changes_nothing():
-    from moo.moo_libs import moo_substitute
+    from moo.moo_builtins import moo_substitute
     assert moo_substitute('got %1', []) == 'got %1'
 
 
 def test_a_bad_pattern_does_not_raise():
-    from moo.moo_libs import moo_match
+    from moo.moo_builtins import moo_match
     assert moo_match('abc', '%(unclosed') == []
 
 
 def test_the_two_match_failures_stay_distinct():
     # Conflating them would make the "which one did you mean?" branch fire
     # on a plain miss.  Both are falsy, and neither equals the other.
-    from moo.moo_libs import FAILED_MATCH, AMBIGUOUS_MATCH
+    from moo.moo_builtins import FAILED_MATCH, AMBIGUOUS_MATCH
     assert FAILED_MATCH != AMBIGUOUS_MATCH
     assert not FAILED_MATCH and not AMBIGUOUS_MATCH
     assert FAILED_MATCH == FAILED_MATCH
@@ -385,7 +457,7 @@ def test_the_two_match_failures_stay_distinct():
 def test_none_never_equals_a_match_sentinel():
     # None is what this engine's matcher really returns, and ported code
     # tests it against these.  The test must be answerable, not a crash.
-    from moo.moo_libs import FAILED_MATCH
+    from moo.moo_builtins import FAILED_MATCH
     assert (None == FAILED_MATCH) is False
 
 
@@ -945,3 +1017,50 @@ def test_moo_index_gets_integer_map_keys_right():
     # have quietly returned whatever was under index-1.
     from moo.moo_builtins import moo_index
     assert moo_index({1: 'a', 3: 'c'}, 3) == 'c'
+
+
+# --------------------------------------------------------------------------
+# The three namespace builders
+#
+# A verb's globals, the eval builtin's, and the API's exec namespace are
+# assembled by three different functions.  Every utility object that moved
+# in-game went missing from at least one of them: `su` was undefined in eval
+# while working perfectly in verbs, then `_effects` did it again in the API.
+# The names come from one table now, and this is what says so.
+# --------------------------------------------------------------------------
+
+def test_the_three_namespaces_agree_on_the_utility_objects(_utils_world):
+    import types
+
+    from moo import builtins as moo_builtins
+    from moo.api import ApiConnection
+    from moo.object_utils import system_ref
+    from moo.verb_namespace import _REF_UTILS, build_verb_namespace
+
+    db, _call_verb = _utils_world
+    pobj = db.get_object(100)
+
+    expected = {}
+    for _group, ref, names in _REF_UTILS:
+        obj = system_ref(db, ref)
+        assert obj is not None, 'the starter world has no $%s' % ref
+        for name in names:
+            expected[name] = obj.objnum
+
+    # 1. a verb's globals
+    ns = build_verb_namespace(this=pobj, pobj=pobj, db=db,
+                              verb_name='probe', args=[], argstr='')
+    assert {n: ns[n].objnum for n in expected} == expected
+
+    # 2. the eval builtin
+    ev = moo_builtins._build_eval_globals({'db': db, 'player': pobj})
+    assert set(expected) <= set(ev)
+    assert {n: ev[n].objnum for n in expected} == expected
+
+    # 3. the API's exec namespace, which has to be asked in its own terms
+    conn = ApiConnection(
+        types.SimpleNamespace(database=db, config=types.SimpleNamespace()),
+        None, None)
+    code = 'result = {%s}' % ', '.join(
+        '%r: %s.objnum' % (n, n) for n in sorted(expected))
+    assert eval(conn._cmd_eval({'code': code})['value']) == expected

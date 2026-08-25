@@ -23,6 +23,7 @@ the value that makes it look busy -- see :func:`ticks_left`.
 
 import logging
 import random as _random
+import re
 import time as _time
 from typing import Any, List, Optional
 
@@ -60,6 +61,10 @@ __all__ = [
     # System references
     'sysobj', 'has_sysobj', 'set_sysobj',
     'moo_notify', 'moo_scatter', 'MooLoopSignal',
+    # MOO's regex builtins, under names that cannot collide -- see the
+    # section at the foot of this module.
+    'moo_match', 'moo_rmatch', 'moo_substitute',
+    'FAILED_MATCH', 'AMBIGUOUS_MATCH',
     # Tasks, verbs and dynamic dispatch
     'queued_tasks', 'call_function', 'set_verb_args', 'crypt',
     'task_stack', 'function_info',
@@ -2016,3 +2021,212 @@ def moo_index(seq, index):
     if isinstance(index, int) and not isinstance(index, bool):
         return seq[index - 1]
     return seq[index]
+
+
+# ---------------------------------------------------------------------------
+# The last of moo_libs
+#
+# These came from `moo/moo_libs.py`, which held ports of LambdaMOO's utility
+# objects.  Those objects are objects now -- $list_utils, $command_utils,
+# $code_utils and $perm_utils, resolved through their $refs -- and the module
+# is gone.  What is below is what could not go with them: MOO's `match`,
+# `rmatch` and `substitute` are server *builtins*, not verbs on a utility
+# object, and the two match sentinels are values the engine hands out.  A
+# builtin belongs in Python by the same rule that sent the rest in-game.
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# The match sentinels
+#
+# MOO spells "no object" four ways and they do not all mean the same
+# thing.  $nothing and $no_one are both #-1 and genuinely mean None here.
+# $failed_match (#-3) and $ambiguous_match (#-2) are what MOO's matcher
+# returns to tell those two failures apart.
+#
+# This engine's pmatch/bmatch return None for both, so there is no value
+# these could map onto that would be right.  Mapping them to None anyway
+# would be worse than useless: `if x == $ambiguous_match` would then fire
+# on an ordinary miss and ask "which one?" about a thing that simply is
+# not there.  So they are distinct sentinels that nothing ever returns.
+# The comparison is well-defined, it is just always false, and the
+# ambiguity branch of ported code is dead rather than wrong.
+# ---------------------------------------------------------------------------
+
+class _MatchSentinel:
+    """A match outcome this engine never produces.  See above."""
+
+    __slots__ = ('_name',)
+
+    def __init__(self, name):
+        self._name = name
+
+    def __repr__(self):
+        return self._name
+
+    def __bool__(self):
+        return False
+
+    def __eq__(self, other):
+        return self is other
+
+    def __hash__(self):
+        return id(self)
+
+
+FAILED_MATCH = _MatchSentinel('$failed_match')
+AMBIGUOUS_MATCH = _MatchSentinel('$ambiguous_match')
+
+
+# ---------------------------------------------------------------------------
+# MOO's regular expressions
+#
+# match() is the most dangerous name in the corpus.  In MOO it is a regex
+# builtin; in this engine `match` matches objects by name.  A translation
+# that passed it through would compile and call the wrong function, and
+# the wrongness would only show at runtime.
+#
+# MOO's syntax is not Python's.  It escapes with `%` rather than `\`, and
+# parentheses are literal unless written `%(`.  Handing a MOO pattern
+# straight to `re` therefore silently changes what it means -- `(foo)`
+# would become a group instead of matching the brackets.
+# ---------------------------------------------------------------------------
+
+_MOO_ESCAPES = {
+    '(': '(', ')': ')', '|': '|',          # grouping and alternation
+    'b': r'\b', 'B': r'\B',                # word boundaries
+    'w': r'\w', 'W': r'\W',                # word characters
+    '<': r'\b(?=\w)', '>': r'\b(?<=\w)',   # start and end of word
+    '%': '%',
+}
+
+
+def moo_regex_to_python(pattern: str) -> str:
+    """
+    Translate a MOO pattern into a Python one.
+
+    Args:
+        pattern: A MOO regular expression.
+
+    Returns:
+        The equivalent Python pattern.
+    """
+    out = []
+    i, n = 0, len(pattern)
+    in_class = False
+    while i < n:
+        ch = pattern[i]
+        if in_class:
+            # Inside [...] nothing is special to MOO, but a backslash is
+            # special to Python, so it has to be escaped on the way out.
+            out.append('\\\\' if ch == '\\' else ch)
+            if ch == ']' and out[-2:-1] != ['[']:
+                in_class = False
+            i += 1
+            continue
+        if ch == '%' and i + 1 < n:
+            nxt = pattern[i + 1]
+            if nxt in _MOO_ESCAPES:
+                out.append(_MOO_ESCAPES[nxt])
+            elif nxt.isdigit() and nxt != '0':
+                out.append('\\' + nxt)          # backreference
+            else:
+                out.append(re.escape(nxt))      # %x means a literal x
+            i += 2
+            continue
+        if ch == '[':
+            in_class = True
+            out.append(ch)
+        elif ch in '()|{}':
+            out.append('\\' + ch)               # literal in MOO
+        elif ch == '\\':
+            out.append('\\\\')
+        else:
+            out.append(ch)
+        i += 1
+    return ''.join(out)
+
+
+def moo_match(subject: str, pattern: str, case_matters: bool = False):
+    """
+    MOO's ``match()``: the leftmost match, in MOO's own return shape.
+
+    Args:
+        subject: The string to search.
+        pattern: A MOO regular expression.
+        case_matters: Whether case is significant.  MOO folds case by
+            default, which is the opposite of Python's default.
+
+    Returns:
+        ``[start, end, replacements, subject]`` with **1-based inclusive**
+        offsets, or ``[]`` when there is no match -- the same shape ported
+        code already unpacks and tests for emptiness.
+    """
+    return _match(subject, pattern, case_matters, last=False)
+
+
+def moo_rmatch(subject: str, pattern: str, case_matters: bool = False):
+    """MOO's ``rmatch()``: as :func:`moo_match`, but the rightmost match."""
+    return _match(subject, pattern, case_matters, last=True)
+
+
+def _match(subject, pattern, case_matters, last):
+    subject = '' if subject is None else str(subject)
+    flags = 0 if case_matters else re.IGNORECASE
+    try:
+        rx = re.compile(moo_regex_to_python(str(pattern)), flags)
+    except re.error:
+        return []
+    found = None
+    for m in rx.finditer(subject):
+        found = m
+        if not last:
+            break
+    if found is None:
+        return []
+    # MOO reports nine replacement slots whether or not the pattern has
+    # nine groups, and an unset slot is {0, -1} rather than absent.
+    reps = []
+    for g in range(1, 10):
+        s, e = found.span(g) if g <= rx.groups else (-1, -1)
+        reps.append([0, -1] if s < 0 else [s + 1, e])
+    return [found.start() + 1, found.end(), reps, subject]
+
+
+def moo_substitute(template: str, subs) -> str:
+    """
+    MOO's ``substitute()``: fill ``&1``..``&9`` from a match result.
+
+    Args:
+        template: Text containing ``&0``-``&9`` placeholders, where ``&0``
+            is the whole match.
+        subs: A result from :func:`moo_match`.
+
+    Returns:
+        The filled-in text, or *template* unchanged if *subs* is empty.
+    """
+    if not subs or len(subs) < 4:
+        return template
+    start, end, reps, subject = subs[0], subs[1], subs[2], subs[3]
+    out = []
+    i, n = 0, len(template)
+    while i < n:
+        ch = template[i]
+        if ch == '%' and i + 1 < n:
+            nxt = template[i + 1]
+            if nxt == '0':
+                out.append(subject[start - 1:end])
+                i += 2
+                continue
+            if nxt.isdigit():
+                s, e = reps[int(nxt) - 1]
+                out.append('' if s < 1 else subject[s - 1:e])
+                i += 2
+                continue
+            if nxt == '%':
+                out.append('%')
+                i += 2
+                continue
+        out.append(ch)
+        i += 1
+    return ''.join(out)

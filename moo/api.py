@@ -777,7 +777,7 @@ class ApiConnection:
                 if callable(attr) or isinstance(attr, (str, int, type)):
                     namespace[name] = attr
 
-        # $string_utils, under both spellings.
+        # The utility objects, under both spellings each.
         #
         # This is the THIRD namespace builder in the engine -- there is
         # `verb_namespace.build_verb_namespace` for verbs, and
@@ -785,28 +785,17 @@ class ApiConnection:
         # `su` used to be a module-level Python object, so all three picked it
         # up for free by scanning attributes.  It is an object in the world
         # now, resolved per database, and all three had to be told
-        # separately; the note in _build_eval_globals already records the
-        # first two disagreeing twice.
+        # separately.  `_effects` then went missing here the same way, and
+        # four more names were about to: $list_utils, $command_utils,
+        # $code_utils and $perm_utils all left Python together.
         #
-        # Patching a third copy is not the fix.  It is recorded in
-        # docs/INGAME_MIGRATION_PLAN.md as work of its own, because the next
-        # name added to the verb side will go missing here too, and the
-        # symptom -- a name that works in a verb and is undefined in eval --
-        # reads as an engine fault rather than a missing line.
-        # ...and $effects_utils, which went missing here the same way the
-        # moment `_effects` stopped being a module attribute.  Third builder,
-        # second name, same lesson: this list has to be derived from the verb
-        # side rather than remembered.
+        # Patching a third copy a third time is not the fix.  The names live
+        # on the verb side in _REF_UTILS, and this asks for them rather than
+        # repeating them -- so the next object to move in-game cannot go
+        # missing here, which is what kept happening.
         try:
-            from .verb_namespace import (_EFFECTS_NAMES,
-                                         _STRING_UTILS_NAMES)
-            from .object_utils import system_ref
-            for _names, _ref in ((_STRING_UTILS_NAMES, 'string_utils'),
-                                 (_EFFECTS_NAMES, 'effects_utils')):
-                _o = system_ref(db, _ref)
-                if _o is not None:
-                    for _n in _names:
-                        namespace[_n] = _o
+            from .verb_namespace import bind_ref_utils
+            bind_ref_utils(namespace, db)
         except Exception:
             pass
 
