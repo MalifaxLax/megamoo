@@ -559,9 +559,11 @@ def build_layout(database):
     # contiguous space before the strays do.
     login = None
     try:
-        from .globals import LOGIN_ROOM
-        if LOGIN_ROOM in rooms:
-            login = LOGIN_ROOM
+        from .object_utils import login_room as _login_room
+        from .builtins import _database
+        _room = _login_room(_database)
+        if _room is not None and _room.objnum in rooms:
+            login = _room.objnum
     except Exception:
         pass
 

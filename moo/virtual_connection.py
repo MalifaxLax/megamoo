@@ -151,7 +151,6 @@ def activate_testbot(server, bot) -> VirtualConnection:
     """
     from .network import _player_connections, _pc_lock
     from .objects import ObjectFlags
-    from .globals import LOGIN_ROOM
     from .hooks import fire_hook
     from .verb_context import set_verb_context, clear_verb_context
 
@@ -162,7 +161,9 @@ def activate_testbot(server, bot) -> VirtualConnection:
     if hasattr(last_loc, 'objnum'):
         last_loc = last_loc.objnum
     if last_loc is None or not database.valid(last_loc):
-        last_loc = LOGIN_ROOM
+        from .object_utils import login_room as _login_room
+        _room = _login_room(database)
+        last_loc = _room.objnum if _room is not None else None
 
     bot.move_to(last_loc, database)
     bot.set_flag(ObjectFlags.PLAYER)

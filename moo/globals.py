@@ -413,11 +413,6 @@ DEFAULT_AUTORELOAD_INTERVAL = 2.0
 # SERVER INFORMATION
 # ============================================================================
 
-# Room where new players are placed on creation.  This is the OOC
-# staging area -- when a player puppets an IC character, that
-# character is moved to its stored ``last_location``.
-LOGIN_ROOM = 14
-
 # Server name
 DEFAULT_SERVER_NAME = 'MegaMOO Server'
 
@@ -639,79 +634,6 @@ SUCCESS_INDEX = {
     'odrop': 3,
     'lock': 4,
     'olock': 5,
-}
-
-# ============================================================================
-# ROOM TYPES (objnum mappings)
-# ============================================================================
-#
-# Maps user-friendly room type names to the objnum of the prototype
-# parent object.  Used by ``@dig`` and ``@make`` when creating new rooms.
-
-ROOM_TYPES = {
-    'room': 15, 'baseroom': 15, 'base': 15,
-    'ooc': 16, 'oocroom': 16, 'oc': 16,
-    'ic': 17, 'icroom': 17,
-}
-
-# Display names for room type selection menus
-ROOM_TYPE_NAMES = [
-    ('room', '#15 BaseRoom'),
-    ('ooc', '#16 OOCRoom'),
-    ('ic', '#17 ICRoom'),
-]
-
-# ============================================================================
-# EXIT TYPES (objnum mappings)
-# ============================================================================
-#
-# Maps user-friendly exit type names (and direction shortcuts) to the
-# objnum of the prototype parent object.  Direction names all map to
-# ``#21 DirectionalExit``.  Other exit types use progressive objnums.
-
-EXIT_TYPES = {
-    # Directional exits (compass directions and vertical movement)
-    'dir': 21, 'direction': 21, 'directional': 21,
-    'north': 21, 'south': 21, 'east': 21, 'west': 21,
-    'ne': 21, 'northeast': 21, 'nw': 21, 'northwest': 21,
-    'se': 21, 'southeast': 21, 'sw': 21, 'southwest': 21,
-    'u': 21, 'up': 21, 'd': 21, 'down': 21,
-    'o': 21, 'out': 21, 'i': 21, 'in': 21,
-    # Go exits (keyword-triggered, e.g. "go path")
-    'go': 22,
-    # Closeable exits (doors that can be opened/closed/locked)
-    'door': 23, 'close': 23, 'closeable': 23,
-    # Climbable exits (e.g. "climb ladder")
-    'climb': 24,
-    # Jumpable exits (e.g. "jump gap")
-    'jump': 25,
-}
-
-# Display names for exit type selection menus
-EXIT_TYPE_NAMES = [
-    ('dir', '#21 DirectionalExit'),
-    ('go', '#22 GoExit'),
-    ('door', '#23 ClosableGoExit'),
-    ('climb', '#24 ClimbableExit'),
-    ('jump', '#25 JumpableExit'),
-]
-
-# ============================================================================
-# OBJECT TYPES (objnum mappings)
-# ============================================================================
-#
-# Maps user-friendly object type names to the objnum of the prototype
-# parent object.  Used by ``@make`` when creating new objects.
-
-TCLASSES = {
-    # Generic objects
-    'obj': 10, 'object': 10,
-    # Containers
-    'container': 26, 'box': 27, 'cup': 28,
-    # Wearables
-    'clothes': 29, 'wearable': 29,
-    # Furniture
-    'furniture': 30,
 }
 
 # ============================================================================

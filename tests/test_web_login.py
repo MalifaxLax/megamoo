@@ -14,7 +14,11 @@ import pytest
 
 import moo.login
 from moo.database import Database
-from moo.globals import LOGIN_ROOM
+# Not `from moo.globals import LOGIN_ROOM` any more: where a player lands is
+# the world's decision, held on $globals.login_room, not the engine's.  The
+# fixture therefore has to say where it is -- which is the behaviour under
+# test, so saying it here is the point rather than a workaround.
+LOGIN_ROOM = 14
 from moo.objects import ObjectFlags
 from moo.web.connection import WebSocketConnection
 
@@ -57,6 +61,16 @@ def _make_world(db):
             db._create_object_with_objnum(objnum, parent=0, owner=0)
     login_room = db.get_object(LOGIN_ROOM)
     login_room.name = 'Login Room'
+    login_room.add_property('is_room', True)
+
+    # $globals.login_room is what object_utils.login_room() resolves.
+    if not db.valid(19):
+        db._create_object_with_objnum(19, parent=0, owner=0)
+    holder = db.get_object(19)
+    holder.name = 'Globals'
+    holder.add_property('login_room', LOGIN_ROOM)
+    sysobj = db.get_object(0) if db.valid(0) else db._create_object_with_objnum(0, parent=0, owner=0)
+    sysobj.add_property('globals', '#19')
 
     elsewhere = db.create_object(parent=0, owner=0)
     elsewhere.name = 'Somewhere In Character'

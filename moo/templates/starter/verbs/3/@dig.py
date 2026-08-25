@@ -16,7 +16,17 @@ Examples:
 
 Note: Use @open, @vopen, @gopen, @copen, @jopen to create exits.
 """
-from moo.object_utils import make_room, ROOM_TYPES, ROOM_TYPE_NAMES
+from moo.object_utils import make_room, system_ref
+
+# The room types are the world's, not the engine's: they name object numbers,
+# and a Python constant naming an object number is one @renumber cannot
+# maintain.  They live on $globals now.
+_g = system_ref(db, 'globals')
+ROOM_TYPES = dict(getattr(_g, 'room_types', None) or {}) if _g is not None else {}
+ROOM_TYPE_NAMES = [tuple(e) for e in (getattr(_g, 'room_type_names', None) or [])] if _g is not None else []
+if not ROOM_TYPES:
+    pobj.msg('$globals.room_types is not set; @dig cannot resolve a room type.')
+    return
 
 # Security: only execute for the player this verb is defined on
 if auth_level(pobj) < 2:

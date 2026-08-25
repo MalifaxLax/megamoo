@@ -636,8 +636,9 @@ def puppet(target: Union[int, MOOObject]) -> bool:
     if hasattr(last_loc, 'objnum'):
         last_loc = last_loc.objnum
     if last_loc is None or not _database.valid(last_loc):
-        from .globals import LOGIN_ROOM
-        last_loc = LOGIN_ROOM
+        from .object_utils import login_room as _login_room
+        _room = _login_room(_database)
+        last_loc = _room.objnum if _room is not None else None
 
     logger.info(f"puppet(): moving #{target_obj.objnum} to room #{last_loc}")
 
