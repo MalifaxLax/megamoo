@@ -296,6 +296,19 @@ CASES: List[Case] = [
     Case('moo.match_utils:prep_match', ('$match_utils', 'prep_match'),
          [('in',), ('into',), ('with',), ('sword',), ('',), ('on',)]),
 
+    # --- $char_data is done, and its cases are retired ---
+    #
+    # Ten cases and 45 inputs, green, run in the moment before
+    # `game/chargen_data.py` was deleted: stat_bonus, bonus_for_rank,
+    # calc_dev_points, calc_max_hits, calc_max_stamina, calc_max_mana,
+    # mana_points, _potential_stat, categorize_hair_length and
+    # generate_description.
+    #
+    # roll_stats, stat_gain and _dice roll, so a differ can say nothing true
+    # about them.  What checks those is the game: chargen runs on roll_stats
+    # and levelling runs on stat_gain, and both were exercised in the world
+    # after the module went.
+
     # --- $combat_utils is done, and its cases are retired ---
     #
     # Nine cases and 54 inputs, green, run in the moment before
