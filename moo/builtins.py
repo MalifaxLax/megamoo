@@ -105,8 +105,49 @@ from .verb_read import read, read_lines  # noqa: F401 — for verb code
 # were to tell the player or to swallow it -- and swallowing is what the
 # verbs did.  Note the name: `log` is already the logarithm.
 from .moo_builtins import server_log  # noqa: F401 — re-exported for verb code
-from .string_utils import su as _su
-esub = _su.esub
+def _string_utils(db=None):
+    """The $string_utils object, or None.
+
+    `su` was a Python instance imported here; it is an object in the world
+    now, so it is resolved rather than imported.  Reaching it needs a
+    database, and notify() is called from tickers and from the network as
+    well as from verbs, so the active verb context is tried first and the
+    process-wide database second.
+    """
+    from .object_utils import system_ref
+    if db is None:
+        try:
+            from .verb_context import verb_ctx
+            ctx = verb_ctx.get()
+            db = ctx[1] if ctx else None
+        except Exception:
+            db = None
+    if db is None:
+        db = _database
+    if db is None:
+        return None
+    try:
+        return system_ref(db, 'string_utils')
+    except Exception:
+        return None
+
+
+def esub(text, sub=None, dob=None, iob=None, uob=None, svals=None,
+         viewer=None, db=None):
+    """Emit substitution.  Delivers $string_utils:esub to a bare name.
+
+    Not a second implementation -- there is exactly one, and it is the verb.
+    This is the same thing builtins.py does for object_utils: put the name
+    where verb code expects to find it.  A world without $string_utils gets
+    its text back unsubstituted rather than an exception, because losing the
+    pronouns in one line beats losing the line.
+    """
+    obj = _string_utils(db)
+    if obj is None:
+        return text
+    fn = make_call_verb(getattr(obj, 'owner', None) or obj, _database or db)
+    return fn(obj, 'esub', text, sub=sub, dob=dob, iob=iob, uob=uob,
+              svals=svals, viewer=viewer)
 from .verb_context import MAX_VERB_DEPTH
 from .match_utils import (      # noqa: F401 — re-exported for verb code
     omatch, match, match_all, bmatch, pmatch,
@@ -2348,7 +2389,6 @@ def notify(player, message, sub=None, dob=None, iob=None, uob=None, svals=None):
     # (svals -> %sN) are provided.
     player_obj = player if isinstance(player, MOOObject) else _database.get_object(player)
     if sub or dob or iob or uob or svals:
-        from .string_utils import su
         try:
             # The recipient goes in as `viewer`, which is what lets one
             # string read "you smile" to the actor and "Malifax smiles"
@@ -2356,10 +2396,16 @@ def notify(player, message, sub=None, dob=None, iob=None, uob=None, svals=None):
             # recipient -- msg_room calls msg on each listener in turn --
             # so this is only telling esub something it was standing next
             # to and never being handed.
-            message = su.esub(message, sub=sub, dob=dob, iob=iob, uob=uob,
-                              svals=svals, viewer=player_obj)
+            message = esub(message, sub=sub, dob=dob, iob=iob, uob=uob,
+                           svals=svals, viewer=player_obj)
         except Exception:
-            pass
+            # Deliberately swallowed, as before: a message that loses its
+            # pronouns still reaches the player, and raising here would take
+            # the line with it.  Logged now, though -- this used to hide a
+            # failure in code that could not fail, and now reaches a verb
+            # that can.
+            logger.warning('esub failed for #%s; sending unsubstituted',
+                           getattr(player_obj, 'objnum', '?'), exc_info=True)
     from .network import get_connection_for_player
     conn = get_connection_for_player(player_obj.objnum)
     # Fall back to the player's account connection if the character
@@ -2810,6 +2856,29 @@ def _build_eval_globals(context: dict) -> dict:
         attr = getattr(this_module, name)
         if callable(attr) or isinstance(attr, (str, int, type)):
             ns[name] = attr
+
+    # $string_utils, under both spellings.  `su` used to be a Python instance
+    # in the static verb namespace, so this function picked it up for free by
+    # scanning module attributes.  It is an object in the world now, resolved
+    # per database, and this function stopped seeing it -- so `su` was
+    # undefined in eval while working perfectly in verbs.
+    #
+    # That is the third time these two namespaces have disagreed, and the
+    # note below already says why: eval is assembled by a different function
+    # from the one that assembles a verb.  Rather than remember again, the
+    # names are taken from the verb side's own group map, so a fourth
+    # addition there arrives here without anyone deciding to bring it.
+    try:
+        from .verb_namespace import _STRING_UTILS_NAMES
+        from .object_utils import system_ref
+        _db = context.get('db') if isinstance(context, dict) else None
+        _db = _db or _database
+        _suobj = system_ref(_db, 'string_utils') if _db is not None else None
+        if _suobj is not None:
+            for _n in _STRING_UTILS_NAMES:
+                ns[_n] = _suobj
+    except Exception:
+        pass
 
     # The MOO compatibility surface -- moo_splice, moo_eq, typeof, sysobj
     # and the rest of moo_builtins.__all__.

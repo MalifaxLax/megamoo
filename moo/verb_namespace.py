@@ -536,9 +536,6 @@ def _fill_static_verb_ns(namespace: Dict[str, Any]) -> None:
     # Bound under both names: `su` is the MegaMOO spelling, `string_utils`
     # is what code ported from a MOO already says, so `$string_utils`
     # resolves without an object behind it. Same instance either way.
-    from .string_utils import su
-    namespace['su'] = su
-    namespace['string_utils'] = su
 
     # Object utilities (ou.make_object, ou.make_room, etc.)
     #
@@ -657,6 +654,7 @@ _LAZY_PERM = 4       # layer 2b -- getattr / setattr / hasattr / type
 _LAZY_PARSE = 5      # layer 3  -- the parsed command parts
 _LAZY_COMPAT = 6     # layer 6b -- tell / pass_ / E_*
 _LAZY_GLOBALS = 7    # layer 7  -- the globals module
+_LAZY_SU = 8         # layer 5  -- $string_utils, resolved per database
 
 # What layer 3 publishes, by either route.  _parse_verb_inst_into_namespace
 # harvests one name _set_parse_fallbacks does not (``regex_match``); a verb
@@ -668,6 +666,11 @@ _PARSE_NAMES = (
     'regex_match', 'match', 'switches',
 )
 _BOUND_NAMES = ('call_verb', 'search', 'find')
+#: `su` used to be the StringUtils *instance*, bound once into the static
+#: namespace.  It names the $string_utils *object* now, which depends on the
+#: database and so cannot be call-invariant.  Both spellings resolve to it:
+#: `su` is the MegaMOO one, `string_utils` is what ported MOO code says.
+_STRING_UTILS_NAMES = ('su', 'string_utils')
 _PERM_NAMES = ('getattr', 'setattr', 'hasattr', 'type')
 
 _GROUP_OF: Optional[Dict[str, int]] = None
@@ -697,6 +700,8 @@ def _get_group_map() -> Dict[str, int]:
         groups[name] = _LAZY_STATIC
     for name in _BOUND_NAMES:                               # layer 5
         groups[name] = _LAZY_BOUND
+    for name in _STRING_UTILS_NAMES:                        # layer 5
+        groups[name] = _LAZY_SU
     # Layer 6b is probed rather than listed: moo_compat owns the set, and
     # ``pass_`` only appears when there is enough context to build it, so the
     # probe supplies that context to learn the name exists.
@@ -796,6 +801,13 @@ class _LazyVerbNS(dict):
             dict.update(self, build_compat_namespace(
                 this=self._this, verb_name=self._verb_name,
                 call_verb=self['call_verb'], db=self._db))
+        elif group == _LAZY_SU:
+            from .object_utils import system_ref
+            obj = system_ref(self._db, 'string_utils')
+            if obj is None:
+                return      # leave unbound -> NameError, which is the truth
+            for nm in _STRING_UTILS_NAMES:
+                dict.__setitem__(self, nm, obj)
         elif group == _LAZY_GLOBALS:
             try:
                 dict.__setitem__(

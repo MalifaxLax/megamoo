@@ -236,58 +236,12 @@ def run(cases: Sequence[Case], dbpath: str, verbose: bool = False) -> int:
 # ---------------------------------------------------------------------------
 
 CASES: List[Case] = [
-    # --- $string_utils, ported by tools/port_to_verbs.py ---
-    Case('moo.string_utils:su.capitalise', ('$string_utils', 'capitalise'),
-         [('hello',), ('a sword',), ('',), ('123',), ('  leading',),
-          ('ALREADY',), ('e',), ('&<245>dim',), ("O'Brien",), ('MacLeod',),
-          ('an OLD sword',), (None,)]),
-
-    Case('moo.string_utils:su.a_or_an', ('$string_utils', 'a_or_an'),
-         [('sword',), ('apple',), ('hour',), ('',), ('elephant',),
-          ('unicorn',), ('  eagle',), ('A',), ('x',)]),
-
-    Case('moo.string_utils:su.ordinal', ('$string_utils', 'ordinal'),
-         [(1,), (2,), (3,), (4,), (11,), (12,), (13,), (21,), (0,), (101,),
-          (112,), (-1,)]),
-
-    Case('moo.string_utils:su.pluralise', ('$string_utils', 'pluralise'),
-         [('sword', 2), ('box', 2), ('knife', 2), ('sheep', 2), ('sword', 1),
-          ('city', 3), ('', 2), ('bush', 2), ('penny', 2)]),
-
-    Case('moo.string_utils:su.english_list', ('$string_utils', 'english_list'),
-         [([],), (['a'],), (['a', 'b'],), (['a', 'b', 'c'],),
-          (['a', 'b', 'c', 'd'],)]),
-
-    Case('moo.string_utils:su.find_prefix', ('$string_utils', 'find_prefix'),
-         [('sw', ['sword', 'shield']), ('x', ['sword']),
-          ('s', ['sword', 'shield']), ('', ['sword']),
-          ('sword', ['sword', 'swordfish']), ('swo', [])]),
-
-    Case('moo.string_utils:su.collapse', ('$string_utils', 'collapse'),
-         [('a  b',), ('  a  \n b ',), ('',), ('one',),
-          ('\n    boxed\n    text\n',)]),
-
-    Case('moo.string_utils:su.conjugate', ('$string_utils', 'conjugate'),
-         [('be',), ('be', True), ('have',), ('have', True), ('go',),
-          ('go', True), ('swing',), ('swing', True), ('',)]),
-
-    Case('moo.string_utils:su.listtoenglish', ('$string_utils', 'listtoenglish'),
-         [([],), (['one'],), (['one', 'two'],), (['one', 'two', 'three'],)]),
-
-    Case('moo.string_utils:su.tlisttoenglish', ('$string_utils', 'tlisttoenglish'),
-         [([],), (['one'],), (['one', 'two'],)]),
-
-    Case('moo.string_utils:su.listtomenu', ('$string_utils', 'listtomenu'),
-         [([],), (['a', 'b'],), (['a', 'b', 'c'], '> ')]),
-
-    Case('moo.string_utils:su.columnize', ('$string_utils', 'columnize'),
-         [([],), (['a'],), (['a', 'b', 'c', 'd', 'e'],)]),
-
-    Case('moo.string_utils:su.wrapstringlist', ('$string_utils', 'wrapstringlist'),
-         [([],), (['short'],), (['a fairly long line of text that should wrap somewhere'], 20)]),
-
-    Case('moo.string_utils:su.index_delimited', ('$string_utils', 'index_delimited'),
-         [('a b c', 'b'), ('a b c', 'd'), ('', 'a'), ('a,b,c', 'b', ',')]),
+    # $string_utils is done.  Its fourteen cases and eighty-seven inputs are
+    # retired rather than kept: `moo/string_utils.py` is deleted, so there is
+    # no longer an original to diff the verbs against.  The port was verified
+    # green immediately before the module was removed, and that run is the
+    # record.  A case here that cannot import its Python side would report as
+    # an error forever and teach everyone to ignore the output.
 
     # --- not yet migrated; the rig reports these as pending, not failing ---
     Case('moo.match_utils:parse_ordinal', ('$match_utils', 'parse_ordinal'),

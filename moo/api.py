@@ -777,6 +777,32 @@ class ApiConnection:
                 if callable(attr) or isinstance(attr, (str, int, type)):
                     namespace[name] = attr
 
+        # $string_utils, under both spellings.
+        #
+        # This is the THIRD namespace builder in the engine -- there is
+        # `verb_namespace.build_verb_namespace` for verbs, and
+        # `builtins._build_eval_globals` for the eval builtin, and this one.
+        # `su` used to be a module-level Python object, so all three picked it
+        # up for free by scanning attributes.  It is an object in the world
+        # now, resolved per database, and all three had to be told
+        # separately; the note in _build_eval_globals already records the
+        # first two disagreeing twice.
+        #
+        # Patching a third copy is not the fix.  It is recorded in
+        # docs/INGAME_MIGRATION_PLAN.md as work of its own, because the next
+        # name added to the verb side will go missing here too, and the
+        # symptom -- a name that works in a verb and is undefined in eval --
+        # reads as an engine fault rather than a missing line.
+        try:
+            from .verb_namespace import _STRING_UTILS_NAMES
+            from .object_utils import system_ref
+            _suobj = system_ref(db, 'string_utils')
+            if _suobj is not None:
+                for _n in _STRING_UTILS_NAMES:
+                    namespace[_n] = _suobj
+        except Exception:
+            pass
+
         # Wire up search/find/call_verb with the correct database context
         namespace['call_verb'] = moo_builtins.make_call_verb(player, db)
         namespace['search'] = lambda *a, _db=db, **kw: moo_builtins._search_fn(*a, db=_db, **kw)
