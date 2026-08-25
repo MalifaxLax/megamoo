@@ -793,13 +793,20 @@ class ApiConnection:
         # name added to the verb side will go missing here too, and the
         # symptom -- a name that works in a verb and is undefined in eval --
         # reads as an engine fault rather than a missing line.
+        # ...and $effects_utils, which went missing here the same way the
+        # moment `_effects` stopped being a module attribute.  Third builder,
+        # second name, same lesson: this list has to be derived from the verb
+        # side rather than remembered.
         try:
-            from .verb_namespace import _STRING_UTILS_NAMES
+            from .verb_namespace import (_EFFECTS_NAMES,
+                                         _STRING_UTILS_NAMES)
             from .object_utils import system_ref
-            _suobj = system_ref(db, 'string_utils')
-            if _suobj is not None:
-                for _n in _STRING_UTILS_NAMES:
-                    namespace[_n] = _suobj
+            for _names, _ref in ((_STRING_UTILS_NAMES, 'string_utils'),
+                                 (_EFFECTS_NAMES, 'effects_utils')):
+                _o = system_ref(db, _ref)
+                if _o is not None:
+                    for _n in _names:
+                        namespace[_n] = _o
         except Exception:
             pass
 

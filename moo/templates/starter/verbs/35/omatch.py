@@ -8,11 +8,11 @@ construction; tools/equivalence.py checks that against the original.
 Type:    function
 """
 
+from moo.database import Database
+
 from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
 
 from moo.objects import MOOObject
-
-from moo.database import Database
 
 def _resolve_db(pobj: MOOObject, db: Database = None) -> Optional[Database]:
     """

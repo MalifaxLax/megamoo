@@ -8,8 +8,6 @@ construction; tools/equivalence.py checks that against the original.
 Type:    function
 """
 
-_ORDINAL_SUFFIXES = frozenset({'st', 'nd', 'rd', 'th'})
-
 _ORDINAL_WORDS = {
     'first': 0, 'second': 1, 'third': 2, 'fourth': 3, 'fifth': 4,
     'sixth': 5, 'seventh': 6, 'eighth': 7, 'ninth': 8, 'tenth': 9,
@@ -17,6 +15,8 @@ _ORDINAL_WORDS = {
     'fifteenth': 14, 'sixteenth': 15, 'seventeenth': 16, 'eighteenth': 17,
     'nineteenth': 18, 'twentieth': 19,
 }
+
+_ORDINAL_SUFFIXES = frozenset({'st', 'nd', 'rd', 'th'})
 
 from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
 

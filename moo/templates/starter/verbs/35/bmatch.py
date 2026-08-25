@@ -10,9 +10,9 @@ Type:    function
 
 from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
 
-from moo.objects import MOOObject
-
 from moo.database import Database
+
+from moo.objects import MOOObject
 
 
 

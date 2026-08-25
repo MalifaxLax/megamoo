@@ -10,6 +10,58 @@ Type:    function
 
 from typing import TYPE_CHECKING, Optional
 
+def _call_title(obj: 'MOOObject', db: 'Database', pobj: 'MOOObject'):
+    """
+    Call the ``_title`` verb on *obj* to rebuild its display name.
+
+    The ``_title`` verb constructs ``obj.name`` from the object's noun
+    and name_mod_list.  This function first tries to
+    invoke ``_title`` via the verb execution system (using ``call_verb``
+    from the active verb context).  If no verb context is available
+    (e.g. during bootstrap or direct script calls), it falls back to
+    :func:`_inline_title` which implements the same logic directly.
+
+    Args:
+        obj:  The object whose title needs to be rebuilt.
+        db:   The database instance.
+        pobj: The player object (needed for verb execution context).
+    """
+    try:
+        from .verb_context import verb_ctx
+        ctx = verb_ctx.get(None)
+        if ctx:
+            from .builtins import make_call_verb
+            call_verb = make_call_verb(pobj, db, ctx[2])
+            call_verb(obj, '_title')
+            return
+    except Exception:
+        pass
+
+    # Fallback: inline the _title logic if no verb context is available
+    _inline_title(obj)
+
+def _set_property(obj: 'MOOObject', prop_name: str, value):
+    """
+    Set a property on *obj*, creating it if it does not exist locally.
+
+    If the property already exists on the object, its value is updated
+    in place.  Otherwise, a new property is added with default
+    permissions ``'rc'`` (readable, inheritable).
+
+    The object is marked as modified after the change so it will be
+    saved to the database on the next save cycle.
+
+    Args:
+        obj:       The object to set the property on.
+        prop_name: Name of the property.
+        value:     The value to set (any Python type).
+    """
+    if prop_name in obj.properties:
+        obj.properties[prop_name].value = value
+    else:
+        obj.add_property(prop_name, value, perms='rc')
+    obj._mark_modified()
+
 def _inline_title(obj: 'MOOObject'):
     """
     Inline fallback for ``_title`` when no verb execution context
@@ -117,58 +169,6 @@ def _get_property_value(obj: 'MOOObject', prop_name: str, db: 'Database' = None)
             parent_num = parent_obj.parent
 
     return None
-
-def _set_property(obj: 'MOOObject', prop_name: str, value):
-    """
-    Set a property on *obj*, creating it if it does not exist locally.
-
-    If the property already exists on the object, its value is updated
-    in place.  Otherwise, a new property is added with default
-    permissions ``'rc'`` (readable, inheritable).
-
-    The object is marked as modified after the change so it will be
-    saved to the database on the next save cycle.
-
-    Args:
-        obj:       The object to set the property on.
-        prop_name: Name of the property.
-        value:     The value to set (any Python type).
-    """
-    if prop_name in obj.properties:
-        obj.properties[prop_name].value = value
-    else:
-        obj.add_property(prop_name, value, perms='rc')
-    obj._mark_modified()
-
-def _call_title(obj: 'MOOObject', db: 'Database', pobj: 'MOOObject'):
-    """
-    Call the ``_title`` verb on *obj* to rebuild its display name.
-
-    The ``_title`` verb constructs ``obj.name`` from the object's noun
-    and name_mod_list.  This function first tries to
-    invoke ``_title`` via the verb execution system (using ``call_verb``
-    from the active verb context).  If no verb context is available
-    (e.g. during bootstrap or direct script calls), it falls back to
-    :func:`_inline_title` which implements the same logic directly.
-
-    Args:
-        obj:  The object whose title needs to be rebuilt.
-        db:   The database instance.
-        pobj: The player object (needed for verb execution context).
-    """
-    try:
-        from .verb_context import verb_ctx
-        ctx = verb_ctx.get(None)
-        if ctx:
-            from .builtins import make_call_verb
-            call_verb = make_call_verb(pobj, db, ctx[2])
-            call_verb(obj, '_title')
-            return
-    except Exception:
-        pass
-
-    # Fallback: inline the _title logic if no verb context is available
-    _inline_title(obj)
 
 
 

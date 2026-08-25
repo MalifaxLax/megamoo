@@ -237,10 +237,9 @@ def set_server(server):
     """
     global _server
     _server = server
-    # Wire up effects system once both db and server are available
-    if _database is not None:
-        from .effects import _set_refs
-        _set_refs(_database, server)
+    # The effects system needed wiring here because its manager kept the
+    # database in a module global.  It is verbs on $effects_utils now, and a
+    # verb has `db` in its namespace, so there is nothing to wire.
 
 
 def shutdown_server(message="Server shutting down", restart=False, with_api=True,
@@ -2943,9 +2942,19 @@ def _build_eval_globals(context: dict) -> dict:
     if _config is not None:
         ns['config'] = _config
 
-    # Effects utility
-    from .effects import eu as _effects_mgr
-    ns['_effects'] = _effects_mgr
+    # $effects_utils, for the same reason $string_utils is above: an object
+    # now, so resolved rather than imported.
+    try:
+        from .verb_namespace import _EFFECTS_NAMES
+        from .object_utils import system_ref
+        _db2 = context.get('db') if isinstance(context, dict) else None
+        _euobj = (system_ref(_db2 or _database, 'effects_utils')
+                  if (_db2 or _database) is not None else None)
+        if _euobj is not None:
+            for _n in _EFFECTS_NAMES:
+                ns[_n] = _euobj
+    except Exception:
+        pass
 
     # Caller context wins (merged last so it can override everything)
     ns.update(context)
