@@ -76,6 +76,12 @@ class Case:
     inputs: List[tuple] = field(default_factory=list)
     kwargs: List[dict] = field(default_factory=list)
     note: str = ''
+    #: A callable to run before the Python side can answer.  `get_crit_result`
+    #: reads a module-level dict that `load_crit_tables()` fills at server
+    #: startup, so an un-started module answers None to everything and the
+    #: differ reports the verb as wrong.  The in-game side needs no such line,
+    #: which is rather the point: the tables are in the world.
+    setup: str = ''
 
     def __post_init__(self):
         if not self.kwargs:
@@ -175,6 +181,8 @@ class Result:
 def run_case(case: Case, db, pobj, call_verb) -> Result:
     try:
         pyfn = resolve_python(case.python)
+        if case.setup:
+            resolve_python(case.setup)()
     except Exception as e:
         return Result(case, 'error', 0, 'python side: %s: %s' % (type(e).__name__, e))
 
@@ -287,6 +295,25 @@ CASES: List[Case] = [
           ('some rocks',), ('',)]),
     Case('moo.match_utils:prep_match', ('$match_utils', 'prep_match'),
          [('in',), ('into',), ('with',), ('sword',), ('',), ('on',)]),
+
+    # --- $combat_utils is done, and its cases are retired ---
+    #
+    # Nine cases and 54 inputs, green, run in the moment before
+    # `game/combat_data.py` was deleted: stacked_penalty,
+    # resolve_crit_severity, get_com_thresh, armor_penalty,
+    # best_at_protection, resolve_attack_type, weapon_line, weapon_crit_type
+    # and get_crit_result, each on the branches that do not roll dice.
+    #
+    # What rolls dice was never diffable here and is checked where it always
+    # was: sfdev/tests/test_combat_resolution.py takes 4,000 swings at a
+    # target and asks which way armor moved the numbers.  Those tests call
+    # the verbs now.
+    #
+    # `setup` on Case was added for these -- get_crit_result read a
+    # module-level dict that load_crit_tables() filled at startup, so an
+    # un-started module answered None to everything and reported the verb as
+    # wrong.  The in-game side needed no such line: the tables are in the
+    # world, which is rather the point.
 
     # --- moo_libs is gone, and its cases with it ---
     #
