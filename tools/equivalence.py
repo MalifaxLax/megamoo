@@ -52,6 +52,22 @@ from typing import Any, Callable, List, Optional, Sequence, Tuple
 # Case definition
 # ---------------------------------------------------------------------------
 
+class Obj(int):
+    """An object number in a case's inputs, resolved to the live object.
+
+    Cases are literals on purpose, but half of what is being migrated takes
+    *objects*.  Writing `1` instead means comparing what two functions do
+    with an integer, which is not the question -- `isa(1, 1)` returned False
+    in Python and raised in the verb, and neither answer was about isa.
+    """
+    __slots__ = ()
+
+
+def _resolve_inputs(args, db):
+    return tuple(db.get_object(int(a)) if isinstance(a, Obj) else a
+                 for a in args)
+
+
 @dataclass
 class Case:
     """One Python implementation against one in-game verb."""
@@ -170,6 +186,7 @@ def run_case(case: Case, db, pobj, call_verb) -> Result:
         return Result(case, 'missing', 0, '%s has no verb %r' % (ref, verbname))
 
     for i, (args, kw) in enumerate(zip(case.inputs, case.kwargs)):
+        args = _resolve_inputs(args, db)
         try:
             expected = pyfn(*args, **kw)
         except Exception as e:
@@ -242,6 +259,23 @@ CASES: List[Case] = [
     # green immediately before the module was removed, and that run is the
     # record.  A case here that cannot import its Python side would report as
     # an error forever and teach everyone to ignore the output.
+
+    # --- $obj_utils ---
+    Case('moo.object_utils:isa', ('$obj_utils', 'isa'),
+         [(Obj(1), Obj(1)), (Obj(5), Obj(3)), (Obj(3), Obj(1)),
+          (Obj(17), Obj(15)), (Obj(1), Obj(17))]),
+    Case('moo.object_utils:has_verb', ('$obj_utils', 'has_verb'),
+         [(Obj(17), 'look'), (Obj(17), 'nonexistent'), (Obj(1), 'msg')]),
+    Case('moo.object_utils:defines_verb', ('$obj_utils', 'defines_verb'),
+         [(Obj(17), 'look'), (Obj(16), 'look'), (Obj(17), 'nope')]),
+    Case('moo.object_utils:has_property', ('$obj_utils', 'has_property'),
+         [(Obj(1), 'name'), (Obj(1), 'no_such_prop'), (Obj(5), 'position')]),
+    Case('moo.object_utils:ancestors', ('$obj_utils', 'ancestors'),
+         [(Obj(5),), (Obj(1),), (Obj(17),)]),
+    Case('moo.object_utils:descendants', ('$obj_utils', 'descendants'),
+         [(Obj(92),), (Obj(1),), (Obj(5024),)]),
+    Case('moo.object_utils:locations', ('$obj_utils', 'locations'),
+         [(Obj(5024),), (Obj(1),)]),
 
     # --- not yet migrated; the rig reports these as pending, not failing ---
     Case('moo.match_utils:parse_ordinal', ('$match_utils', 'parse_ordinal'),
