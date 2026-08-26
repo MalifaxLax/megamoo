@@ -747,7 +747,29 @@ class MOOObject:
         if isinstance(value, dict):
             return {k: (v.objnum if isinstance(v, MOOObject) else MOOObject._store_objref(v))
                     for k, v in value.items()}
-        return value
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        if isinstance(value, tuple):
+            # A tuple stores and comes back a list, so it is converted here
+            # rather than left to surprise the reader later.
+            return [MOOObject._store_objref(v) for v in value]
+        # Anything else will not survive the store, and the store is where
+        # that used to be discovered: json.dumps() raised inside the save
+        # loop, after the properties row had been deleted, and the error was
+        # swallowed.  The object lost most of itself and froze on disk.
+        #
+        # A set is the one people actually write -- `{'a', 'b'}` is what a
+        # MOO-literate builder types for a list -- so it is named directly.
+        if isinstance(value, (set, frozenset)):
+            raise TypeError(
+                'a set cannot be stored in a property (the store is JSON). '
+                'Use a list: %r' % (sorted(value, key=repr),)
+            )
+        raise TypeError(
+            '%s cannot be stored in a property; the store is JSON, so values '
+            'are strings, numbers, booleans, None, lists, dicts and objects'
+            % type(value).__name__
+        )
 
     def _resolve_objref(self, value, _prop=None, _root=None):
         """Auto-resolve ``'#N'`` string values to live MOOObject instances.

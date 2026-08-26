@@ -1875,22 +1875,36 @@ class Database:
                 raise
             return
 
-        # Replace all properties
+        # Replace all properties.
+        #
+        # Serialised in full *before* the DELETE, so a value that will not
+        # serialise cannot leave the object half-written.  It used to delete
+        # first and json.dumps() inside the insert loop: one set-valued
+        # property -- `{'a', 'b'}`, which is what a MOO-literate builder
+        # writes for a list -- raised partway through, after the delete, and
+        # took every property after it in iteration order with it.  The
+        # caller swallowed the error, so the object silently lost most of
+        # itself and every later save failed at the same value, freezing it
+        # on disk for good.
+        rows = []
+        for name, prop in obj.properties.items():
+            try:
+                encoded = json.dumps(prop.value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "#%s.%s holds %s, which cannot be stored: %s"
+                    % (objnum, name, type(prop.value).__name__, exc)
+                ) from exc
+            rows.append((objnum, name, encoded, prop.owner, prop.perms))
+
         self._conn.execute(
             "DELETE FROM properties WHERE objnum = ?", (objnum,)
         )
-        for name, prop in obj.properties.items():
-            self._conn.execute(
-                """INSERT INTO properties (objnum, name, value, owner, perms)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (
-                    objnum,
-                    name,
-                    json.dumps(prop.value),
-                    prop.owner,
-                    prop.perms,
-                )
-            )
+        self._conn.executemany(
+            """INSERT INTO properties (objnum, name, value, owner, perms)
+               VALUES (?, ?, ?, ?, ?)""",
+            rows,
+        )
 
         # Replace all verbs
         self._conn.execute(
