@@ -219,9 +219,17 @@ it is why the standard library is genuinely available rather than a curated
 subset.
 
 The consequence is that **the security boundary is who can create a verb,
-not what a verb can do once created.** `@program`, `@adverb` and `eval` are
-gated at gm3. Anyone holding gm3 can run arbitrary code as the server
-process and should be considered as trusted as the person running it.
+not what a verb can do once created.** `@program`, `@adverb`, `@port`,
+`@load`, `@reload`, `@verbauth` and `eval` are gated at **gm5**. Anyone
+holding gm5 can run arbitrary code as the server process and should be
+considered as trusted as the person running it.
+
+They were gm3 until 2026-08-26, which made gm3 and gm5 the same privilege
+under two names: a gm3 could write a verb that set
+`ENFORCE_WIZARD_PERMISSIONS = False` and stop being a gm3. gm3 is a builder
+now — rooms, exits, descriptions, properties — and `auth` itself is refused
+below gm5 by `@set`, `@adprop` and `@rmprop`, since `auth_level()` reads it
+and setting it was a one-line promotion.
 
 Two things follow:
 

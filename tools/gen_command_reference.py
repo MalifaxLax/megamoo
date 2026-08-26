@@ -62,7 +62,8 @@ GROUPS = [
     ('look', 'Looking at things', [
         ('+show', 'A quick summary of an object: its number, name, parent and location.'),
         ('@examine', 'Everything about an object — properties, verbs, tags, flags.'),
-        ('+props', "List an object's properties."),
+        ('+props', "List an object's properties. <code>/all</code> walks the "
+                   "inheritance chain, <code>/val</code> shows each value."),
         ('+verbs', 'List the commands attached to an object.'),
         ('+decompile', "Print a verb's code exactly as stored — the ground truth for what is running."),
         ('@list', 'List objects in a range of numbers.'),
