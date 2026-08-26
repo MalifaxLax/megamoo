@@ -5,7 +5,7 @@ Handles movement through virtual exits — exits that have no
 object representation, with all data stored on the room's
 dexits property instead.
 
-Called via: call_verb(db.get_object(21), 'vmove', enum=N)
+Called via: call_verb(db.get_object(15), 'vmove', enum=N)
 where N is the direction index (0=north, 1=south, etc.).
 'enum' is injected into the verb namespace by call_verb kwargs.
 

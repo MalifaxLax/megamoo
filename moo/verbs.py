@@ -135,6 +135,95 @@ _MASTER_RE = re.compile(
 # ===========================================================================
 
 
+class UnsafeValue(ValueError):
+    """A `@set` value that is not a literal.  Carries the offending node."""
+
+
+def eval_value_literal(processed: str, db):
+    """Evaluate a property value written by a player, without running it.
+
+    `@set x.p = <value>` and `@adprop` used real ``eval()`` on the argument.
+    They are gm3 commands, so that was arbitrary Python in the server's
+    process for anyone who could set a description --
+
+        @set me.description = __import__('socket').gethostname()
+
+    -- which made the gm5 gate on `@program`, `@adverb` and `eval` worth
+    nothing: the cheap command was the way in.
+
+    What those commands actually need is a *literal*, possibly containing
+    object references.  `preprocess_objrefs` has already rewritten `#5` to
+    ``db.get_object(5)`` and `$item` to ``db.get_object(0).item``, so this
+    walks the parse tree and evaluates exactly that grammar and nothing
+    else: constants, lists, tuples, sets, dicts, a leading minus, those
+    `get_object` calls, and attribute access on them.
+
+    Anything else raises, including a bare name -- `@set` treats a failure
+    on unprocessed input as "store it as a string", which is what makes
+    ``@set x.title = Champion`` work.
+
+    Args:
+        processed: The argument, after `preprocess_objrefs`.
+        db: The database, for resolving object references.
+
+    Returns:
+        The value.
+
+    Raises:
+        UnsafeValue: If the expression is not a literal of that grammar.
+        SyntaxError: If it does not parse.
+    """
+    import ast
+
+    def _fail(node):
+        raise UnsafeValue('%s is not allowed in a value'
+                          % type(node).__name__)
+
+    def _is_get_object(node):
+        return (isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == 'get_object'
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == 'db'
+                and len(node.args) == 1
+                and not node.keywords
+                and isinstance(node.args[0], ast.Constant)
+                and isinstance(node.args[0].value, int))
+
+    def _eval(node):
+        if isinstance(node, ast.Constant):
+            return node.value
+        if isinstance(node, ast.List):
+            return [_eval(e) for e in node.elts]
+        if isinstance(node, ast.Tuple):
+            return tuple(_eval(e) for e in node.elts)
+        if isinstance(node, ast.Set):
+            return {_eval(e) for e in node.elts}
+        if isinstance(node, ast.Dict):
+            return {_eval(k): _eval(v)
+                    for k, v in zip(node.keys, node.values)}
+        if isinstance(node, ast.UnaryOp) and isinstance(
+                node.op, (ast.UAdd, ast.USub)):
+            v = _eval(node.operand)
+            if not isinstance(v, (int, float)) or isinstance(v, bool):
+                _fail(node)
+            return v if isinstance(node.op, ast.UAdd) else -v
+        if _is_get_object(node):
+            return db.get_object(node.args[0].value)
+        if isinstance(node, ast.Attribute):
+            # `$name` and `#N.prop`, which preprocess_objrefs produces.
+            # Underscored names are refused: `#1.__class__` is where every
+            # Python escape starts, and no property a player sets is called
+            # that.
+            if node.attr.startswith('_'):
+                raise UnsafeValue('%r is not a property name you can read '
+                                  'here' % node.attr)
+            return getattr(_eval(node.value), node.attr)
+        _fail(node)
+
+    return _eval(ast.parse(processed, mode='eval').body)
+
+
 def preprocess_objrefs(code: str) -> str:
     """
     Rewrite MOO-style shorthand in source code into valid Python.

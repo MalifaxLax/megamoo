@@ -98,6 +98,11 @@ if not val_str:
     pobj.msg(f"&<245>#{target.objnum}:{target.name}&n.{prop_name} = {repr(cur).replace('&', '&&')}{origin}")
     return
 
+# A literal, evaluated as a literal. This used to be a real `eval()`, which
+# made a gm3 command arbitrary Python in the server's process --
+# `@set me.description = __import__('socket').gethostname()` worked -- and
+# so made the gm5 gate on @program and eval worth nothing.
+#
 # Resolve object references the same way verb source does: rewrite each bare
 # #N token to db.get_object(N) (and $name to a system-property lookup) before
 # evaluating the literal. preprocess_objrefs is string/comment-aware, so a #N
@@ -111,7 +116,8 @@ except Exception:
     processed = val_str
 
 try:
-    value = eval(processed)
+    from moo.verbs import eval_value_literal
+    value = eval_value_literal(processed, db)
 except Exception as e:
     if processed != val_str:
         # The value contained #N / $name references but didn't evaluate --

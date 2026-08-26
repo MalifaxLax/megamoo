@@ -44,10 +44,10 @@ def make_room(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
     Examples::
 
         # Create an IC room named "Town Square"
-        room = make_room(db.get_object(17), db, pobj, name='Town Square')
+        room = make_room(db.get_object(13), db, pobj, name='Town Square')
 
         # Create an OOC room with the default name from the parent
-        lounge = make_room(db.get_object(16), db, pobj)
+        lounge = make_room(db.get_object(12), db, pobj)
     """
     room_name = name if name else parent.noun
     new_room = call_verb(this, 'make_object', parent, db, pobj, noun=room_name)

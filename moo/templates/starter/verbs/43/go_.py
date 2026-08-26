@@ -42,10 +42,16 @@ def _header(text):
     pobj.msg(f"&<245>{border}&n")
 
 def _input(prompt):
-    """Yield for input. Raises _Quit if player types 'quit'."""
+    """Yield for input. Raises _Quit if the player types 'quit'.
+
+    The whole word, not a prefix of it. This used to accept anything
+    `'quit'.startswith(ans)` matched, so answering the *name* prompt with
+    "Q", "Qu" or "Qui" silently abandoned chargen -- no message, back in the
+    Drop Zone, and the half-made character still holding its slot. Those are
+    plausible names, and a name prompt should not have control words in it.
+    """
     response = yield (prompt or "")
-    ans = response.strip().lower()
-    if ans and 'quit'.startswith(ans):
+    if response.strip().lower() == 'quit':
         raise _Quit()
     return response
 

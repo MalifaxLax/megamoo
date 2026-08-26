@@ -4109,8 +4109,18 @@ def set_task_perms(who=None):
     if not isinstance(target, int):
         raise MOOError('E_INVARG', 'set_task_perms() takes an object')
 
+    # Both normalised to object numbers before comparing.  `current_perms()`
+    # returns an int and `caller_perms()` returns a MOOObject, so a set
+    # holding both and tested against an int matched only the first: the
+    # "or its caller's" branch -- the entire reason this function exists --
+    # was dead, and every legitimate `set_task_perms(caller_perms())` from a
+    # verb whose owner is not a wizard raised E_PERM.
+    #
+    # It looked correct because the three commands that use it sit on #3,
+    # which #0 owns, so the wizard short-circuit above answered first.
     current = current_perms()
-    allowed = {current, caller_perms()}
+    caller = caller_perms()
+    allowed = {current, getattr(caller, 'objnum', caller)}
     allowed.discard(None)
     is_wizard = False
     if _database is not None and current is not None:

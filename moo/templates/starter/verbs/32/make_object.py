@@ -206,11 +206,11 @@ def make_object(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
 
     Examples::
 
-        # Create a sword from the GenericItem parent (#9)
-        sword = make_object(db.get_object(11), db, pobj, noun='sword')
+        # Create a sword from the object prototype (#9)
+        sword = make_object(db.get_object(9), db, pobj, noun='sword')
 
         # Create a copy with the same name as the parent
-        clone = make_object(db.get_object(11), db, pobj)
+        clone = make_object(db.get_object(9), db, pobj)
 
         # Create with a different owner
         gift = make_object(parent, db, pobj, noun='gift', owner=recipient)

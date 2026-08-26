@@ -59,7 +59,10 @@ value = None
 val_str = iobj.strip() if prep == '=' and iobj else None
 if val_str:
     try:
-        value = eval(val_str)
+        # A literal, not code.  See @set: this was a real `eval()` on a gm3
+        # command, so `@adprop x.y = __import__('os').system('...')` ran.
+        from moo.verbs import eval_value_literal, preprocess_objrefs
+        value = eval_value_literal(preprocess_objrefs(val_str), db)
     except Exception:
         value = val_str
 
