@@ -125,6 +125,11 @@ def find_or_create_testbot(database, configured_objnum: int = 0):
     bot.name = TESTBOT_NAME
     bot.noun = 'testbot'
     bot.aliases = ['testbot', 'bot']
+    # A player object owns itself -- the same convention login.py applies to
+    # a real account and chargen to a character.  Without it the bot cannot
+    # write its own properties, so it stops being a faithful stand-in for a
+    # player the moment permissions are actually enforced.
+    bot.owner = bot.objnum
     # is_char is inherited from #3 Base_Character, so #5's on_puppet
     # plist handling works for this bot without chargen having run.
     database.save_object(bot)

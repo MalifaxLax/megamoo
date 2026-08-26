@@ -33,6 +33,20 @@ if auth_level(pobj) < 3:
     pobj.msg("Do what?")
     return
 
+# Act as whoever typed this, not as the staff account that owns the verb.
+#
+# Without it every staff-owned command is a way to borrow staff's rights:
+# `_check_write` asks who the *running verb* acts as, so `@set` owned by
+# staff wrote anything, and `@set me.auth = ["gm5"]` promoted a builder to
+# god while `me.auth = ["gm5"]` inside a verb was refused.
+#
+# With it the ordinary ownership rules apply to what follows. A builder may
+# write what they own and the local copy of an inherited property on an
+# object they own -- their rooms, their objects, their own description --
+# and nothing else. `auth` is owned by #0 with 'rc' perms, so it refuses
+# itself, with no list of special names to keep up to date.
+set_task_perms(caller_perms())
+
 # With "= <value>" the object.property spec is the direct object and the value
 # is the indirect object. Without "=", the whole argument is the spec (read).
 if prep == '=':
@@ -51,25 +65,6 @@ if not spec or '.' not in spec:
 
 obj_part, prop_name = spec.rsplit('.', 1)
 prop_name = prop_name.strip()
-
-# Two property names are not data about the world, they are authority over
-# it, and both are reachable from here:
-#
-#   auth            auth_level() reads it, so writing it is a one-line
-#                   promotion from builder to god.
-#   startup_evals   its entries are executed at boot, as #0, which carries
-#                   WIZARD -- arbitrary code with no verb involved.
-#
-# This has to be checked here, not in the engine. MOOObject._check_write
-# gates `auth` already, but against the *verb owner* -- who the running verb
-# acts as -- which is the MOO model and is what lets a staff verb write a
-# player's stats. This verb is owned by staff, so that check passes, and
-# should. The question here is a different one: may the person who typed
-# this grant themselves authority? Only the command can ask that.
-RESERVED_PROPS = ('auth', 'startup_evals')
-if prop_name in RESERVED_PROPS and auth_level(pobj) < 5:
-    pobj.msg("You can't touch that.")
-    return
 if not prop_name:
     pobj.msg("No property name specified.")
     return

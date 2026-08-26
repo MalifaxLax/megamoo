@@ -870,6 +870,18 @@ class LoginHandler:
             # Set the display name
             player.set_property('name', name)
 
+            # A player owns itself.  That is LambdaMOO's convention and it
+            # is what makes the permission model usable: `_check_write`
+            # lets an object's owner write the local copy of an inherited
+            # property, so self-ownership is what lets somebody set their
+            # own description without being able to set anybody else's.
+            # A player object owned by #0 or #1 -- which is what a pooled
+            # PlayerPlace arrives as -- can only be written by staff, so
+            # every ordinary edit would have to go through a staff-owned
+            # verb acting with staff's rights, and that is the hole this
+            # model exists to close.
+            player.owner = player.objnum
+
             # Hash and store the password.  Threaded for the same reason
             # the verify is: hashing costs the same ~133ms, and account
             # creation should not stop the world either.

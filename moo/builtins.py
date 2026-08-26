@@ -4068,18 +4068,65 @@ def current_perms():
 
 def set_task_perms(who=None):
     """
-    Accepted, and deliberately does nothing.
+    Run the rest of this verb as somebody else.
 
-    MOO uses this to run the rest of a task as somebody else, usually as
-    ``set_task_perms(caller_perms())`` at the top of a utility verb.  This
-    engine does not have task permissions: what a verb may do follows its
-    owner, decided when it runs, and there is nothing to reassign.
+    MOO's idiom, and the reason it exists: a utility verb owned by staff,
+    called on a player's behalf, opens with
+    ``set_task_perms(caller_perms())`` so that what it does is bounded by
+    what the *caller* may do rather than by what its own owner may do.
+    Without it, every staff-owned command is a way for whoever can type it
+    to act with staff's rights -- which is how ``@set me.auth = ["gm5"]``
+    promoted a builder to god while `me.auth = ["gm5"]` in a verb was
+    refused.
 
-    It is a no-op rather than an error because ported utility verbs open
-    with it as a matter of habit, and raising would stop code that is
-    otherwise correct.  Nothing is silently granted -- the verb's own
-    permissions were already in force and are unchanged.
+    Scope is the current verb frame, so it ends when the verb does and a
+    verb this one calls starts again from its own owner.  That is narrower
+    than MOO, where the change lasts the whole task, and deliberately: a
+    permission drop that outlives the verb that asked for it is a permission
+    drop nobody can see when reading the verb that inherits it.
+
+    **You cannot use this to gain anything.**  The new permissions must be
+    ones the task already holds -- its own, or its caller's -- unless it is
+    already running as a wizard.  Otherwise a verb could simply ask to be
+    #0.
+
+    Args:
+        who: An object, object number, or None to restore the verb's owner.
+
+    Raises:
+        MOOError: E_PERM, if the task does not already hold *who*.
     """
+    stack = _frames()
+    if not stack:
+        return None                       # outside a verb: nothing to set
+
+    frame = stack[-1]
+    if who is None:
+        frame['owner'] = frame.get('_real_owner', frame.get('owner'))
+        return None
+
+    target = getattr(who, 'objnum', who)
+    if not isinstance(target, int):
+        raise MOOError('E_INVARG', 'set_task_perms() takes an object')
+
+    current = current_perms()
+    allowed = {current, caller_perms()}
+    allowed.discard(None)
+    is_wizard = False
+    if _database is not None and current is not None:
+        try:
+            is_wizard = bool(getattr(_database.get_object(current),
+                                     'is_wizard', False))
+        except Exception:
+            is_wizard = False
+    if not is_wizard and target not in allowed:
+        raise MOOError(
+            'E_PERM',
+            'set_task_perms(#%d): a task may only take permissions it '
+            'already holds' % target)
+
+    frame.setdefault('_real_owner', frame.get('owner'))
+    frame['owner'] = target
     return None
 
 

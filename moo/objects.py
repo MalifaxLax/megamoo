@@ -1298,6 +1298,37 @@ class MOOObject:
             f"Permission denied: cannot set '{name}' on #{self.objnum}"
         )
 
+    def _check_add(self, name):
+        """Refuse creating a property on an object the actor does not own.
+
+        The companion to :meth:`_check_write`, for the case where there is
+        no permission record yet because the property does not exist.  Same
+        actor, same wizard exemption; ownership of the object stands in for
+        the property's own perms.
+        """
+        if name in MOOObject._PRIVILEGED_PROPS:
+            self._check_write(name, self.properties.get(name))
+            return
+        try:
+            from .builtins import current_perms
+            actor = current_perms()
+        except Exception:
+            return
+        if actor is None:
+            return                      # engine-level: no player to check
+        db = self.__dict__.get('_database')
+        if db is not None:
+            try:
+                if getattr(db.get_object(actor), 'is_wizard', False):
+                    return
+            except Exception:
+                return
+        if actor == self.owner:
+            return
+        raise PermissionError(
+            f"Permission denied: cannot add '{name}' to #{self.objnum}"
+        )
+
     def _check_write(self, name, prop_info):
         """
         Refuse a property write the running verb is not entitled to make.
@@ -1778,6 +1809,17 @@ class MOOObject:
         Raises:
             ValueError: If property already exists
         """
+        # See set_property.  A brand-new property has no permission record
+        # to consult, so the question is about the *object*: may you add
+        # something to this one?  Ownership answers it, which is the same
+        # rule the other two paths end up applying.
+        #
+        # Without this, `@adprop #0.startup_evals = [...]` created a
+        # property on the system object -- whose entries then run at boot as
+        # #0, carrying WIZARD -- for anybody who could type it.  The
+        # privileged-name gate did not catch it because the name was new,
+        # and there is always another name.
+        self._check_add(name)
         if name in self.properties:
             raise ValueError(f"Property '{name}' already exists on #{self.objnum}")
 
@@ -1805,6 +1847,10 @@ class MOOObject:
         Raises:
             KeyError: If property doesn't exist on this object
         """
+        # See set_property.  Removing somebody's `auth` is the same
+        # privilege action in the other direction, and @rmprop reaches here.
+        if name in self.properties:
+            self._check_write(name, self.properties[name])
         if name not in self.properties:
             raise KeyError(f"Property '{name}' not found on #{self.objnum}")
             
@@ -1886,6 +1932,27 @@ class MOOObject:
         """
         db = database or self._database
         value = self._store_objref(value)
+
+        # The same check `__setattr__` makes.  These three methods used not
+        # to make it, and @set, @adprop and @rmprop all reach the property
+        # system through them rather than through the attribute sugar -- so
+        # the permission model was enforced on `obj.x = v` and not on the
+        # commands, which is the way round that matters.
+        #
+        # This only bites now that those commands open with
+        # `set_task_perms(caller_perms())`.  Before that they acted as their
+        # staff owner, the check passed, and adding it here changed nothing:
+        # tried, watched a gm3 promote itself straight through it, and the
+        # reason was that the check asks who the *verb* acts as.
+        if name in self.properties:
+            self._check_write(name, self.properties[name])
+        elif db is not None and self.has_property(name, local_only=False,
+                                                  database=db):
+            try:
+                parent_obj = db.get_object(self.parent)
+                self._check_write(name, parent_obj.get_property_info(name, db))
+            except (KeyError, AttributeError):
+                pass
 
         # If property exists locally, set it
         if name in self.properties:

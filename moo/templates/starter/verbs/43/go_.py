@@ -239,7 +239,15 @@ def _run_chargen():
                     continue
                 else:
                     # Empty slot — create character immediately
+                    # A character owns itself, the way an account does.
+                    # Ownership is what `_check_write` reads, so this is
+                    # what lets somebody edit their own character and
+                    # nobody else's. Owned by the account instead, the
+                    # character could not write its own properties once
+                    # puppeted -- the actor is then the character, not the
+                    # account that owns it.
                     new_char = create(parent=5, owner=pobj.objnum)
+                    new_char.owner = new_char.objnum
                     new_char.noun = "unnamed"
                     new_char.add_property('name', 'unnamed')
                     new_char.add_property('account', pobj.objnum)
