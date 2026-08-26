@@ -18,6 +18,21 @@ import pytest
 STARTER = Path(__file__).parent.parent / 'moo' / 'templates' / 'starter' / 'world.db'
 
 
+def _objects_holding(verb_name):
+    """Which objects define a verb by this name, lowest number first.
+
+    The list used to be written out -- (3, 15, 16, 17) -- and #15, #16 and
+    #17 stopped being the rooms when the starter adopted sf's numbering, so
+    the search found nothing and the test failed claiming `look` was missing
+    from a world that has it.  A test for aliases should not also be a
+    second, unmaintained copy of the object map.
+    """
+    with sqlite3.connect(f'file:{STARTER}?mode=ro', uri=True) as db:
+        return [objnum for objnum, names in
+                db.execute('select objnum, names from verbs order by objnum')
+                if verb_name in json.loads(names)]
+
+
 def _names_of(verb_substring, objnum=3):
     with sqlite3.connect(f'file:{STARTER}?mode=ro', uri=True) as db:
         for names, in db.execute('select names from verbs where objnum=?',
@@ -56,9 +71,8 @@ def test_known_aliases_survive(verb, alias):
     Deliberately small: it exists because an alias cannot be checked by
     looking at the verb tree, so the only place to assert one is a test.
     """
-    for objnum in (3, 15, 16, 17):
+    for objnum in _objects_holding(verb):
         names = _names_of(verb, objnum)
-        if names is not None:
-            assert alias in names, f'{verb} on #{objnum} lost its {alias} alias'
-            return
+        assert alias in names, f'{verb} on #{objnum} lost its {alias} alias'
+        return
     pytest.fail(f'{verb} not found in the starter world')

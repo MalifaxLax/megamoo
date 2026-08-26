@@ -54,16 +54,24 @@ def test_the_new_world_reads_its_own_verbs(game):
     """
     The single most important line in the whole command.
 
-    The template's #8.moo_verb_path names the *engine's* directory.
+    The template's ``moo_verb_path`` names the *engine's* directory.
     Copied unchanged, a new game would run on the engine's verbs while
     the builder edited their own tree to no effect -- a failure that
     looks like nothing happening at all.
+
+    Asked without naming an object number.  This test used to say
+    ``objnum = 8``, which stopped being the Body Bag when the starter
+    adopted sf's numbering, and a `fetchone()[0]` on no rows is a
+    TypeError rather than an answer.  There is exactly one holder, so
+    finding it by the property is both simpler and durable.
     """
     con = sqlite3.connect(f'file:{game / "world.db"}?mode=ro', uri=True)
-    stored = con.execute(
-        "select value from properties "
-        "where objnum=8 and name='moo_verb_path'").fetchone()[0]
+    rows = con.execute(
+        "select objnum, value from properties "
+        "where name = 'moo_verb_path'").fetchall()
     con.close()
+    assert len(rows) == 1, f'expected one moo_verb_path holder, found {rows}'
+    stored = rows[0][1]
     assert str(game / 'verbs') in stored
     assert 'megamoo' not in stored.replace(str(game), '')
 
