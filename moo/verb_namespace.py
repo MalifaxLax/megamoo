@@ -740,6 +740,62 @@ def _get_group_map() -> Dict[str, int]:
     return groups
 
 
+class _ReadOnlyGlobals:
+    """`globals` in verb code: the engine's constants, readable only.
+
+    It used to be the `moo.globals` module itself, which a verb could write:
+    ``globals.WRAP_WIDTH = 80`` in one verb rewraps every line the server
+    sends to everybody, for every connection, until it restarts -- and
+    nothing says so, because a module attribute assignment cannot fail.
+    The same applies to ``ENFORCE_WIZARD_PERMISSIONS``, which
+    `docs/INGAME_MIGRATION_PLAN.md` says must never be settable in-game.
+
+    **This is not a security control, and must not be described as one.**
+    Verb code is ordinary Python in the server's own process: `import`,
+    `open` and `sys.modules` all work, so anyone who can write a verb can
+    write ``import moo.globals`` on the next line and reach the real module.
+    The boundary is who may create a verb, which is what README says; this
+    only stops a verb changing the server's configuration *by accident*,
+    which was a live bug class and is now an exception with a name on it.
+    """
+
+    __slots__ = ()
+
+    def __getattr__(self, name):
+        from . import globals as _g
+        try:
+            return getattr(_g, name)
+        except AttributeError:
+            raise AttributeError(
+                'globals has no %r -- it is moo/globals.py, read-only here'
+                % name) from None
+
+    def __setattr__(self, name, value):
+        raise AttributeError(
+            'globals.%s is read-only in verb code. It is the engine\'s '
+            'configuration, shared by every connection, and a verb that '
+            'changed it would change it for everyone until restart. Put '
+            'per-world settings on $globals (#27) instead.' % name)
+
+    def __delattr__(self, name):
+        self.__setattr__(name, None)
+
+    def __repr__(self):
+        return "<moo.globals, read-only>"
+
+    def __dir__(self):
+        from . import globals as _g
+        return dir(_g)
+
+
+#: One instance, shared by every namespace.  It holds no state -- the reads
+#: go straight to the module -- and `test_only_three_names_vary_between_callers`
+#: asks that a name shared by two namespaces be the same object, which is a
+#: real property worth keeping: a per-call instance here would be indis-
+#: tinguishable from per-call state having leaked into the static layer.
+_READ_ONLY_GLOBALS = _ReadOnlyGlobals()
+
+
 _PROBE = object()   # stands in for `this`/`call_verb` while probing layer 6b
 _ABSENT = object()  # "the filler did not bind this name"
 
@@ -837,9 +893,7 @@ class _LazyVerbNS(dict):
                 dict.__setitem__(self, nm, obj)
         elif group == _LAZY_GLOBALS:
             try:
-                dict.__setitem__(
-                    self, 'globals',
-                    __import__('moo.globals', fromlist=['globals']))
+                dict.__setitem__(self, 'globals', _READ_ONLY_GLOBALS)
             except Exception:
                 pass
 
