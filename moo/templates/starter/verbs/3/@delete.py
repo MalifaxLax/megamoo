@@ -25,7 +25,7 @@ target = bmatch(spec, pobj, candidates, db)
 if not target:
     pobj.msg(f"Object '{spec}' not found.")
     return
-if target.objnum < 10:
+if target.objnum < 8:
     pobj.msg(f"Cannot delete core object #{target.objnum}.")
     return
 name = target.name

@@ -46,7 +46,7 @@ if exit is None:
     pobj.msg("You can't go that way.")
 elif type(exit) == int:
     # Virtual exit — delegate to #21 DirectionalExit's vmove
-    call_verb(db.get_object(21), 'vmove', enum=exit)
+    call_verb(db.get_object(15), 'vmove', enum=exit)
 else:
     # Climbable/jumpable exits require specific commands
     if exit.climbable:

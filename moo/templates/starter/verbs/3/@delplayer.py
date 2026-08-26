@@ -70,7 +70,7 @@ if answer.strip() != 'YES':
 
 # Gather characters
 chars = account.characters or []
-storage = db.get_object(8)
+storage = db.get_object(39)
 
 for c in list(chars):
     if isinstance(c, str) and c.startswith('#'):

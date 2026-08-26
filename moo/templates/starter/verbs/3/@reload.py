@@ -40,7 +40,7 @@ if not args:
     return
 
 # Resolve base verb path from #8.moo_verb_path
-verb_path = getattr(db.get_object(8), 'moo_verb_path', None)
+verb_path = getattr(db.get_object(39), 'moo_verb_path', None)
 if not verb_path:
     pobj.msg("#8.moo_verb_path is not set.")
     return

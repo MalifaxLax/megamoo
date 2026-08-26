@@ -187,16 +187,44 @@ def _point_at_own_verbs(db_path: pathlib.Path, verbs_dir: pathlib.Path):
     """
     con = sqlite3.connect(str(db_path))
     try:
+        # Which object holds the property is a question about the world, not
+        # a constant.  `$config` names it -- the same reference
+        # `verb_loader.resolve_verb_base_path` reads -- and #8 is only the
+        # answer for a template that has not been renumbered.  Writing to #8
+        # regardless is silent: the update matches no row, the new world
+        # keeps the template's path, and the watcher reports an engine
+        # directory that does not exist while every verb edit does nothing.
+        holder = None
+        row = con.execute(
+            "select value from properties where objnum = 0 and name = 'config'"
+        ).fetchone()
+        if row:
+            try:
+                value = json.loads(row[0])
+            except Exception:
+                value = None
+            if isinstance(value, str) and value.startswith('#'):
+                holder = int(value[1:])
+            elif isinstance(value, int):
+                holder = value
+        if holder is None:
+            holder = 8
+
         # json.dumps, not an f-string with quotes round it.  Property
         # values are read back with json.loads, and a Windows path --
         # C:\Users\... -- makes `"{path}"` invalid JSON, because \U is an
         # escape.  The world then fails to load the one property that
         # tells it where its own verbs are, on every machine that is not
         # this one.
-        con.execute(
+        cur = con.execute(
             "update properties set value = ? "
-            "where objnum = 8 and name = 'moo_verb_path'",
-            (json.dumps(str(verbs_dir)),))
+            "where objnum = ? and name = 'moo_verb_path'",
+            (json.dumps(str(verbs_dir)), holder))
+        if cur.rowcount != 1:
+            raise RuntimeError(
+                'moo_verb_path: expected one row on #%d, updated %d.  The new '
+                'world would run on the engine\'s verb tree.'
+                % (holder, cur.rowcount))
         con.commit()
     finally:
         con.close()

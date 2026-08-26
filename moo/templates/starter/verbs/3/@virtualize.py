@@ -47,7 +47,7 @@ is_direxit = False
 seen = set()
 while obj is not None and obj.objnum not in seen:
     seen.add(obj.objnum)
-    if obj.objnum == 21:
+    if obj.objnum == 15:
         is_direxit = True
         break
     parent = obj.parent

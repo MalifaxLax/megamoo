@@ -77,7 +77,7 @@ elif dest_str:
     pobj.msg("Please supply a valid destination ID (#N). Exit not linked.")
 
 # Create the exit via make_exit
-parent = db.get_object(22)
+parent = db.get_object(16)
 new_exit = ou.make_exit(parent, db, pobj, noun=name, room=room, dest=dest)
 
 # /noadd -- an exit only something else can reach.

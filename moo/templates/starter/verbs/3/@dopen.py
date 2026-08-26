@@ -61,7 +61,7 @@ if not dest.is_room:
     return
 
 # Create the exit via make_exit
-parent = db.get_object(23)
+parent = db.get_object(17)
 new_exit = ou.make_exit(parent, db, pobj, noun=name, room=room, dest=dest)
 
 # /noadd -- an exit only something else can reach.

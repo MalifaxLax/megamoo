@@ -54,3 +54,11 @@ build/
 models/
 config.json
 vectors.db
+
+# starter reshape backups -- a copy of the template, not a change to it
+*.pre-reshape
+*.pre-reshape.[0-9]*
+*.pre-reshape-shm
+*.pre-reshape-wal
+*.pre-reshape.[0-9]*-shm
+*.pre-reshape.[0-9]*-wal

@@ -86,7 +86,7 @@ else:
         pobj.msg("Cancelled.")
         return
 
-    trash = db.get_object(9)
+    trash = db.get_object(40)
 
     exits = room.exits or []
     if target.objnum in exits:

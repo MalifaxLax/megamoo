@@ -120,7 +120,7 @@ else:
 
             # Ensure per-object directory exists and write verb file
             import os
-            verb_path = getattr(db.get_object(8), 'moo_verb_path', None)
+            verb_path = getattr(db.get_object(39), 'moo_verb_path', None)
             if verb_path:
                 from moo.verb_loader import expand_verb_path
                 base_path = expand_verb_path(verb_path)

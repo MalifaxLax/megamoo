@@ -55,7 +55,7 @@ exit = call_verb(room, 'match_exit', argstr=direction)
 
 if exit is not None and type(exit) == int:
     # Virtual exit — delegate to #21 DirectionalExit's vmove
-    call_verb(db.get_object(21), 'vmove', enum=exit)
+    call_verb(db.get_object(15), 'vmove', enum=exit)
     return
 
 if exit is None and sub_prep:

@@ -76,7 +76,7 @@ elif dest_str:
 # Create the exit via make_exit
 fname = fdnames[dnum] if dnum < len(fdnames) else name
 rfname = rfdnames[dnum] if dnum < len(rfdnames) else name
-parent = db.get_object(21)
+parent = db.get_object(15)
 new_exit = ou.make_exit(parent, db, pobj, noun=name, room=room,
                         dest=dest, fname=fname, rfname=rfname)
 

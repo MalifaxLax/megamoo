@@ -82,7 +82,7 @@ if not re.match(r"^[A-Za-z'-]+$", new_name):
 # list simply refuses nothing here.
 badnames = []
 try:
-    badnames = list(get_object(7).bad_names or [])
+    badnames = list(get_object(43).bad_names or [])
 except Exception:
     pass
 if new_name.lower() in [b.lower() for b in badnames]:

@@ -105,7 +105,7 @@ def _validate_name(name, label):
 
 origin_room = pobj.location
 msg_room(origin_room, f"{pobj.name} is consumed by a burst of primal energy.", exclude=[pobj], sub=pobj, dob=dobj, iob=iobj)
-move(pobj, db.get_object(6))
+move(pobj, db.get_object(29))
 
 chargen_state = {'ichar': None}
 
@@ -407,7 +407,7 @@ try:
 except _Quit:
     pass
 finally:
-    if pobj.location and pobj.location.objnum == 6:
+    if pobj.location and pobj.location.objnum == 29:
         move(pobj, origin_room)
         msg_room(origin_room, f"{pobj.name} arrives, looking slightly bewildered.", exclude=[pobj], sub=pobj, dob=dobj, iob=iobj)
 
