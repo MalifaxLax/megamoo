@@ -16,6 +16,11 @@ if auth_level(pobj) < 3:
     pobj.msg("Do what?")
     return
 
+# Act as whoever typed this, not as the staff account that owns the verb.
+# See @set: without it a staff-owned command lends staff's rights to anyone
+# who can type it, and the ownership rules below never get a chance to apply.
+set_task_perms(caller_perms())
+
 if not dobj or prep != '=' or not iobj:
     pobj.msg("Usage: @parent <object> = <new_parent>")
     pobj.msg("       @parent #<start> to #<end> = <new_parent>")

@@ -484,7 +484,30 @@ def auth_level(obj: Union[int, MOOObject]) -> int:
     if _database is None:
         return 0
     obj_instance = obj if isinstance(obj, MOOObject) else _database.get_object(obj)
-    auth = getattr(obj_instance, 'auth', None) or []
+
+    # The object's *own* auth, never an inherited one.  Authority is granted
+    # to somebody; it is not a property of the kind of thing they are.
+    #
+    # `getattr` resolves up the parent chain, so any object that became a
+    # child of a wizard inherited that wizard's level.  Two gm3 commands did
+    # it: `@parent me = #100` (chparent has no permission check, and #100 is
+    # implicitly fertile because is_fertile counts the object's own WIZARD
+    # flag) followed by `@clear me.auth` to drop the local copy and let the
+    # inherited one show through.
+    #
+    # Tightening is_fertile instead would have been wrong: every prototype in
+    # the starter is fertile *only* via that same WIZARD flag, so `@make` and
+    # `@dig` would have stopped working entirely.  The inheritance is the
+    # part that was never right.
+    props = getattr(obj_instance, 'properties', None)
+    if isinstance(props, dict):
+        info = props.get('auth')
+        auth = getattr(info, 'value', None) if info is not None else None
+    else:
+        # Not a MOOObject -- a test double, or something duck-typed.  There
+        # is no property table to read locally, so take what it offers.
+        auth = getattr(obj_instance, 'auth', None)
+    auth = auth or []
     level = 0
     for a in auth:
         if isinstance(a, str) and a.startswith('gm') and a[2:].isdigit():
