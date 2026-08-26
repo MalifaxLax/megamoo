@@ -133,7 +133,6 @@ def make_object(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
 
 
 # Import room type mappings from globals (canonical source of truth)
-from .globals import ROOM_TYPES, ROOM_TYPE_NAMES
 
 
 def make_room(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
@@ -863,9 +862,17 @@ def login_room(db):
         room = system_ref(db, ref)
         if room is not None and repr(room) != 'None':
             return room
-    from .globals import LOGIN_ROOM
+    # Last resort.  This used to be `globals.LOGIN_ROOM`, a Python constant
+    # naming an object number -- which @renumber cannot maintain, so a world
+    # that repacked its numbers left the engine pointing at whatever moved
+    # into #14.  It is $globals.login_room now, which @renumber does maintain
+    # because it is listed in $objref_props.
+    holder = system_ref(db, 'globals')
+    fallback = getattr(holder, 'login_room', None) if holder is not None else None
+    if not isinstance(fallback, int):
+        return None
     try:
-        room = db.get_object(LOGIN_ROOM)
+        room = db.get_object(fallback)
     except Exception:
         return None
     # The constant is a guess about a database it may know nothing about,

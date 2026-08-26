@@ -463,18 +463,19 @@ class LoginHandler:
         PLAYER_POOL (int): Object number of the player pool container
             (``#2`` = PlayerObjectDB), which holds pre-created blank
             ``PlayerPlace`` objects ready to be claimed by new accounts.
-        DEFAULT_LOCATION (int): Object number of the room where newly
-            created (or newly logged-in) players are placed.  Read
-            from ``settings.LOGIN_ROOM`` at class definition time.
+        Newly created players are placed by
+            :func:`moo.object_utils.login_room`, resolved per call so a
+            world can move its entry hall without an engine change.
     """
 
     # Parent for new players (#4 = OCharacter prototype).
     DEFAULT_PARENT = 4
     # Pool of pre-created player objects (#2 = PlayerObjectDB).
     PLAYER_POOL = 2
-    # Starting location — read from settings.LOGIN_ROOM
-    from .globals import LOGIN_ROOM
-    DEFAULT_LOCATION = LOGIN_ROOM
+    # Starting location is resolved per call, not bound here.  It used to be
+    # `DEFAULT_LOCATION = LOGIN_ROOM` evaluated at class-definition time --
+    # before any database exists, so it could only ever be a constant, and a
+    # world that renumbered its rooms could not change it.
 
     def __init__(self, database: 'Database', config: 'ServerConfig'):
         """
@@ -883,8 +884,10 @@ class LoginHandler:
                 player.add_property('password', pw_hash, perms='r')
 
             # Move the new player to the starting room
-            if self.database.valid(self.DEFAULT_LOCATION):
-                player.move_to(self.DEFAULT_LOCATION, self.database)
+            from .object_utils import login_room as _login_room
+            _room = _login_room(self.database)
+            if _room is not None:
+                player.move_to(_room.objnum, self.database)
 
             # Register the name→objnum mapping so future logins can
             # find this player by name.

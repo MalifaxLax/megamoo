@@ -255,7 +255,6 @@ class WebSocketConnection:
             )
 
             # Move to the login room and announce arrival
-            from ..globals import LOGIN_ROOM
             from ..objects import ObjectFlags
             from ..builtins import msg_room, _send_room_gmcp
 
@@ -271,14 +270,15 @@ class WebSocketConnection:
                 # This mirrors PlayerConnection._handle_login.
                 logger.info(f"Web player {player.name} reconnected (takeover)")
             else:
-                try:
-                    player.set_property('last_location', LOGIN_ROOM)
-                except KeyError:
-                    player.add_property('last_location', LOGIN_ROOM)
-                if self.server.database.valid(LOGIN_ROOM):
-                    player.move_to(LOGIN_ROOM, self.server.database)
-                    login_room = self.server.database.get_object(LOGIN_ROOM)
-                    msg_room(login_room, f"{player.name} arrives.",
+                from ..object_utils import login_room as _login_room
+                _room = _login_room(self.server.database)
+                if _room is not None:
+                    try:
+                        player.set_property('last_location', _room.objnum)
+                    except KeyError:
+                        player.add_property('last_location', _room.objnum)
+                    player.move_to(_room.objnum, self.server.database)
+                    msg_room(_room, f"{player.name} arrives.",
                              exclude=[player])
 
             self.server.database.save_object(player)

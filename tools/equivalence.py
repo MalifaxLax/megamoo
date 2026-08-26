@@ -52,6 +52,22 @@ from typing import Any, Callable, List, Optional, Sequence, Tuple
 # Case definition
 # ---------------------------------------------------------------------------
 
+class Obj(int):
+    """An object number in a case's inputs, resolved to the live object.
+
+    Cases are literals on purpose, but half of what is being migrated takes
+    *objects*.  Writing `1` instead means comparing what two functions do
+    with an integer, which is not the question -- `isa(1, 1)` returned False
+    in Python and raised in the verb, and neither answer was about isa.
+    """
+    __slots__ = ()
+
+
+def _resolve_inputs(args, db):
+    return tuple(db.get_object(int(a)) if isinstance(a, Obj) else a
+                 for a in args)
+
+
 @dataclass
 class Case:
     """One Python implementation against one in-game verb."""
@@ -60,6 +76,12 @@ class Case:
     inputs: List[tuple] = field(default_factory=list)
     kwargs: List[dict] = field(default_factory=list)
     note: str = ''
+    #: A callable to run before the Python side can answer.  `get_crit_result`
+    #: reads a module-level dict that `load_crit_tables()` fills at server
+    #: startup, so an un-started module answers None to everything and the
+    #: differ reports the verb as wrong.  The in-game side needs no such line,
+    #: which is rather the point: the tables are in the world.
+    setup: str = ''
 
     def __post_init__(self):
         if not self.kwargs:
@@ -159,6 +181,8 @@ class Result:
 def run_case(case: Case, db, pobj, call_verb) -> Result:
     try:
         pyfn = resolve_python(case.python)
+        if case.setup:
+            resolve_python(case.setup)()
     except Exception as e:
         return Result(case, 'error', 0, 'python side: %s: %s' % (type(e).__name__, e))
 
@@ -170,6 +194,7 @@ def run_case(case: Case, db, pobj, call_verb) -> Result:
         return Result(case, 'missing', 0, '%s has no verb %r' % (ref, verbname))
 
     for i, (args, kw) in enumerate(zip(case.inputs, case.kwargs)):
+        args = _resolve_inputs(args, db)
         try:
             expected = pyfn(*args, **kw)
         except Exception as e:
@@ -236,39 +261,81 @@ def run(cases: Sequence[Case], dbpath: str, verbose: bool = False) -> int:
 # ---------------------------------------------------------------------------
 
 CASES: List[Case] = [
-    Case('moo.string_utils:su.capitalise', ('$string_utils', 'capitalise'),
-         [('hello',), ('a sword',), ('',), ('123',), ('  leading',),
-          ('ALREADY',), ('e',), ('&<245>dim',)]),
+    # $string_utils is done.  Its fourteen cases and eighty-seven inputs are
+    # retired rather than kept: `moo/string_utils.py` is deleted, so there is
+    # no longer an original to diff the verbs against.  The port was verified
+    # green immediately before the module was removed, and that run is the
+    # record.  A case here that cannot import its Python side would report as
+    # an error forever and teach everyone to ignore the output.
 
-    Case('moo.string_utils:su.a_or_an', ('$string_utils', 'a_or_an'),
-         [('sword',), ('apple',), ('hour',), ('',), ('elephant',), ('unicorn',)]),
+    # --- $obj_utils ---
+    Case('moo.object_utils:isa', ('$obj_utils', 'isa'),
+         [(Obj(1), Obj(1)), (Obj(5), Obj(3)), (Obj(3), Obj(1)),
+          (Obj(17), Obj(15)), (Obj(1), Obj(17))]),
+    Case('moo.object_utils:has_verb', ('$obj_utils', 'has_verb'),
+         [(Obj(17), 'look'), (Obj(17), 'nonexistent'), (Obj(1), 'msg')]),
+    Case('moo.object_utils:defines_verb', ('$obj_utils', 'defines_verb'),
+         [(Obj(17), 'look'), (Obj(16), 'look'), (Obj(17), 'nope')]),
+    Case('moo.object_utils:has_property', ('$obj_utils', 'has_property'),
+         [(Obj(1), 'name'), (Obj(1), 'no_such_prop'), (Obj(5), 'position')]),
+    Case('moo.object_utils:ancestors', ('$obj_utils', 'ancestors'),
+         [(Obj(5),), (Obj(1),), (Obj(17),)]),
+    Case('moo.object_utils:descendants', ('$obj_utils', 'descendants'),
+         [(Obj(92),), (Obj(1),), (Obj(5024),)]),
+    Case('moo.object_utils:locations', ('$obj_utils', 'locations'),
+         [(Obj(5024),), (Obj(1),)]),
 
-    Case('moo.string_utils:su.ordinal', ('$string_utils', 'ordinal'),
-         [(1,), (2,), (3,), (4,), (11,), (12,), (13,), (21,), (0,), (101,)]),
-
-    Case('moo.string_utils:su.pluralise', ('$string_utils', 'pluralise'),
-         [('sword', 2), ('box', 2), ('knife', 2), ('sheep', 2),
-          ('sword', 1), ('city', 3), ('', 2)]),
-
-    Case('moo.string_utils:su.english_list', ('$string_utils', 'english_list'),
-         [([],), (['a'],), (['a', 'b'],), (['a', 'b', 'c'],)]),
-
-    Case('moo.string_utils:su.find_prefix', ('$string_utils', 'find_prefix'),
-         [('sw', ['sword', 'shield']), ('x', ['sword']),
-          ('s', ['sword', 'shield']), ('', ['sword'])]),
-
-    Case('moo.string_utils:su.collapse', ('$string_utils', 'collapse'),
-         [('a  b',), ('  a  \n b ',), ('',), ('one',)]),
-
+    # --- $match_utils.  Still has a Python side: `match` and `omatch` are on
+    # the command-parsing path, so the module was shrunk rather than deleted,
+    # and what is left can still be diffed. ---
     Case('moo.match_utils:parse_ordinal', ('$match_utils', 'parse_ordinal'),
          [('first',), ('2nd',), ('third',), ('sword',), ('',), ('21st',)]),
-
     Case('moo.match_utils:strip_articles', ('$match_utils', 'strip_articles'),
          [('the sword',), ('a sword',), ('an apple',), ('sword',),
           ('some rocks',), ('',)]),
-
     Case('moo.match_utils:prep_match', ('$match_utils', 'prep_match'),
          [('in',), ('into',), ('with',), ('sword',), ('',), ('on',)]),
+
+    # --- $char_data is done, and its cases are retired ---
+    #
+    # Ten cases and 45 inputs, green, run in the moment before
+    # `game/chargen_data.py` was deleted: stat_bonus, bonus_for_rank,
+    # calc_dev_points, calc_max_hits, calc_max_stamina, calc_max_mana,
+    # mana_points, _potential_stat, categorize_hair_length and
+    # generate_description.
+    #
+    # roll_stats, stat_gain and _dice roll, so a differ can say nothing true
+    # about them.  What checks those is the game: chargen runs on roll_stats
+    # and levelling runs on stat_gain, and both were exercised in the world
+    # after the module went.
+
+    # --- $combat_utils is done, and its cases are retired ---
+    #
+    # Nine cases and 54 inputs, green, run in the moment before
+    # `game/combat_data.py` was deleted: stacked_penalty,
+    # resolve_crit_severity, get_com_thresh, armor_penalty,
+    # best_at_protection, resolve_attack_type, weapon_line, weapon_crit_type
+    # and get_crit_result, each on the branches that do not roll dice.
+    #
+    # What rolls dice was never diffable here and is checked where it always
+    # was: sfdev/tests/test_combat_resolution.py takes 4,000 swings at a
+    # target and asks which way armor moved the numbers.  Those tests call
+    # the verbs now.
+    #
+    # `setup` on Case was added for these -- get_crit_result read a
+    # module-level dict that load_crit_tables() filled at startup, so an
+    # un-started module answered None to everything and reported the verb as
+    # wrong.  The in-game side needed no such line: the tables are in the
+    # world, which is rather the point.
+
+    # --- moo_libs is gone, and its cases with it ---
+    #
+    # $list_utils, $command_utils, $code_utils and $perm_utils were diffed
+    # here first: 27 cases, 104 inputs, all green, run immediately before
+    # `moo/moo_libs.py` was deleted.  That run is the record.  The cases are
+    # retired rather than kept for the reason the $string_utils ones were --
+    # there is no Python side left to import, so they could only report an
+    # error forever, and a rig that always prints errors stops being read.
 ]
 
 

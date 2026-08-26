@@ -777,6 +777,28 @@ class ApiConnection:
                 if callable(attr) or isinstance(attr, (str, int, type)):
                     namespace[name] = attr
 
+        # The utility objects, under both spellings each.
+        #
+        # This is the THIRD namespace builder in the engine -- there is
+        # `verb_namespace.build_verb_namespace` for verbs, and
+        # `builtins._build_eval_globals` for the eval builtin, and this one.
+        # `su` used to be a module-level Python object, so all three picked it
+        # up for free by scanning attributes.  It is an object in the world
+        # now, resolved per database, and all three had to be told
+        # separately.  `_effects` then went missing here the same way, and
+        # four more names were about to: $list_utils, $command_utils,
+        # $code_utils and $perm_utils all left Python together.
+        #
+        # Patching a third copy a third time is not the fix.  The names live
+        # on the verb side in _REF_UTILS, and this asks for them rather than
+        # repeating them -- so the next object to move in-game cannot go
+        # missing here, which is what kept happening.
+        try:
+            from .verb_namespace import bind_ref_utils
+            bind_ref_utils(namespace, db)
+        except Exception:
+            pass
+
         # Wire up search/find/call_verb with the correct database context
         namespace['call_verb'] = moo_builtins.make_call_verb(player, db)
         namespace['search'] = lambda *a, _db=db, **kw: moo_builtins._search_fn(*a, db=_db, **kw)
