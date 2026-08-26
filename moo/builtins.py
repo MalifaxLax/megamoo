@@ -2106,13 +2106,39 @@ __builtins_getattr = getattr
 _builtin_ns_cache: Optional[Dict[str, Any]] = None
 
 
+#: Public names in this module that verb code must not reach.
+#:
+#: The namespace is built by sweeping every public callable here, which is
+#: convenient and was wrong for exactly these three: they do not *do*
+#: anything a verb wants, they change who the engine thinks the verb is.
+#:
+#:   push_frame   pushes a call frame with an ``owner`` of your choosing.
+#:                ``current_perms()`` returns that owner verbatim, and every
+#:                permission check in objects.py short-circuits when it names
+#:                a wizard.  One line -- ``push_frame(this, 'x', None, pobj,
+#:                owner=0)`` -- and the verb is #0.
+#:   pop_frame    the other half: unbalance the stack and the frame the
+#:                engine restores is not the one it pushed.
+#:   set_frame_owner
+#:                same, without the push.
+#:
+#: They stay public because the engine calls them across modules; what
+#: changes is that the verb namespace no longer carries them.  `set_task_perms`
+#: is the supported way for a verb to change what it acts as, and it refuses
+#: permissions the task does not already hold.
+_ENGINE_ONLY_NAMES = frozenset({
+    'push_frame', 'pop_frame', 'set_frame_owner',
+})
+
+
 def _get_builtin_ns_template() -> Dict[str, Any]:
     """
     Return (and lazily build) the cached builtin namespace dictionary.
 
     The template contains every public callable and constant from this
-    module.  It is shallow-copied into each verb namespace by
-    ``build_verb_namespace()``.
+    module, minus :data:`_ENGINE_ONLY_NAMES` -- the frame-stack machinery,
+    which decides what a verb is allowed to do and so cannot be something a
+    verb calls.
 
     Returns:
         dict: Mapping of name -> object for all public builtins.
@@ -2123,7 +2149,7 @@ def _get_builtin_ns_template() -> Dict[str, Any]:
         this_module = sys.modules[__name__]
         ns = {}
         for name in dir(this_module):
-            if not name.startswith('_'):
+            if not name.startswith('_') and name not in _ENGINE_ONLY_NAMES:
                 attr = __builtins_getattr(this_module, name)
                 if callable(attr) or isinstance(attr, (str, int, type)):
                     ns[name] = attr
@@ -3309,6 +3335,21 @@ def delay(seconds: float, code: str, context: dict):
 
     if seconds < 0:
         raise ValueError("Cannot delay for negative seconds")
+
+    # The delayed code runs with the permissions of the verb that scheduled
+    # it -- not with whatever the caller put in the dict.
+    #
+    # `context` becomes the delayed task's globals, and `verb_baton` pushes a
+    # frame from it with `owner=namespace.get('_verb_owner')`.  Since the
+    # caller supplies the dict, it supplied the answer to "who is this?":
+    # `delay(0, code, {'player': pobj, '_verb_owner': 0})` ran as #0, and
+    # omitting `this`/`pobj` gave `owner=None`, which every check in
+    # objects.py reads as "engine, unrestricted".
+    #
+    # A copy, because the caller's dict is theirs and a verb that reuses it
+    # should not find the engine has written into it.
+    context = dict(context)
+    context['_verb_owner'] = current_perms()
 
     # Get player from context
     player_obj = context.get('player')
