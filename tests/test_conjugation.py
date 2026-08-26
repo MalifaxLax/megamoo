@@ -9,12 +9,17 @@ and ``notify`` hands ``esub`` the recipient as ``viewer``.
 
 What this file pins down is the agreement rule, which is where the
 subtleties are, and that the tokens that existed before are untouched.
+
+`su` was `moo.string_utils`.  It is $string_utils in the world now, so it
+arrives as a fixture from `conftest.py` -- a proxy whose attribute access is
+a verb call.  The bodies below are unchanged: what was true of the module has
+to stay true of the verb, and rewriting the assertions at the same time as
+the code would have stopped them being evidence.
 """
 from types import SimpleNamespace as NS
 
 import pytest
 
-from moo.string_utils import su
 
 
 def person(name='Malifax', gender='male', objnum=52, **kw):
@@ -45,17 +50,17 @@ def thing(name, article, objnum=100, **kw):
     ('have', 'has'),           # irregular
     ('be', 'is'),              # irregular
 ])
-def test_third_person_singular(bare, third):
+def test_third_person_singular(bare, third, su):
     assert su.conjugate(bare) == third
     assert su.conjugate(bare, plural=True) == bare
 
 
-def test_case_is_preserved_through_an_irregular():
+def test_case_is_preserved_through_an_irregular(su):
     """"Have" -> "has" must not lose a capital the author wrote."""
     assert su.conjugate('Have') == 'Has'
 
 
-def test_an_empty_verb_is_left_alone():
+def test_an_empty_verb_is_left_alone(su):
     assert su.conjugate('') == ''
 
 
@@ -63,17 +68,17 @@ def test_an_empty_verb_is_left_alone():
 # takes_plural_verb()
 # ------------------------------------------------------------------
 
-def test_the_reader_takes_the_bare_form():
+def test_the_reader_takes_the_bare_form(su):
     """Second person, always: "you smile", never "you smiles"."""
     me = person()
     assert su.takes_plural_verb(me, viewer=me) is True
 
 
-def test_somebody_else_takes_the_s_form():
+def test_somebody_else_takes_the_s_form(su):
     assert su.takes_plural_verb(person(), viewer=person('Bramble', objnum=7)) is False
 
 
-def test_a_name_is_singular_even_for_a_they_character():
+def test_a_name_is_singular_even_for_a_they_character(su):
     """"Robin smiles", not "Robin smile".
 
     They/them takes the bare form behind the *pronoun* -- "they smile" --
@@ -91,16 +96,16 @@ def test_a_name_is_singular_even_for_a_they_character():
     ('several', True),
     ('', False),               # more often proper-named than plural
 ])
-def test_a_things_article_decides_it(article, plural):
+def test_a_things_article_decides_it(article, plural, su):
     assert su.takes_plural_verb(thing('x', article)) is plural
 
 
 @pytest.mark.parametrize('article, override', [('a', True), ('some', False)])
-def test_an_explicit_plural_property_wins(article, override):
+def test_an_explicit_plural_property_wins(article, override, su):
     assert su.takes_plural_verb(thing('x', article, plural=override)) is override
 
 
-def test_nothing_is_singular():
+def test_nothing_is_singular(su):
     assert su.takes_plural_verb(None) is False
 
 
@@ -108,7 +113,7 @@ def test_nothing_is_singular():
 # The tokens, end to end
 # ------------------------------------------------------------------
 
-def test_one_string_reads_both_ways():
+def test_one_string_reads_both_ways(su):
     me, them = person(), person('Bramble', 'female', objnum=7)
     text = '&Ys &v(smile) at &d.'
 
@@ -116,7 +121,7 @@ def test_one_string_reads_both_ways():
     assert su.esub(text, sub=me, dob=them, viewer=them) == 'Malifax smiles at Bramble.'
 
 
-def test_the_verb_can_agree_with_the_item_instead():
+def test_the_verb_can_agree_with_the_item_instead(su):
     """&vd() is why sub can stay the character while the item acts.
 
     "&D &vd(dangle) from &yp ear" needs both: the possessive belongs to
@@ -132,7 +137,7 @@ def test_the_verb_can_agree_with_the_item_instead():
         'A large gold earhoop dangles from his ear.'
 
 
-def test_a_plural_item_agrees_plurally():
+def test_a_plural_item_agrees_plurally(su):
     me = person()
     drapes = thing('some drapes', 'some', objnum=5035)
 
@@ -152,7 +157,7 @@ def test_a_plural_item_agrees_plurally():
     ('&Ya', 'Yours', 'His'),
     ('&Yr', 'Yourself', 'Himself'),
 ])
-def test_each_viewer_aware_token(token, mine, theirs):
+def test_each_viewer_aware_token(token, mine, theirs, su):
     me = person()
     other = person('Bramble', 'female', objnum=7)
 
@@ -160,7 +165,7 @@ def test_each_viewer_aware_token(token, mine, theirs):
     assert su.esub(token, sub=me, viewer=other) == theirs
 
 
-def test_the_whole_family_mirrors_the_pronoun_tokens():
+def test_the_whole_family_mirrors_the_pronoun_tokens(su):
     """&ys sits beside &ps, case for case, so there is one thing to learn.
 
     Also the boundary check: five two-letter tokens sharing a first
@@ -175,7 +180,7 @@ def test_the_whole_family_mirrors_the_pronoun_tokens():
         'Malifax him his his himself'
 
 
-def test_no_viewer_reads_as_third_person():
+def test_no_viewer_reads_as_third_person(su):
     """Callers that never pass one -- most of the engine -- are unaffected."""
     assert su.esub('&Ys &v(smile).', sub=person()) == 'Malifax smiles.'
 
@@ -184,7 +189,7 @@ def test_no_viewer_reads_as_third_person():
 # Three audiences: the &t family
 # ------------------------------------------------------------------
 
-def test_one_string_serves_all_three_points_of_view():
+def test_one_string_serves_all_three_points_of_view(su):
     """An emit has three readers, and a combat line needs all of them.
 
     "You attack Bramble" / "Malifax attacks you" / "Malifax attacks
@@ -202,7 +207,7 @@ def test_one_string_serves_all_three_points_of_view():
     assert su.esub(text, sub=A, dob=B, viewer=C) == 'Malifax attacks Bramble.'
 
 
-def test_the_targets_possessive_follows_the_reader():
+def test_the_targets_possessive_follows_the_reader(su):
     A = person('Malifax', 'male', objnum=52)
     B = person('Bramble', 'female', objnum=7)
     C = person('a bystander', 'neutral', objnum=9)
@@ -223,7 +228,7 @@ def test_the_targets_possessive_follows_the_reader():
     ('&Tp', 'Your', 'Her'),
     ('&Tr', 'Yourself', 'Herself'),
 ])
-def test_each_target_token(token, target_reads, others_read):
+def test_each_target_token(token, target_reads, others_read, su):
     A = person('Malifax', 'male', objnum=52)
     B = person('Bramble', 'female', objnum=7)
     C = person('a bystander', 'neutral', objnum=9)
@@ -232,7 +237,7 @@ def test_each_target_token(token, target_reads, others_read):
     assert su.esub(token, sub=A, dob=B, viewer=C) == others_read
 
 
-def test_the_subject_takes_a_pronoun_in_object_position_but_the_target_a_name():
+def test_the_subject_takes_a_pronoun_in_object_position_but_the_target_a_name(su):
     """The one place the two families deliberately differ.
 
     &yo reads "him" because &ys has just said the name in the same
@@ -247,7 +252,7 @@ def test_the_subject_takes_a_pronoun_in_object_position_but_the_target_a_name():
     assert su.esub('&to', sub=A, dob=B, viewer=C) == 'Bramble'
 
 
-def test_a_line_with_no_target_is_unaffected():
+def test_a_line_with_no_target_is_unaffected(su):
     """dob is optional; the &t family simply does not fire without one."""
     assert su.esub('&Ys &v(smile).', sub=person(), viewer=None) == 'Malifax smiles.'
 
@@ -257,28 +262,26 @@ def test_a_line_with_no_target_is_unaffected():
     ('&S draws &pp sword.', 'Malifax draws his sword.'),
     ('&s and &d', 'Malifax and Bramble'),
 ])
-def test_the_old_tokens_are_untouched(text, expected):
+def test_the_old_tokens_are_untouched(text, expected, su):
     """Adoption is opt-in: new letters, so nothing already written moves."""
     me, them = person(), person('Bramble', 'female', objnum=7)
     assert su.esub(text, sub=me, dob=them, viewer=me) == expected
 
 
-def test_the_empty_word_takes_a():
+def test_the_empty_word_takes_a(su):
     """`'' in 'aeiou'` is True -- the empty string is a substring of every
     string -- so the slice that was chosen to survive an empty word survived
     it by answering wrongly.  Found by tools/equivalence.py, comparing the
     Python against a straightforward in-game port."""
-    from moo.string_utils import su
     assert su.a_or_an('') == 'a'
     assert su.a_or_an('   ') == 'a'
     assert su.a_or_an(None) == 'a'      # str(None) -> 'None'
 
 
-def test_a_or_an_still_uses_the_simple_vowel_rule():
+def test_a_or_an_still_uses_the_simple_vowel_rule(su):
     """Deliberately wrong for 'hour' and 'unicorn'; the naming code stores the
     article explicitly rather than deriving it.  Pinned so a well-meaning fix
     does not quietly change what every ported MOO verb expects."""
-    from moo.string_utils import su
     assert su.a_or_an('hour') == 'a'
     assert su.a_or_an('unicorn') == 'an'
     assert su.a_or_an('apple') == 'an'

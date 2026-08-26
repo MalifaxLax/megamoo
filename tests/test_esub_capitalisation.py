@@ -11,17 +11,17 @@ Measured before removing it: of 123 cname values in the starter world, 0
 differed from capitalising name; of 405 in Shadowfall, 3 differed and all
 three were *un*capitalised -- wrong rather than deliberate. The property
 was redundant wherever it was right.
+
+`su` was `moo.string_utils`.  It is $string_utils in the world now, so it
+arrives as a fixture from `conftest.py` -- a proxy whose attribute access is
+a verb call.  The bodies below are unchanged: what was true of the module has
+to stay true of the verb, and rewriting the assertions at the same time as
+the code would have stopped them being evidence.
 """
 from types import SimpleNamespace
 
 import pytest
 
-from moo.string_utils import StringUtils
-
-
-@pytest.fixture
-def su():
-    return StringUtils()
 
 
 def test_a_stale_inherited_cname_is_ignored(su):
@@ -66,23 +66,39 @@ def test_capitalise_edge_cases(su, value, expected):
     assert su.capitalise(value) == expected
 
 
-def test_there_is_exactly_one_capitalise():
+def test_there_is_exactly_one_capitalise(_utils_world):
     """
     The rule lived in three places -- su.capitalise, a module-level
     _capitalised, and a capitalize_first builtin nothing called. Three
     copies of a rule are two chances for it to drift.
-    """
-    from moo import builtins, string_utils, utils
 
-    assert not hasattr(string_utils, '_capitalised')
+    Two of the three are gone with `moo/string_utils.py`; the assertion that
+    survives is about the modules that are still here.  $string_utils holds
+    the only `capitalise` now, so the count is asked of the world.
+    """
+    from moo import builtins, utils
+    from moo.object_utils import system_ref
+
     assert not hasattr(utils, 'capitalize_first')
     assert not hasattr(builtins, 'capitalize_first')
 
+    db, _ = _utils_world
+    holders = [o.objnum for o in db.objects()
+               for v in o.verbs if 'capitalise' in v.names]
+    assert holders == [system_ref(db, 'string_utils').objnum], holders
 
-def test_esub_no_longer_reads_cname():
-    """A cname set deliberately must not quietly win again."""
-    import inspect
-    from moo import string_utils
 
-    body = inspect.getsource(string_utils.StringUtils.esub)
-    assert 'cname' not in body
+def test_esub_no_longer_reads_cname(_utils_world):
+    """A cname set deliberately must not quietly win again.
+
+    Read off the verb rather than off `inspect.getsource` of a class that no
+    longer exists.  The verb's code is a column in the database, which is
+    the same question asked of the thing that now answers it.
+    """
+    from moo.object_utils import system_ref
+
+    db, _ = _utils_world
+    su_obj = system_ref(db, 'string_utils')
+    esub = [v for v in su_obj.verbs if 'esub' in v.names]
+    assert len(esub) == 1, 'expected one esub on $string_utils, got %d' % len(esub)
+    assert 'cname' not in (esub[0].code or '')

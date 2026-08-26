@@ -19,24 +19,24 @@ are 2812 colour tokens and 1512 substitution tokens, and of the 171
 occurrences of a colliding letter, every one is `&i` used as an indirect
 object. Neither world uses `&i` as inverse or `&u` as underline -- there
 is no `&u` in either world at all.
+
+`su` was `moo.string_utils`.  It is $string_utils in the world now, so it
+arrives as a fixture from `conftest.py` -- a proxy whose attribute access is
+a verb call.  The bodies below are unchanged: what was true of the module has
+to stay true of the verb, and rewriting the assertions at the same time as
+the code would have stopped them being evidence.
 """
 from types import SimpleNamespace
 
 import pytest
 
 from moo.color import ColorProcessor
-from moo.string_utils import StringUtils
 from moo.web.color import moo_colors_to_html
 
 
 @pytest.fixture
 def cp():
     return ColorProcessor(enable_color=True)
-
-
-@pytest.fixture
-def su():
-    return StringUtils()
 
 
 # ---------------------------------------------------------------------------

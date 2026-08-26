@@ -9,84 +9,17 @@ every ported call off by one.
 
 `lu`, `cu`, `cdu` and `pu` were Python instances in `moo/moo_libs.py` when
 these tests were written.  They are objects in the world now -- $list_utils,
-$command_utils, $code_utils, $perm_utils -- and the fixtures below hand each
-test a proxy that calls the verb.  The test bodies are unchanged on purpose:
+$command_utils, $code_utils, $perm_utils -- and the fixtures hand each test
+a proxy that calls the verb.  The test bodies are unchanged on purpose:
 saying the same thing about the verbs that they said about the Python is the
 claim the migration has to keep making.
+
+The fixtures themselves live in `conftest.py`.  They were here, which is why
+the three files testing $string_utils could not use them and went on
+importing a module that no longer exists.
 """
 
-import os
-import sqlite3
-import pathlib
-
 import pytest
-
-STARTER = (pathlib.Path(__file__).resolve().parent.parent
-           / 'moo' / 'templates' / 'starter' / 'world.db')
-
-
-class _Util:
-    """One utility object, called the way verb code calls it."""
-
-    def __init__(self, obj, call_verb):
-        self._obj = obj
-        self._call = call_verb
-
-    def __getattr__(self, name):
-        def call(*args, **kwargs):
-            return self._call(self._obj, name, *args, **kwargs)
-        return call
-
-
-@pytest.fixture(scope='module')
-def _utils_world(tmp_path_factory):
-    """The starter world on a throwaway copy, with a context to call in.
-
-    Copied with SQLite's backup API rather than the filesystem: the template
-    is checkpointed but carries a -wal, and half a copy is a world whose
-    verbs are missing for no reason a reader would guess.
-    """
-    if not STARTER.exists():
-        pytest.skip('starter template not present')
-    copy = str(tmp_path_factory.mktemp('utils') / 'world.db')
-    srcdb = sqlite3.connect('file:%s?mode=ro' % STARTER, uri=True)
-    dstdb = sqlite3.connect(copy)
-    with dstdb:
-        srcdb.backup(dstdb)
-    srcdb.close()
-    dstdb.close()
-
-    from moo.testing import world
-    from moo.builtins import make_call_verb
-    from moo.verb_context import clear_verb_context, set_verb_context
-    w = world(copy)
-    db = w.db
-    pobj = db.get_object(100)
-    token = set_verb_context(pobj, db, depth=0)
-    try:
-        yield db, make_call_verb(pobj, db)
-    finally:
-        clear_verb_context(token)
-        db.close()
-
-
-def _utility(ref):
-    def fixture(_utils_world):
-        db, call_verb = _utils_world
-        from moo.object_utils import system_ref
-        obj = system_ref(db, ref)
-        if obj is None:
-            pytest.skip('this world has no $%s' % ref)
-        return _Util(obj, call_verb)
-    fixture.__name__ = ref
-    return pytest.fixture(fixture)
-
-
-lu = _utility('list_utils')
-cu = _utility('command_utils')
-cdu = _utility('code_utils')
-pu = _utility('perm_utils')
-
 
 # --------------------------------------------------------------------------
 # $list_utils -- 1-based, per the originals
