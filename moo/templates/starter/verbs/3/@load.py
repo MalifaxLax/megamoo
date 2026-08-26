@@ -11,7 +11,12 @@ Switches:
     /list - Show what is available to load.
     /dry  - Report what would be built without building it.
 
-Auth: gm3+ (auth_level 3)
+Auth: gm5 (auth_level 5)
+Raised from gm%d to gm5 on 2026-08-26. Writing or installing verb code is
+arbitrary code execution in the server's own process -- `import`, `open` and
+`sys.modules` all work from verb code -- so whoever can do it can switch off
+permission enforcement and is a wizard whether or not the level says so.
+gm3 is a builder: rooms, exits, descriptions, properties. Code is gm5.
 
 The loaded object is always a *new* object with a new number.  Nothing is
 overwritten, because the number in the dump belongs to whatever holds it
@@ -30,7 +35,7 @@ are counted and listed, so they can be fixed by hand with @set.
 
 See also: @dump
 """
-if auth_level(pobj) < 3:
+if auth_level(pobj) < 5:
     pobj.msg("Do what?")
     return
 

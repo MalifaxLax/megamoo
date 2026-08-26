@@ -28,8 +28,14 @@ Examples:
     @adverb #3.@telq with rx auth=3
 
 Abbrev:  @adverb=4
+Auth: gm5 (auth_level 5)
+Raised from gm%d to gm5 on 2026-08-26. Writing or installing verb code is
+arbitrary code execution in the server's own process -- `import`, `open` and
+`sys.modules` all work from verb code -- so whoever can do it can switch off
+permission enforcement and is a wizard whether or not the level says so.
+gm3 is a builder: rooms, exits, descriptions, properties. Code is gm5.
 """
-if auth_level(pobj) < 3:
+if auth_level(pobj) < 5:
     pobj.msg("Do what?")
     return
 

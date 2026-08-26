@@ -22,6 +22,14 @@ if not spec or '.' not in spec:
     return
 obj_part, prop_name = spec.rsplit('.', 1)
 prop_name = prop_name.strip()
+
+# `auth` is not a property that describes authority, it *is* authority:
+# auth_level() reads it, so reaching it here would strip a wizard of theirs. Granting or
+# revoking a level is @auth/@rmauth's job, which is gm5 and says what it is
+# doing.
+if prop_name == 'auth' and auth_level(pobj) < 5:
+    pobj.msg("You can't touch that.")
+    return
 if not prop_name:
     pobj.msg("No property name specified.")
     return

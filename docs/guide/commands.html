@@ -112,7 +112,7 @@ works too.
 <tr><td><code>@renumber</code></td><td><code>gm5</code></td><td>Give an object a different number.</td></tr>
 <tr><td><code>@copy</code></td><td><code>gm3</code></td><td>Duplicate an object: same parent, name parts and local properties.</td></tr>
 <tr><td><code>@dump</code></td><td><code>gm3</code></td><td>Write an object out as text, to move or keep it.</td></tr>
-<tr><td><code>@load</code></td><td><code>gm3</code></td><td>Build an object from a file written by <code>@dump</code>.</td></tr>
+<tr><td><code>@load</code></td><td><code>gm5</code></td><td>Build an object from a file written by <code>@dump</code>.</td></tr>
 </tbody>
 </table>
 </div>
@@ -169,12 +169,12 @@ works too.
 <table>
 <thead><tr><th>Command</th><th>Level</th><th>Does</th></tr></thead>
 <tbody>
-<tr><td><code>@adverb</code> <span class="c">(@adv)</span></td><td><code>gm3</code></td><td>Create a command. <code>/hidden</code> makes it unreachable by typing.</td></tr>
-<tr><td><code>@program</code> <span class="c">(@pro)</span></td><td><code>gm3</code></td><td>Open the editor for a command's code. Also <code>@prog</code>, <code>@code</code>.</td></tr>
+<tr><td><code>@adverb</code> <span class="c">(@adv)</span></td><td><code>gm5</code></td><td>Create a command. <code>/hidden</code> makes it unreachable by typing.</td></tr>
+<tr><td><code>@program</code> <span class="c">(@pro)</span></td><td><code>gm5</code></td><td>Open the editor for a command's code. Also <code>@prog</code>, <code>@code</code>.</td></tr>
 <tr><td><code>@rmverb</code> <span class="c">(@rmv)</span></td><td><code>gm3</code></td><td>Delete a command.</td></tr>
-<tr><td><code>@reload</code> <span class="c">(@rel)</span></td><td><code>gm3</code></td><td>Load a command from its file on disk.</td></tr>
+<tr><td><code>@reload</code> <span class="c">(@rel)</span></td><td><code>gm5</code></td><td>Load a command from its file on disk.</td></tr>
 <tr><td><code>@min</code></td><td><code>gm3</code></td><td>Set how few letters will match the name.</td></tr>
-<tr><td><code>@verbauth</code> <span class="c">(@verba)</span></td><td><code>gm3</code></td><td>Set or read the level a command requires.</td></tr>
+<tr><td><code>@verbauth</code> <span class="c">(@verba)</span></td><td><code>gm5</code></td><td>Set or read the level a command requires.</td></tr>
 <tr><td><code>@hideverb</code> <span class="c">(@hidev)</span></td><td><code>gm3</code></td><td>Hide a command so nobody can type it.</td></tr>
 <tr><td><code>@unhideverb</code> <span class="c">(@unhidev)</span></td><td><code>gm3</code></td><td>Reverse that.</td></tr>
 <tr><td><code>@alias</code> <span class="c">(@ali)</span></td><td><code>gm3</code></td><td>Show a command's names, or add one: <code>@alias #13.look = observe(3)</code>.</td></tr>
@@ -221,13 +221,13 @@ works too.
 <thead><tr><th>Command</th><th>Level</th><th>Does</th></tr></thead>
 <tbody>
 <tr><td><code>@version</code> <span class="c">(@ver)</span></td><td><code>gm1</code></td><td>What the engine is, and what this world says it is. <code>@version/server</code> and <code>@version/db</code> ask separately.</td></tr>
-<tr><td><code>eval</code></td><td><code>gm4</code></td><td>Run Python against the live world. Also <code>/</code>.</td></tr>
+<tr><td><code>eval</code></td><td><code>gm5</code></td><td>Run Python against the live world. Also <code>/</code>.</td></tr>
 <tr><td><code>@restart</code></td><td><code>gm5</code></td><td>Restart in place.</td></tr>
 <tr><td><code>@shutdown</code></td><td><code>gm5</code></td><td>Stop the server.</td></tr>
 <tr><td><code>@ps</code></td><td><code>gm3</code></td><td>List the tasks the server is running.</td></tr>
 <tr><td><code>@kill</code></td><td><code>gm3</code></td><td>Abort a running or suspended task.</td></tr>
 <tr><td><code>@checkpoint</code></td><td><code>gm4</code></td><td>Take a database snapshot now, flushing memory to disk first.</td></tr>
-<tr><td><code>@port</code></td><td><code>gm3</code></td><td>Translate pasted MOO code into Python.</td></tr>
+<tr><td><code>@port</code></td><td><code>gm5</code></td><td>Translate pasted MOO code into Python.</td></tr>
 </tbody>
 </table>
 </div>

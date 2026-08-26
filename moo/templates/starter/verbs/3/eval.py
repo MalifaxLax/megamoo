@@ -10,7 +10,12 @@ Arguments:
     expression  - Any valid Python expression to evaluate.
 
 Aliases: /
-Auth: gm4+ (auth_level 4)
+Auth: gm5 (auth_level 5)
+Raised from gm%d to gm5 on 2026-08-26. Writing or installing verb code is
+arbitrary code execution in the server's own process -- `import`, `open` and
+`sys.modules` all work from verb code -- so whoever can do it can switch off
+permission enforcement and is a wizard whether or not the level says so.
+gm3 is a builder: rooms, exits, descriptions, properties. Code is gm5.
 
 gm4, not gm3, because that is what this actually needs: eval_python()
 requires the WIZARD flag, which sync_auth_flags() sets at gm4. The guard
@@ -22,7 +27,7 @@ Note: The expression runs in a context with: player, pobj (me), here,
 db, location, ObjectFlags, and MOOObjectRef available as variables.
 """
 # Eval command - evaluate Python expression (wizards only)
-if auth_level(pobj) < 4:
+if auth_level(pobj) < 5:
     pobj.msg("Do what?")
     return
 if not argstr:

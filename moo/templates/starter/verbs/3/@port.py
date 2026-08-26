@@ -7,7 +7,12 @@ Arguments:
     object    - The object the verb belongs to (#92, or a name in reach).
     verb-name - The verb to write the translation into.
 
-Auth: gm3+ (auth_level 3)
+Auth: gm5 (auth_level 5)
+Raised from gm%d to gm5 on 2026-08-26. Writing or installing verb code is
+arbitrary code execution in the server's own process -- `import`, `open` and
+`sys.modules` all work from verb code -- so whoever can do it can switch off
+permission enforcement and is a wizard whether or not the level says so.
+gm3 is a builder: rooms, exits, descriptions, properties. Code is gm5.
 
 Opens an editor, the same as @program: paste MOO source, '.' alone on a
 line to finish, '@abort' to cancel.  The difference is what happens next --
@@ -40,7 +45,7 @@ textdump means is a different job from running a game.
 
 See also: @program
 """
-if auth_level(pobj) < 3:
+if auth_level(pobj) < 5:
     pobj.msg("Do what?")
     return
 
