@@ -1,5 +1,5 @@
 """
-exit_func on #17 (ICRoom)
+exit_func on #13 (ICRoom)
 Called when an object leaves this room.
 args = objnum string of the departing object.
 Removes characters from this room's plist.

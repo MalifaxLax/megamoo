@@ -30,7 +30,7 @@ here:
 
 Everything else that still names the old number is reported, not guessed
 at. `obvexits` is the reason: it holds direction indices, so [1, 2, 3]
-there means north, south and east -- not #1, #2 and #3. Since #0 to #9
+there means north, south and east -- not #1, #2 and #3. Since #0 to #40
 are all real objects, no test on a value can tell a small number from a
 reference to a low object. This is the same line LambdaMOO's renumber()
 draws when it declines to touch property values at all, and its cores
@@ -44,8 +44,8 @@ if auth_level(pobj) < 5:
 
 if not dobj:
     pobj.msg('Usage: @renumber <object> [= | to] [<new number>]')
-    pobj.msg('Example: @renumber #42 = #10')
-    pobj.msg('Example: @renumber #42 to #10')
+    pobj.msg('Example: @renumber #42 = #8')
+    pobj.msg('Example: @renumber #42 to #8')
     pobj.msg('Example: @renumber #42')
     return
 

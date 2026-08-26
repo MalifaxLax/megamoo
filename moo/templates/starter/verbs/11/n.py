@@ -7,14 +7,14 @@ their abbreviations (n, s, e, w, u, d, o).
 
 When invoked, calls the room's match_exit verb to find a
 matching exit (object or virtual). If a virtual exit is found
-(integer index), delegates to #21's vmove verb. If an object
+(integer index), delegates to #15's vmove verb. If an object
 exit is found, calls its move verb directly.
 
 Verb names: n, s, e, w, ne, nw, se, sw, u, d, o, in,
             north, south, east, west, northeast, northwest,
             southeast, southwest, up, down, out
 
-Goes on #15 (BaseRoom) so all rooms inherit it.
+Goes on #11 (BaseRoom) so all rooms inherit it.
 Verb names are set from the room's directions property.
 
 Aliases: s, e, w, ne, nw, se, sw, u, d, o, in, north, south, east, west, northeast, northwest, southeast, southwest, up, down, out
@@ -37,7 +37,7 @@ exit = call_verb(room, 'match_exit', argstr=verb)
 if exit is None:
     pobj.msg("You can't go that way.")
 elif type(exit) == int:
-    # Virtual exit — delegate to #21 DirectionalExit's vmove
+    # Virtual exit — delegate to #15 DirectionalExit's vmove
     call_verb(db.get_object(15), 'vmove', enum=exit)
 else:
     # Object exit — call its move verb

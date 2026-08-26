@@ -26,13 +26,13 @@ def make_room(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
     ===========  =======  ==================
     Type key     ObjNum   Description
     ===========  =======  ==================
-    ``'room'``   #15      BaseRoom
-    ``'ooc'``    #16      OOCRoom (out-of-character)
-    ``'ic'``     #17      ICRoom (in-character)
+    ``'room'``   #11      BaseRoom
+    ``'ooc'``    #12      OOCRoom (out-of-character)
+    ``'ic'``     #13      ICRoom (in-character)
     ===========  =======  ==================
 
     Args:
-        parent: The room-type parent to inherit from (e.g. #15, #16, #17).
+        parent: The room-type parent to inherit from (e.g. #11, #12, #13).
         db:     The database instance.
         pobj:   The player creating the room (becomes the owner).
         name:   Optional name for the room.  If omitted, the parent's

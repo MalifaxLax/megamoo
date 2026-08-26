@@ -1,5 +1,5 @@
 """
-behind_put verb on #11 (GenericObject).
+behind_put verb on #9 (GenericObject).
 
 Places an item behind this object. Called by the room-level put verb
 when the player uses: put <item> behind <object>

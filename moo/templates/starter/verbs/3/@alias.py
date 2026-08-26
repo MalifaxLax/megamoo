@@ -18,9 +18,9 @@ Arguments:
               Abbrev line uses, so `observe(3)` is reachable as `obs`.
 
 Examples:
-    @alias #17.look
-    @alias #17.look = observe
-    @alias #17.look = observe(3)
+    @alias #13.look
+    @alias #13.look = observe
+    @alias #13.look = observe(3)
 
 The alias is written to the verb's **file on disk**, on its `Aliases:`
 line, before the database is touched -- disk is authoritative, being what

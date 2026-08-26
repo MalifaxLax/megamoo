@@ -22,7 +22,7 @@ and loads every verb file found. Verbs that exist on the object
 are updated; verbs that don't exist yet are created.
 
 Examples:
-    @reload #7.go_
+    @reload #43.go_
     @reload #3.@move
     @reload all
 
@@ -39,10 +39,10 @@ if not args:
     pobj.msg("Usage: @reload <object>.<verb_name_or_path>  or  @reload all")
     return
 
-# Resolve base verb path from #8.moo_verb_path
+# Resolve base verb path from #39.moo_verb_path
 verb_path = getattr(db.get_object(39), 'moo_verb_path', None)
 if not verb_path:
-    pobj.msg("#8.moo_verb_path is not set.")
+    pobj.msg("#39.moo_verb_path is not set.")
     return
 from moo.verb_loader import expand_verb_path
 base_path = expand_verb_path(verb_path)

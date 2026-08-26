@@ -1,5 +1,5 @@
 """
-unlatch on #17 (ICRoom)
+unlatch on #13 (ICRoom)
 Usage: unlatch <object>
 
 Abbrev:  unlatch=5

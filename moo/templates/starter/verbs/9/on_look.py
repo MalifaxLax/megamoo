@@ -1,5 +1,5 @@
 """
-on_look verb on #11 (GenericObject).
+on_look verb on #9 (GenericObject).
 
 Shows what is on top of this object. Called by the room-level look verb
 when the player uses: look on <object>

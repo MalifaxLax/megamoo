@@ -12,7 +12,7 @@ property so that opening/closing/locking one side affects both.
 
 Both exits start in the closed state.
 
-The exit is created as a child of #23 (ClosableGoExit).
+The exit is created as a child of #17 (ClosableGoExit).
 
 Switches:
     /noadd  - Do not place the exit in the room or list it among its
@@ -71,7 +71,7 @@ new_exit = ou.make_exit(parent, db, pobj, noun=name, room=room, dest=dest)
 # its own still leaves the exit walkable by name.  room.exits is what
 # match_exit searches, and it resolves those numbers straight to objects
 # without ever looking at where they are -- an exit moved inside another
-# object went on answering to `go <name>` exactly as before.  And #17 go
+# object went on answering to `go <name>` exactly as before.  And #13 go
 # falls back to matching room.contents when match_exit finds nothing, so
 # an exit merely dropped from the list is still reachable if it is lying
 # in the room.

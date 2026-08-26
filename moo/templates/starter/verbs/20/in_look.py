@@ -1,5 +1,5 @@
 """
-in_look verb on #26 (BaseContainer).
+in_look verb on #20 (BaseContainer).
 
 Shows what is inside this container. Called by the room-level look verb
 when the player uses: look in <container>

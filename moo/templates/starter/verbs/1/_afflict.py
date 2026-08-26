@@ -3,7 +3,7 @@ _afflict — apply a status or condition effect for a while
 
 Hands the affliction to the effects system and stops there. $eu owns the
 schedule, the countdown, the expiry and cancelling; the do_<effect> verb
-on #53 owns the status/condition dict. This maps the name a caller types
+on #33 owns the status/condition dict. This maps the name a caller types
 to the name $eu knows it by, and nothing else.
 
 (There is no `Names:` line here any more. It read like a declaration and
@@ -27,7 +27,7 @@ except NameError:
     _dur = int(args) if args else 0
 
 # Config: verb name -> the effect name $eu knows it by.  The dict and key
-# each affliction writes now live in its own do_<effect> handler on #53,
+# each affliction writes now live in its own do_<effect> handler on #33,
 # which is the only thing that needs to know them.
 _AFF = {
     '_immobilize':  'immobilize',

@@ -1,5 +1,5 @@
 """
-look_ verb on #26 (BaseContainer).
+look_ verb on #20 (BaseContainer).
 
 What `look <container>` shows: the container itself. Its description, and
 whether it is shut -- which you can see from outside without opening it.
@@ -10,7 +10,7 @@ This verb used to answer both: it repeated in_look's listing almost line
 for line, so `look chest` and `look in chest` printed the same thing and
 there was no way to look *at* a container.
 
-No name header, matching #17:look and #30:look_, which this hook returns
+No name header, matching #13:look and #23:look_, which this hook returns
 before and would otherwise contradict.
 
 Returns True to indicate the action was handled.

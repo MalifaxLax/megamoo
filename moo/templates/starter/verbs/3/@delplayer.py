@@ -2,7 +2,7 @@
 @delplayer verb on #3 (PlayerAccount).
 
 Permanently deletes a player account. Moves all IC characters and their
-inventories to #8 (object storage), clears all locally overridden
+inventories to #39 (object storage), clears all locally overridden
 properties from the OCharacter account objects to restore parental
 defaults, resets their noun to "PlayerPlace", and moves the account
 object back to #2 (player pool).
@@ -82,14 +82,14 @@ for c in list(chars):
     except Exception:
         continue
 
-    # Move character's inventory to #8
+    # Move character's inventory to #39
     for item in list(ichar.contents):
         try:
             move(item, storage)
         except Exception:
             pass
 
-    # Move character to #8
+    # Move character to #39
     try:
         move(ichar, storage)
     except Exception:

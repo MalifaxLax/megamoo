@@ -31,7 +31,7 @@ if auth_level(pobj) < 3:
 
 if not dobj:
     pobj.msg('Usage: @make <parent> = <name> [with <owner>]')
-    pobj.msg('Example: @make #35 = glove')
+    pobj.msg('Example: @make #31 = glove')
     pobj.msg('Example: @make sword = rapier')
     pobj.msg('Example: @make/drop chest = sack')
     return

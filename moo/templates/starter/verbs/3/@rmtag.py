@@ -12,8 +12,8 @@ Arguments:
 Auth: gm3+ (auth_level 3)
 
 Examples:
-    @rmtag #15 = zone/haven       Remove a specific tag from a category.
-    @rmtag #15 = zone             Remove an entire category.
+    @rmtag #11 = zone/haven       Remove a specific tag from a category.
+    @rmtag #11 = zone             Remove an entire category.
 """
 if auth_level(pobj) < 3:
     pobj.msg("Do what?")
@@ -21,8 +21,8 @@ if auth_level(pobj) < 3:
 
 if not dobj or prep != '=':
     pobj.msg("Usage: @rmtag <object> = <category>[/<tag>]")
-    pobj.msg("Example: @rmtag #15 = zone/haven")
-    pobj.msg("Example: @rmtag #15 = zone  (removes entire category)")
+    pobj.msg("Example: @rmtag #11 = zone/haven")
+    pobj.msg("Example: @rmtag #11 = zone  (removes entire category)")
     return
 
 tag_part = iobj.strip() if iobj else ''

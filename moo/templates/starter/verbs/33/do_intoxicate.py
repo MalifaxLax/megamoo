@@ -1,5 +1,5 @@
 """
-do_intoxicate verb on #53 (effects_utils).
+do_intoxicate verb on #33 (effects_utils).
 
 Effect handler for the 'intoxicate' effect. Called by the _tick dispatcher
 each time the intoxication effect fires on a character.

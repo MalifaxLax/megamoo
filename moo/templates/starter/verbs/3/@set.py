@@ -22,8 +22,8 @@ Abbrev:  @set=2, @val=2
 Auth: gm3+ (auth_level 3)
 
 Examples:
-    @set #15.hp = 100
-    @set #15.flags = ['shiny', 'heavy']
+    @set #11.hp = 100
+    @set #11.flags = ['shiny', 'heavy']
     @set me.title = Champion
     @set me.hp                  - show the current value of hp
 
@@ -45,7 +45,7 @@ else:
 if not spec or '.' not in spec:
     pobj.msg("Usage: @set <object>.<property> = <value>")
     pobj.msg("       @set <object>.<property>   (to show the value)")
-    pobj.msg("Example: @set #15.hp = 100")
+    pobj.msg("Example: @set #11.hp = 100")
     pobj.msg("Example: @set me.title = Champion")
     return
 
@@ -88,7 +88,7 @@ if not val_str:
 # #N token to db.get_object(N) (and $name to a system-property lookup) before
 # evaluating the literal. preprocess_objrefs is string/comment-aware, so a #N
 # inside a quoted string is left alone. This makes `#N` mean "the object"
-# uniformly -- `@set x.p = #5` and `@set x.items = [#5, #6]` both resolve,
+# uniformly -- `@set x.p = #5` and `@set x.items = [#5, #29]` both resolve,
 # instead of falling back to a raw "#5" string.
 try:
     from moo.verbs import preprocess_objrefs

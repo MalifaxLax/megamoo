@@ -14,7 +14,7 @@ the exit still works — it simply has no bearing, which is the right
 answer for a front door or an arch into a building, and the map
 will not invent one.
 
-The exit is created as a child of #22 (GoExit). If DESTINATION
+The exit is created as a child of #16 (GoExit). If DESTINATION
 is provided as #N and links to a valid room, a return exit of
 the same name is also created at the destination and linked
 back — unless the /noret switch is used.
@@ -87,7 +87,7 @@ new_exit = ou.make_exit(parent, db, pobj, noun=name, room=room, dest=dest)
 # its own still leaves the exit walkable by name.  room.exits is what
 # match_exit searches, and it resolves those numbers straight to objects
 # without ever looking at where they are -- an exit moved inside another
-# object went on answering to `go <name>` exactly as before.  And #17 go
+# object went on answering to `go <name>` exactly as before.  And #13 go
 # falls back to matching room.contents when match_exit finds nothing, so
 # an exit merely dropped from the list is still reachable if it is lying
 # in the room.

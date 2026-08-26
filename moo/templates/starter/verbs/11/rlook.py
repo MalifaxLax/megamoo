@@ -1,5 +1,5 @@
 """
-rlook verb on #15 (BaseRoom).
+rlook verb on #11 (BaseRoom).
 
 Staff-level room look that shows full debugging information. Displays
 object numbers (#objnum:name), hidden/invisible/dark status flags,

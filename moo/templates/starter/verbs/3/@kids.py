@@ -19,7 +19,7 @@ there was no way to look down it -- @ex shows an object's parent, so you
 could walk toward the root one step at a time, but nothing showed you what
 would break if you changed a prototype.
 
-/all is the one that answers that question, since a change to #11 reaches
+/all is the one that answers that question, since a change to #9 reaches
 its grandchildren just as surely as its children.
 """
 if auth_level(pobj) < 2:
@@ -31,7 +31,7 @@ MAX_HITS = 200
 spec = (args or '').strip()
 if not spec:
     pobj.msg('Usage: @kids <object>')
-    pobj.msg('Example: @kids #11')
+    pobj.msg('Example: @kids #9')
     pobj.msg('Example: @kids/all #1')
     return
 

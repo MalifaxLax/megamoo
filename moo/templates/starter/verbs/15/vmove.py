@@ -1,5 +1,5 @@
 """
-Virtual exit movement verb for #21 DirectionalExit.
+Virtual exit movement verb for #15 DirectionalExit.
 
 Handles movement through virtual exits — exits that have no
 object representation, with all data stored on the room's

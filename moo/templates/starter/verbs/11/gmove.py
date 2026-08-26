@@ -1,7 +1,7 @@
 """
 Internal verb: gmove (generic move)
 
-Defined on #15 (BaseRoom). Called programmatically via:
+Defined on #11 (BaseRoom). Called programmatically via:
     call_verb(room, 'gmove', dest=dest, succ=s, osucc=os, drop=d, odrop=od, rt=rt)
 
 Moves the player from this room to a destination room. Unlike the

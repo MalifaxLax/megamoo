@@ -1,5 +1,5 @@
 """
-open_ verb on #27 (ChestContainer).
+open_ verb on #21 (ChestContainer).
 
 Opens this container. If already open, displays the "already open"
 message. If locked, shows the ofail/oofail messages. If trapped,

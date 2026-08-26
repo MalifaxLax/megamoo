@@ -1,5 +1,5 @@
 """
-open_ verb on #23 (ClosableGoExit).
+open_ verb on #17 (ClosableGoExit).
 
 Opens this exit. If already open, displays the aopen message. If locked,
 displays the olopen message. If latched and online characters are in the

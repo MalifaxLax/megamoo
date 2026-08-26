@@ -1,5 +1,5 @@
 """
-under_look verb on #11 (GenericObject).
+under_look verb on #9 (GenericObject).
 
 Shows what is under this object. Called by the room-level look verb
 when the player uses: look under <object>

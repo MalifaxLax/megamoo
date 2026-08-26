@@ -10,8 +10,8 @@ Arguments:
     alias   - The name to remove. One name, no spaces or commas.
 
 Examples:
-    @rmalias #17.inventory = i
-    @rmalias #15.look_here = glance
+    @rmalias #13.inventory = i
+    @rmalias #11.look_here = glance
 
 Refuses to remove the verb's primary (first) name -- that is the name its
 source file is stored under -- and refuses to remove the last one, which

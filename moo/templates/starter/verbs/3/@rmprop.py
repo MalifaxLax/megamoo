@@ -18,7 +18,7 @@ if auth_level(pobj) < 3:
 spec = args.strip() if args else ''
 if not spec or '.' not in spec:
     pobj.msg("Usage: @rmprop <object>.<property>")
-    pobj.msg("Example: @rmprop #15.hp")
+    pobj.msg("Example: @rmprop #11.hp")
     return
 obj_part, prop_name = spec.rsplit('.', 1)
 prop_name = prop_name.strip()

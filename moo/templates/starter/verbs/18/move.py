@@ -1,5 +1,5 @@
 """
-move verb on #24 (ClimbableExit).
+move verb on #18 (ClimbableExit).
 
 Moves a player through a climbable exit after checking closed state,
 lock restrictions, and a skill-based climb difficulty check. If the

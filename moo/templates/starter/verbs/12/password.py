@@ -1,5 +1,5 @@
 """
-password verb on #16 (OOCRoom).
+password verb on #12 (OOCRoom).
 
 Changes the player's account password. Prompts for confirmation to
 ensure the password was typed correctly.

@@ -1,5 +1,5 @@
 """
-go_ verb on #51 (Enter Game Portal).
+go_ verb on #44 (Enter Game Portal).
 
 Handles the "enter game" portal in the OOC lobby. When a player goes
 through this portal, presents a menu of their completed characters

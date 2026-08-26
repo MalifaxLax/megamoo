@@ -1,5 +1,5 @@
 """
-unlatch on #16 (OCRoom)
+unlatch on #12 (OCRoom)
 Usage: unlatch <object>
 
 Abbrev:  unlatch=5

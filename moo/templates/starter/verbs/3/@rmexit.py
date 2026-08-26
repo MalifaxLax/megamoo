@@ -1,7 +1,7 @@
 """
 Removes an exit from the current room. Handles both virtual (directional)
 exits and object-based exits. Virtual exits have their dexits entry cleared;
-object exits are moved to #9 (trash).
+object exits are moved to #40 (trash).
 
 Usage: @rmexit <exit>
 
@@ -13,7 +13,7 @@ Auth: gm2+ (auth_level 2)
 
 Note: For virtual exits, clears the dexits slot and removes from obvexits.
 For object exits, removes from the room's exits and obvexits lists and
-moves the exit object to #9 (trash room).
+moves the exit object to #40 (trash room).
 """
 if auth_level(pobj) < 2:
     pobj.msg("Do what?")
@@ -78,7 +78,7 @@ if type(exit) == int:
 
     pobj.msg(f"Removed virtual exit &<245>{dname}&n{dest_str}.")
 else:
-    # Object exit — move to #9 and remove from exits/obvexits
+    # Object exit — move to #40 and remove from exits/obvexits
     target = exit
 
     answer = yield f"Remove exit &<245>#{target.objnum}:{target.name}&n? [y/n] "

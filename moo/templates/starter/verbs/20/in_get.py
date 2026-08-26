@@ -1,5 +1,5 @@
 """
-in_get verb on #26 (BaseContainer).
+in_get verb on #20 (BaseContainer).
 
 Retrieves an item from inside this container. Called by the room-level
 get verb when the player uses: get <item> from <container>

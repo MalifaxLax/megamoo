@@ -8,7 +8,7 @@ west, ne, nw, se, sw, u, d, o, in (or full names).
 If DESTINATION is provided as #N, the exit will be linked to
 that room. Otherwise the exit is created unlinked.
 
-The exit is created as a child of #21 (DirectionalExit), placed
+The exit is created as a child of #15 (DirectionalExit), placed
 in the current room, added to the room's exits and obvexits
 lists, and given default success/osuccess/odrop messages.
 

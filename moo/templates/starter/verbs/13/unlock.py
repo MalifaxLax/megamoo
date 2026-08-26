@@ -1,5 +1,5 @@
 """
-unlock on #17 (ICRoom)
+unlock on #13 (ICRoom)
 Usage: unlock <object> with <key>
 
 Abbrev:  unlock=5

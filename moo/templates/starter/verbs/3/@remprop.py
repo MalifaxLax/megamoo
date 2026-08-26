@@ -10,7 +10,7 @@ raw = args
 # Validate input: must contain a dot to separate object from property name
 if not raw or '.' not in raw:
     pobj.msg("Usage: @remprop <object>.<property>")
-    pobj.msg("Example: @remprop #15.hp")
+    pobj.msg("Example: @remprop #11.hp")
     return
 
 # Split object reference from property name at the last dot

@@ -63,8 +63,8 @@ cannot.
 </p>
 
 <p>
-The two room prototypes are <code>#16</code> for out-of-character rooms and
-<code>#17</code> for in-character ones. Put a verb on <code>#17</code> and every
+The two room prototypes are <code>#12</code> for out-of-character rooms and
+<code>#13</code> for in-character ones. Put a verb on <code>#13</code> and every
 IC room in your world has it. Put it on one room, and only that room does.
 </p>
 
@@ -157,10 +157,10 @@ nothing happens and the normal behaviour continues.
 <p>
 Say you want a <code>pull</code> command. Normally it just reports that nothing
 happens, with slightly different wording depending on what was pulled. Put this
-on <code>#17</code> and every IC room has it:
+on <code>#13</code> and every IC room has it:
 </p>
 
-<div class="term"><code><span class="c"># the shared `pull` verb on #17</span>
+<div class="term"><code><span class="c"># the shared `pull` verb on #13</span>
 if not dobj:
     pobj.msg("Pull what?")
     return
@@ -288,7 +288,7 @@ MasterVerb splits the line at the first preposition it finds:
 <tr><td><code>dobj</code></td><td>The direct object — what the command acts on.</td></tr>
 <tr><td><code>prep</code></td><td>The preposition found: <em>in</em>, <em>from</em>, <em>to</em>, <em>on</em>…</td></tr>
 <tr><td><code>iobj</code></td><td>The indirect object — what follows the preposition.</td></tr>
-<tr><td><code>prep2</code> / <code>dobj2</code></td><td>A <em>second</em> preposition and everything after it. This is how <code>@move ball to #13 with A ball flies in!</code> keeps its message.</td></tr>
+<tr><td><code>prep2</code> / <code>dobj2</code></td><td>A <em>second</em> preposition and everything after it. This is how <code>@move ball to #201 with A ball flies in!</code> keeps its message.</td></tr>
 <tr><td><code>lhs</code> / <code>rhs</code></td><td>Everything left and right of the preposition.</td></tr>
 <tr><td><code>args</code></td><td>The whole line after the command word.</td></tr>
 <tr><td><code>switches</code></td><td>Options typed as <code>look/brief</code>.</td></tr>
@@ -305,8 +305,8 @@ room, your hands, or inside a container.
 
 <p>
 Single-character prepositions work without spaces, which is why
-<code>@desc #14=A room</code> parses the same as
-<code>@desc #14 = A room</code>.
+<code>@desc #201=A room</code> parses the same as
+<code>@desc #201 = A room</code>.
 </p>
 
 <div class="warn">
@@ -320,7 +320,7 @@ Single-character prepositions work without spaces, which is why
 prep = <span class="o">'='</span>
 iobj = <span class="o">'3'</span></code></div>
     <p>This is deliberate and it is not going to change: it is what makes
-       <code>@name #10=Sword</code> work. What it means for you is that a verb
+       <code>@name #201=Sword</code> work. What it means for you is that a verb
        whose arguments may contain <code>=</code> — free text, or options
        written as <code>key=value</code> — should read <code>argstr</code>, the
        whole unsplit argument string, and split it itself. Everything else
@@ -330,6 +330,55 @@ iobj = <span class="o">'3'</span></code></div>
        <code>=</code>, or free text a player might type an <code>=</code> into,
        parse <code>argstr</code>. Otherwise trust the slots.</p>
 </div>
+
+<h3>Verbs nobody types: <code>Type: function</code></h3>
+
+<p>
+A hook or a utility verb is never typed. <code>look_here</code>,
+<code>in_get</code>, <code>$string_utils:capitalise</code> — these are reached
+from other code through <code>call_verb</code>, which hands them their
+arguments positionally. There is no command line behind them, so there is
+nothing for the parser to split.
+</p>
+
+<p>
+Declaring one a function says so, in the verb file itself:
+</p>
+
+<pre><code>"""
+name_match on $match_utils.
+
+Type:    function
+"""</code></pre>
+
+<p>
+That skips the whole command-parsing lifecycle. Measured against
+<code>MasterVerb</code> on the same verb, parsing was
+<strong>2.06&micro;s of a 6.02&micro;s call</strong> — 34% of it, spent
+deciding that an empty argument string contains no direct object. It is not a
+new execution path: a verb with no type instance was always legal, and this
+reaches that state deliberately rather than by a verb type failing to build.
+</p>
+
+<div class="note">
+    <p><strong>When not to use it.</strong> If the verb reads
+       <code>dobj</code>, <code>iobj</code>, <code>prep</code>,
+       <code>lhs</code>/<code>rhs</code>, <code>switches</code> or
+       <code>regex_match</code>, it wants the parse and must stay a
+       <code>MasterVerb</code>.</p>
+    <p>That includes a hook called as
+       <code>call_verb(npc, 'react', args='angry')</code>:
+       <code>MasterVerb</code> sets <code>dobj</code> to
+       <code>'angry'</code>, and a function verb leaves it
+       <code>''</code>. The difference is silent, which is why it is worth
+       stating twice.</p>
+</div>
+
+<p>
+<code>at_pre_cmd()</code> does not fire on a function verb either, and for the
+same reason: the veto exists to stop a <em>typed</em> command before its body
+runs, and there is no typed command here to stop.
+</p>
 
 <h3>When you need a custom type</h3>
 
@@ -411,8 +460,8 @@ Two commands, in this order. <code>@adverb</code> creates the verb;
 <code>@program</code> opens an editor for its code.
 </p>
 
-<div class="term"><code><span class="p">&gt;</span> @adverb #17.pull
-<span class="p">&gt;</span> @program #17.pull</code></div>
+<div class="term"><code><span class="p">&gt;</span> @adverb #13.pull
+<span class="p">&gt;</span> @program #13.pull</code></div>
 
 <h3>Aliases and minimums</h3>
 
@@ -421,12 +470,12 @@ A verb can answer to several names, and each name can be abbreviated. The number
 in brackets is the fewest letters that will do:
 </p>
 
-<div class="term"><code><span class="p">&gt;</span> @adverb #17.examine(3),look(1),l
+<div class="term"><code><span class="p">&gt;</span> @adverb #13.examine(3),look(1),l
 <span class="c">  examine, exa, look, l all work — but 'ex' does not</span></code></div>
 
 <p>
 A minimum of 0 — the default — means the name must be typed in full. Set one
-later with <code>@min #17.examine = 3</code>. Abbreviations count the
+later with <code>@min #13.examine = 3</code>. Abbreviations count the
 <code>@</code>: <code>@article</code> with a minimum of 4 answers to
 <code>@art</code>.
 </p>
@@ -461,7 +510,7 @@ Every verb carries a short permission string, and the default —
 <code>w</code> only if others should be able to rewrite it.
 </p>
 
-<div class="term"><code><span class="p">&gt;</span> @adverb #17.pull with rx      <span class="c"># the default, spelled out</span></code></div>
+<div class="term"><code><span class="p">&gt;</span> @adverb #13.pull with rx      <span class="c"># the default, spelled out</span></code></div>
 
 <p>
 Permissions are about the verb's code. Whether a <em>player</em> may use the
@@ -649,7 +698,7 @@ has already done it.
 <div class="warn">
     <span class="label">Where the world looks</span>
     <p>Each world remembers its own verb folder in
-       <code>#8.moo_verb_path</code>, and <code>megamoo init</code> points
+       <code>#39.moo_verb_path</code>, and <code>megamoo init</code> points
        it at the <code>verbs/</code> directory beside your world file.
        Move a world to a differently-named folder without updating that
        and your edits quietly stop landing, because the world is still

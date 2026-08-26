@@ -1,5 +1,5 @@
 """
-_tick verb on #53 (effects_utils).
+_tick verb on #33 (effects_utils).
 
 Periodic ticker callback that drives the effects system. Called by the
 ticker system at regular intervals. Iterates through all registered

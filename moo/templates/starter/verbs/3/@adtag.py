@@ -12,7 +12,7 @@ Arguments:
 Auth: gm3+ (auth_level 3)
 
 Examples:
-    @adtag #15 = zone/haven
+    @adtag #11 = zone/haven
     @adtag sword = weapon/blade
     @adtag me = staff
 """
@@ -22,7 +22,7 @@ if auth_level(pobj) < 3:
 
 if not dobj or prep != '=':
     pobj.msg("Usage: @adtag <object> = <category>[/<tag>]")
-    pobj.msg("Example: @adtag #15 = zone/haven")
+    pobj.msg("Example: @adtag #11 = zone/haven")
     pobj.msg("Example: @adtag sword = weapon/blade")
     pobj.msg("Example: @adtag me = staff")
     return

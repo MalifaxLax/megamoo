@@ -22,8 +22,8 @@ if auth_level(pobj) < 3:
 spec = dobj.strip() if prep == '=' and dobj else args.strip()
 if not spec or '.' not in spec:
     pobj.msg("Usage: @adprop <object>.<property> [= <value>]")
-    pobj.msg("Example: @adprop #15.hp")
-    pobj.msg("Example: @adprop #15.exits = []")
+    pobj.msg("Example: @adprop #11.hp")
+    pobj.msg("Example: @adprop #11.exits = []")
     pobj.msg("Example: @adprop me.score = 0")
     return
 

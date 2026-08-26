@@ -11,7 +11,7 @@ Arguments:
 Abbrev:  @virtualize=5
 Auth: gm2+ (auth_level 2)
 
-Note: The exit must be a directional exit (descended from #21) located in
+Note: The exit must be a directional exit (descended from #15) located in
 the current room. After conversion, the exit data lives in the room's
 dexits list and the direction is added to obvexits. The original exit
 object is permanently recycled.
@@ -38,7 +38,7 @@ if not target:
     pobj.msg(f"Exit '{dobj}' not found in this room.")
     return
 
-# Verify it's a directional exit (child of #21).
+# Verify it's a directional exit (child of #15).
 # The inheritance link is `parent` (an objnum); there is no `_parent_id`
 # attribute, so reading that one ended the walk on the first step and no
 # exit ever qualified.  #0 is its own parent, hence the seen-set.

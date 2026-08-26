@@ -1,5 +1,5 @@
 """
-close_ verb on #23 (ClosableGoExit).
+close_ verb on #17 (ClosableGoExit).
 
 Closes this exit. If already closed, displays the aclose message. Sets
 the closed property to 1, sends close/oclose messages, and also closes

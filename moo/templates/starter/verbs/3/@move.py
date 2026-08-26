@@ -10,9 +10,9 @@ DESTINATION must be a room or container ID in form #N.
 MESSAGE is optional arrival text shown to the destination.
 
 Examples:
-    @move ball to #13
-    @move ball to #13 with A ball comes flying into the room!
-    @move #50 to #14
+    @move ball to #41
+    @move ball to #201 with A ball comes flying into the room!
+    @move #50 to #42
 """
 if auth_level(pobj) < 2:
     pobj.msg("Do what?")
@@ -30,8 +30,8 @@ if not dobj:
 
 # The parser splits on both prepositions, so take the second slot.
 #
-# `@move ball to #13 with A ball comes flying in!` arrives as
-# dobj='ball', prep='to', iobj='#13', prep2='with', dobj2='A ball comes
+# `@move ball to #201 with A ball comes flying in!` arrives as
+# dobj='ball', prep='to', iobj='#201', prep2='with', dobj2='A ball comes
 # flying in!'.  This verb looked for ' with ' inside iobj, which holds
 # only the destination, so the condition was never true and the
 # documented message was silently dropped -- since the verb was written.

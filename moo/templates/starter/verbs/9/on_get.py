@@ -1,5 +1,5 @@
 """
-on_get verb on #11 (GenericObject).
+on_get verb on #9 (GenericObject).
 
 Retrieves an item from on top of this object. Called by the room-level get
 verb when the player uses: get <item> from off <object>

@@ -7,13 +7,13 @@ their abbreviations (n, s, e, w, u, d, o).
 
 When invoked, calls the room's match_exit verb to find a
 matching exit (object or virtual). If a virtual exit is found
-(integer index), delegates to #21's vmove verb. If an object
+(integer index), delegates to #15's vmove verb. If an object
 exit is found, calls the exit's invoke verb directly.
 
 Room display after movement is handled by the at_post_move
 hook on #3 (Player_Character), not here.
 
-Goes on #17 (ICRoom) so all IC rooms inherit it.
+Goes on #13 (ICRoom) so all IC rooms inherit it.
 Verb names are set from the room's directions property.
 
 Aliases: s, e, w, ne, nw, se, sw, u, d, o, in, north, south, east, west, northeast, northwest, southeast, southwest, up, down, out
@@ -27,7 +27,7 @@ if not room or not room.is_room:
 # Can the character act? do_wait covers roundtime as well as the
 # immobilising conditions, and emits its own message.
 #
-# IC only. The #15 and #16 copies of this verb are deliberately left
+# IC only. The #11 and #12 copies of this verb are deliberately left
 # ungated so that roundtime from a fight never strands anyone in an
 # out-of-character room.
 if pobj.do_wait():
@@ -45,7 +45,7 @@ exit = call_verb(room, 'match_exit', argstr=verb)
 if exit is None:
     pobj.msg("You can't go that way.")
 elif type(exit) == int:
-    # Virtual exit — delegate to #21 DirectionalExit's vmove
+    # Virtual exit — delegate to #15 DirectionalExit's vmove
     call_verb(db.get_object(15), 'vmove', enum=exit)
 else:
     # Climbable/jumpable exits require specific commands

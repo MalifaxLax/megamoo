@@ -20,7 +20,7 @@ if auth_level(pobj) < 3:
 spec = args.strip() if args else ''
 if not spec or '.' not in spec:
     pobj.msg("Usage: @rmverb <object>.<verb_name>")
-    pobj.msg("Example: @rmverb #15.look")
+    pobj.msg("Example: @rmverb #11.look")
     return
 obj_part, verb_name = spec.rsplit('.', 1)
 verb_name = verb_name.strip()

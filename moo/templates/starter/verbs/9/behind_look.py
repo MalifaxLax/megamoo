@@ -1,5 +1,5 @@
 """
-behind_look verb on #11 (GenericObject).
+behind_look verb on #9 (GenericObject).
 
 Shows what is behind this object. Called by the room-level look verb when
 the player uses: look behind <object>

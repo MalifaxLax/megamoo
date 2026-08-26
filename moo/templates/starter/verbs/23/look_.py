@@ -1,5 +1,5 @@
 """
-look_ verb on #30 (BaseFurniture).
+look_ verb on #23 (BaseFurniture).
 
 Displays the furniture's description, then anyone else sitting or lying
 on it -- "Sinda is sitting there." The looker is left out: they know
@@ -17,8 +17,8 @@ Hidden:  yes
 item = this
 desc = item.description
 
-# The description alone, no name header -- the same as #17:look and
-# #26:look_, which this hook returns before and would otherwise
+# The description alone, no name header -- the same as #13:look and
+# #20:look_, which this hook returns before and would otherwise
 # contradict.  No leading blank either: that newline belonged to the
 # header line, and with the header gone it was a gap above nothing,
 # which object-look had and character-look did not.
@@ -39,7 +39,7 @@ if sitters and pobj.location:
     groups = {}
     for objnum in sitters:
         # Not yourself: you are the one looking, and you know where you
-        # are sitting.  #15:look_here leaves the looker out of its
+        # are sitting.  #11:look_here leaves the looker out of its
         # furniture line for the same reason.
         if objnum == pobj.objnum:
             continue
@@ -55,7 +55,7 @@ if sitters and pobj.location:
                 pstring = 'lying'
             else:
                 pstring = 'here'
-            # esub here, as #15:look_here does: the position strings carry
+            # esub here, as #11:look_here does: the position strings carry
             # pronouns -- 'lying on &pp back' -- and printed raw the sigil
             # reaches the player.  Per character, since the pronoun is
             # theirs, before they are grouped by the result.

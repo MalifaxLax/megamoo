@@ -129,7 +129,7 @@ GROUPS = [
         ('@verbauth', 'Set or read the level a command requires.'),
         ('@hideverb', 'Hide a command so nobody can type it.'),
         ('@unhideverb', 'Reverse that.'),
-        ('@alias', "Show a command's names, or add one: <code>@alias #17.look = observe(3)</code>."),
+        ('@alias', "Show a command's names, or add one: <code>@alias #13.look = observe(3)</code>."),
         ('@rmalias', 'Remove one of those names, leaving the command itself.'),
     ]),
     ('numbers', 'Object numbers', [

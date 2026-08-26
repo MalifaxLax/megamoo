@@ -6,7 +6,7 @@ Changes the parent of an object or range of objects.
 
 Examples:
     @parent #100 = #4
-    @parent sword = #30
+    @parent sword = #23
     @parent #500 to #520 = #1
 
 Abbrev:  @parent=4

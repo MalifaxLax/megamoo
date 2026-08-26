@@ -1,5 +1,5 @@
 """
-lock_ on #23 (ClosableGoExit)
+lock_ on #17 (ClosableGoExit)
 Called by room verbs: call_verb(target, 'lock_', iobj=key_obj)
 Locks this exit. Checks lockable, closed, already locked.
 If this.key is set, validates iobj.key matches or is 'skeleton'.
@@ -33,7 +33,7 @@ if _door_key:
                 getattr(this, 'olockn', None) or '&S struggles to lock &D.',
                 exclude=[pobj], sub=pobj, dob=this)
         return
-    # getattr: `key` is declared on #23, not on items, so a bare read
+    # getattr: `key` is declared on #17, not on items, so a bare read
     # raised E_PROPNF for whatever the player happened to be holding --
     # the fit check below already treats a non-matching value as the
     # wrong key, which is exactly what a thing with no key is.

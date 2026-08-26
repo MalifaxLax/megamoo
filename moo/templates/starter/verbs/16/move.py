@@ -1,5 +1,5 @@
 """
-move verb on #22 (GoExit).
+move verb on #16 (GoExit).
 
 Moves a player through this exit after checking closed state and lock
 restrictions. If the exit is closed, shows the failure message. If a

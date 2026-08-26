@@ -16,7 +16,7 @@ An `@` anywhere in the text is replaced by your name and nothing is
 prepended -- that is how you put yourself in the middle of a sentence
 rather than at the front.
 
-Sits beside `say` on #15 rather than on #17, so you can emote anywhere
+Sits beside `say` on #11 rather than on #13, so you can emote anywhere
 you can talk, the lobby included. It still asks do_wait, which is a
 no-op for a character carrying no afflictions and is why you cannot
 emote your way through being paralysed.

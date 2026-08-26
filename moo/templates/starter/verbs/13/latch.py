@@ -1,5 +1,5 @@
 """
-latch on #17 (ICRoom)
+latch on #13 (ICRoom)
 Usage: latch <object>
 
 Abbrev:  latch=3

@@ -257,7 +257,7 @@ hand, and this is it:
 <span class="c"># 3. Restart. Verb files are loaded from disk on the way up.</span>
 <span class="p">$</span> megamoo world.db
 <span class="o">[autoreload] created #3:@alias from disk</span>
-<span class="o">[autoreload] updated #23:lock_ from disk</span></code></div>
+<span class="o">[autoreload] updated #17:lock_ from disk</span></code></div>
 
 <div class="note">
     <span class="label">Deleting a file does not delete the command</span>
@@ -265,7 +265,7 @@ hand, and this is it:
        file you removed is still in <code>world.db</code> and still
        reachable, with no source on disk to read — the worst of both. Remove
        it in-game as well:</p>
-    <div class="term"><code><span class="p">&gt;</span> @rmverb #23.lock</code></div>
+    <div class="term"><code><span class="p">&gt;</span> @rmverb #17.lock</code></div>
     <p>Until you do, that command survives every restart.</p>
 </div>
 

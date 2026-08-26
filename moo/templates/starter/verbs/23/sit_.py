@@ -1,5 +1,5 @@
 """
-sit_ verb on #30 (BaseFurniture).
+sit_ verb on #23 (BaseFurniture).
 
 Makes a player sit down at this furniture. Checks seat capacity, removes
 the player from any previous furniture, sets position to 6 (sitting),

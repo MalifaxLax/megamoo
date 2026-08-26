@@ -1,5 +1,5 @@
 """
-lay_ verb on #30 (BaseFurniture).
+lay_ verb on #23 (BaseFurniture).
 
 Makes a player lie down on this furniture. Checks seat capacity, removes
 the player from any previous furniture, sets position to 8 (lying on

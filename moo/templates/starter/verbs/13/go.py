@@ -1,5 +1,5 @@
 """
-go verb on #17 (ICRoom)
+go verb on #13 (ICRoom)
 
 Usage: go <exit>
        go <direction>
@@ -54,7 +54,7 @@ if not target_name:
 exit = call_verb(room, 'match_exit', argstr=target_name)
 
 if exit is not None and type(exit) == int:
-    # Virtual exit — delegate to #21's vmove
+    # Virtual exit — delegate to #15's vmove
     call_verb(db.get_object(15), 'vmove', enum=exit)
     return
 
@@ -97,7 +97,7 @@ if sub_prep:
 # The contents fallback above matches any object in the room, which is
 # deliberate -- chargen's #300 and the Orb Wars entry are reached that way
 # and are not in any room's exits list -- and the go_ hook has already had
-# its chance at it.  What is left below belongs to #20 BaseExit: climbable
+# its chance at it.  What is left below belongs to #14 BaseExit: climbable
 # and jumpable are its properties and invoke is its verb, so an ordinary
 # object reaching this line handed the player E_PROPNF on a missing flag
 # and then a raw KeyError from the missing verb.  `go drapes` reported

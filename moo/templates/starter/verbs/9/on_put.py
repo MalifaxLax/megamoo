@@ -1,5 +1,5 @@
 """
-on_put verb on #11 (GenericObject).
+on_put verb on #9 (GenericObject).
 
 Places an item on top of this object. Called by the room-level put verb
 when the player uses: put <item> on <object>

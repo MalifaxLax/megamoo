@@ -30,7 +30,7 @@ if auth_level(pobj) < 2:
 if not args or not args.strip():
     pobj.msg('Usage: @find <text> [in <room>] [isa <parent>]')
     pobj.msg('Example: @find lantern')
-    pobj.msg('Example: @find/exact sword isa #12')
+    pobj.msg('Example: @find/exact sword isa #10')
     pobj.msg('Example: @find dummy in #401')
     return
 

@@ -1,5 +1,5 @@
 """
-under_put verb on #11 (GenericObject).
+under_put verb on #9 (GenericObject).
 
 Places an item under this object. Called by the room-level put verb
 when the player uses: put <item> under <object>

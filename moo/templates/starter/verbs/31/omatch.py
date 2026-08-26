@@ -77,7 +77,7 @@ def omatch(inp: str, pobj: MOOObject, db: Database = None) -> Optional[MOOObject
     if low == 'here':
         return pobj.location  # None if the player is nowhere
 
-    # --- Direct dbref: "#N" (e.g. "#3", "#17") ---
+    # --- Direct dbref: "#N" (e.g. "#3", "#13") ---
     if low.startswith('#') and low[1:].isdigit():
         rdb = _resolve_db(pobj, db)
         if rdb:

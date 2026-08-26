@@ -1,12 +1,12 @@
 """
-go_ verb for the chargen arch (#7) in room #14.
+go_ verb for the chargen arch (#43) in room #42.
 
 Runs character generation when a player enters the arch. Uses yield for
 each interactive step. Returns True to prevent normal exit movement.
 
-#7 is the arch exit. #6 is the isolation container (parented to #1,
-no verbs) — pobj is moved into #6 for the duration of chargen, then
-moved back to room #14 when done or cancelled.
+#43 is the arch exit. #29 is the isolation container (parented to #1,
+no verbs) — pobj is moved into #29 for the duration of chargen, then
+moved back to room #42 when done or cancelled.
 
 Character is created immediately at slot selection. Each step writes its
 data directly to the character object; resume is handled by reading
@@ -376,7 +376,7 @@ def _run_chargen():
         pronoun = 'man' if gender == 'male' else 'woman'
         _set(ichar, 'desclist', [f"{first_name} {last_name} is an unremarkable {pronoun}."])
 
-        # Leave home unset — the portal on #51 drops the character into the
+        # Leave home unset — the portal on #44 drops the character into the
         # IC room named by $globals.ic_dropin_room on first entry.
         _set(ichar, 'last_location', 0)
 

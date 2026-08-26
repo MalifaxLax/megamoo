@@ -28,7 +28,7 @@ def make_exit(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
     4. Setting default success/osuccess/odrop messages using fname/rfname.
 
     Args:
-        parent: The exit parent object (#20, #21, #22, #23, etc.).
+        parent: The exit parent object (#14, #15, #16, #17, etc.).
         db:     The database instance.
         pobj:   The player creating the exit.
         noun:   The exit's noun (e.g. 'north', 'door', 'gate').
@@ -45,7 +45,7 @@ def make_exit(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
     # Movement messages, naming the direction this exit actually goes.
     #
     # Step 4 of the list above, which the body did not do.  Every exit
-    # therefore inherited #20 BaseExit's literals -- "You walk out." going
+    # therefore inherited #14 BaseExit's literals -- "You walk out." going
     # north, south and every other way -- and an osuccess still written in
     # the %% sigil from before it moved to &, so the watching room got
     # "%%S %%OMODE out." on every move through a created exit.

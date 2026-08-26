@@ -1,7 +1,7 @@
 """
 Internal verb: gmove (generic move)
 
-Defined on #20 (BaseExit). Called programmatically via:
+Defined on #14 (BaseExit). Called programmatically via:
     call_verb(exit, 'gmove')
 
 Moves the player through an exit to its destination room. Handles

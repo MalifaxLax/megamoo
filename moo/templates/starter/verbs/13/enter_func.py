@@ -1,5 +1,5 @@
 """
-enter_func on #17 (ICRoom)
+enter_func on #13 (ICRoom)
 Called when an object enters this room.
 args = objnum string of the arriving object.
 Appends characters to this room's plist.

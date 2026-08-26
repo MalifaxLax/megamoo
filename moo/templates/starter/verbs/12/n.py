@@ -7,13 +7,13 @@ their abbreviations (n, s, e, w, u, d, o).
 
 When invoked, calls the room's match_exit verb to find a
 matching exit (object or virtual). If a virtual exit is found
-(integer index), delegates to #21's vmove verb. If an object
+(integer index), delegates to #15's vmove verb. If an object
 exit is found, calls the exit's invoke verb directly.
 
 Room display after movement is handled by the at_post_move
 hook on #3 (Player_Character), not here.
 
-Goes on #16 (OCRoom) and #17 (ICRoom) so all rooms inherit it.
+Goes on #12 (OCRoom) and #13 (ICRoom) so all rooms inherit it.
 Verb names are set from the room's directions property.
 
 Aliases: s, e, w, ne, nw, se, sw, u, d, o, in, north, south, east, west, northeast, northwest, southeast, southwest, up, down, out
@@ -36,7 +36,7 @@ exit = call_verb(room, 'match_exit', argstr=verb)
 if exit is None:
     pobj.msg("You can't go that way.")
 elif type(exit) == int:
-    # Virtual exit — delegate to #21 DirectionalExit's vmove
+    # Virtual exit — delegate to #15 DirectionalExit's vmove
     call_verb(db.get_object(15), 'vmove', enum=exit)
 else:
     # Object exit — check for go_ override on the exit first

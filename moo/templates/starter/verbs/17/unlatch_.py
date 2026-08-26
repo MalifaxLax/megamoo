@@ -1,5 +1,5 @@
 """
-unlatch_ on #23 (ClosableGoExit)
+unlatch_ on #17 (ClosableGoExit)
 Called by room verbs: call_verb(target, 'unlatch_')
 Unlatches this exit. Checks already not latched.
 Sets latched=False on this and reverse exit.

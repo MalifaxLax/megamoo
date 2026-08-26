@@ -206,7 +206,7 @@ def make_object(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
 
     Examples::
 
-        # Create a sword from the GenericItem parent (#11)
+        # Create a sword from the GenericItem parent (#9)
         sword = make_object(db.get_object(11), db, pobj, noun='sword')
 
         # Create a copy with the same name as the parent

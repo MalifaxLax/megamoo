@@ -9,7 +9,7 @@ Examples:
     +show me
     +show here
     +show sword
-    +show #15
+    +show #11
 """
 
 if auth_level(pobj) < 1:

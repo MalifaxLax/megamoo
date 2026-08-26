@@ -1,5 +1,5 @@
 """
-behind_get verb on #11 (GenericObject).
+behind_get verb on #9 (GenericObject).
 
 Retrieves an item from behind this object. Called by the room-level get
 verb when the player uses: get <item> from behind <object>

@@ -33,7 +33,7 @@ if not args or not args.strip():
     pobj.msg('Example: @grep do_wait')
     pobj.msg('Example: @grep/names adverb          (substring)')
     pobj.msg('Example: @grep/names/re ^@r          (regex needs /re)')
-    pobj.msg('Example: @grep/count pobj.msg on #17')
+    pobj.msg('Example: @grep/count pobj.msg on #13')
     return
 
 MAX_HITS = 200

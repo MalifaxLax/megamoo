@@ -16,7 +16,7 @@ Abbrev:  +decompile=4
 Auth: gm3+ (auth_level 3)
 
 Examples:
-    +decompile #6.eval
+    +decompile #29.eval
     +decompile/line #5089.set_name
     +decompile/line/body #5089.set_name
 """
@@ -29,7 +29,7 @@ raw = args
 # Validate input: must contain a dot to separate object from verb name
 if not raw or '.' not in raw:
     pobj.msg("Usage: +decompile <object>.<verb_name>")
-    pobj.msg("Example: +decompile #6.eval")
+    pobj.msg("Example: +decompile #29.eval")
     return
 
 # Split object reference from verb name at the last dot

@@ -43,7 +43,7 @@ spec = (args or '').strip()
 if not spec:
     pobj.msg('Usage: @dump <object>')
     pobj.msg('Example: @dump #92')
-    pobj.msg('Example: @dump/screen #12')
+    pobj.msg('Example: @dump/screen #10')
     return
 
 candidates = list(pobj.location.contents) + list(pobj.contents)

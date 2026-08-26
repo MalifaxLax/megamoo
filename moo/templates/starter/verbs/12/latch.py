@@ -1,5 +1,5 @@
 """
-latch on #16 (OCRoom)
+latch on #12 (OCRoom)
 Usage: latch <object>
 
 Abbrev:  latch=3

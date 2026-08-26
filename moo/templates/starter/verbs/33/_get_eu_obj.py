@@ -20,7 +20,7 @@ def _get_eu_obj():
     The system object (``#0``) has a property ``eu`` that references the
     EffectsUtils object. This reference can be stored as:
     - A direct MOOObject reference (has ``.objnum`` attribute)
-    - A string like ``"#53"``
+    - A string like ``"#33"``
     - An integer object number
 
     Returns:
@@ -41,7 +41,7 @@ def _get_eu_obj():
     if hasattr(eu_ref, 'objnum'):
         # Already a MOOObject
         return eu_ref
-    # String "#53" form
+    # String "#33" form
     if isinstance(eu_ref, str) and eu_ref.startswith('#'):
         return _db.get_object(int(eu_ref[1:]))
     # Plain integer

@@ -1,5 +1,5 @@
 """
-latch_ on #23 (ClosableGoExit)
+latch_ on #17 (ClosableGoExit)
 Called by room verbs: call_verb(target, 'latch_')
 Latches this exit. Checks latchable, closed, already latched.
 Sets latched=True on this and reverse exit.

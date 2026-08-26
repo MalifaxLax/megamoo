@@ -1,5 +1,5 @@
 """
-lock on #17 (ICRoom)
+lock on #13 (ICRoom)
 Usage: lock <object> [with <key>]
 
 Abbrev:  lock=3

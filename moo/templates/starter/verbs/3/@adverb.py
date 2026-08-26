@@ -20,10 +20,10 @@ that name alone, and overrides min=N.
 @min and @verbauth set the same two things on a verb that already exists.
 
 Examples:
-    @adverb #7.look,l
+    @adverb #43.look,l
     @adverb #2.examine(3),look(1),l
     @adverb #2.examine,x with rx min=3
-    @adverb #15.reset with rwx base
+    @adverb #11.reset with rwx base
     @adverb/hidden #5.at_post_move
     @adverb #3.@telq with rx auth=3
 
@@ -51,7 +51,7 @@ opts = tail.strip() if sep else ''
 # Validate input: must contain a dot to separate object from verb name(s)
 if not spec or '.' not in spec:
     pobj.msg('Usage: @adverb <object>.<name[(min)][,...]> [with <perms> [base] [min=N] [auth=N]]')
-    pobj.msg('Example: @adverb #7.look,l')
+    pobj.msg('Example: @adverb #43.look,l')
     pobj.msg('Example: @adverb #2.examine(3),look(1),l')
     pobj.msg('Example: @adverb #2.examine,x with rx min=3')
 else:

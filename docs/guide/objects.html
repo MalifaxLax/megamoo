@@ -145,8 +145,8 @@ named objects.
 <p>
 Every property on <code>#0</code> can be referred to anywhere as
 <code>$name</code>. Because <code>#0</code> has a property called
-<code>item</code> holding object <code>#12</code>, writing <code>$item</code>
-means <code>#12</code> — anywhere you would otherwise type the number.
+<code>item</code> holding object <code>#10</code>, writing <code>$item</code>
+means <code>#10</code> — anywhere you would otherwise type the number.
 </p>
 
 <div class="term"><code><span class="p">&gt;</span> +props #0
@@ -170,7 +170,7 @@ So the starter world gives you these to build from:
 </div>
 
 <p>
-Two reasons to prefer <code>$item</code> over <code>#12</code>. It says what you
+Two reasons to prefer <code>$item</code> over <code>#10</code>. It says what you
 mean, so a command is readable months later. And it survives renumbering — if
 the prototype ever moves, <code>#0</code> is updated once and every
 <code>$item</code> in your world still points at the right thing.
@@ -213,7 +213,7 @@ could — a <code>$chair</code> can be sat on before you write anything.
     <p><code>@make item = sword</code> does <em>not</em> work — it looks for an
        object called "item" nearby and reports
        <code>Parent object 'item' not found</code>. Use the shortcut
-       (<code>$item</code>) or the number (<code>#12</code>).</p>
+       (<code>$item</code>) or the number (<code>#10</code>).</p>
 </div>
 
 <p>

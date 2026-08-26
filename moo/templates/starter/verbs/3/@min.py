@@ -17,13 +17,13 @@ Arguments:
     number  - Minimum characters required to match the name you typed.
 
 Examples:
-    @min #17.look
-    @min #17.look = 1
-    @min #17.observe = 3
-    @min #17.observe = 0
+    @min #13.look
+    @min #13.look = 1
+    @min #13.observe = 3
+    @min #13.observe = 0
 
 Every name carries its own minimum, so the number applies to the one name
-you named rather than to the whole verb -- `@min #17.observe = 3` leaves
+you named rather than to the whole verb -- `@min #13.observe = 3` leaves
 `look` as it was. A minimum equal to the name's length means it must be
 typed in full; `0` clears it, which is the only way to take one off.
 

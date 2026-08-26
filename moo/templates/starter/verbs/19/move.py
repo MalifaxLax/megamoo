@@ -1,5 +1,5 @@
 """
-move verb on #25 (JumpableExit).
+move verb on #19 (JumpableExit).
 
 Moves a player through a jumpable exit after checking closed state,
 lock restrictions, and a skill-based jump difficulty check. If the

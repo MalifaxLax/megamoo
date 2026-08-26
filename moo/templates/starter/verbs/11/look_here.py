@@ -1,7 +1,7 @@
 """
-Room look verb for #15 BaseRoom.
+Room look verb for #11 BaseRoom.
 
-Called by the look verb (on #16 OOCRoom or similar) when a player
+Called by the look verb (on #12 OOCRoom or similar) when a player
 types 'look' or 'l' with no arguments. Displays:
 
   1. Room name (dark gray)

@@ -1,5 +1,5 @@
 """
-in_put verb on #26 (BaseContainer).
+in_put verb on #20 (BaseContainer).
 
 Places an item into this container. Called by the room-level put verb
 when the player uses: put <item> in <container>

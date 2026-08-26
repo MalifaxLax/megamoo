@@ -1,5 +1,5 @@
 """
-invoke verb on #20 (BaseExit).
+invoke verb on #14 (BaseExit).
 
 Called when a player attempts to move through this exit. Checks if the
 exit is closed; if so, displays failure/ofailure messages. Otherwise
