@@ -113,8 +113,23 @@ exists, where <code>@adprop</code> creates one:
 
 <p>
 Keep the name a single lowercase word, since it is exactly what a player has to
-type. The starter world ships with no topics at all — the library is yours to
-fill.
+type. The starter ships three topics — <code>bmatch</code>, <code>pmatch</code>
+and <code>matching</code>, which explain the two matchers to whoever is writing a
+verb — and the rest of the library is yours to fill.
+</p>
+
+<p>
+Those three are staff-only, which is a thing a topic can be.
+<code>_topic_auth</code> on <code>#34</code> maps a topic name to the auth level
+needed to read it, and a topic not named there is public:
+</p>
+
+<div class="term"><code><span class="p">&gt;</span> @set #34._topic_auth = {"bmatch": 3, "pmatch": 3, "matching": 3}</code></div>
+
+<p>
+Below that level the topic is missing from the index <em>and</em>
+<code>help &lt;topic&gt;</code> answers as though it does not exist — which is the
+point, since a refusal tells someone there is something there to find.
 </p>
 
 <h2 id="categories">Categories</h2>
