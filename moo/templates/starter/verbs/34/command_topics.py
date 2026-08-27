@@ -11,6 +11,25 @@ Type:    function
 """
 
 
+def _cfg(name, default):
+    """Read one of this object's underscore-named config properties.
+
+    Not `getattr`: MOOObject.__getattr__ skips property lookup entirely for
+    any name beginning with an underscore (objects.py, "skip
+    single-underscore names"), so `getattr(this, '_internal_verbs', [])` is
+    always the default -- and a filter that is always empty filters
+    nothing.  The store is read directly instead.
+
+    The reason this survived is that it reads back correctly in the same
+    process that wrote it: __setattr__ leaves the value in the instance
+    __dict__, where normal attribute lookup finds it before __getattr__ is
+    ever consulted.  It is only after a restart, reading the object fresh
+    from disk, that the property becomes invisible.
+    """
+    prop = this.properties.get(name)
+    return default if prop is None else prop.value
+
+
 def command_topics(who, plevel=0, exclude=()):
     """The visible command names around *who*, sorted."""
     if who is None:
@@ -19,12 +38,12 @@ def command_topics(who, plevel=0, exclude=()):
     # Engine machinery, not player commands: hook verbs invoked by name via
     # call_verb.  They cannot be marked hidden -- that also removes them from
     # dispatch -- so help filters them here.
-    internal = set(getattr(this, '_internal_verbs', []) or [])
-    prefixes = tuple(getattr(this, '_internal_prefixes', []) or ())
+    internal = set(_cfg('_internal_verbs', []) or [])
+    prefixes = tuple(_cfg('_internal_prefixes', []) or ())
     # One verb implements every compass command, so deduping onto names[0]
     # would show only 'n'.  List the long forms instead.
-    direction_canon = getattr(this, '_direction_canon', 'n')
-    direction_topics = list(getattr(this, '_direction_topics', []) or [])
+    direction_canon = _cfg('_direction_canon', 'n')
+    direction_topics = list(_cfg('_direction_topics', []) or [])
 
     already = set(exclude or ())
     out = []

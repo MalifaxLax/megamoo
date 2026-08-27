@@ -31,7 +31,7 @@ def _show(found, missing="There's no help for that."):
 
 
 if not args:
-    topics = hu.topics()
+    topics = hu.topics(plevel)
     commands = hu.command_topics(pobj, plevel, topics)
 
     pobj.msg("")
@@ -72,7 +72,7 @@ if topic.startswith('#'):
     return
 
 # A topic this object holds, then a verb the player can reach.
-found = hu.text_for(topic)
+found = hu.text_for(topic, plevel)
 if not found:
     for obj in [pobj, pobj.location] + list(pobj.location.contents):
         if not obj:

@@ -5,16 +5,22 @@ properties -- `matching` holds several, for instance.  Returns
 ``[heading, text]`` so the caller does the printing, and ``[]`` for no such
 topic, which is the one answer the command has to tell apart.
 
+*plevel* is handed to `topics`, which applies the staff gate, and both
+searches below run over the list it returns.  A topic the caller may not
+read is therefore not found rather than refused: "there is no such topic"
+and "you may not read that topic" are the same sentence to someone who
+should not know the topic exists.
+
 Type:    function
 """
 
 
-def text_for(topic):
-    """``[heading, text]`` for *topic*, or ``[]``."""
+def text_for(topic, plevel=0):
+    """``[heading, text]`` for *topic* as *plevel* may read it, or ``[]``."""
     wanted = (topic or '').strip().lower()
     if not wanted:
         return []
-    names = call_verb(this, 'topics')
+    names = call_verb(this, 'topics', plevel)
 
     # A property of this object, by name.
     for name in names:
