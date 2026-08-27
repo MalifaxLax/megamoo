@@ -46,10 +46,16 @@
 
 <p>
 Every object has a permanent number. When you make something, MegaMOO gives it
-the lowest free number it can find. That is fine for a lamp or a chair, but it
-means that a zone built over several sessions ends up scattered — the tavern is
-<code>#204</code>, its cellar is <code>#251</code>, and the room you added last
-week is <code>#198</code>, because other things were being made in between.
+the lowest free number that is not reserved. In a fresh world that is
+<code>#201</code>: everything below it is either a shipped prototype or a
+reserved slot, so your first room lands at <code>#201</code> and counts up
+from there.</p>
+
+<p>
+That is fine for a lamp or a chair, but it means a zone built over several
+sessions ends up scattered — the tavern is <code>#204</code>, its cellar is
+<code>#251</code>, and the room you added last week is <code>#233</code>,
+because other things were being made in between.
 </p>
 
 <h2 id="why">Why you would reserve a block</h2>
@@ -68,9 +74,17 @@ a questline — and not worth doing for scenery.
 
 <div class="note">
     <span class="label">Some numbers are already spoken for</span>
-    <p>The starter world reserves several low blocks for future core objects.
-       Run <code>@fon/list</code> to see them before choosing where your zone
-       goes; picking a high, round number is the simplest way to stay clear.</p>
+    <p><strong>Everything below <code>#50</code> is the shipped world.</strong>
+       The system objects, the object/room/exit/container/furniture spine,
+       <code>$globals</code>, the nine utility objects, the trash bins, the
+       OOC rooms and the chargen arch — the number <em>is</em> the
+       classification. <code>#100</code> is the wizard, and
+       <code>#101</code>–<code>#199</code> are account slots.</p>
+    <p>Every free number below <code>#100</code> is reserved, and so are
+       several blocks above it, so nothing of yours can land in the middle of
+       the prototypes. Run <code>@fon/list</code> to see the ranges before
+       choosing where your zone goes; picking a high, round number is the
+       simplest way to stay clear.</p>
 </div>
 
 <h2 id="how">Reserving with @foff and @fon</h2>

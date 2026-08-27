@@ -88,7 +88,7 @@ decision rather than a stylistic one.
 <thead><tr><th></th><th><code>pmatch</code></th><th><code>bmatch</code></th></tr></thead>
 <tbody>
 <tr><td>For</td><td>player commands</td><td>staff verbs</td></tr>
-<tr><td>Used by</td><td>the room parents <code>#16</code> and <code>#17</code>, and <code>#11</code>, <code>#15</code>, <code>#26</code></td><td><code>#3</code>, the character base</td></tr>
+<tr><td>Used by</td><td>the room parents <code>#12</code> and <code>#13</code>, and <code>#9</code>, <code>#11</code>, <code>#20</code></td><td><code>#3</code>, the character base</td></tr>
 <tr><td><code>me</code>, <code>here</code></td><td>yes</td><td>yes</td></tr>
 <tr><td><code>my sword</code></td><td>yes, filtered from your candidates</td><td>yes, straight from <code>pobj.contents</code></td></tr>
 <tr><td><code>#4711</code></td><td><strong>no</strong></td><td>yes</td></tr>
@@ -169,10 +169,12 @@ character. Against "a silver sword", <code>swo</code>, <code>sw</code>,
        word starting in "s" — the sword, the sack, the stranger — and
        the first in your candidate list wins, silently. That is worth knowing
        before you write a verb whose argument is often one character.</p>
-    <p><code>name_match</code>'s own docstring in <code>match_utils.py</code>
-       claims a single character needs an exact whole-word match. It does not;
-       the guard it describes can only ever reject the empty string. The code
-       is the authority.</p>
+    <p><code>name_match</code> is a verb on <code>$match_utils</code> now, not a
+       function in <code>match_utils.py</code>, and its docstring used to
+       claim a single character needed an exact whole-word match. It never
+       did — the guard it described could only ever reject the empty string —
+       and the docstring was corrected when the verb was ported. The
+       behaviour is unchanged; it is the description that was wrong.</p>
 </div>
 
 <div class="note">

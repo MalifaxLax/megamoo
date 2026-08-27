@@ -55,7 +55,7 @@ knowing which is which saves you a lot of writing:
 <thead><tr><th>Source</th><th>Covers</th><th>Who writes it</th></tr></thead>
 <tbody>
 <tr><td><strong>Verb docstrings</strong></td><td>Commands.</td><td>Nobody, separately — the comment at the top of a verb <em>is</em> its help.</td></tr>
-<tr><td><strong>The topic library on <code>#54</code></strong></td><td>Everything that is not a command: your world's rules, its history, how combat works, what a newcomer should do first.</td><td>You, as editable prose.</td></tr>
+<tr><td><strong>The topic library on <code>#34</code></strong></td><td>Everything that is not a command: your world's rules, its history, how combat works, what a newcomer should do first.</td><td>You, as editable prose.</td></tr>
 </tbody>
 </table>
 </div>
@@ -75,7 +75,7 @@ hit:
 </p>
 
 <ol>
-<li>A <strong>topic</strong> of that name on <code>#54</code>.</li>
+<li>A <strong>topic</strong> of that name on <code>#34</code>.</li>
 <li>A <strong>sub-topic</strong> inside one of the categories there.</li>
 <li>A <strong>command</strong> of that name that the player can reach — its
     docstring is printed.</li>
@@ -94,12 +94,12 @@ Because topics are checked first, a topic named <code>look</code> would hide the
 <h2 id="topics">Writing topics</h2>
 
 <p>
-A topic is a property on <code>#54</code>. The property name is the word players
+A topic is a property on <code>#34</code>. The property name is the word players
 type. Create it with <code>@adprop</code>:
 </p>
 
-<div class="term"><code><span class="p">&gt;</span> @adprop #54.rules = "Be excellent to each other. No harassment, no cheating."
-<span class="o">Property 'rules' added to #54:help_utils = 'Be excellent to each other...'</span>
+<div class="term"><code><span class="p">&gt;</span> @adprop #34.rules = "Be excellent to each other. No harassment, no cheating."
+<span class="o">Property 'rules' added to #34:help_utils = 'Be excellent to each other...'</span>
 <span class="p">&gt;</span> help rules
 <span class="o">rules</span>
 <span class="o">Be excellent to each other. No harassment, no cheating.</span></code></div>
@@ -109,7 +109,7 @@ To revise it later, <code>@set</code> — which changes a property that already
 exists, where <code>@adprop</code> creates one:
 </p>
 
-<div class="term"><code><span class="p">&gt;</span> @set #54.rules = "Be excellent. No cheating. No spoilers in public channels."</code></div>
+<div class="term"><code><span class="p">&gt;</span> @set #34.rules = "Be excellent. No cheating. No spoilers in public channels."</code></div>
 
 <p>
 Keep the name a single lowercase word, since it is exactly what a player has to
@@ -124,7 +124,7 @@ A topic whose value is a dictionary becomes a category: an index of sub-topics,
 each reachable on its own.
 </p>
 
-<div class="term"><code><span class="p">&gt;</span> @adprop #54.magic = {'spells': 'Casting consumes mana.', 'mana': 'Mana regenerates while resting.'}</code></div>
+<div class="term"><code><span class="p">&gt;</span> @adprop #34.magic = {'spells': 'Casting consumes mana.', 'mana': 'Mana regenerates while resting.'}</code></div>
 
 <div class="term"><code><span class="p">&gt;</span> help magic
 <span class="o">magic</span>

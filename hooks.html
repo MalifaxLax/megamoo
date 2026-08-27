@@ -175,7 +175,7 @@ like to handle the rest.
 <p>
 That is how you attach behaviour to <em>one thing</em> without editing the verb
 everybody uses. The cursed sword that refuses to be picked up is a
-<code>get_</code> on the sword, not an <code>if</code> in <code>#17:get</code>.
+<code>get_</code> on the sword, not an <code>if</code> in <code>#13:get</code>.
 </p>
 
 <div class="term"><code><span class="c"># get_ on the one cursed sword</span>
@@ -201,14 +201,14 @@ fall through.
 <table>
 <thead><tr><th>Verb</th><th>On</th><th>What it does</th></tr></thead>
 <tbody>
-<tr><td><code>open_</code></td><td>#23, #27</td><td>Opens the exit or container. Refuses if locked; announces through to the far side.</td></tr>
-<tr><td><code>close_</code></td><td>#23, #27</td><td>Closes it, and closes the matching exit on the other side.</td></tr>
-<tr><td><code>lock_</code></td><td>#23</td><td>Locks a closed exit. Checks <code>lockable</code>, and the key against <code>this.key</code>.</td></tr>
-<tr><td><code>unlock_</code></td><td>#23</td><td>The reverse, with the same key check.</td></tr>
-<tr><td><code>latch_</code>, <code>unlatch_</code></td><td>#23</td><td>As lock, for a latch — no key involved.</td></tr>
-<tr><td><code>look_</code></td><td>#26, #30</td><td>Replaces the ordinary description. The container lists contents; the furniture lists who is sitting on it.</td></tr>
-<tr><td><code>sit_</code>, <code>lay_</code></td><td>#30</td><td>Seats or beds a character. Checks capacity and sets their position.</td></tr>
-<tr><td><code>go_</code></td><td>#7, #51</td><td>Runs when a character walks into the arch (chargen) or the portal (entering the game).</td></tr>
+<tr><td><code>open_</code></td><td>#17, #21</td><td>Opens the exit or container. Refuses if locked; announces through to the far side.</td></tr>
+<tr><td><code>close_</code></td><td>#17, #21</td><td>Closes it, and closes the matching exit on the other side.</td></tr>
+<tr><td><code>lock_</code></td><td>#17</td><td>Locks a closed exit. Checks <code>lockable</code>, and the key against <code>this.key</code>.</td></tr>
+<tr><td><code>unlock_</code></td><td>#17</td><td>The reverse, with the same key check.</td></tr>
+<tr><td><code>latch_</code>, <code>unlatch_</code></td><td>#17</td><td>As lock, for a latch — no key involved.</td></tr>
+<tr><td><code>look_</code></td><td>#20, #23</td><td>Replaces the ordinary description. The container lists contents; the furniture lists who is sitting on it.</td></tr>
+<tr><td><code>sit_</code>, <code>lay_</code></td><td>#23</td><td>Seats or beds a character. Checks capacity and sets their position.</td></tr>
+<tr><td><code>go_</code></td><td>#43, #44</td><td>Runs when a character walks into the arch (chargen) or the portal (entering the game).</td></tr>
 </tbody>
 </table>
 </div>
@@ -217,7 +217,7 @@ fall through.
 
 <p>
 An object has four faces a thing can be put, and each face has three verbs. They
-are the exception pattern again, one step more specific: <code>#17:put</code>
+are the exception pattern again, one step more specific: <code>#13:put</code>
 works out <em>which</em> face you meant from the preposition you typed, then calls
 that face's hook.
 </p>
@@ -231,17 +231,17 @@ that face's hook.
 <table>
 <thead><tr><th>Face</th><th>Verbs</th><th>On</th></tr></thead>
 <tbody>
-<tr><td>inside</td><td><code>in_get</code>, <code>in_put</code>, <code>in_look</code></td><td>#26 BaseContainer</td></tr>
-<tr><td>on top of</td><td><code>on_get</code>, <code>on_put</code>, <code>on_look</code></td><td>#11 object</td></tr>
-<tr><td>underneath</td><td><code>under_get</code>, <code>under_put</code>, <code>under_look</code></td><td>#11 object</td></tr>
-<tr><td>behind</td><td><code>behind_get</code>, <code>behind_put</code>, <code>behind_look</code></td><td>#11 object</td></tr>
+<tr><td>inside</td><td><code>in_get</code>, <code>in_put</code>, <code>in_look</code></td><td>#20 BaseContainer</td></tr>
+<tr><td>on top of</td><td><code>on_get</code>, <code>on_put</code>, <code>on_look</code></td><td>#9 object</td></tr>
+<tr><td>underneath</td><td><code>under_get</code>, <code>under_put</code>, <code>under_look</code></td><td>#9 object</td></tr>
+<tr><td>behind</td><td><code>behind_get</code>, <code>behind_put</code>, <code>behind_look</code></td><td>#9 object</td></tr>
 </tbody>
 </table>
 </div>
 
 <p>
 Every object in the world inherits the on, under and behind faces from
-<code>#11</code>, so you can already put a coin under any rock. Only containers
+<code>#9</code>, so you can already put a coin under any rock. Only containers
 have an inside.
 </p>
 
@@ -259,8 +259,8 @@ object's life. They are optional everywhere: no verb, nothing happens, no error.
 <tr><td><code>at_post_move</code></td><td>#3</td><td>a character has finished moving</td></tr>
 <tr><td><code>on_puppet</code></td><td>#5</td><td>a player takes control of the character — adds them to the room's list</td></tr>
 <tr><td><code>on_unpuppet</code></td><td>#5</td><td>they disconnect or leave the game</td></tr>
-<tr><td><code>enter_func</code></td><td>#17, #26</td><td>something enters the room, or climbs into the container</td></tr>
-<tr><td><code>exit_func</code></td><td>#17, #26</td><td>something leaves it</td></tr>
+<tr><td><code>enter_func</code></td><td>#13, #20</td><td>something enters the room, or climbs into the container</td></tr>
+<tr><td><code>exit_func</code></td><td>#13, #20</td><td>something leaves it</td></tr>
 </tbody>
 </table>
 </div>
@@ -280,7 +280,7 @@ object's life. They are optional everywhere: no verb, nothing happens, no error.
 <p>
 Anything that should happen repeatedly and then stop — a poison, a stun, a spell
 that burns down — is an <em>effect</em>. You start one and the effects object
-(<code>$eu</code>, which is <code>#53</code>) does the rest: the scheduling, the
+(<code>$eu</code>, which is <code>#33</code>) does the rest: the scheduling, the
 counting down, the expiry, the stacking.
 </p>
 
@@ -427,7 +427,7 @@ people differently.
 <tr><td><code>postring</code></td><td>#5</td><td>That number as words — "sitting", "lying down".</td></tr>
 <tr><td><code>make_postatus</code></td><td>#5</td><td>Position and status combined, as the room sees it.</td></tr>
 <tr><td><code>look_self</code></td><td>#5</td><td>What a character looks like to somebody else.</td></tr>
-<tr><td><code>rlook</code></td><td>#5, #15</td><td>The same, for staff, with the numbers shown.</td></tr>
+<tr><td><code>rlook</code></td><td>#5, #11</td><td>The same, for staff, with the numbers shown.</td></tr>
 <tr><td><code>_afflict</code></td><td>#1</td><td>Applies an affliction by name. Answers to thirteen: <code>_stun</code>, <code>_blind</code>, <code>_sleep</code>, <code>_web</code> and the rest — each one hands off to <code>$eu</code>.</td></tr>
 <tr><td><code>_resource</code></td><td>#1</td><td>Drains a resource. Answers to <code>_hits</code>, <code>_stamina</code>, <code>_mana</code>, <code>_focus</code>, <code>_adrenalin</code>, <code>_fabric</code>.</td></tr>
 <tr><td><code>_rt</code></td><td>#1</td><td>Applies roundtime and starts it counting down.</td></tr>
@@ -450,12 +450,12 @@ descriptions work everywhere at once.
 <table>
 <thead><tr><th>Verb</th><th>On</th><th>What it does</th></tr></thead>
 <tbody>
-<tr><td><code>gmove</code></td><td>#15, #20</td><td>The generic move: takes the traveller, the destination and the four messages, and performs the move.</td></tr>
-<tr><td><code>move</code></td><td>#21, #22, #24, #25</td><td>One per exit kind. Each checks what its kind cares about — closed, locked, climbable, jumpable — then delegates to <code>gmove</code>.</td></tr>
-<tr><td><code>vmove</code></td><td>#21</td><td>The same for virtual exits, which have no object of their own.</td></tr>
-<tr><td><code>invoke</code></td><td>#20</td><td>Checks whether an exit will let you through, and says why not.</td></tr>
-<tr><td><code>match_exit</code></td><td>#15</td><td>Turns "north" or "2 door" into an actual exit.</td></tr>
-<tr><td><code>look_here</code></td><td>#15</td><td>Builds the room description a player sees.</td></tr>
+<tr><td><code>gmove</code></td><td>#11, #14</td><td>The generic move: takes the traveller, the destination and the four messages, and performs the move.</td></tr>
+<tr><td><code>move</code></td><td>#15, #16, #18, #19</td><td>One per exit kind. Each checks what its kind cares about — closed, locked, climbable, jumpable — then delegates to <code>gmove</code>.</td></tr>
+<tr><td><code>vmove</code></td><td>#15</td><td>The same for virtual exits, which have no object of their own.</td></tr>
+<tr><td><code>invoke</code></td><td>#14</td><td>Checks whether an exit will let you through, and says why not.</td></tr>
+<tr><td><code>match_exit</code></td><td>#11</td><td>Turns "north" or "2 door" into an actual exit.</td></tr>
+<tr><td><code>look_here</code></td><td>#11</td><td>Builds the room description a player sees.</td></tr>
 </tbody>
 </table>
 </div>
@@ -496,9 +496,9 @@ things are worth keeping in mind:
 
 <div class="note">
     <span class="label">Finding them in a running world</span>
-    <p><code>+verbs #26</code> lists every verb on an object, hidden ones
+    <p><code>+verbs #20</code> lists every verb on an object, hidden ones
        included; <code>/all</code> adds the ones it inherits. And <code>@vfind in_get</code> finds which objects define a
-       given hook. <code>+decompile #26.in_get</code> prints the source exactly as
+       given hook. <code>+decompile #20.in_get</code> prints the source exactly as
        stored, which is the ground truth for what is actually running.</p>
 </div>
 

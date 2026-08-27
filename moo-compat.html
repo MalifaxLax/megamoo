@@ -88,9 +88,12 @@ the thing most likely to get it released.
 <h3>What happens to object numbers</h3>
 
 <p>
-They change, and they have to. A LambdaMOO <code>#10</code> cannot become a
-MegaMOO <code>#10</code> — that number is already the base object here, and
-a core landing on top of the shipped hierarchy would destroy both.
+They change, and they have to. Every number below <code>#50</code> in a
+MegaMOO world already belongs to a shipped prototype — <code>#8</code> is
+the base object, <code>#11</code> to <code>#13</code> are the rooms,
+<code>#30</code> to <code>#38</code> are the utility objects — and a core
+landing on top of that hierarchy would destroy both. A LambdaMOO
+<code>#8</code> therefore cannot stay <code>#8</code>.
 </p>
 
 <p>
@@ -244,8 +247,8 @@ The table above is what you do by hand. For a whole verb,
 read the Python it produces, and save it only if you agree.
 </p>
 
-<div class="term"><code>&gt; @port #12.appraise
-<span class="o">Porting MOO code into 'appraise' on an item (#12).</span>
+<div class="term"><code>&gt; @port #10.appraise
+<span class="o">Porting MOO code into 'appraise' on an item (#10).</span>
 <span class="o">Paste MOO source.  '.' alone to finish, '@abort' to cancel.</span>
 <span class="o">-----</span>
 player:tell("It weighs ", weight, " units.");
@@ -254,7 +257,7 @@ return 1;
 <span class="o">-- translated --</span>
 <span class="o">  tell(pobj, f"It weighs {weight} units.")</span>
 <span class="o">  return 1</span>
-<span class="o">Save this to appraise on #12? [y/N]</span></code></div>
+<span class="o">Save this to appraise on #10? [y/N]</span></code></div>
 
 <p>
 Nothing is saved without a yes. Anything the translator would not guess
@@ -276,8 +279,8 @@ its name.
        improves; when it learns something, a verb that still carries its
        source can simply be redone rather than dug out of the textdump
        again:</p>
-    <div class="term"><code>&gt; @port/again #12.appraise
-<span class="o">Re-translating 'appraise' on an item (#12) from its kept source (2 lines).</span></code></div>
+    <div class="term"><code>&gt; @port/again #10.appraise
+<span class="o">Re-translating 'appraise' on an item (#10) from its kept source (2 lines).</span></code></div>
     <p>It shows the result and asks, exactly as pasting does — it is the
        same code path. A verb with no kept source says so and stops,
        rather than opening an empty editor.</p>
@@ -336,8 +339,8 @@ importer, and the everyday one: they move a single object between two
 MegaMOO databases — a development world and a live one, say.
 </p>
 
-<pre><code>@dump/verbs #92
-@load 92-BaseMerchant
+<pre><code>@dump/verbs #90
+@load 90-BaseMerchant
 </code></pre>
 
 <p>
