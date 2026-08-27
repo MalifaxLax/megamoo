@@ -183,10 +183,24 @@ async def listen_walking_ports(handler, host: str, first_port: int,
             rather than retried: it would repeat identically on all 50
             ports and bury the real cause under a scan.
     """
+    # A wildcard host is bound on *both* address families.
+    #
+    # '0.0.0.0' is IPv4 only.  `localhost` resolves to ::1 before 127.0.0.1
+    # on a modern machine, so a browser asked for http://localhost:8888/
+    # tried IPv6 first, got connection-refused, and reported the server as
+    # down -- while telnet to the same world worked, because that client
+    # falls back to IPv4.  Passing None binds every interface on every
+    # family, which is what '0.0.0.0' is nearly always meant to say.
+    #
+    # An explicit host is left exactly as given: somebody who wrote
+    # '127.0.0.1' meant loopback-IPv4 and not "also accept ::1".
+    bind_host = None if host in ('0.0.0.0', '', None) else host
+
     last_error = None
     for port in range(first_port, min(first_port + scan_limit, 65536)):
         try:
-            server = await asyncio.start_server(handler, host, port, **kwargs)
+            server = await asyncio.start_server(handler, bind_host, port,
+                                                **kwargs)
         except OSError as e:
             if e.errno != errno.EADDRINUSE:
                 raise
