@@ -422,7 +422,7 @@ DEFAULT_AUTORELOAD_INTERVAL = 2.0
 DEFAULT_SERVER_NAME = 'MegaMOO Server'
 
 # Server version (imported from __init__.py)
-SERVER_VERSION = '0.10.0-beta17'
+SERVER_VERSION = '0.10.0-beta18'
 
 # Server description
 SERVER_DESCRIPTION = 'A Python implementation of LambdaMOO'
