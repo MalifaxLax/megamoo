@@ -272,6 +272,20 @@ def _run_chargen():
                     new_char.add_property('account', pobj.objnum)
                     new_char.add_property('chargen_step', 'first_name')
 
+                    # Claim the slot *before* anything that can fail.
+                    #
+                    # The auth copy below used to come first, and when it
+                    # raised, the character existed and the account had
+                    # never heard of it: an orphan the slot list did not
+                    # name, so `[R]esume` could not offer it and the slot
+                    # still read <unused>.  Three of them accumulated in one
+                    # afternoon of hitting the same error.  Linked first,
+                    # a later failure leaves something resumable.
+                    chars = list(pobj.characters or [])
+                    chars.append(new_char.objnum)
+                    pobj.characters = chars
+                    pobj._mark_modified()
+
                     # Copy auth and permissions from account
                     acct_auth = list(pobj.auth or [])
                     if acct_auth:
@@ -280,12 +294,6 @@ def _run_chargen():
                             new_char.flags |= 2  # PROGRAMMER
                         if pobj.is_wizard:
                             new_char.flags |= 4  # WIZARD
-
-                    # Store in slot immediately
-                    chars = list(pobj.characters or [])
-                    chars.append(new_char.objnum)
-                    pobj.characters = chars
-                    pobj._mark_modified()
 
                     ichar = new_char
                     chargen_state['ichar'] = ichar
