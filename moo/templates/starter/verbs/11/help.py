@@ -35,11 +35,16 @@ if not args:
     commands = hu.command_topics(pobj, plevel, topics)
 
     pobj.msg("")
-    pobj.msg("&<245>Help Topics&n")
+    # Each heading belongs to its list.  Now that topics are gated, a player
+    # can legitimately have none -- in a world whose only topics are staff
+    # ones, all of them -- and a bare "Help Topics" heading over nothing
+    # reads as something missing rather than as nothing to show.
     if topics:
+        pobj.msg("&<245>Help Topics&n")
         pobj.msg(', '.join(topics))
     if commands:
-        pobj.msg("")
+        if topics:
+            pobj.msg("")
         pobj.msg("&<245>Command Help&n")
         pobj.msg(', '.join(commands))
     if not topics and not commands:
