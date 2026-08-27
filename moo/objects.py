@@ -1391,12 +1391,33 @@ class MOOObject:
                 is_wizard = bool(getattr(db.get_object(actor), 'is_wizard', False))
             except Exception:
                 is_wizard = False
+        # The privileged-name gate comes *before* the wizard short-circuit,
+        # and asks for a level rather than a flag.
+        #
+        # `sync_auth_flags` sets WIZARD at gm4, so with the old order a gm4
+        # -- Admin, not Owner -- walked past this and could
+        # `@set bob.auth = ["gm5"]`, which is precisely what @auth's own gm5
+        # guard exists to prevent.  A flag standing in for a level, granted
+        # in one place and checked in another.
+        #
+        # Granting authority is gm5, wizard or not.  A gm5 passes and
+        # continues; below that it is refused even with the flag.
+        if name in MOOObject._PRIVILEGED_PROPS:
+            level = 0
+            if db is not None:
+                try:
+                    from .builtins import auth_level
+                    level = auth_level(db.get_object(actor))
+                except Exception:
+                    level = 0
+            if level < 5:
+                raise PermissionError(
+                    f"Permission denied: cannot write '{name}' on "
+                    f"#{self.objnum} -- granting authority is gm5"
+                )
+            return
         if is_wizard:
             return
-        if name in MOOObject._PRIVILEGED_PROPS:
-            raise PermissionError(
-                f"Permission denied: cannot write '{name}' on #{self.objnum}"
-            )
         # 'c' is chown: a descendant's copy of an inherited property
         # belongs to that descendant's owner, so the object's owner may
         # write it.  This is what lets a player's own verb set their own

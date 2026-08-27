@@ -539,7 +539,7 @@ class InteractiveSession:
         who typed the line rather than to the verb's owner.  For chargen
         that meant being refused the account it exists to fill in.
         """
-        from .builtins import push_frame, pop_frame
+        from .builtins import push_frame, pop_frame, current_perms
         framed = False
         try:
             push_frame(self.player_obj, '<interactive>', None,
@@ -551,6 +551,21 @@ class InteractiveSession:
             yield
         finally:
             if framed:
+                # Carry the effective owner into the next segment before the
+                # frame goes.  A verb that opened with
+                # `set_task_perms(caller_perms())` and then yielded a prompt
+                # used to have that drop thrown away on resume: the session
+                # was built with the *static* VerbDef owner, so every write
+                # after the yield went back to acting as staff.  @rmprop
+                # prompts "are you sure?", which put all of its work on the
+                # far side of exactly that.
+                #
+                # MOO's set_task_perms lasts the task, so persisting it
+                # across a pause is the semantic anyway.
+                try:
+                    self.verb_owner = current_perms()
+                except Exception:
+                    pass
                 try:
                     pop_frame()
                 except Exception:

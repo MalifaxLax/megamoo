@@ -33,6 +33,11 @@ if auth_level(pobj) < 5:
     pobj.msg("Do what?")
     return
 
+# Act as whoever typed this. Granting authority is gm5, and the engine checks
+# the *actor's* level -- so without this the actor is #0, which owns the verb
+# and has no `auth` property of its own, and even a gm5 was refused.
+set_task_perms(caller_perms())
+
 GM_LEVELS = ['gm1', 'gm2', 'gm3', 'gm4', 'gm5']
 USAGE = ('Usage: @rmauth <player> = <auth>[, <auth> ...]'
          '   or  @rmauth <auth>[, <auth> ...] from <player>')
