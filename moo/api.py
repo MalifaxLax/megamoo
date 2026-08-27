@@ -106,6 +106,40 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger('megamoo.api')
 
 
+def _acting_player(db, args):
+    """Who an API command acts as.
+
+    The token authenticates the *connection*, not a person, so a command that
+    writes has to act as somebody or the engine has nobody to check.  With no
+    verb context `current_perms()` is None, which every check in objects.py
+    reads as "engine, unrestricted" -- so `set_property` over the API wrote
+    anything, `auth` included, with no ownership test at all.
+
+    `player_objnum` names the actor; without it the lowest-numbered wizard
+    stands in, which is the same default `eval` has always used.
+
+    Args:
+        db: The database.
+        args (dict): The command's arguments.
+
+    Returns:
+        The acting MOOObject.
+
+    Raises:
+        ValueError: If no actor is named and the world has no wizard.
+    """
+    given = args.get('player_objnum')
+    if given is None:
+        objnum = _first_wizard(db)
+        if objnum is None:
+            raise ValueError(
+                'no wizard in this database to act as; '
+                'pass player_objnum explicitly')
+    else:
+        objnum = int(given)
+    return db.get_object(objnum)
+
+
 def _first_wizard(db):
     """
     Return the lowest-numbered wizard's object number, or ``None``.
@@ -819,6 +853,22 @@ class ApiConnection:
         captured = io.StringIO()
         processed_code = preprocess_verb_code(code)
 
+        # The named player must actually be allowed to run code -- the same
+        # rule eval_python applies in-game, PROGRAMMER (gm3) or WIZARD.
+        #
+        # Without it, `player_objnum` was decoration: the code ran regardless
+        # of who was named, so a caller could point it at an ordinary player
+        # and still get everything.  This does not make the token less
+        # powerful -- omit the argument and it elects a wizard, and a caller
+        # holding the token can do that -- but naming somebody now means what
+        # it looks like it means.
+        from .objects import ObjectFlags as _Flags
+        if not (player.has_flag(_Flags.PROGRAMMER)
+                or player.has_flag(_Flags.WIZARD)):
+            raise ValueError(
+                '#%s may not run code: eval needs the PROGRAMMER flag (gm3) '
+                'or WIZARD (gm4+)' % player.objnum)
+
         # Set up the verb execution context for builtins that depend on it
         token = set_verb_context(player, db, depth=0)
         try:
@@ -996,13 +1046,24 @@ class ApiConnection:
         """
         objnum = int(args['objnum'])
         name = args['name']
+        db = self.api.database
         value = self._resolve_refs(args['value'])
-        obj = self.api.database.get_object(objnum)
+        obj = db.get_object(objnum)
+
+        # Act as somebody.  Without a verb context the engine's ownership and
+        # privileged-name checks see `current_perms() is None` and allow
+        # everything, so this command used to be a way past all of them.
+        from .verb_context import set_verb_context, clear_verb_context
+        actor = _acting_player(db, args)
+        token = set_verb_context(actor, db, depth=0)
         try:
-            obj.set_property(name, value)
-        except KeyError:
-            obj.add_property(name, value)
-        self.api.database.save_object(obj)
+            try:
+                obj.set_property(name, value)
+            except KeyError:
+                obj.add_property(name, value)
+        finally:
+            clear_verb_context(token)
+        db.save_object(obj)
         # Report the serialised form actually stored (JSON-safe: never a live
         # object), so callers see '#N' / int objnums rather than object reprs.
         stored = obj.properties[name].value if name in obj.properties else value

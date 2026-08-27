@@ -1344,7 +1344,10 @@ class MOOObject:
                 if getattr(db.get_object(actor), 'is_wizard', False):
                     return
             except Exception:
-                return
+                # Could not tell.  Fall through to the ownership test rather
+                # than returning -- `return` here means *allow*, so a lookup
+                # that threw was a way past the check entirely.
+                pass
         if actor == self.owner:
             return
         raise PermissionError(
@@ -1381,7 +1384,13 @@ class MOOObject:
             from .builtins import current_perms
             actor = current_perms()
         except Exception:
-            return
+            # Refuse rather than allow.  This used to `return`, which is the
+            # permissive branch: anything that made the import or the lookup
+            # throw turned the check off instead of failing closed.
+            raise PermissionError(
+                f"Permission denied: cannot establish who is writing "
+                f"'{name}' on #{self.objnum}"
+            )
         if actor is None:
             return                      # no verb context: engine-level write
         db = self.__dict__.get('_database')

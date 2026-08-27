@@ -78,10 +78,14 @@ class StubDatabase:
 
 
 def test_set_property_adds_when_missing():
-    db = StubDatabase([StubObject(10, 'Thing')])
+    # player_objnum is named: the command acts as somebody now, because a
+    # write with no verb context is a write the engine cannot check, and
+    # that was how the API reached `auth` on any object.  Unnamed, it looks
+    # for the lowest wizard, which this stub has no way to answer.
+    db = StubDatabase([StubObject(10, 'Thing'), StubObject(1, 'Wiz')])
     conn = make_conn(database=db)
     result = conn._cmd_set_property(
-        {'objnum': 10, 'name': 'hits', 'value': 42})
+        {'objnum': 10, 'name': 'hits', 'value': 42, 'player_objnum': 1})
     assert db.objects[10].props['hits'] == 42
     assert 10 in db.saved
     assert result['value'] == 42
@@ -109,11 +113,14 @@ def test_list_contents_returns_objnum_name_pairs():
 
 def test_set_property_updates_existing_on_real_moo_object():
     """Handler's set/add fallback works against real MOOObject semantics."""
-    obj = MOOObject(objnum=42, parent=0, owner=0)
+    obj = MOOObject(objnum=42, parent=0, owner=42)
     obj.add_property('score', 0)
+    # Acts as #42 itself, which owns the property -- the ownership rule the
+    # engine applies once there is a verb context to apply it in.
     db = StubDatabase([obj])
     conn = make_conn(database=db)
-    result = conn._cmd_set_property({'objnum': 42, 'name': 'score', 'value': 99})
+    result = conn._cmd_set_property(
+        {'objnum': 42, 'name': 'score', 'value': 99, 'player_objnum': 42})
     assert obj.get_property('score') == 99
     assert result['value'] == 99
     assert 42 in db.saved
