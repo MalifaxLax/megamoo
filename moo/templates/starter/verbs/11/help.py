@@ -65,6 +65,13 @@ if topic.startswith('#'):
         return
     if '.' in topic[1:]:
         found = hu.verb_help(obj, verb_part, plevel)
+        # Qualify the heading with the object asked about.  $help_utils
+        # answers what the verb says and heads it with the verb's own name,
+        # which is right for `help go` and loses something here: the whole
+        # point of `help #42.go` is that it is #42's go and not the one you
+        # would have reached by typing `help go` where you stand.
+        if found:
+            found = ['#%s.%s' % (obj_part, found[0]), found[1]]
         _show(found, "No help available for '%s'." % verb_part
               if verb_part else "There's no help for that.")
         return
