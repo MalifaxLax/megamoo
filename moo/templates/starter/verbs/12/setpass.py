@@ -6,10 +6,19 @@ Usage: setpass <new password>
 You will be asked to type the password again to confirm.
 """
 
-from moo.login import hash_password
+from moo.login import hash_password, password_problem, password_rule
 
 if not args:
-    pobj.msg("Usage: setpass <new password>")
+    pobj.msg("Usage: setpass <new password>  (%s)" % password_rule())
+    return
+
+# The same rule account creation applies, from the same function.  This
+# verb used to check only that the two entries matched -- so it would set
+# a blank password on an existing account, and check_password refuses an
+# empty hash, which locked the account out of itself.
+problem = password_problem(args)
+if problem:
+    pobj.msg(problem)
     return
 
 pw1 = args

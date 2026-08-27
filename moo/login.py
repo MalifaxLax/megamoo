@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import string
 import hmac
 import logging
 import secrets
@@ -91,6 +92,74 @@ except ImportError:
 #: PBKDF2 iterations.  OWASP's 2023 floor for PBKDF2-HMAC-SHA256 is
 #: 600,000; the cost is a few hundred milliseconds once per login.
 PBKDF2_ROUNDS = 600_000
+
+
+#: The symbols a password may contain: the shifted characters, which are
+#: the ones reachable with Shift on a US keyboard.  Deliberately *not* the
+#: unshifted punctuation -- ``- = [ ] \\ ; \' , . /`` and backtick are
+#: excluded, so a password cannot be built from characters that a MUD
+#: client, a trigger or a stored alias is likely to treat as syntax.
+PASSWORD_SYMBOLS = '~!@#$%^&*()_+{}|:"<>?'
+
+#: Letters, digits and those symbols.  One set, used by the validator and
+#: named in the prompt, so the rule that is stated is the rule enforced.
+PASSWORD_CHARS = frozenset(
+    string.ascii_letters + string.digits + PASSWORD_SYMBOLS)
+
+
+def password_problem(plain):
+    """Why *plain* is not an acceptable password, or None if it is.
+
+    One definition, because there are two doors -- account creation and
+    `setpass` -- and they had different rules: creation refused an empty
+    password, `setpass` did not, so `setpass` could set a blank one on an
+    existing account and lock it out (`check_password` refuses empty).
+
+    The bounds come from `globals`, which is where they looked like they
+    already came from.  `MIN_PASSWORD_LENGTH`, `MAX_PASSWORD_LENGTH` and
+    `REQUIRE_PASSWORDS` had no readers anywhere in the engine: four
+    constants under a SECURITY SETTINGS heading, describing a policy
+    nothing implemented.
+
+    No composition rule -- nothing is *required*.  Current guidance is
+    against forcing a digit or a symbol: it pushes people towards
+    `Password1!` and towards reuse, and length is what actually helps.  The
+    stored hash is PBKDF2-HMAC-SHA256 at 600,000 rounds, which is the real
+    defence.  What is constrained is the *alphabet*, so that a password is
+    typeable on the keyboard the player logs in from.
+
+    Args:
+        plain: The candidate password, already stripped.
+
+    Returns:
+        str | None: A message to show the player, or None if it is fine.
+    """
+    from . import globals as _g
+    if not plain:
+        return ('A password is required.' if _g.REQUIRE_PASSWORDS
+                else None)
+    if len(plain) < _g.MIN_PASSWORD_LENGTH:
+        return ('Password must be at least %d characters.'
+                % _g.MIN_PASSWORD_LENGTH)
+    if len(plain) > _g.MAX_PASSWORD_LENGTH:
+        return ('Password must be no more than %d characters.'
+                % _g.MAX_PASSWORD_LENGTH)
+    bad = sorted({c for c in plain if c not in PASSWORD_CHARS})
+    if bad:
+        return ('Password may not contain %s. Use letters, digits or %s.'
+                % (' '.join(repr(c) for c in bad), PASSWORD_SYMBOLS))
+    return None
+
+
+def password_rule():
+    """The rule, phrased for a prompt, so it is stated before it is enforced.
+
+    The name prompt has always said what it wants; the password prompt said
+    nothing and then refused, which is the wrong way round.
+    """
+    from . import globals as _g
+    return ('at least %d characters; letters, digits or %s'
+            % (_g.MIN_PASSWORD_LENGTH, PASSWORD_SYMBOLS))
 
 
 def hash_password(plain: str) -> str:
@@ -800,11 +869,21 @@ class LoginHandler:
             return None
 
         # --- Password (with confirmation) ---
-        await send("Choose a password: ", add_newline=False)
+        # State the rule before asking, the way the name prompt does.
+        await send(f"Choose a password ({password_rule()}): ",
+                   add_newline=False)
         pw1 = await read_line()
         if pw1 is None:
             return None
         pw1 = pw1.strip()
+
+        # Check before asking to confirm.  Typing a bad password twice and
+        # only then being told it is too short is two prompts wasted, and
+        # the second one teaches nothing.
+        problem = password_problem(pw1)
+        if problem:
+            await send(problem + "\n")
+            return None
 
         await send("Confirm password: ", add_newline=False)
         pw2 = await read_line()
@@ -816,13 +895,11 @@ class LoginHandler:
             await send("Passwords do not match.\n")
             return None
 
-        # Pressing Enter twice used to pass the match check above and
-        # store an empty hash, which check_password then accepted from
-        # anybody.  Both of those now fail closed; refusing it here as
-        # well means the account never reaches that state to begin with.
-        if not pw1:
-            await send("A password is required.\n")
-            return None
+        # The password was validated before the confirmation prompt, so
+        # there is nothing left to check here.  It used to be checked only
+        # at this point, which is why an empty one reached the match test
+        # first: pressing Enter twice matched, stored an empty hash, and
+        # check_password accepted it from anybody.
 
         # --- Claim a PlayerPlace object from the pool ---
         # #2 (PLAYER_POOL) is a container holding blank PlayerPlace

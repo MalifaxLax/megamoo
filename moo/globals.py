@@ -366,16 +366,21 @@ PROPERTY_CACHE_SIZE = 10000
 
 # Require passwords for player accounts.  Set to True for any
 # server exposed to the internet.
-REQUIRE_PASSWORDS = False  # Set to True for production
+REQUIRE_PASSWORDS = True   # A blank password is refused at every door
 
 # Minimum password length
-MIN_PASSWORD_LENGTH = 6
+MIN_PASSWORD_LENGTH = 8
 
 # Maximum password length
 MAX_PASSWORD_LENGTH = 128
 
 # Password hashing algorithm
-PASSWORD_HASH_ALGORITHM = 'sha256'
+#: What `moo.login.hash_password` actually uses.  This said 'sha256' while
+#: the code ran PBKDF2-HMAC-SHA256 at 600,000 rounds -- and before that it
+#: really was one unstretched SHA-256, which is where the wrong value came
+#: from.  A constant naming the wrong algorithm is worse than none: it is
+#: what somebody reads when deciding whether the hashes are safe to leak.
+PASSWORD_HASH_ALGORITHM = 'pbkdf2_sha256'  # or bcrypt, when installed
 
 # Enable wizard commands only for wizards
 ENFORCE_WIZARD_PERMISSIONS = True
