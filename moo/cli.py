@@ -289,6 +289,12 @@ def _apply_game_toml(args):
     Args:
         args: Parsed arguments, modified in place.
     """
+    # Which settings came from the file rather than the command line.
+    # Once the file has been folded into `args` the two are
+    # indistinguishable, and at least one decision downstream turns on
+    # the difference -- see `pin_port` in `run_server`.
+    args.from_toml = set()
+
     game = _read_game_toml()
     if not game:
         return
@@ -303,6 +309,7 @@ def _apply_game_toml(args):
             args.web_tls = args.web_tls or game['web_tls']
         elif getattr(args, key, None) is None:
             setattr(args, key, game[key])
+            args.from_toml.add(key)
 
 
 def _only_database_here():
@@ -768,7 +775,11 @@ Examples:
                        tls_port=args.tls_port,
                        web_tls=args.web_tls,
                        tls_cert=args.tls_cert,
-                       tls_key=args.tls_key)
+                       tls_key=args.tls_key,
+                       # A port out of megamoo.toml is a preference, not a
+                       # demand: it still walks past a busy port.  Only a
+                       # typed --port pins.
+                       pin_port='port' not in getattr(args, 'from_toml', ()))
             
             return 0
             

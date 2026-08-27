@@ -1528,7 +1528,8 @@ def run_server(database_path: str, port: Optional[int] = None,
                tls_port: Optional[int] = None,
                tls_cert: Optional[str] = None,
                tls_key: Optional[str] = None,
-               web_tls: bool = False):
+               web_tls: bool = False,
+               pin_port: bool = True):
     """
     Build and run a MegaMOO server from scratch.
 
@@ -1545,9 +1546,10 @@ def run_server(database_path: str, port: Optional[int] = None,
 
     Args:
         database_path (str): Filesystem path to the database directory.
-        port (int | None): TCP port override.  Pins that exact port
-            (a conflict is then fatal).  If ``None``, the configured
-            port is the first candidate and a busy port is walked past.
+        port (int | None): TCP port override.  With ``pin_port`` (the
+            default) this pins that exact port and a conflict is fatal.
+            If ``None``, the configured port is the first candidate and
+            a busy port is walked past.
         host (str | None): Bind-address override.
         config_path (str | None): Path to a YAML/JSON config file.
             If ``None``, built-in defaults are used.
@@ -1555,6 +1557,11 @@ def run_server(database_path: str, port: Optional[int] = None,
             server regardless of the config file setting.
         api_port (int | None): Override the API server port.
         api_token (str | None): Override the API authentication token.
+        pin_port (bool): Whether ``port`` is an explicit request for that
+            exact port.  ``True`` for a ``--port`` flag; ``False`` when
+            the value merely came from ``megamoo.toml``, which is a
+            standing preference rather than an instruction and so still
+            walks past a busy port.
 
     Notes:
         The signal handler uses a ``_shutting_down`` flag to implement
@@ -1578,8 +1585,19 @@ def run_server(database_path: str, port: Optional[int] = None,
         # Same rule as --api-port: naming a port is a request for *that*
         # port, so pin it and let a conflict fail loudly.  Auto-selection
         # is for the case where the operator didn't care.
+        #
+        # `pin_port` is how the caller says which of those two happened,
+        # because the port value alone cannot tell them apart.  A port
+        # read out of megamoo.toml arrives here looking exactly like one
+        # typed as --port, and `megamoo init` writes `[server] port` into
+        # every world it creates -- so treating the value as an explicit
+        # request pinned the listener for people who had never chosen a
+        # port at all, and a busy 6770 met them with a traceback on their
+        # first run.  The file is the standing preference; the flag is the
+        # specific instruction.
         config.network.port = port
-        config.network.auto_port = False
+        if pin_port:
+            config.network.auto_port = False
     if host:
         config.network.host = host
 
@@ -1720,6 +1738,22 @@ def run_server(database_path: str, port: Optional[int] = None,
         # Ctrl+C arrived before the signal handler could fire (rare race).
         logger.info("Keyboard interrupt")
         loop.run_until_complete(server.shutdown("Server interrupted"))
+    except OSError as e:
+        # A busy port is the one startup failure that is entirely ordinary
+        # and entirely the operator's to fix, so it gets a sentence rather
+        # than a stack trace -- the traceback says nothing the message does
+        # not, and burying "6770 is taken" under thirty lines of asyncio
+        # internals is how a first run ends in a bug report.
+        if getattr(e, 'errno', None) == errno.EADDRINUSE or 'in use' in str(e):
+            logger.error("%s", e)
+            logger.error(
+                "Another server may already be running here. Stop it, "
+                "pass --port to choose a different one, or change "
+                "[server] port in megamoo.toml.")
+        else:
+            logger.error(f"Server error: {e}", exc_info=True)
+        loop.run_until_complete(server.shutdown(f"Server error: {e}"))
+        failed = True
     except Exception as e:
         logger.error(f"Server error: {e}", exc_info=True)
         loop.run_until_complete(server.shutdown(f"Server error: {e}"))
