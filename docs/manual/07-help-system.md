@@ -94,12 +94,13 @@ a wizard session.
 
 ### A standalone article (string property)
 
-`@set` writes a property that already exists; a new topic has to be created
-first, which is `@adprop`:
+`@adprop` creates the topic and takes its text in one go. `@set` is for
+revising it afterwards -- it writes a property that already exists and cannot
+create one:
 
 ```
-@adprop #34.rules
-@set #34.rules = "Be excellent to each other. No harassment, no cheating..."
+@adprop #34.rules = "Be excellent to each other. No harassment, no cheating..."
+@set #34.rules = "Be excellent. No cheating. No spoilers in public channels."
 ```
 
 `help rules` now prints that text. The property name is the topic name, so keep
