@@ -518,6 +518,18 @@ def clear_property(obj, name: str) -> None:
         own = getattr(obj, 'properties', None)
         if own is not None and name in own:
             del own[name]
+            # See set_verb_code.  Deleting straight out of the dict leaves
+            # nothing dirty, so the property came back on the next restart
+            # -- and descendants went on resolving it from their cache in
+            # the meantime.
+            obj._mark_modified()
+            try:
+                obj.invalidate_inheritance_cache()
+            except Exception:
+                pass
+            from .builtins import _database as _db
+            if _db is not None:
+                _db.save_object(obj)
     except Exception:
         pass
 
@@ -537,9 +549,29 @@ def set_verb_info(obj, verb, info) -> None:
     if v is None or not isinstance(info, (list, tuple)) or len(info) < 3:
         return
     owner, perms, names = info[0], info[1], info[2]
+    renamed = v.names != str(names).split()
     v.owner = int(getattr(owner, 'objnum', owner))
     v.perms = str(perms)
     v.names = str(names).split()
+
+    # See set_verb_code: without _mark_modified the verbs table is not
+    # written at all, so a rename or an owner change survived only until the
+    # next restart.
+    try:
+        obj._mark_modified()
+    except Exception:
+        pass
+    # A renamed verb is cached under its old names, per object and inherited
+    # by every descendant -- so the old name goes on answering and the new
+    # one does not, until something unrelated happens to invalidate it.
+    if renamed:
+        try:
+            obj.invalidate_inheritance_cache()
+        except Exception:
+            pass
+    from .builtins import _database as _db
+    if _db is not None:
+        _db.save_object(obj)
 
 
 # ---------------------------------------------------------------------------
@@ -741,6 +773,14 @@ def set_property_info(obj, name: str, info) -> None:
             return
         prop.owner = int(getattr(info[0], 'objnum', info[0]))
         prop.perms = str(info[1])
+        # See set_verb_code.  Writing straight onto the PropertyInfo leaves
+        # nothing dirty, so the change was never written; and this whole
+        # body sits in `except Exception: pass`, which would have swallowed
+        # the save failing too.
+        obj._mark_modified()
+        from .builtins import _database as _db
+        if _db is not None:
+            _db.save_object(obj)
     except Exception:
         pass
 

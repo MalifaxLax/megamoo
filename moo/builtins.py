@@ -4033,6 +4033,12 @@ def set_verb_code(obj, desc, code):
         return E_VERBNF
     v.code = '\n'.join(code) if isinstance(code, (list, tuple)) else str(code)
     v.compiled_code = None
+    # _mark_modified, not just save_object: a save only writes the verbs
+    # table when the object is wholly dirty, and editing a verb in place
+    # leaves nothing else to notice.  Without it this returned success for a
+    # change that lived in memory until the next restart quietly reverted it.
+    # api.py's _cmd_set_verb already had this; the MOO builtin never did.
+    obj._mark_modified()
     if _database is not None:
         _database.save_object(obj)
     return []
