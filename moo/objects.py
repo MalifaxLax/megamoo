@@ -431,6 +431,9 @@ class TagHandler:
 # ===========================================================================
 
 
+_UNSET = object()
+
+
 class MOOObject:
     """
     Base MOO object class -- the fundamental building block of the world.
@@ -1241,7 +1244,7 @@ class MOOObject:
 
         # Update existing local property
         if name in props:
-            self._check_write(name, props[name])
+            self._check_write(name, props[name], value)
             props[name].value = value
             self.__dict__['_dirty_props'].add(name)
             self._invalidate_local()
@@ -1255,7 +1258,7 @@ class MOOObject:
         if resolved and name in resolved:
             # Inherited property exists — create a local override
             inherited_info, _defining_obj = resolved[name]
-            self._check_write(name, inherited_info)
+            self._check_write(name, inherited_info, value)
             self.add_property(name, value=value, perms=inherited_info.perms)
             return
 
@@ -1320,7 +1323,7 @@ class MOOObject:
             f"Permission denied: cannot set '{name}' on #{self.objnum}"
         )
 
-    def _check_add(self, name):
+    def _check_add(self, name, value=_UNSET):
         """Refuse creating a property on an object the actor does not own.
 
         The companion to :meth:`_check_write`, for the case where there is
@@ -1329,7 +1332,7 @@ class MOOObject:
         the property's own perms.
         """
         if name in MOOObject._PRIVILEGED_PROPS:
-            self._check_write(name, self.properties.get(name))
+            self._check_write(name, self.properties.get(name), value)
             return
         try:
             from .builtins import current_perms
@@ -1354,7 +1357,7 @@ class MOOObject:
             f"Permission denied: cannot add '{name}' to #{self.objnum}"
         )
 
-    def _check_write(self, name, prop_info):
+    def _check_write(self, name, prop_info, value=_UNSET):
         """
         Refuse a property write the running verb is not entitled to make.
 
@@ -1412,6 +1415,17 @@ class MOOObject:
         # Granting authority is gm5, wizard or not.  A gm5 passes and
         # continues; below that it is refused even with the flag.
         if name in MOOObject._PRIVILEGED_PROPS:
+            # You may not grant a level above your own.
+            #
+            # A flat "gm5 to touch auth" was too blunt.  It stopped the
+            # attack -- a gm4 writing gm5 -- but it also stopped chargen
+            # copying a staff account's own level onto the character it is
+            # creating for them, which is not a grant at all: the authority
+            # already exists and is being mirrored, not raised.
+            #
+            # Comparing levels keeps the property that matters and lets the
+            # mirroring through.  gm4 writing gm5 is still refused; gm5
+            # writing gm5, or gm3 writing gm3, is not.
             level = 0
             if db is not None:
                 try:
@@ -1419,10 +1433,21 @@ class MOOObject:
                     level = auth_level(db.get_object(actor))
                 except Exception:
                     level = 0
-            if level < 5:
+            wanted = 0
+            if value is not _UNSET:
+                for a in (value or []):
+                    if (isinstance(a, str) and a.startswith('gm')
+                            and a[2:].isdigit()):
+                        wanted = max(wanted, int(a[2:]))
+            else:
+                # No value to inspect -- a deletion, or a caller that did
+                # not pass one.  Treat it as the strictest case.
+                wanted = 5
+            if wanted > level:
                 raise PermissionError(
                     f"Permission denied: cannot write '{name}' on "
-                    f"#{self.objnum} -- granting authority is gm5"
+                    f"#{self.objnum} -- that grants gm{wanted} and you "
+                    f"hold gm{level}"
                 )
             return
         if is_wizard:
@@ -1871,7 +1896,7 @@ class MOOObject:
         # #0, carrying WIZARD -- for anybody who could type it.  The
         # privileged-name gate did not catch it because the name was new,
         # and there is always another name.
-        self._check_add(name)
+        self._check_add(name, value)
         if name in self.properties:
             raise ValueError(f"Property '{name}' already exists on #{self.objnum}")
 
@@ -1997,12 +2022,12 @@ class MOOObject:
         # tried, watched a gm3 promote itself straight through it, and the
         # reason was that the check asks who the *verb* acts as.
         if name in self.properties:
-            self._check_write(name, self.properties[name])
+            self._check_write(name, self.properties[name], value)
         elif db is not None and self.has_property(name, local_only=False,
                                                   database=db):
             try:
                 parent_obj = db.get_object(self.parent)
-                self._check_write(name, parent_obj.get_property_info(name, db))
+                self._check_write(name, parent_obj.get_property_info(name, db), value)
             except (KeyError, AttributeError):
                 pass
 

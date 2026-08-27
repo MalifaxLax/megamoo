@@ -26,6 +26,19 @@ Hidden:  yes
 Perms:   rxd
 """
 
+# Act as the player this is running for, not as the arch's owner.
+#
+# Chargen copies a staff account's own auth onto the character it creates
+# for them.  That is mirroring, not granting -- the authority already
+# exists -- but the engine checks the *actor*, and the actor here was #0,
+# which owns the arch and has no `auth` of its own.  So it read as level 0
+# and the copy was refused: "cannot write 'auth' on #201".
+#
+# `pobj`, not `caller_perms()`: this verb is reached as
+# `call_verb(exit, 'go_')` from the `go` verb, so the caller is that verb's
+# owner -- #0 again -- and not the person standing in the room.
+set_task_perms(pobj)
+
 import re
 
 # ── Quit exception ─────────────────────────────────────────────────────
