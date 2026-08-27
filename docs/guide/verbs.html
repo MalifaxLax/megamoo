@@ -91,9 +91,9 @@ listed in full in the <a href="commands.html">Command Reference</a>.
 <tbody>
 <tr><td><code>gm1</code></td><td>Trusted player</td><td>Teleport, hold things, inspect objects.</td></tr>
 <tr><td><code>gm2</code></td><td>Builder</td><td>Dig rooms, make exits, name and describe things, move and delete them.</td></tr>
-<tr><td><code>gm3</code></td><td>Programmer</td><td>Make objects, set properties, reserve numbers, dig and describe.</td></tr>
+<tr><td><code>gm3</code></td><td>Programmer</td><td>Everything a builder does, <em>and write verb code</em>: <code>@program</code>, <code>@adverb</code>, <code>eval</code>.</td></tr>
 <tr><td><code>gm4</code></td><td>Wizard</td><td>Remove player accounts.</td></tr>
-<tr><td><code>gm5</code></td><td>Owner</td><td>Write and install verb code, grant levels, restart and shut down.</td></tr>
+<tr><td><code>gm5</code></td><td>Owner</td><td>Grant levels, reserve number blocks, restart and shut down.</td></tr>
 </tbody>
 </table>
 </div>
@@ -122,21 +122,25 @@ engine refuses the command before your code runs:
 <span class="p">&gt;</span> @verbauth #3.@mycmd = 3     <span class="c"># or afterwards</span></code></div>
 
 <div class="warn">
-    <span class="label">gm5 is the security boundary</span>
+    <span class="label">gm3 is the security boundary</span>
     <p>Verb code is ordinary Python with ordinary Python privileges: it can
        <code>import</code> anything, open files, and reach the interpreter's
        own builtins. That is the point of the language choice, and it is why
        the whole standard library is genuinely available to you.</p>
-    <p>It also means that <strong>anyone who can write a verb can run any
-       code they like as the account your server runs under</strong>. That is
-       why <code>@program</code>, <code>@adverb</code>, <code>@port</code>,
-       <code>@load</code>, <code>@reload</code>, <code>@verbauth</code> and
-       <code>eval</code> are <strong>gm5</strong> — grant it to people you
-       would trust with the machine, not merely with the game.</p>
-    <p><code>gm3</code> is a builder: rooms, exits, descriptions, properties.
-       It cannot reach any of those commands. The levels used to say
-       otherwise — writing code was gm3 — which made gm3 and gm5 the same
-       privilege wearing two names.</p>
+    <p>It also means that <strong>anyone you give <code>gm3</code> can run
+       any code they like as the account your server runs under</strong>.
+       Grant it to people you would trust with the machine, not merely with
+       the game.</p>
+    <p>That is a deliberate trade, and it is the one classic MOO made in
+       reverse: there, ordinary players could program because the MOO
+       language was itself the sandbox. Python is not, so MegaMOO puts the
+       boundary at <em>who may write a verb</em> instead. A coder is staff.</p>
+    <p>What <code>gm3</code> <em>cannot</em> do is reach anyone else's things.
+       Ownership decides that, not level: a verb runs as its owner, so a
+       builder's code writes their own objects and is refused on yours — and
+       on <code>auth</code>, which #0 owns. That is enforcement, not
+       etiquette. It is not a defence against a coder who means harm, and
+       nothing in-process could be.</p>
     <p>Classic MOO let ordinary players program, because the MOO language
        was itself the sandbox. MegaMOO has no equivalent boundary, so a
        world where untrusted players write code is not something the auth

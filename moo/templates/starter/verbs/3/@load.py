@@ -11,31 +11,20 @@ Switches:
     /list - Show what is available to load.
     /dry  - Report what would be built without building it.
 
-Auth: gm5 (auth_level 5)
-Raised from gm%d to gm5 on 2026-08-26. Writing or installing verb code is
-arbitrary code execution in the server's own process -- `import`, `open` and
-`sys.modules` all work from verb code -- so whoever can do it can switch off
-permission enforcement and is a wizard whether or not the level says so.
-gm3 is a builder: rooms, exits, descriptions, properties. Code is gm5.
+Auth: gm3+ (auth_level 3)
 
-The loaded object is always a *new* object with a new number.  Nothing is
-overwritten, because the number in the dump belongs to whatever holds it
-here, which is rarely the same thing.
+gm3 is Coder, and a coder writes code. That is a decision about trust, not a
+gap: verb code is ordinary Python in the server's process, so whoever can
+write a verb can do anything the server account can. Grant gm3 to people you
+would trust with the machine.
 
-Two things are worth knowing before moving content between databases:
-
-Parent.  The dump records a parent by number, and that number means
-whatever it means *here*.  Loading a dump from another database against a
-mismatched hierarchy is the one way to get a badly wrong result, so the
-parent is named in the output -- check it.
-
-Object references.  A property holding #N is stored as a number, and the
-number is not remapped, because there is nothing to remap it to.  These
-are counted and listed, so they can be fixed by hand with @set.
-
-See also: @dump
+It was gm5 for part of 2026-08-26, while the ownership model was being built.
+Ownership is what stops a coder touching other people's things -- their own
+verbs run as them, so `auth` (owned by #0, perms 'rc') refuses them -- but it
+cannot stop a verb that means harm, and pretending otherwise would be worse
+than saying this plainly.
 """
-if auth_level(pobj) < 5:
+if auth_level(pobj) < 3:
     pobj.msg("Do what?")
     return
 

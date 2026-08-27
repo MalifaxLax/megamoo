@@ -3193,8 +3193,10 @@ def eval_python(code: str, context: dict) -> Any:
                     {'player': player, 'db': db})
     """
     player = context.get('player')
-    if not player or not player.has_flag(ObjectFlags.WIZARD):
-        raise PermissionError("eval_python requires wizard permissions")
+    if not player or not (player.has_flag(ObjectFlags.PROGRAMMER)
+                          or player.has_flag(ObjectFlags.WIZARD)):
+        raise PermissionError(
+            "running code requires the PROGRAMMER flag (gm3) or WIZARD (gm4+)")
 
     # Preprocess to convert #N syntax to db.get_object(N) calls
     from .verbs import preprocess_objrefs
@@ -3260,7 +3262,8 @@ def exec_python(code: str, context: dict) -> None:
                     {'player': player, 'db': db})
     """
     player = context.get('player')
-    if not player or not player.has_flag(ObjectFlags.WIZARD):
+    if not player or not (player.has_flag(ObjectFlags.PROGRAMMER)
+                          or player.has_flag(ObjectFlags.WIZARD)):
         raise PermissionError("exec_python requires wizard permissions")
 
     # Preprocess to convert #N syntax

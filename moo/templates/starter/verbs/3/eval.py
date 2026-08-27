@@ -10,29 +10,21 @@ Arguments:
     expression  - Any valid Python expression to evaluate.
 
 Aliases: /
-Auth: gm5 (auth_level 5)
-Raised from gm%d to gm5 on 2026-08-26. Writing or installing verb code is
-arbitrary code execution in the server's own process -- `import`, `open` and
-`sys.modules` all work from verb code -- so whoever can do it can switch off
-permission enforcement and is a wizard whether or not the level says so.
-gm3 is a builder: rooms, exits, descriptions, properties. Code is gm5.
+Auth: gm3+ (auth_level 3)
 
-gm5, and it was gm3 until 2026-08-26. Two reasons, and the second is the
-real one: eval_python() requires the WIZARD flag, which sync_auth_flags()
-sets at gm4, so a gm3 passed the guard and then met a raw "eval_python
-requires wizard permissions" from inside the engine -- an internal message
-for what is really just "you may not do that". And running arbitrary Python
-in the server's process is the code boundary itself, which is gm5.
+gm3 is Coder, and a coder writes code. That is a decision about trust, not a
+gap: verb code is ordinary Python in the server's process, so whoever can
+write a verb can do anything the server account can. Grant gm3 to people you
+would trust with the machine.
 
-This is the only verb in either corpus that evaluates what somebody typed.
-@set, @adprop and @wearpos used to as well, which made the boundary
-decorative; they parse literals now (moo.verbs.eval_value_literal).
-
-Note: The expression runs in a context with: player, pobj (me), here,
-db, location, ObjectFlags, and MOOObjectRef available as variables.
+It was gm5 for part of 2026-08-26, while the ownership model was being built.
+Ownership is what stops a coder touching other people's things -- their own
+verbs run as them, so `auth` (owned by #0, perms 'rc') refuses them -- but it
+cannot stop a verb that means harm, and pretending otherwise would be worse
+than saying this plainly.
 """
 # Eval command - evaluate Python expression (wizards only)
-if auth_level(pobj) < 5:
+if auth_level(pobj) < 3:
     pobj.msg("Do what?")
     return
 if not argstr:

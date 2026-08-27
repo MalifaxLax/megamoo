@@ -219,17 +219,25 @@ it is why the standard library is genuinely available rather than a curated
 subset.
 
 The consequence is that **the security boundary is who can create a verb,
-not what a verb can do once created.** `@program`, `@adverb`, `@port`,
-`@load`, `@reload`, `@verbauth` and `eval` are gated at **gm5**. Anyone
-holding gm5 can run arbitrary code as the server process and should be
-considered as trusted as the person running it.
+not what a verb can do once created.** `@program`, `@adverb` and `eval` are
+gated at **gm3**. Anyone holding gm3 can run arbitrary code as the server
+process and should be considered as trusted as the person running it.
 
-They were gm3 until 2026-08-26, which made gm3 and gm5 the same privilege
-under two names: a gm3 could write a verb that set
-`ENFORCE_WIZARD_PERMISSIONS = False` and stop being a gm3. gm3 is a builder
-now — rooms, exits, descriptions, properties — and `auth` itself is refused
-below gm5 by `@set`, `@adprop` and `@rmprop`, since `auth_level()` reads it
-and setting it was a one-line promotion.
+That is the same trade classic MOO made in reverse. There, ordinary players
+could program safely because the MOO language *was* the sandbox — a small VM
+with no imports and no host access. Here the in-world language is Python
+itself, which is the point, and Python has never been safely sandboxable
+in-process. So the boundary moves to who may write a verb, and a coder is
+staff.
+
+**What gm3 cannot do is reach anybody else's things.** Ownership decides
+that, not level. A verb runs as its owner, so a builder's code writes their
+own objects and is refused on yours; `auth` is owned by `#0` with `rc` perms,
+so no amount of `@set`, `@adprop` or `@rmprop` will grant a level. Authority
+is not inherited either — `auth_level()` reads an object's own property, so
+descending from a wizard grants nothing. Those are enforced by the engine,
+not by convention. None of them is a defence against a coder who means harm,
+and nothing running in this process could be.
 
 Two things follow:
 
