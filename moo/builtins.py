@@ -523,7 +523,7 @@ def sync_auth_flags(obj: Union[int, MOOObject]) -> None:
     object flags consistent with the permission model:
 
     - gm3+ sets the ``PROGRAMMER`` flag
-    - gm4+ sets the ``WIZARD`` flag
+    - gm5 sets the ``WIZARD`` flag
     - Below those thresholds the corresponding flags are cleared
 
     Args:
@@ -545,7 +545,16 @@ def sync_auth_flags(obj: Union[int, MOOObject]) -> None:
     else:
         obj_instance.flags &= ~ObjectFlags.PROGRAMMER
 
-    if level >= 4:
+    # WIZARD is gm5, not gm4.
+    #
+    # It used to be gm4+, and WIZARD is the flag every check in objects.py
+    # treats as "may do anything" -- so an Admin was an Owner as far as the
+    # engine was concerned, and could grant itself gm5 through @set.  Adding
+    # a level test on top of the flag stopped that and broke three other
+    # things, because the flag and the level then disagreed about who was
+    # privileged.  Making the flag mean gm5 is the fix the others were
+    # working around.
+    if level >= 5:
         obj_instance.flags |= ObjectFlags.WIZARD
     else:
         obj_instance.flags &= ~ObjectFlags.WIZARD

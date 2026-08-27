@@ -1314,11 +1314,34 @@ class MOOObject:
         db = self.__dict__.get('_database')
         if db is None:
             return
+        # The WIZARD *flag* or gm4 and above, which is the level that flag
+        # is supposed to mirror.
+        #
+        # Testing the flag alone is the same split that let a gm4 grant
+        # itself gm5 and that stopped chargen copying an account's auth:
+        # `sync_auth_flags` sets WIZARD at gm4+, but nothing guarantees it
+        # has run, and the shipped Wizard is the proof -- `auth ["gm5"]`
+        # with flags 6, so `auth_level` says 5 while `is_wizard` says
+        # False.  Asking both means the answer does not depend on which of
+        # the two somebody last wrote.
         try:
-            if getattr(db.get_object(actor), 'is_wizard', False):
+            who = db.get_object(actor)
+            if getattr(who, 'is_wizard', False):
+                return
+            from .builtins import auth_level
+            # gm5, matching the flag.  gm4 was wrong and reopened the hole
+            # by another door: `flags` is in this same privileged set, so an
+            # Admin allowed to set it could set its own WIZARD bit and then
+            # grant itself gm5 -- the very thing the auth gate stops.
+            if auth_level(who) >= 5:
                 return
         except Exception:
-            return
+            # Cannot tell -- refuse.  This used to `return`, the permissive
+            # branch, so a lookup that threw turned the check off.
+            raise PermissionError(
+                f"Permission denied: cannot establish who is setting "
+                f"'{name}' on #{self.objnum}"
+            )
         raise PermissionError(
             f"Permission denied: cannot set '{name}' on #{self.objnum}"
         )
@@ -1429,8 +1452,15 @@ class MOOObject:
             level = 0
             if db is not None:
                 try:
+                    who = db.get_object(actor)
+                    if getattr(who, 'is_wizard', False):
+                        # WIZARD is gm5 now, so the flag is the answer.
+                        # This is what lets a verb owned by #0 -- chargen,
+                        # @auth -- manage auth at all: #0 carries the flag
+                        # and has no `auth` property of its own to read.
+                        return
                     from .builtins import auth_level
-                    level = auth_level(db.get_object(actor))
+                    level = auth_level(who)
                 except Exception:
                     level = 0
             wanted = 0
