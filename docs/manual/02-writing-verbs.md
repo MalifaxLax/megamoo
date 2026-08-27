@@ -179,7 +179,7 @@ untouched.
 | You write | Becomes | Notes |
 |---|---|---|
 | `#42` | `db.get_object(42)` | An object literal. |
-| `$wearable` | `db.get_object(0).wearable` | A property on the system object (#0) — see [named constants](#named-object-constants) below. |
+| `$chair` | `db.get_object(0).chair` | A property on the system object (#0) — see [named constants](#named-object-constants) below. |
 | `$su` | `su` | The one special case: `su` is in `_PYTHON_CONSTANTS`, so it maps to the injected namespace name rather than a `#0` property. |
 | `"text with #5"` | unchanged | Inside a string. |
 | `# a comment about #1` | unchanged | A real comment (`#` not followed by a digit). |
@@ -199,22 +199,25 @@ those properties store object numbers, `$name` resolves to a well-known object
 without hardcoding its number:
 
 ```python
-# Instead of memorizing that the wearable base is #35:
-glove = create(parent=$wearable)     # → create(parent=db.get_object(0).wearable)
+# Instead of memorizing that the chair prototype is #24:
+seat = create(parent=$chair)         # → create(parent=db.get_object(0).chair)
 if target.parent == $chest:          # readable, refactor-proof
     ...
-$eu.trigger(pobj, 'poison', 5, 3)    # $eu → db.get_object(0).eu  (the effects object, #53)
+$eu.trigger(pobj, 'poison', 5, 3)    # $eu → db.get_object(0).eu  (the effects object, #33)
 ```
 
-The constants defined on #0 in the shipped database are `$bed`, `$chair`,
-`$chest`, `$eu`, `$furniture`, `$globals`, `$hat`, `$item`, `$obj`, `$pants`,
-`$shirt`, `$shoes`, `$table`, and `$wearable`. A `$name` with no matching
+The constants defined on #0 in the shipped database are the prototypes `$bed`,
+`$chair`, `$chest`, `$furniture`, `$item`, `$obj` and `$table`; `$config` and
+`$globals`; and the utility objects, each under a long name and a short one —
+`$string_utils`/`$su`, `$list_utils`/`$lu`, `$match_utils`/`$mu`,
+`$object_utils`/`$obj_utils`/`$ou`, `$command_utils`/`$cu`, `$code_utils`/`$cdu`,
+`$perm_utils`/`$pu`, `$effects_utils`/`$eu`, `$help_utils`/`$hu`. A `$name` with no matching
 property on #0 does not error — it reads as the falsy `_null_attr` sentinel, so a
 typo fails silently. Check the live list with `+props #0`.
 
 This is the same indirection LambdaMOO's `$foo` corewords provide: a layer of
 named aliases over raw object numbers, so verb code reads in terms of *roles*
-("the wearable prototype", "the effects utility") rather than magic numbers, and
+("the chair prototype", "the effects utility") rather than magic numbers, and
 a world can renumber its prototypes by re-pointing `#0`'s properties.
 
 **Adding one:** set a property on #0 to the target object number — `@adprop
@@ -588,7 +591,7 @@ parsing.
 Verbs can build the world at runtime:
 
 ```python
-sword = create(parent=db.get_object(35))   # child of #35 (BaseWearable)
+seat = create(parent=db.get_object(24))    # child of #24 (chair)
 sword.noun = "sword"
 sword.description = "A plain iron sword."
 add_property(sword, 'damage', 12)

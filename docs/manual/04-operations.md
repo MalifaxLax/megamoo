@@ -185,10 +185,9 @@ Pointing the server at a database file that doesn't exist (with no output path)
 is an error — it won't silently create an empty world; you start from a template.
 
 > **The shipped database.** MegaMOO ships with a default database containing the
-> core object hierarchy — every object through **#54**, plus **#90** (BaseEdible)
-> and **#91** (BaseDrinkable) — and **#100**, the owner/wizard account and the
-> first character in the game. That gives you the base prototypes (rooms, exits,
-> containers, furniture, wearables, consumables) and a usable login from the
+> core object hierarchy — every object through **#44** — and **#100**, the
+> owner/wizard account and the first character in the game. That gives you the base prototypes (rooms, exits,
+> containers, furniture) and a usable login from the
 > first launch; build your world on top of it.
 
 ---

@@ -1,14 +1,19 @@
 # 06 — The Prototype Library
 
-The shipped database (#0 through #54, plus #90/#91) includes a library of base
-prototypes you build the world from: room types, the five exit kinds,
-containers, furniture, wearables, and consumables. This chapter is the reference
-for those prototypes — the properties they define and the `<verb>_` hooks they
-respond to.
+The shipped database (#0 through #44) includes a library of base prototypes you
+build the world from: room types, the five exit kinds, containers, and
+furniture. This chapter is the reference for those prototypes — the properties
+they define and the `<verb>_` hooks they respond to.
 
 These are **engine prototypes**, not game content: they model space, movement,
-containment, clothing layers, and consumption generically. A specific game adds
-its own subclasses and content on top, documented separately.
+containment and seating generically. A specific game adds its own subclasses and
+content on top, documented separately.
+
+> **Wearables and consumables are not in the starter.** They were, and this
+> chapter documented them; the starter was cut back to the prototypes above, so
+> #35–#49 (clothing) and #90/#91 (the consumable bases) are no longer shipped
+> and those two sections are gone with them. A game that wants either builds it
+> as its own content.
 
 > Property names below are the load-bearing ones used by the engine's own verbs.
 > For the authoritative, current list on any prototype, use `+props/all #N`
@@ -19,8 +24,6 @@ its own subclasses and content on top, documented separately.
 - [Exits](#exits)
 - [Containers and spatial storage](#containers-and-spatial-storage)
 - [Furniture](#furniture)
-- [Wearables](#wearables)
-- [Consumables](#consumables)
 
 ---
 
@@ -200,92 +203,6 @@ piece's `sitters`; `stand` clears it.
 which check capacity and `sit_prep`), `look_` (renders the piece and who's on it),
 and `tt` — **table talk**, which speaks only to others at the same piece of
 furniture.
-
----
-
-## Wearables
-
-Wearables descend from **#35 BaseWearable** (itself a child of #12 item). The
-shipped clothing prototypes are **#36 Shirt**, **#37 Pants**, **#38 Shoes**,
-**#39 Hat**, and **#40–#49 BlankClothing** (blank templates to clone and
-configure).
-
-### Body slots and the layer system
-
-A wearable's `wear_pos` is a list of `[position, size]` pairs naming the body
-slots it occupies and how it layers there. Layering is **size-based**:
-
-- **Size 0 — accessories.** Don't participate in layering; multiple can share a
-  slot (rings, bracelets).
-- **Size 1+ — layers.** A larger size goes over a smaller one in the same slot;
-  you can't put a smaller garment over a larger one. Removing an inner layer is
-  blocked while something larger covers it.
-
-**Bilateral (left/right) slots** are encoded by position values over 100: the
-base slot is `pos % 100` (the **right** side) and the **left** is `base − 1`, so a
-single `wear_pos` entry can describe a left-or-right item.
-
-Configure all of this in-game with `@wearpos` (a game/staff command — see its note
-in [Building Worlds](03-building-worlds.md#movement-and-structure)).
-
-### Wearable properties
-
-| Property | Meaning |
-|---|---|
-| `wear_pos` | List of `[position, size]` pairs — where it's worn and how it layers. |
-| `worn` | Whether it's currently worn. |
-| `size` | The layering size of the garment. |
-| `visible` | Whether it's visible when worn. |
-| `layer_flex` | Per-slot flags allowing flexible layering order. |
-
-(A character tracks what it has on via its own `wearing` property.)
-
-### Wearable verbs
-
-`wear_` and `remove_` (the per-object hooks the room's `wear`/`remove` dispatch
-to — they check slot availability, layer order, and what's on top), plus
-`items_on_top` / `items_under` (the helpers that report layering conflicts and so
-gate removal).
-
----
-
-## Consumables
-
-Two prototypes, both children of #10: **#90 BaseEdible** (food) and **#91
-BaseDrinkable** (beverages). Both support multiple uses, effects on consumption,
-and custom messages.
-
-### Properties
-
-| Property | Meaning |
-|---|---|
-| `uses` | Bites / sips remaining. |
-| `prepared` | Whether the item is ready to consume. |
-| `effects` | Effect(s) applied to the consumer on each use (via the [effects system](05-engine-systems.md#the-effects-system)). |
-| `eemits` | Messages emitted to the room on each use. |
-| `rtdice` | Dice parameters for randomized effect application. |
-| `finish` / `ofinish` | Message to the consumer / to onlookers on the final use. |
-| `liquid` | Marker on #91 identifying it as a beverage (used by cup containers). |
-
-### Verbs
-
-`eat_` (on #90), `drink_` and `sip` (on #91): each decrements `uses`, applies
-`effects`, shows the `eemits`, and on the last use shows `finish`/`ofinish`. They
-are the per-object hooks the room's `eat`/`drink`/`sip` verbs dispatch to.
-
-```
-@make #90
-@name <obj> = loaf of bread
-@adprop <obj>.uses = 5
-@adprop <obj>.prepared = True
-@adprop <obj>.finish = You eat the last of the bread.
-@adprop <obj>.ofinish = %S eats the last of the bread.
-```
-
-(Property values are set with `@adprop` — there is no separate `@set`; on a fresh
-instance these create local overrides of the inherited defaults. `@adprop`
-evaluates the right-hand side as a Python expression where it can, so `5` and
-`True` become an int and a bool, while unparseable text is stored as a string.)
 
 ---
 

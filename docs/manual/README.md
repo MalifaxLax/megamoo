@@ -29,7 +29,7 @@ is, with references into the source so you can follow the engine end to end.
 | [03 — Building Worlds](03-building-worlds.md) | Builders / staff | The 64-command `@`-toolkit: rooms, exits, objects, descriptions, properties, and in-game verb programming, with a worked example. |
 | [04 — Operations](04-operations.md) | Operators | Running the server, command-line flags, configuration, the JSON API and MCP integration, persistence/backups, and the permission ladder. |
 | [05 — Engine Systems](05-engine-systems.md) | Verb authors / programmers | The runtime systems verbs plug into: hooks (lifecycle events), the ticker (scheduled verbs), and the effects system. |
-| [06 — The Prototype Library](06-object-prototypes.md) | Builders / programmers | The shipped base objects — rooms (+ the compass), exits, containers, furniture, wearables, consumables — and their properties and verbs. |
+| [06 — The Prototype Library](06-object-prototypes.md) | Builders / programmers | The shipped base objects — rooms (+ the compass), exits, containers and furniture — and their properties and verbs. |
 | [07 — The Help System](07-help-system.md) | Builders / staff | The in-game `help` command: its resolution ladder, the `#34` topic store (articles and categories), self-documenting verb docstrings, and object introspection (`help #obj`). |
 
 ## The engine at a glance

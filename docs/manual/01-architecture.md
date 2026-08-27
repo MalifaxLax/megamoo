@@ -104,9 +104,8 @@ verbs are skipped during player-initiated lookup.
 ## The core object hierarchy
 
 A handful of low-numbered objects form the backbone of any MegaMOO world, and the
-shipped database defines them out of the box: every object through **#54**, plus
-**#90**/**#91** (the consumable bases) and **#100**, the owner/wizard account and
-first character in the game. The table below lists the load-bearing ones; they
+shipped database defines them out of the box: every object through **#44**, and
+**#100**, the owner/wizard account and first character in the game. The table below lists the load-bearing ones; they
 are the conventional layout new content builds against:
 
 | # | Object | Parent | Role |

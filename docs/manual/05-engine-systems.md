@@ -237,5 +237,5 @@ plus a dict.
 ---
 
 Next: [The Prototype Library](06-object-prototypes.md) — the shippable base
-objects (rooms, exits, containers, furniture, wearables, consumables) and their
+objects (rooms, exits, containers, furniture) and their
 properties.
