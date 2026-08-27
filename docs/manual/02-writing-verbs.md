@@ -723,8 +723,8 @@ not engine requirements, but following them keeps new content consistent:
 - **Hidden / internal verbs** are named with a trailing `_` (called
   programmatically) or a leading `_` (ticker callbacks, lifecycle hooks) and are
   marked hidden so players can't invoke them.
-- **Colors:** prefer `%<245>` for dim UI chrome; avoid `%<240>` (too dark);
-  `%n` resets. All of it disappears under screenreader mode, so never encode
+- **Colors:** prefer `&<245>` for dim UI chrome; avoid `&<240>` (too dark);
+  `&n` resets. All of it disappears under screenreader mode, so never encode
   meaning in color alone.
 
 ---

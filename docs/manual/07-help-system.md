@@ -20,14 +20,14 @@ The `help` verb draws from exactly two places:
 
 | Source | What it is | Who authors it |
 |---|---|---|
-| **The topic store** — `#54` (`help_utils`) | Free-form articles: lore, mechanics, policy, "how to play" prose. Each topic is a property. | Builders / staff (`#54` is owned by the `#100` wizard) |
+| **The topic store** — `#34` (`help_utils`) | Free-form articles: lore, mechanics, policy, "how to play" prose. Each topic is a property. | Builders / staff (`#34` is owned by the `#100` wizard) |
 | **Verb docstrings** | The first triple-quoted block of any verb in scope. Documents commands as a side effect of writing them. | Whoever wrote the verb |
 
 The split is deliberate. **Commands document themselves** — the same docstring a
 programmer reads in the source is the help a player reads in the game, so the two
 can never drift apart. **Everything that isn't a command** — combat rules, the
 chargen walkthrough, world history, the rules of conduct — lives as editable
-prose on `#54`, where staff can revise it live without touching a verb.
+prose on `#34`, where staff can revise it live without touching a verb.
 
 ---
 
@@ -40,10 +40,12 @@ Understanding the order is the key to both using and authoring help.
 
 Two lists are printed:
 
-1. **Help Topics** — every own property on `#54` except the bookkeeping
-   props `name`, `cname`, `name_mod_list`, and `description`. Only the object's
+1. **Help Topics** — every own property on `#34` except the bookkeeping
+   props `name`, `name_mod_list`, and `description`, and anything whose name
+   begins with an underscore, which is how this object marks its own
+   configuration rather than a topic. Only the object's
    *own* properties count (`properties_list(include_inherited=False)`), so nothing
-   leaks in from `#54`'s parent.
+   leaks in from `#34`'s parent.
 2. **Command Help** — the visible verbs reachable from where the player is
    *standing right now*: the verbs on `pobj`, on `pobj.location`, and on every
    object in the room's contents. A verb is listed only if it has a docstring and
@@ -59,14 +61,14 @@ For a non-empty argument that does not start with `#`, the verb tries, in order:
 
 | Rung | Match | Result |
 |---|---|---|
-| 1 | Argument equals an own property name on `#54` (case-insensitive) | If the value is a **string**, print it. If it's a **dict**, treat it as a category and print its sorted keys (its sub-topics). |
-| 2 | Argument equals a **key inside any dict property** on `#54` | Print that sub-topic's text, headed `category > key`. |
+| 1 | Argument equals an own property name on `#34` (case-insensitive) | If the value is a **string**, print it. If it's a **dict**, treat it as a category and print its sorted keys (its sub-topics). |
+| 2 | Argument equals a **key inside any dict property** on `#34` | Print that sub-topic's text, headed `category > key`. |
 | 3 | Argument matches a **verb name** in scope (`pobj`, location, contents) | Extract and print the verb's docstring. Respects auth gating. |
 | — | Nothing matched | `There's no help for that.` |
 
 So a single word like `combat` can be satisfied by a standalone article, by a
 sub-topic nested inside a category, or by a command of that name — whichever the
-ladder reaches first. Author topics with that precedence in mind: a `#54`
+ladder reaches first. Author topics with that precedence in mind: a `#34`
 property name shadows a verb of the same name.
 
 ### `help #<object>` and `help #<object>.<verb>` — introspection
@@ -87,26 +89,30 @@ players):
 
 ## Authoring topic articles
 
-Topics are properties on `#54`. Add them in-game with the builder toolkit or from
+Topics are properties on `#34`. Add them in-game with the builder toolkit or from
 a wizard session.
 
 ### A standalone article (string property)
 
+`@set` writes a property that already exists; a new topic has to be created
+first, which is `@adprop`:
+
 ```
-@set #54.rules to "Be excellent to each other. No harassment, no cheating..."
+@adprop #34.rules
+@set #34.rules = "Be excellent to each other. No harassment, no cheating..."
 ```
 
 `help rules` now prints that text. The property name is the topic name, so keep
 it a single lowercase word or short token — that is exactly what the player types.
 
 For multi-line prose, set it from the verb editor or via `set_property` so you can
-embed newlines and color codes (e.g. `%<245>` for dim headers, `%n` to reset —
+embed newlines and color codes (e.g. `&<245>` for dim headers, `&n` to reset —
 see [Architecture](01-architecture.md) and the color conventions used elsewhere
 in the world):
 
 ```python
-set_property(54, 'combat',
-    "%<245>Combat%n\n"
+set_property(34, 'combat',
+    "&<245>Combat&n\n"
     "Attacks are resolved on a roundtime clock. Type 'attack <target>'...\n"
     "See also: help wounds, help parry")
 ```
@@ -117,7 +123,7 @@ A property whose value is a **dict** becomes a *category*: an index whose keys a
 sub-topics. The category name lists its contents; each key is reachable directly.
 
 ```python
-set_property(54, 'magic', {
+set_property(34, 'magic', {
     'spells':   "Casting consumes mana. Type 'cast <spell> at <target>'...",
     'mana':     "Mana regenerates while resting. Your pool scales with...",
     'schools':  "There are four schools: evocation, abjuration...",
@@ -134,9 +140,28 @@ Note the asymmetry: the **category name** (`magic`) appears in the no-argument
 reading the category or by knowing the word. Categories keep the top-level index
 short while still making every sub-topic directly addressable.
 
+### Staff-only topics
+
+A topic can require an auth level. `_topic_auth` on `#34` maps a topic name to
+the level needed to read it, and a topic not named there is public:
+
+```
+@set #34._topic_auth = {"bmatch": 3, "pmatch": 3, "matching": 3}
+```
+
+Those three are the shipped example: they document the two matchers a person
+chooses between *while writing a verb*, which is a decision a player never makes.
+Below the level, the topic is absent from the *Help Topics* index **and**
+`help <topic>` answers "There's no help for that" — the same answer as for a
+topic that does not exist, because "you may not read this" tells someone fishing
+that there is something there to read. Hiding a topic from the index while still
+printing it on request is not a gate.
+
+The gate applies to the topic, so a category's sub-topics go with it.
+
 ### What never becomes a topic
 
-`name`, `cname`, `name_mod_list`, and `description` on `#54` are filtered out of
+`name`, `name_mod_list`, and `description` on `#34` are filtered out of
 the topic index, so you can name and describe the help object normally without
 those showing up as bogus topics.
 
@@ -192,7 +217,7 @@ A builder wants `help factions` to exist as a category with three entries.
 
 ```python
 # from a wizard eval / verb editor
-set_property(54, 'factions', {
+set_property(34, 'factions', {
     'guild':   "The Tinkers' Guild controls trade in the eastern wards...",
     'crown':   "The Crown's agents enforce the King's law...",
     'free':    "The Free Companies answer to coin and little else...",
@@ -216,15 +241,15 @@ because help content is object state read on every invocation.
 
 | Command | Who | Effect |
 |---|---|---|
-| `help` | all | Index: topic names on `#54` + visible commands in scope |
+| `help` | all | Index: topic names on `#34` + visible commands in scope |
 | `help <topic>` | all | Article (string), category index (dict), sub-topic, or command docstring — first match wins |
 | `help #<obj>` | gm3+ | Print the object's `help_text` property |
 | `help #<obj>.<verb>` | gm3+ | Print the docstring of that verb as defined on that object |
 
 | To author… | Do this |
 |---|---|
-| A standalone article | Set a **string** property on `#54`: `@set #54.<topic> to "..."` |
-| A category of sub-topics | Set a **dict** property on `#54`: `set_property(54, '<cat>', {...})` |
+| A standalone article | Set a **string** property on `#34`: `@set #34.<topic> = "..."` |
+| A category of sub-topics | Set a **dict** property on `#34`: `set_property(34, '<cat>', {...})` |
 | Command help | Write a triple-quoted **docstring** as the first thing in the verb |
 | Help for an object | Set a `help_text` string property on that object |
 | Hide a command from the index | Flag the verb `hidden` (e.g. `@hideverb`) |
@@ -234,11 +259,11 @@ because help content is object state read on every invocation.
 
 ## Design notes and gotchas
 
-- **One object holds all articles.** `#54` (`help_utils`, owned by `#100`) is the
+- **One object holds all articles.** `#34` (`help_utils`, owned by `#100`) is the
   entire topic library. Back it up with the rest of the database; there is no
   separate help store to manage.
-- **Precedence matters.** A `#54` property name shadows a verb of the same name
-  (rung 1 before rung 3). If you add a `look` property to `#54`, `help look`
+- **Precedence matters.** A `#34` property name shadows a verb of the same name
+  (rung 1 before rung 3). If you add a `look` property to `#34`, `help look`
   stops reaching the `look` command. Name topics so they don't collide with
   commands unless you intend to override them.
 - **Sub-topic keys are not indexed.** They are addressable (`help <key>`) but do
@@ -249,7 +274,7 @@ because help content is object state read on every invocation.
   the objects in it. A command defined on an object in another room won't appear
   until the player is in scope of it. This is a feature — it surfaces what's
   usable here — but don't expect a global command list from `help` alone.
-- **Help is read live.** Every `help` invocation re-reads `#54` and the verbs in
+- **Help is read live.** Every `help` invocation re-reads `#34` and the verbs in
   scope, so edits to topics or docstrings take effect immediately, with no reload.
 - **The login banner points here.** New connections are greeted with
   *"Type 'help' for help, or 'quit' to disconnect."*

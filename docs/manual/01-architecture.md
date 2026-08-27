@@ -344,8 +344,8 @@ event loop:
 - **MXP clickable links:** text in backticks (`` `north` ``) is rendered as a
   clickable `<send>` link for MXP-capable clients and degrades to plain text
   otherwise.
-- **Color:** `%`-prefixed codes (`%r` red, `%G` bright green, `%<245>` xterm-256
-  gray, `%<#FF0000>` hex RGB, `%n` reset) are translated to ANSI on output. See
+- **Color:** `&`-prefixed codes (`&r` red, `&G` bright green, `&<245>` xterm-256
+  gray, `&<#FF0000>` hex RGB, `&n` reset) are translated to ANSI on output. See
   [Building Worlds](03-building-worlds.md#colors-and-message-tokens).
 - **ANSI-aware wrapping:** wrapping measures *visible* width, so escape sequences
   never count toward the line length or get split. `WRAP_WIDTH` (default 121) can

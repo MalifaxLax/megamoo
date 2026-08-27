@@ -267,13 +267,13 @@ Output codes are `%`-prefixed and translated to ANSI:
 
 | Code | Effect |
 |---|---|
-| `%r %g %b %y %m %c %w %k` | red / green / blue / yellow / magenta / cyan / white / black |
-| `%R %G %B …` (uppercase) | bold/bright variants |
-| `%<245>` | xterm-256 color (245 = dim gray, good for UI chrome) |
-| `%<#FF0000>` | hex RGB |
-| `%n` | reset |
+| `&r &g &b &y &m &c &w &k` | red / green / blue / yellow / magenta / cyan / white / black |
+| `&R &G &B …` (uppercase) | bold/bright variants |
+| `&<245>` | xterm-256 color (245 = dim gray, good for UI chrome) |
+| `&<#FF0000>` | hex RGB |
+| `&n` | reset |
 
-Conventions: `%<245>` for dim chrome, avoid `%<240>` (too dark). **All color is
+Conventions: `&<245>` for dim chrome, avoid `&<240>` (too dark). **All color is
 stripped under screenreader mode**, so never rely on color alone to convey
 meaning. `@color` prints the live reference.
 
