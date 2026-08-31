@@ -718,6 +718,45 @@ class Database:
             self._save_metadata()
             self._conn.commit()
 
+            # Identity, assigned once and never recomputed.
+            #
+            # An upgrade has to pair the object in a world with the object it
+            # came from in the starter, and neither obvious answer holds: the
+            # number breaks across a renumber -- the starter did that at b17,
+            # when 75 numbers changed hands -- and the noun breaks when a
+            # builder renames their own object.  Nothing bounds how many
+            # objects may share a noun either, so a collision-breaker built
+            # on it ends up reaching for the number again.  So the key is
+            # opaque and derived from nothing that can change.
+            #
+            # Here rather than in make_object because make_object is not the
+            # only way an object comes into being -- a login creates one, and
+            # so does the test harness -- and an identity most objects have
+            # is not an identity.  It goes at the one place none of them can
+            # go around, and after the row exists, because a property added
+            # to an object SQLite has not seen yet is silently dropped.
+            # Written straight into the property table rather than through
+            # add_property, which is permission-checked: the API acts as an
+            # ordinary player, and an ordinary player may not add a property
+            # owned by #0 to an object they do not own.  Rightly so -- but
+            # this is the engine recording what it just made, not a player
+            # doing anything, and it must not be refusable.
+            from .globals import TEMPLATE_KEY_PROP, new_template_key
+            from .objects import PropertyInfo
+            _key = new_template_key()
+            obj.properties[TEMPLATE_KEY_PROP] = PropertyInfo(
+                name=TEMPLATE_KEY_PROP, value=_key, owner=0, perms='r')
+            obj._invalidate_local()
+            # And straight to the table.  Setting it in memory alone leaves
+            # it there until something else happens to save the object,
+            # which for an object nobody touches again is never -- it was
+            # lost exactly that way first time round.
+            self._conn.execute(
+                "INSERT OR REPLACE INTO properties "
+                "(objnum, name, value, owner, perms) VALUES (?, ?, ?, ?, ?)",
+                (objnum, TEMPLATE_KEY_PROP, json.dumps(_key), 0, 'r'))
+            self._conn.commit()
+
             # Update parent's children set
             if parent > 0:
                 try:

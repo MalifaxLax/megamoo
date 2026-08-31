@@ -424,6 +424,31 @@ DEFAULT_SERVER_NAME = 'MegaMOO Server'
 # Server version (imported from __init__.py)
 SERVER_VERSION = '0.10.0-beta22'
 
+# ---------------------------------------------------------------------------
+#   Object identity
+# ---------------------------------------------------------------------------
+#
+# Every object gets one of these when it is created, and never gets another.
+#
+# An upgrade has to pair the object in a world with the object it came from
+# in the starter, and neither of the obvious answers holds.  The number
+# breaks the moment either side renumbers -- the starter did, at b17, when
+# 75 numbers changed hands.  The noun breaks when a builder renames their
+# own object, which is an ordinary thing to do, and nothing bounds how many
+# objects may share one, so any collision-breaker built on it ends up
+# reaching for the number again.
+#
+# So the key is opaque and says nothing.  It is not derived from the noun,
+# the number, the parent or the creation time, because each of those is
+# something that can legitimately change afterwards.
+TEMPLATE_KEY_PROP = 'template_key'
+
+
+def new_template_key():
+    """A fresh object identity.  Opaque by design; see above."""
+    import uuid
+    return uuid.uuid4().hex[:16]
+
 # Server description
 SERVER_DESCRIPTION = 'A Python implementation of LambdaMOO'
 

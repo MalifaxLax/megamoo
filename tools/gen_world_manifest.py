@@ -59,10 +59,18 @@ def manifest_for(db_path, version):
                           sort_keys=True)
         verbs['%d:%s' % (objnum, primary)] = {'code': _h(code), 'meta': _h(meta)}
 
+    # template_key is what lets an upgrade pair objects across a renumber
+    # or a rename.  Worlds older than the key simply do not have one, and
+    # pairing falls back to the number for them.
+    tkeys = {o: json.loads(v) for o, v in con.execute(
+        "select objnum,value from properties where name='template_key'")}
     objects = {}
     for objnum, parent, noun in con.execute(
             'select objnum,parent,noun from objects'):
-        objects[str(objnum)] = {'parent': parent, 'noun': noun}
+        rec = {'parent': parent, 'noun': noun}
+        if objnum in tkeys:
+            rec['key'] = tkeys[objnum]
+        objects[str(objnum)] = rec
 
     props = {}
     for objnum, name, value, perms in con.execute(

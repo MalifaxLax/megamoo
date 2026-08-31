@@ -92,10 +92,37 @@ def _read_verbs(db_path: str, hash_len: int) -> Dict[str, dict]:
 
 def _read_objects(db_path: str) -> Dict[str, dict]:
     con = sqlite3.connect('file:%s?mode=ro' % db_path, uri=True)
-    out = {str(o): {'parent': p, 'noun': n}
-           for o, p, n in con.execute('select objnum,parent,noun from objects')}
+    tkeys = {o: json.loads(v) for o, v in con.execute(
+        "select objnum,value from properties where name='template_key'")}
+    out = {}
+    for o, p, n in con.execute('select objnum,parent,noun from objects'):
+        rec = {'parent': p, 'noun': n}
+        if o in tkeys:
+            rec['key'] = tkeys[o]
+        out[str(o)] = rec
     con.close()
     return out
+
+
+def _rekey(objects: Dict[str, dict]) -> Dict[str, dict]:
+    """Re-index objects by template_key where they have one.
+
+    Pairing by number breaks across a renumber; pairing by noun breaks when
+    a builder renames their own object, which is an ordinary thing to do.
+    The key is set once by the starter and changed by nothing, so where both
+    sides carry one it is the only honest way to say "these are the same
+    object".  Objects without a key keep their number as the key, which is
+    what worlds older than the stamp fall back to.
+    """
+    out = {}
+    for num, rec in objects.items():
+        out[rec['key'] if 'key' in rec else '#' + num] = dict(rec, objnum=num)
+    return out
+
+
+def keyed(objects: Dict[str, dict]) -> bool:
+    """Whether this collection carries template keys at all."""
+    return any('key' in r for r in objects.values())
 
 
 def _read_props(db_path: str, hash_len: int) -> Dict[str, str]:
