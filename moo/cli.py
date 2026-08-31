@@ -441,12 +441,25 @@ Examples:
             help='New database file to create (optional)'
         )
         parser.add_argument(
-            'port',
+            # Its own dest, not `port`.  Sharing the flag's dest is what
+            # made this positional need `default=argparse.SUPPRESS`: any
+            # ordinary default clobbered a typed --port with None on the
+            # launches that leave the positional out.  But SUPPRESS is the
+            # *string* '==SUPPRESS==', and argparse runs a string default
+            # through `type` for an absent nargs='?' positional -- so
+            # `type=int` turned every launch without a positional port into
+            #     error: argument port: invalid int value: '==SUPPRESS=='
+            # which is `megamoo --dev`, `megamoo world.db`, and the second
+            # line of the README quick start.  Python 3.13 stopped
+            # converting the default and hid it; 3.10-3.12 are the
+            # supported versions that did not.
+            #
+            # Two dests and the explicit merge below have no such edge, and
+            # metavar keeps --help reading as it always did.
+            'positional_port',
+            metavar='port',
             nargs='?',
             type=int,
-            # SUPPRESS: this positional shares dest with --port; without
-            # it, an absent positional clobbers the flag's value with None.
-            default=argparse.SUPPRESS,
             help='Port number to listen on'
         )
         
@@ -580,6 +593,15 @@ Examples:
         )
         
         args = parser.parse_args()
+
+        # The two spellings of the game port meet here, and the flag wins:
+        # `megamoo world.db 7777 --port 8888` listens on 8888, as it did
+        # when both spellings shared a dest and the later write took it.
+        # This has to precede _apply_game_toml, which fills in only what is
+        # still None -- run it after and a positional port would be read as
+        # file-sourced and left unpinned.
+        if args.port is None and args.positional_port is not None:
+            args.port = args.positional_port
 
         # The world's own file, then dev's forcing on top: --dev insists on
         # a few things (the API, the browser client, autoreload) that no

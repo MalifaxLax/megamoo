@@ -261,3 +261,130 @@ def test_cli_tells_run_server_where_the_port_came_from():
     assert 'pin_port=' in src, 'cli must pass pin_port'
     assert "'port' not in getattr(args, 'from_toml'" in src, \
         'cli must decide pin_port from where the port came'
+
+
+# ------------------------------------------------------------------
+# The parser itself
+# ------------------------------------------------------------------
+#
+# Everything above reaches `args` by building an `argparse.Namespace` by
+# hand, so argparse never runs.  That left the front door untested: the
+# `port` positional shared a dest with `--port` and carried
+# `default=argparse.SUPPRESS` to stop an absent positional clobbering the
+# flag -- but SUPPRESS is the string '==SUPPRESS==', and argparse feeds a
+# string default through `type` for an absent nargs='?' positional.  With
+# `type=int` that is int('==SUPPRESS=='), so every launch that named no
+# positional port died in the parser:
+#
+#     megamoo: error: argument port: invalid int value: '==SUPPRESS=='
+#
+# `megamoo --dev` and `megamoo world.db` are both that launch, and so is
+# the second line of the README quick start.  Python 3.13 stopped
+# converting string defaults and hid it; 3.10, 3.11 and 3.12 are supported
+# and did not.  These tests run the real parser on real argv.
+
+
+def _parse(tmp_path, argv, toml_body=None):
+    """Run `MegaMOO.parse_arguments` on *argv* and report what it produced.
+
+    Out of process for the same reason as `_apply_toml`: importing
+    `moo.cli` opens `megamoo.log` in the working directory.
+    """
+    (tmp_path / 'world.db').write_bytes(b'')
+    if toml_body is not None:
+        (tmp_path / 'megamoo.toml').write_text(textwrap.dedent(toml_body))
+    snippet = textwrap.dedent(f"""
+        import json, sys
+        sys.argv = ['megamoo'] + {argv!r}
+        from moo.cli import MegaMOO
+        args = MegaMOO().parse_arguments()
+        print('RESULT' + json.dumps({{'port': args.port,
+                                      'database': args.database,
+                                      'new_database': args.new_database,
+                                      'host': args.host,
+                                      'from_toml': sorted(args.from_toml)}}))
+    """)
+    proc = subprocess.run([sys.executable, '-c', snippet],
+                          cwd=tmp_path, capture_output=True, text=True,
+                          env={**os.environ, 'PYTHONPATH': ROOT})
+    assert proc.returncode == 0, (
+        f'megamoo {" ".join(argv)} did not parse:\n{proc.stderr}')
+    line = [l for l in proc.stdout.splitlines() if l.startswith('RESULT')]
+    assert line, f'no result from {argv}:\n{proc.stdout}\n{proc.stderr}'
+    import json
+    return json.loads(line[-1][len('RESULT'):])
+
+
+@pytest.mark.parametrize('argv', [
+    ['world.db'],
+    ['--dev'],
+    ['--input', 'world.db'],
+    ['world.db', '--port', '7777'],
+    ['world.db', '--web'],
+])
+def test_a_launch_without_a_positional_port_parses(tmp_path, argv):
+    """The absent positional must not be handed to `type` as a default."""
+    out = _parse(tmp_path, argv)
+    assert out['database'], f'megamoo {" ".join(argv)} lost the database'
+
+
+def test_the_quick_start_second_line_parses(tmp_path):
+    """`megamoo --dev` is what the README tells a new user to type."""
+    assert _parse(tmp_path, ['--dev'])['database']
+
+
+def test_a_positional_port_still_reaches_args_port(tmp_path):
+    """The LambdaMOO spelling: <database> <new_database> <port>."""
+    out = _parse(tmp_path, ['world.db', 'new.db', '7777'])
+    assert out['port'] == 7777
+    assert out['new_database'] == 'new.db'
+
+
+def test_a_bare_positional_port_is_read_as_a_port(tmp_path):
+    """`megamoo world.db 6770` -- the second positional is a port, not a db."""
+    out = _parse(tmp_path, ['world.db', '6770'])
+    assert out['port'] == 6770
+    assert out['new_database'] is None
+
+
+def test_a_positional_host_and_port_both_land(tmp_path):
+    """`megamoo world.db localhost 6770` -- documented in the epilog."""
+    out = _parse(tmp_path, ['world.db', 'localhost', '6770'])
+    assert out['host'] == 'localhost'
+    assert out['port'] == 6770
+
+
+def test_an_absent_positional_does_not_clobber_the_flag(tmp_path):
+    """What SUPPRESS was there to prevent, asserted directly this time."""
+    assert _parse(tmp_path, ['world.db', '--port', '7777'])['port'] == 7777
+
+
+def test_the_flag_wins_over_a_positional_port(tmp_path):
+    """Both spellings given: the flag is the more specific instruction."""
+    out = _parse(tmp_path, ['world.db', 'new.db', '7777', '--port', '8888'])
+    assert out['port'] == 8888
+
+
+def test_no_port_anywhere_leaves_it_none_for_the_toml(tmp_path):
+    """`_apply_game_toml` fills only what is still None -- keep it None."""
+    assert _parse(tmp_path, ['world.db'])['port'] is None
+
+
+def test_a_toml_port_survives_the_parser(tmp_path):
+    """The file is the standing preference when no spelling overrides it."""
+    out = _parse(tmp_path, ['world.db'], toml_body="""
+        [server]
+        port = 6890
+    """)
+    assert out['port'] == 6890
+
+
+def test_a_positional_port_beats_the_toml(tmp_path):
+    """The merge must precede `_apply_game_toml`, which fills only None."""
+    out = _parse(tmp_path, ['world.db', 'new.db', '7777'], toml_body="""
+        [server]
+        port = 6890
+    """)
+    assert out['port'] == 7777, 'a typed positional port must beat the file'
+    assert 'port' not in out['from_toml'], \
+        'a typed port must not be recorded as file-sourced, or it goes unpinned'
