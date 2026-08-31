@@ -96,9 +96,9 @@ which is the same spelling verbs already use for `moo.objects`. That is
 the whole extension mechanism — no plugin registry, no hooks, nothing
 new to learn.
 
-The starter world comes with 206 verbs: player commands, staff and
-building tools (75 `@`-commands), rooms and exits, containers and
-furniture, and character generation. They are copied into your game, so
+The starter world comes with 312 verbs, 228 of them typeable: player
+commands, staff and building tools (73 `@`-commands), rooms and exits,
+containers and furniture, and character generation. They are copied into your game, so
 they are yours to edit — the engine keeps no copy you have to merge
 against.
 
@@ -257,7 +257,9 @@ provide.
 
 MegaMOO is developed by a quadriplegic (C1–C2) programmer using a head-pointer input device at about 30 words per minute, in collaboration with AI pair-programming tools. That vantage point shapes the engine:
 
-- **Screenreader mode** (`screenreader` command) strips all ANSI color and visual decoration from output, per player, persistently.
+- **Screenreader mode** (`screenreader` command) strips all ANSI color and visual decoration from output, per player, persistently. It is reachable from anywhere, character creation included, so it can be turned on before the first screen rather than after it.
+- **Output that reads aloud.** The building and introspection commands — `@ps`, `+props`, `+verbs`, `@list`, `+pron`, `@dig/types` — answer screenreader mode with one labelled fact per line instead of a padded table, and character creation drops its box borders. Sighted output is unchanged.
+- **Verb files that lint clean.** Verb code is Python with its context injected, which a linter reports as hundreds of undefined names. Your game ships a `ruff.toml` and a type stub that declare them, so an editor is usable from the first minute — which matters most if you navigate code by tooling rather than by eye.
 - **ANSI-aware wrapping** computes visible text width so escape sequences never break line layout; server-side wrapping can also be disabled entirely (`WRAP_WIDTH = 0`) for screen readers and clients that reflow.
 - Text-native gameplay: everything in the world — movement, building, programming — is fully playable through assistive input at any typing speed, because a MOO rewards thought, not reflexes.
 

@@ -342,7 +342,11 @@ def init_game(destination, name=None, port=6770, template=None) -> pathlib.Path:
     (dest / 'display_screen.txt').write_text(DEFAULT_SCREEN)
 
     print(f'Created {dest}')
-    print(f'  {copied} verb files, a starter world, and an empty game/ package')
+    # Count the verbs, not the files: the tree also carries a ruff.toml and
+    # a type stub, and calling those "verb files" is both wrong and the kind
+    # of number that ends up quoted in the guide.
+    n_verbs = sum(1 for _p in verbs.rglob('*.py'))
+    print(f'  {n_verbs} verb files, a starter world, and an empty game/ package')
     print()
     print(f'  cd {dest}')
     print(f'  megamoo --dev')

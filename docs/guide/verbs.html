@@ -43,6 +43,7 @@
         <li><a href="#adding">Adding a verb</a></li>
         <li><a href="#waiting">Waiting, and talking to the outside</a></li>
         <li><a href="#disk">Editing verbs on disk</a></li>
+        <li><a href="#disk">Your editor, and the names it cannot see</a></li>
           <li><a href="#game">Your own Python: the <code>game/</code> package</a></li>
         <li><a href="#ai">Writing verbs with an AI assistant</a></li>
     </ol>
@@ -683,6 +684,46 @@ You only need <code>@reload</code> when a file changed by some means other than
 the watcher — a <code>git pull</code>, say. After an ordinary save, the watcher
 has already done it.
 </p>
+
+<h3>Your editor, and the names it cannot see</h3>
+
+<p>
+Verb code is ordinary Python, but the engine hands the verb its context —
+<code>pobj</code>, <code>this</code>, <code>db</code>, <code>call_verb</code> and
+about 330 others — instead of the file importing it. Your editor does not know
+that, so it marks every one of them undefined: dozens in a single verb, all of
+them wrong. Across the starter world that was 4,683 false errors.
+</p>
+
+<p>
+Your game ships with a <code>ruff.toml</code> in the verb tree that declares
+those names, and a <code>verb_context.pyi</code> so a language server can
+complete them rather than merely tolerate them. Both are already there; you do
+not have to do anything. If you upgrade MegaMOO and want the list refreshed:
+</p>
+
+<div class="term"><code>python tools/gen_verb_lint_config.py <span class="c">&lt;your-game-dir&gt;</span></code></div>
+
+<p>
+The list is assembled from the places the engine actually defines those names,
+so it cannot drift out of step with the engine you are running.
+</p>
+
+<p>
+Both files sit <em>inside</em> the verb tree rather than at the top of your
+game, and deliberately: a linter uses the nearest config to each file, so your
+own Python under <code>game/</code> gets none of these declarations. An
+undefined name there is still a real mistake, and should still be reported.
+</p>
+
+<div class="note">
+    <span class="label">Names your own game injects</span>
+    <p>If you call a verb with keyword arguments of your own —
+       <code>call_verb(target, 'hit', attacker=pobj)</code> — those arrive as
+       names too, and the shipped list has no way to know about them. Put them
+       one per line in <code>verb_lint_extra.txt</code> beside the config and
+       regenerate.</p>
+</div>
 
 <div class="note">
     <span class="label">The file is the source of truth</span>
