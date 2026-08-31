@@ -110,46 +110,68 @@ are the conventional layout new content builds against:
 
 | # | Object | Parent | Role |
 |---|---|---|---|
-| #0 | System object | — | Holds globals; `$name` resolves to `#0.name` |
-| #1 | Root | #0 | Ancestor of everything |
+| #0 | SystemObject | — | Holds globals; `$name` resolves to `#0.name` |
+| #1 | Root_Object | #0 | Ancestor of everything; `tell` and the `_resource` / `_rt` / `_afflict` tick verbs |
 | #2 | PlayerObjectDB | #1 | Pool of player-account objects |
-| #3 | Base_Character | #10 | Base for all characters; **staff/builder verbs live here**. Defines `is_char`. |
+| #3 | Base_Character | #8 | Base for all characters; **staff/builder verbs live here** (86 of them). Defines `is_char`. |
 | #4 | OCharacter | #3 | Out-of-character (account) character |
-| #5 | ICharacter | #3 | In-character (in-game) character — the puppetable avatar |
-| #6 | Nowhere | #1 | Isolation container used during character generation |
-| #7 | arch | #22 GoExit | Character-generation entry exit in room #14 |
-| #8 | Bag | #27 | "The Body Bag"; holds the `moo_verb_path` config |
-| #9 | TrashBin | #1 | Where recycled objects go |
-| #10 | BaseObject | #1 | Base for all game objects |
-| #11 | object | #10 | Generic object; defines the spatial put/get/look hooks |
-| #12 | item | #11 | Carriable item |
-| #14 | (login room) | #16 | OOC staging room where new connections arrive (`LOGIN_ROOM` in `moo/globals.py`) |
-| #15 | BaseRoom | #11 | Base room; `gmove` / `match_exit` |
-| #16 | OCRoom | #15 | OOC room; `go` / `look` |
-| #17 | ICRoom | #15 | IC room; `go` / `look` plus round-time checks |
-| #20 | BaseExit | #11 | Base exit; `invoke` / `gmove` |
-| #21 | DirectionalExit | #20 | Virtual compass-direction exits |
-| #22 | GoExit | #20 | Named, walkable passage exits |
-| #23 | ClosableGoExit | #22 | Doors/gates that open, close, lock |
-| #24 | ClimbableExit | #22 | Exits requiring `climb` |
-| #25 | JumpableExit | #22 | Exits requiring `jump` |
-| #26 | BaseContainer | #12 | Holds items; supports entry/exit |
-| #30 | BaseFurniture | #11 | Sit/lie targets |
+| #5 | ICharacter | #3 | In-character (in-game) character — the puppetable avatar; `exit`, hand and status verbs |
+| #8 | BaseObject | #1 | Base for all game objects |
+| #9 | object | #8 | Generic object; defines the spatial `on_`/`in_`/`under_`/`behind_` put/get/look hooks |
+| #10 | item | #9 | Carriable item |
+| #11 | BaseRoom | #9 | Base room; `gmove` / `match_exit` / `look_here` and the compass verbs |
+| #12 | OCRoom | #11 | OOC room; `go` / `look`, plus `password` / `setpass` |
+| #13 | ICRoom | #11 | IC room; the full player command set — `look`, `go`, `get`, `put`, `drop`, `give`, `inventory`, `climb`, `jump`, … |
+| #14 | BaseExit | #9 | Base exit; `invoke` / `gmove` |
+| #15 | DirectionalExit | #14 | Virtual compass-direction exits; `move` / `vmove` |
+| #16 | GoExit | #14 | Named, walkable passage exits |
+| #17 | ClosableGoExit | #16 | Doors/gates that open, close, lock |
+| #18 | ClimbableExit | #16 | Exits requiring `climb` |
+| #19 | JumpableExit | #16 | Exits requiring `jump` |
+| #20 | BaseContainer | #10 | Holds items; supports entry/exit |
+| #21 | ChestContainer | #20 | Openable container |
+| #23 | BaseFurniture | #9 | Sit/lie targets; `sit_` / `lay_` / `look_` |
+| #24–#26 | chair, bed, table | #23 | The shipped furniture prototypes |
+| #27 | Globals | #8 | `$globals`; holds `login_room`, `room_types`, `ic_dropin_room` |
+| #29 | Nowhere | #1 | Isolation container used during character generation |
+| #30–#38 | StringUtils, MatchUtils, ObjUtils, effects_utils, help_utils, ListUtils, CommandUtils, CodeUtils, PermUtils | #1 | The utility objects the builtin library delegates to — `esub`, `match`/`smatch`, `isa`, effects, help lookup, `controls` |
+| #39 | Bag | #21 | "The Body Bag"; holds the `moo_verb_path` config |
+| #40 | TheBiggestTrashBinYouEverSaw | #1 | Where recycled objects go |
+| #41 | Upstairs - Game Entry | #12 | OOC room |
+| #42 | Upstairs - Drop Zone | #12 | OOC staging room where new connections land — see [the login room](#the-login-room-is-resolved-not-hardcoded) |
+| #43 | arch | #16 | Character-generation entry exit |
+| #44 | portal | #16 | Named passage exit |
+
+### The login room is resolved, not hardcoded
+
+There is no `LOGIN_ROOM` constant. `login_room()` in `moo/object_utils.py`
+resolves it as a `$ref` — `$login_room`, then `$start_room`, then
+`$globals.login_room` — and returns `None` rather than guessing if none of
+them resolve. The shipped world sets `$globals.login_room` to **#42**.
+
+The constant it replaced (`LOGIN_ROOM = 14`) was right for one database and
+arbitrary in every other: `@renumber` cannot maintain a Python integer, so a
+world that repacked its numbers found #14 occupied by a pooled blank
+character, and logging in moved the player *into another player*.
+`$globals.login_room` is listed in `$objref_props`, so `@renumber` does
+maintain it. Build against the `$ref`, never the number.
 
 Two structural conventions follow from this:
 
 - **Where in-game verbs live.** Player commands are *not* defined on player
-  objects. They live on the room parents — **#16 (OCRoom)** for out-of-character
-  rooms and **#17 (ICRoom)** for in-character rooms — so every room of a type
+  objects. They live on the room parents — **#12 (OCRoom)** for out-of-character
+  rooms and **#13 (ICRoom)** for in-character rooms — so every room of a type
   inherits the full command set (`look`, `go`, `get`, `inventory`, and so on).
-  Character objects (#3/#4/#5) carry **only staff verbs**, inherited from #3.
+  Character objects carry **no player commands**: #3 holds the staff/builder
+  verbs, #4 adds nothing, and #5 adds only what acts on the character itself
+  (`exit` to unpuppet, the hand and status helpers).
   Per-object behavior is added not by putting a player verb on the object, but by
   the room verb calling a `<verb>_` hook on the matched object (e.g. `get` on the
   room calls `in_get` / `on_get` on the container). Room/player verbs use
   `pmatch()` and check `obj.existent` after matching; staff verbs on #3 use
   `bmatch()`. See [Writing Verbs](02-writing-verbs.md#matching-objects).
 - **The OOC / IC split** is realized as two character classes: you connect as an
-  OCharacter (#4) in the login room (#14), then *puppet* into an ICharacter (#5)
+  OCharacter (#4) in the login room (#42), then *puppet* into an ICharacter (#5)
   to play. The same player connection drives whichever object is currently
   puppeted. See [the request lifecycle](#connection-login-and-puppeting) below
   and [Operations](04-operations.md).
@@ -177,7 +199,7 @@ stripped/negotiated, and the resulting command string is handed to the parser.
    inventory** — walking the inheritance chain at each step and stopping at the
    first match. In practice the player object only contributes staff verbs (from
    #3); the everyday commands — `look`, `go`, `get`, `inventory` — are found on
-   the room (#16/#17), which is why a player standing in any room has the full
+   the room (#12/#13), which is why a player standing in any room has the full
    command set even though nothing is defined on the player itself.
 4. Pull off MUSH-style switches (`look/brief` → verb `look`, switches
    `['brief']`).
@@ -259,7 +281,7 @@ The lifecycle above assumes a logged-in player. Getting there:
    session). **`NEW`** runs an account-creation flow (name → password → confirm)
    that claims a free account object from the player pool (#2).
 3. The connected account object is flagged `PLAYER` and placed in the login room
-   (#14) — the OOC staging area.
+   (#42 in the shipped world) — the OOC staging area.
 4. From OOC the player **puppets** into an in-character ICharacter (#5). Puppeting
    swaps which object the connection drives and moves the IC character to its
    stored `last_location`. `exit` unpuppets back to OOC. On disconnect the engine
