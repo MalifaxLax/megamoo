@@ -1,4 +1,4 @@
-Long-time lurker, first-time show-and-teller. This all started here for
+Hello! Long-time lurker here, first-time show-and-teller. This all started here for
 me, so...
 
 I built a full MOO platform on top of Evennia a while back, and it worked,
@@ -9,7 +9,7 @@ inheritance lived in typeclasses. Not a flaw, a deliberate and sensible
 design — just not the MOO way, and I wanted the MOO way badly enough to
 stop working around it.
 
-So I wrote MegaMOO — LambdaMOO's object model, with Python as the in-world scripting language instead of MOO code.
+So I wrote MegaMOO — LambdaMOO's object model, with Python as the in-world scripting language instead of MOO code...
 
 I couldn't have done it without Evennia's inspiration though, and help
 from the Inspector and scads of others who patiently answered my
@@ -82,5 +82,4 @@ genuinely like to know what you think.
 
 I'm building a MegaMOO-based game myself, old-school hack & slash with
 an emphasis on role-play and mechanics built to encourage and reward
-player cooperation and collaboration. Swords, sorcery and cybernetics
-in a mutating post-apocalyptic world. A few screenshots:
+player interaction, cooperation and collaboration. Swords, sorcery and cybernetics in a mutating post-apocalyptic world. A few screenshots:
