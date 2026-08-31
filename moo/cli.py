@@ -863,8 +863,10 @@ def _upgrade_cmd(argv):
               'them.')
 
     if not a.apply:
-        actionable = sum(1 for v, _, _ in plan['items']
-                         if v in (up.UPDATE, up.ADD, up.REMOVABLE))
+        actionable = sum(
+            1 for kind in ('items', 'objects', 'properties')
+            for v, _, _ in (plan.get(kind) or [])
+            if v in (up.UPDATE, up.ADD, up.REMOVABLE))
         print()
         if actionable:
             print('Nothing was written. Re-run with --apply to make the %d '

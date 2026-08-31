@@ -90,6 +90,49 @@ def _read_verbs(db_path: str, hash_len: int) -> Dict[str, dict]:
     return out
 
 
+def _read_objects(db_path: str) -> Dict[str, dict]:
+    con = sqlite3.connect('file:%s?mode=ro' % db_path, uri=True)
+    out = {str(o): {'parent': p, 'noun': n}
+           for o, p, n in con.execute('select objnum,parent,noun from objects')}
+    con.close()
+    return out
+
+
+def _read_props(db_path: str, hash_len: int) -> Dict[str, str]:
+    con = sqlite3.connect('file:%s?mode=ro' % db_path, uri=True)
+    out = {'%d:%s' % (o, n): _h('%s\x00%s' % (v, pm), hash_len)
+           for o, n, v, pm in con.execute(
+               'select objnum,name,value,perms from properties')}
+    con.close()
+    return out
+
+
+def _classify(base, theirs, new):
+    """The same five verdicts, for any keyed collection."""
+    items = []
+    for key in sorted(set(base) | set(theirs) | set(new)):
+        in_b, in_t, in_n = key in base, key in theirs, key in new
+        if in_t and in_n and in_b:
+            untouched = theirs[key] == base[key]
+            moved = new[key] != base[key]
+            if untouched and moved:
+                items.append((UPDATE, key, 'changed upstream'))
+            elif not untouched and moved:
+                items.append((CONFLICT, key, 'both changed'))
+            elif not untouched:
+                items.append((LOCAL, key, 'yours'))
+        elif in_n and not in_t:
+            items.append((ADD, key,
+                          'new upstream' if not in_b else 'you deleted it'))
+        elif in_t and not in_n and in_b:
+            items.append((REMOVABLE, key, 'dropped upstream')
+                         if theirs[key] == base[key]
+                         else (LOCAL, key, 'yours, dropped upstream'))
+        elif in_b and not in_t and not in_n:
+            items.append((GONE, key, 'gone both sides'))
+    return items
+
+
 def world_template_version(db_path: str) -> Optional[str]:
     con = sqlite3.connect('file:%s?mode=ro' % db_path, uri=True)
     try:
@@ -113,7 +156,8 @@ def plan(world_db: str, starter_db: str = STARTER_WORLD,
     """What an upgrade would do to *world_db*.  Reads only."""
     born = world_template_version(world_db)
     chain = load_chain(chain_path)
-    result = {'world': world_db, 'born': born, 'items': [], 'error': None}
+    result = {'world': world_db, 'born': born, 'items': [],
+              'objects': [], 'properties': [], 'error': None}
 
     if chain is None:
         result['error'] = 'no manifest chain shipped with this engine'
@@ -130,6 +174,32 @@ def plan(world_db: str, starter_db: str = STARTER_WORLD,
         return result
 
     hl = chain['hash_len']
+    new_objects = _read_objects(starter_db)
+
+    # An object number that now holds a different object is not an update,
+    # it is a different object.  The starter was renumbered once, at b17,
+    # and 75 numbers changed hands; a world from before that cannot be
+    # reconciled by number alone, and pretending otherwise would rewrite
+    # its rooms into somebody else's prototypes.  One release did this and
+    # another might, so the test is for the condition rather than for b17.
+    renamed = sorted(
+        (k for k in set(base['objects']) & set(new_objects)
+         if base['objects'][k]['noun'] != new_objects[k]['noun']),
+        key=int)
+    if renamed:
+        result['error'] = (
+            'object numbers were reassigned between %s and the current '
+            'starter -- %d of them, including #%s. A world from before that '
+            'cannot be upgraded by number: those numbers hold different '
+            'objects now. Verb files can still be carried across by hand.'
+            % (born, len(renamed), ', #'.join(renamed[:4])))
+        return result
+
+    result['objects'] = _classify(base['objects'], _read_objects(world_db),
+                                  new_objects)
+    result['properties'] = _classify(base['properties'],
+                                     _read_props(world_db, hl),
+                                     _read_props(starter_db, hl))
     theirs = _read_verbs(world_db, hl)
     new = _read_verbs(starter_db, hl)
     b = base['verbs']
@@ -179,15 +249,32 @@ def summarise(p: dict) -> List[str]:
         n = counts.get(verdict, 0)
         if n:
             lines.append('  %4d %s' % (n, label))
-    if not counts:
+    actionable = [1 for kind in ('items', 'objects', 'properties')
+                  for v, _, _ in (p.get(kind) or [])
+                  if v in (UPDATE, ADD, REMOVABLE, CONFLICT)]
+    if not actionable:
         lines.append('  Nothing to do -- this world matches the starter.')
+
+    for kind, noun in (('objects', 'Objects'), ('properties', 'Properties')):
+        rows = p.get(kind) or []
+        counts2: Dict[str, int] = {}
+        for verdict, _, _ in rows:
+            counts2[verdict] = counts2.get(verdict, 0) + 1
+        actionable = {k: v for k, v in counts2.items()
+                      if k in (UPDATE, ADD, REMOVABLE, CONFLICT)}
+        if not actionable:
+            continue
+        lines += ['', '%s:' % noun]
+        for verdict, label in order:
+            if counts2.get(verdict):
+                lines.append('  %4d %s' % (counts2[verdict], label))
 
     for verdict, label in ((UPDATE, 'Would update'), (ADD, 'Would add'),
                            (CONFLICT, 'Conflicts')):
         rows = [(k, why) for v, k, why in p['items'] if v == verdict]
         if not rows:
             continue
-        lines += ['', '%s:' % label]
+        lines += ['', '%s (verbs):' % label]
         for k, why in rows[:40]:
             lines.append('  %-34s %s' % (k, why))
         if len(rows) > 40:
@@ -287,7 +374,9 @@ def apply(world_db: str, starter_db: str = STARTER_WORLD,
         return out
 
     todo = [(v, k) for v, k, _ in p['items'] if v in (UPDATE, ADD, REMOVABLE)]
-    if not todo:
+    other = [1 for kind in ('objects', 'properties')
+             for v, _, _ in p[kind] if v in (UPDATE, ADD, REMOVABLE)]
+    if not todo and not other:
         return out
 
     if backup:
@@ -304,6 +393,53 @@ def apply(world_db: str, starter_db: str = STARTER_WORLD,
     rows = _starter_verb_rows(starter_db)
     tree = _verb_tree(world_db)
     con = sqlite3.connect(world_db)
+    src = sqlite3.connect('file:%s?mode=ro' % starter_db, uri=True)
+
+    # Objects first: a property or verb cannot be added to an object that is
+    # not there yet.  Only additions -- an object already present keeps its
+    # parent and name, because reparenting a live object moves everything
+    # beneath it.
+    for verdict, key, _why in p['objects']:
+        if verdict != ADD:
+            continue
+        row = src.execute('select objnum,parent,noun,aliases,owner,location,'
+                          'flags,created,last_move from objects where '
+                          'objnum=?', (int(key),)).fetchone()
+        if row is None:
+            continue
+        if con.execute('select 1 from objects where objnum=?',
+                       (int(key),)).fetchone():
+            out['skipped'].append(('#' + key, 'number already in use here'))
+            continue
+        con.execute('insert into objects (objnum,parent,noun,aliases,owner,'
+                    'location,flags,created,last_move) values (?,?,?,?,?,?,?,?,?)',
+                    row)
+        out['applied'].append((ADD, '#' + key))
+
+    # Then properties.  A value the builder never touched is the starter's
+    # to correct; one they did is theirs, and _classify has already said
+    # which is which.
+    for verdict, key, _why in p['properties']:
+        objnum, name = key.split(':', 1)
+        if verdict in (ADD, UPDATE):
+            row = src.execute('select value,owner,perms from properties '
+                              'where objnum=? and name=?',
+                              (int(objnum), name)).fetchone()
+            if row is None:
+                continue
+            if not con.execute('select 1 from objects where objnum=?',
+                               (int(objnum),)).fetchone():
+                out['skipped'].append((key, 'object #%s not in this world'
+                                       % objnum))
+                continue
+            con.execute('insert or replace into properties (objnum,name,'
+                        'value,owner,perms) values (?,?,?,?,?)',
+                        (int(objnum), name, row[0], row[1], row[2]))
+            out['applied'].append((verdict, key))
+        elif verdict == REMOVABLE:
+            con.execute('delete from properties where objnum=? and name=?',
+                        (int(objnum), name))
+            out['applied'].append((REMOVABLE, key))
     for verdict, key in todo:
         if verdict == REMOVABLE:
             # Byte-identical to what it shipped as, and gone upstream.  Not
@@ -363,4 +499,5 @@ def apply(world_db: str, starter_db: str = STARTER_WORLD,
         out['now_at'] = starter_version
     con.commit()
     con.close()
+    src.close()
     return out
