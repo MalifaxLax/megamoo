@@ -18,8 +18,7 @@ mkdir -p "$OUT"
 
 # Reading order (basename, no extension)
 FILES=(README 01-architecture 02-writing-verbs 03-building-worlds \
-       04-operations 05-engine-systems 06-object-prototypes 07-help-system \
-       08-orb-wars)
+       04-operations 05-engine-systems 06-object-prototypes 07-help-system)
 
 common=(--standalone --css="$CSS" --pdf-engine=weasyprint \
         --highlight-style="$HL" --metadata title="")
