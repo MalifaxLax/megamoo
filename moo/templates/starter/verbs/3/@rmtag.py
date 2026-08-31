@@ -50,7 +50,6 @@ if not tag and not category:
     pobj.msg("No tag specified.")
     return
 
-# Check if it exists before removing
 all_tags = target.tags.all()
 cat = category or 'general'
 if cat not in all_tags:

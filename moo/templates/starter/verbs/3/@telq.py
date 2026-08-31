@@ -47,7 +47,6 @@ if not spec:
 
 quiet = 'q' in (switches or [])
 
-
 def _realm(room):
     """
     'ic', 'ooc', or None -- decided by which room prototype it descends
@@ -71,11 +70,7 @@ def _realm(room):
         cur = db.get_object(parent) if isinstance(parent, int) else parent
     return None
 
-
-# --- Where are we going? --------------------------------------------------
 if not spec.startswith('#'):
-    # A mark.  The number is the one `mark/list` prints, so it is 1-based:
-    # marks is a list of room objnums, not a mapping.
     try:
         idx = int(spec)
     except (TypeError, ValueError):
@@ -111,8 +106,6 @@ if destination is None or not getattr(destination, 'is_room', False):
     pobj.msg(REFUSED)
     return
 
-# The room itself may refuse even when what you aimed at did not -- a
-# character standing somewhere sealed is not a way in.
 if getattr(destination, 'no_tel', False):
     pobj.msg(REFUSED)
     return
@@ -126,7 +119,6 @@ if _realm(source) != _realm(destination):
     pobj.msg(REFUSED)
     return
 
-# --- Go -------------------------------------------------------------------
 if quiet:
     pobj.move_to(destination, db)
     try:
@@ -135,8 +127,6 @@ if quiet:
         call_verb(destination, 'look_here', leader=False)
     return
 
-# tel_emit is [departure, arrival].  Unset or empty falls back to the
-# world's, so one place says what teleporting looks like.
 emits = getattr(pobj, 'tel_emit', None)
 if not emits:
     emits = getattr(db.get_object(0), 'default_tel_emit', None) or []

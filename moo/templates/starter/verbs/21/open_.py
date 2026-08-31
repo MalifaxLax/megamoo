@@ -1,12 +1,8 @@
 """
-open_ verb on #21 (ChestContainer).
-
 Opens this container. If already open, displays the "already open"
 message. If locked, shows the ofail/oofail messages. If trapped,
 warns about the trap. Otherwise sets open to True and shows
 osucc/oosucc messages.
-
-Called by the room-level open verb: call_verb(container, 'open_')
 
 Returns True to indicate the action was handled.
 

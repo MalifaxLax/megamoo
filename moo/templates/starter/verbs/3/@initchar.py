@@ -32,38 +32,24 @@ if not target:
     pobj.msg(f"Target '{spec}' not found.")
     return
 
-# Every property here is read by a verb this world ships.  It used to
-# carry a whole RPG on top -- stats, skills, resistances, training and
-# crafting budgets, per-body-part combat arrays: 59 properties that no
-# shipped verb touched, seeded onto every character in every world built
-# from this template.  A starter world should not decide what genre you
-# are writing.  Add your own here; that is what this table is for.
 props = {
-    # Hands and carrying
     'hand': ['right', 'left'],
     'mh': None,
     'oh': None,
     'load': 0,
 
-    # Who they are -- filled in by chargen
     'desclist': ['', '', '', ''],
     'gender': None,
     'last_name': None,
     'chargen_step': None,
     'level': 1,
 
-    # Posture, roundtime and the conditions that gate acting
     'position': 0,
     'rt': 0,
     'status': {},
     'condition': {},
     'tickers': [],
 
-    # Resource pools.  Drained by _resource on #1 and recovered by the
-    # matching _tu_* ticker in _tick_up; regen_<pool> is the per-tick
-    # rate those two write and read, and regen_mods holds the per-pool
-    # modifier, indexed 0 hits, 1 fabric, 2 stamina, 3 mana, 4 focus,
-    # 5 psy, 6 adrenalin, 7 bft.
     'max_hits': 100,
     'hits': 100,
     'max_stamina': 100,

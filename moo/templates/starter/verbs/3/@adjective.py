@@ -30,9 +30,7 @@ else:
     else:
         nml = target.name_mod_list
         if nml:
-            nml = list(nml)  # local copy (don't mutate inherited)
-            # If article is 'some' (inherited from parent like GoExit),
-            # default to 'a' — _title() will correct a/an automatically
+            nml = list(nml)
             if nml[0].lower() == 'some':
                 nml[0] = 'a'
         else:

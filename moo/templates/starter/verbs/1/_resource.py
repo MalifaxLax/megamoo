@@ -1,6 +1,4 @@
 """
-_resource verb on #1 (RootObject).
-
 Generic resource drain shared by the per-resource call names:
     _hits, _stamina, _mana, _focus, _adrenalin, _fabric
 
@@ -21,15 +19,11 @@ Aliases: _hits, _stamina, _mana, _focus, _adrenalin, _fabric
 Hidden:  yes
 """
 
-# Read the injected kwarg into a NEW name -- reassigning `amount` itself would
-# make it verb-local, so `try: amount` would raise UnboundLocalError and clobber
-# the kwarg to 0.  See [[verb-kwarg-idiom-gotcha]].
 try:
     _amt = amount
 except NameError:
     _amt = int(args) if args else 0
 
-# verb -> (prop, max_prop, rate_prop, regen_mods index, tick_up_verb, default_interval)
 _RES = {
     '_hits':      ('hits',      'max_hits',      'regen_hits',      0, '_tu_hits',      60),
     '_stamina':   ('stamina',   'max_stamina',   'regen_stamina',   2, '_tu_stamina',   10),
@@ -40,9 +34,6 @@ _RES = {
 }
 
 def _w(o, p, v):
-    # Ungated write: set_property (add_property if the prop is new) skips the
-    # safe_setattr() permission gate, which would otherwise block this drain
-    # from writing an 'rc'-perm prop on a character that doesn't own itself.
     try:
         o.set_property(p, v)
     except Exception:
@@ -52,11 +43,9 @@ cfg = _RES.get(verb)
 if cfg:
     prop, max_prop, rate_prop, mod_idx, tu_verb, default_interval = cfg
 
-    # Drain the resource
     current = max(0, (getattr(this, prop, 0) or 0) - _amt)
     _w(this, prop, current)
 
-    # Per-tick regen rate -> regen_<prop>; modifier from regen_mods[idx]
     rmods = this.regen_mods or []
     mod = (rmods[mod_idx] if mod_idx < len(rmods) else 0) or 0
     if prop == 'hits':
@@ -65,11 +54,9 @@ if cfg:
         rate = max(1, 1 + mod)
     _w(this, rate_prop, int(rate))
 
-    # Defensive: ensure the ceiling exists (the @initchar template provides it)
     if not getattr(this, max_prop, None):
         _w(this, max_prop, 100)
 
-    # Start regen ticker (provided interval or per-resource default)
     try:
         tick_interval = interval
     except NameError:

@@ -63,13 +63,11 @@ if not verb_name:
     pobj.msg("No verb name specified.")
     return
 
-# Resolve object
 obj = bmatch(obj_ref, pobj, list(pobj.location.contents) + list(pobj.contents), db)
 if not obj:
     pobj.msg(f"Object '{obj_ref}' not found.")
     return
 
-# Find the verb locally, then walk the inheritance chain
 inherited_from = None
 matches = [v for v in obj.verbs if verb_name in v.names]
 if not matches:
@@ -86,7 +84,6 @@ if not matches:
 v = matches[0]
 _mins = getattr(v, 'min_lengths', None) or {}
 
-
 def _starred(name):
     """`look` with a min length of 1 reads `l*ook`, as +verbs writes it."""
     m = _mins.get(name)
@@ -94,10 +91,8 @@ def _starred(name):
         return name[:m] + '*' + name[m:]
     return name
 
-
 where = f"&<245>#{obj.objnum}:{obj.noun}&n"
 
-# --- Report, when there is nothing to add ---------------------------------
 if prep != '=' or not iobj:
     pobj.msg(f"&<245>#{obj.objnum}:{v.names[0]}&n"
              + (f"  &<245>(inherited)&n" if inherited_from else ""))
@@ -109,10 +104,8 @@ if prep != '=' or not iobj:
         pobj.msg("  &<245>A star marks where the name may be cut short.&n")
     return
 
-# --- Add ------------------------------------------------------------------
 alias = iobj.strip()
 
-# `observe(3)` -- @adverb's spelling, and the one the Abbrev line uses.
 minlen = None
 if alias.endswith(')') and '(' in alias:
     alias, _, tail = alias.partition('(')
@@ -138,8 +131,6 @@ if alias in v.names:
     pobj.msg(f"'{alias}' is already a name for that verb.")
     return
 
-# A second verb on the same object answering to the same name would be
-# ambiguous -- refuse rather than create a shadowed, unreachable verb.
 for other in obj.verbs:
     if other is not v and alias in getattr(other, 'names', None):
         pobj.msg(f"'{alias}' is already used by verb [{', '.join(getattr(other, 'names', None))}] "
@@ -152,15 +143,6 @@ if minlen is not None:
         v.min_lengths = {}
     v.min_lengths[alias] = minlen
 
-# Write the name where it lives: the Aliases line of the verb's file on
-# disk.  Not the database copy of the source -- that is what makes this
-# look like it works and then lose the alias at the next restart, because
-# the loader compares the stored verb against the file and refreshes from
-# the file when they disagree.  write_verb_file puts it plainly: "Disk is
-# authoritative -- it is what git tracks and what an editor opens".
-#
-# So: file first, database second, and abandon the whole thing if the file
-# cannot be written, which is the order @program and @port already keep.
 from moo.verb_meta import render_verb_meta
 from moo.builtins import verb_file_path, write_verb_file
 
@@ -169,15 +151,13 @@ rewritten = render_verb_meta(v.code, v.names,
                              bool(getattr(v, 'hidden', False)),
                              getattr(v, 'perms', None) or 'rx')
 
-# render_verb_meta returns the source unchanged when there is no docstring
-# to put the line in; there is then nothing on disk worth rewriting.
 persisted = False
 if rewritten != v.code:
     path = verb_file_path(db, obj.objnum, v.names[0])
     if path:
         err = write_verb_file(path, rewritten)
         if err:
-            v.names.remove(alias)          # nothing was changed
+            v.names.remove(alias)
             if minlen is not None:
                 v.min_lengths.pop(alias, None)
             pobj.msg(f"Could not write {path}: {err}")
@@ -185,7 +165,7 @@ if rewritten != v.code:
             return
         persisted = True
     v.code = rewritten
-    v.compiled_code = None   # force recompile, as @program does
+    v.compiled_code = None
     v.compile()
 
 obj.invalidate_inheritance_cache()

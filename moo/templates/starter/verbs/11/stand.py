@@ -12,7 +12,6 @@ if pos == 0:
     pobj.msg("You're already standing.")
     return
 
-# If on furniture, remove from sitters and send furniture-specific messages
 cur_table = pobj.table
 if cur_table:
     try:
@@ -27,12 +26,10 @@ if cur_table:
         if not pobj.invis:
             pobj.location.msg_room(ostand_msg, exclude=[pobj], sub=pobj, dob=furn)
     except Exception:
-        # Furniture gone — generic stand
         pobj.msg("You stand up.")
         if not pobj.invis:
             pobj.location.msg_room("&S stands up.", exclude=[pobj], sub=pobj)
 else:
-    # Floor stand
     pobj.msg("You stand up.")
     if not pobj.invis:
         pobj.location.msg_room("&S stands up.", exclude=[pobj], sub=pobj)

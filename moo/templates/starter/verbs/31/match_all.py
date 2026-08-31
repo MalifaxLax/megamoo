@@ -1,9 +1,5 @@
 """
-match_all on $match_utils.
-
-Ported from `moo.match_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -68,28 +64,21 @@ def adj_match(adjectives: List[str], obj: MOOObject) -> bool:
 
     title = obj.name.casefold()
 
-    # --- Pass 1: Ordered substring matching against the full name ---
     pos = 0
     for adj in adjectives:
         adj_low = adj.casefold()
-        # Find the adjective starting at 'pos' (after previous matches)
         idx = title.find(adj_low, pos)
         if idx == -1:
             break
-        # Enforce word boundary: adjective must be at start of string
-        # or preceded by a space
         if idx > 0 and title[idx - 1] != ' ':
             idx = title.find(' ' + adj_low, pos)
             if idx == -1:
                 break
-            idx += 1  # skip the leading space
-        # Advance past this adjective for the next search
+            idx += 1
         pos = idx + len(adj_low)
     else:
-        # The for-loop completed without breaking -- all adjectives matched
         return True
 
-    # --- Pass 2: Fallback to the 'adjectives' property list ---
     props = obj.properties
     if 'adjectives' in props:
         obj_adjs = props['adjectives'].value
@@ -98,7 +87,6 @@ def adj_match(adjectives: List[str], obj: MOOObject) -> bool:
             last_idx = -1
             for adj in adjectives:
                 adj_low = adj.casefold()
-                # Find this adjective in the property list after last_idx
                 found = False
                 for i in range(last_idx + 1, len(obj_adjs_low)):
                     if obj_adjs_low[i].startswith(adj_low):
@@ -138,7 +126,6 @@ def strip_articles(text: str) -> str:
     """
     first_space = text.find(' ')
     if first_space == -1:
-        # Single word -- nothing to strip
         return text
     first_word = text[:first_space].casefold()
     if first_word in _ARTICLES:
@@ -188,10 +175,6 @@ def name_match(obj: MOOObject, token: str) -> bool:
         name_match(sword_obj, '')       # False (the only thing rejected)
     """
     tok = token.casefold()
-    # The empty string is the only token this rejects: min_prefix is 1
-    # whenever the token is one character or shorter, so `len(tok) <
-    # min_prefix` is only ever true for ''.  Everything else goes to the
-    # prefix comparisons below, one-character tokens included.
     min_prefix = 1 if len(tok) <= 1 else 2
 
     if len(tok) < min_prefix:
@@ -199,19 +182,16 @@ def name_match(obj: MOOObject, token: str) -> bool:
 
     obj_name = obj.name.casefold()
 
-    # Check each non-article word in the object's name
     for word in obj_name.split():
         if word in _ARTICLES:
             continue
         if word.startswith(tok):
             return True
 
-    # Check alias list (alternative names for the object)
     for alias in obj.aliases:
         if alias.casefold().startswith(tok):
             return True
 
-    # Check the 'noun' property (the core/atomic name, e.g. "sword")
     noun = obj.noun
     if noun and noun.casefold().startswith(tok):
         return True
@@ -248,22 +228,17 @@ def parse_ordinal(word: str) -> Optional[int]:
     """
     low = word.casefold()
 
-    # Word ordinals: "first" -> 0, "second" -> 1, etc.
     idx = _ORDINAL_WORDS.get(low)
     if idx is not None:
         return idx
 
-    # Numeric suffix ordinals: "1st" -> 0, "2nd" -> 1, "3rd" -> 2, etc.
     if len(low) > 2 and low[-2:] in _ORDINAL_SUFFIXES and low[:-2].isdigit():
         return int(low[:-2]) - 1
 
-    # Bare integer: "1" -> 0, "2" -> 1, etc.
     if low.isdigit():
         return int(low) - 1
 
     return None
-
-
 
 def match_all(inp: str, candidates: Sequence[MOOObject]) -> List[MOOObject]:
     """
@@ -288,7 +263,6 @@ def match_all(inp: str, candidates: Sequence[MOOObject]) -> List[MOOObject]:
     if not tokens:
         return []
 
-    # Skip ordinal if present (we want ALL matches, not the Nth)
     if parse_ordinal(tokens[0]) is not None:
         tokens = tokens[1:]
         if not tokens:
@@ -299,7 +273,6 @@ def match_all(inp: str, candidates: Sequence[MOOObject]) -> List[MOOObject]:
 
     return [obj for obj in candidates
             if name_match(obj, noun) and adj_match(adjectives, obj)]
-
 
 _a = kwargs.pop('_pyargs', None)
 

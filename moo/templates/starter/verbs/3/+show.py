@@ -32,7 +32,6 @@ pobj.msg(f"Object Noun:  {obj.noun}")
 pobj.msg(f"Object Name:  {obj.name}")
 pobj.msg(f"Object ID:    #{obj.objnum}")
 
-# Parent
 if obj.parent is not None and obj.parent >= 0:
     try:
         p = db.get_object(obj.parent)
@@ -42,7 +41,6 @@ if obj.parent is not None and obj.parent >= 0:
 else:
     pobj.msg("Parent:       ***NONE***")
 
-# Location chain
 loc = obj.location
 if loc and hasattr(loc, 'objnum'):
     pobj.msg(f"Location:     #{loc.objnum},  {loc.name}")
@@ -57,7 +55,6 @@ if loc and hasattr(loc, 'objnum'):
 else:
     pobj.msg("Location:     ***NONE***")
 
-# Owner
 if obj.owner is not None and obj.owner >= 0:
     try:
         o = db.get_object(obj.owner)
@@ -67,12 +64,10 @@ if obj.owner is not None and obj.owner >= 0:
 else:
     pobj.msg("Owner:        ***NONE***")
 
-# Flags
 pobj.msg(f"Programmer: {1 if obj.is_programmer else 0}. "
          f"Wizard: {1 if obj.is_wizard else 0}. "
          f"Fertile: {1 if obj.is_fertile else 0}")
 
-# Children
 children = sorted(obj.children) if obj.children else []
 if not children:
     pobj.msg("Children:     ***NONE***")
@@ -88,7 +83,6 @@ else:
             parts.append(f"#{cnum}")
     pobj.msg(f"Children:     {', '.join(parts)}")
 
-# Contents
 contents = list(obj.contents) if hasattr(obj, 'contents') else []
 if not contents:
     pobj.msg("Contents:     ***NONE***")

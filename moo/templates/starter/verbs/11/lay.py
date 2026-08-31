@@ -20,7 +20,6 @@ if pos != 0 and pos != 6:
     return
 
 if dobj:
-    # Lay on a specific object
     slist = list(pobj.location.contents)
     target = pmatch(dobj, pobj, slist)
     if not target:
@@ -35,13 +34,11 @@ if dobj:
         pobj.msg("You can't lie down on that.")
     return
 
-# Floor lay — check room permission
 room = pobj.location
 if not room.is_layable:
     pobj.msg("You can't lie down here.")
     return
 
-# If on furniture, leave it first
 cur_table = pobj.table
 if cur_table:
     try:

@@ -1,14 +1,12 @@
 """
 _tick_up — generic regen-to-max ticker callback
 Names: _tu_hits, _tu_stamina, _tu_mana, _tu_focus, _tu_adrenalin, _tu_fabric
-Called by ticker_add() — no args, uses `verb` to identify which timer.
 Per-tick regen rate is stored in regen_<prop> by the _resource drain.
 
 Aliases: _tu_hits, _tu_stamina, _tu_mana, _tu_focus, _tu_adrenalin, _tu_fabric
 Hidden:  yes
 """
 
-# verb -> (property, max_property, regen_rate_property)  -- @initchar names
 _TU = {
     '_tu_hits':      ('hits',      'max_hits',      'regen_hits'),
     '_tu_stamina':   ('stamina',   'max_stamina',   'regen_stamina'),
@@ -19,9 +17,6 @@ _TU = {
 }
 
 def _w(o, p, v):
-    # Ungated write: set_property (add_property if the prop is new) skips the
-    # safe_setattr() permission gate, which would otherwise block this ticker
-    # from writing an 'rc'-perm prop on a character that doesn't own itself.
     try:
         o.set_property(p, v)
     except Exception:

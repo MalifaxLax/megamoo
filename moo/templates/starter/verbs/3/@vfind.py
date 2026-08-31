@@ -27,11 +27,6 @@ if not text:
     pobj.msg("Usage: @vfind <verb> [in #N to #M]")
     return
 
-# Read out of argstr by hand rather than from the dobj/prep/iobj slots.
-# The range is two prepositions deep -- "in #1 to #100" -- so the parser
-# splits it across iobj and the second slot, and reassembling it is more
-# work than reading it. Custom-parsing argstr is the intended move when a
-# verb's arguments do not fit the one-preposition shape.
 first, last = 1, max_object()
 marker = text.lower().find(" in ")
 if marker != -1:
@@ -56,7 +51,6 @@ for num in range(max(first, 0), last + 1):
     try:
         obj = db.get_object(num)
     except Exception:
-        # A gap in the number space, not an error worth reporting.
         continue
     searched += 1
     for vdef in obj.verbs:
@@ -67,8 +61,6 @@ for num in range(max(first, 0), last + 1):
             notes.append("hidden")
         if vdef.auth:
             notes.append("gm%d" % vdef.auth)
-        # Names are player-supplied text going into a message: double the
-        # sigil so a `&` in an object name cannot turn into a colour code.
         matches.append("  #%-5s %-24s %s%s" % (
             num,
             (obj.name or "").replace("&", "&&"),

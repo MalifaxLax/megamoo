@@ -36,9 +36,6 @@ if not args or not args.strip():
 
 MAX_HITS = 100
 
-# 'in <room>' and 'isa <parent>' are pulled off the argument string by
-# hand. 'isa' is not a preposition the parser knows, and the search text
-# itself may contain the word 'in'.
 needle = args.strip()
 where = None
 kind = None
@@ -53,8 +50,6 @@ for word, setter in (('  isa  ', 'isa'), (' isa ', 'isa'), (' in ', 'in')):
     candidates = list(pobj.location.contents) + list(pobj.contents)
     target = bmatch(tail, pobj, candidates, db)
     if target is None and tail.startswith('#') and tail[1:].isdigit():
-        # get_object raises for a number nobody holds, rather than
-        # returning None, so the report below never got reached.
         try:
             target = db.get_object(int(tail[1:]))
         except Exception:

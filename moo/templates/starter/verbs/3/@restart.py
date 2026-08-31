@@ -36,33 +36,25 @@ Examples:
 Abbrev:  @restart=8
 """
 
-# Check wizard permission (gm5 required)
 if auth_level(pobj) < 5:
     pobj.msg("Permission denied.")
 else:
     arg = argstr.strip()
     sw = [s.lower() for s in switches]
 
-    # /noapi is the switch spelling; the bare leading word predates it and
-    # still works, because it is what the docstring taught for a while.
     with_api = 'noapi' not in sw
     parts = arg.split(None, 1)
     if parts and parts[0].lower() == "noapi":
         with_api = False
         arg = parts[1].strip() if len(parts) > 1 else ""
 
-    # None, not False: the default is "leave the launch flags alone".
     with_web = True if 'web' in sw else None
 
-    # Use provided message or fall back to default
     message = arg if arg else "Server restarting."
     notes = ["with API" if with_api else "without API"]
     if with_web:
         notes.append("with web client")
     pobj.msg(f"Restarting server ({', '.join(notes)}): {message}")
-    # Initiate server shutdown with restart flag.
-    # Fall back gracefully on older server builds whose shutdown_server()
-    # predates these keywords (e.g. before this build is loaded).
     try:
         shutdown_server(message, restart=True, with_api=with_api,
                         with_web=with_web)

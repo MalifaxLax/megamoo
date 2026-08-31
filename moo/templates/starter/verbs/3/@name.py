@@ -28,13 +28,9 @@ else:
         old_name = target.name
         new_noun = iobj.strip()
         target.noun = new_noun
-        # Proper noun (uppercase initial) — no article
         if new_noun and new_noun[0].isupper():
             target.name_mod_list = ['', '', '', '', '']
         else:
-            # Lowercase noun — set local name_mod_list with 'a' article
-            # so we don't inherit a parent's article (e.g. 'some' from GoExit)
-            # _title() will correct a/an based on first letter
             target.name_mod_list = ['a', '', '', '', '']
         target._title()
         db.save_object(target)

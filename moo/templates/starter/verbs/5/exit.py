@@ -1,6 +1,4 @@
 """
-exit verb on #5 (ICharacter).
-
 Returns the player from the in-character (IC) world to the out-of-character
 (OOC) lobby by puppeting back to their OCharacter account object.
 
@@ -29,7 +27,6 @@ ochar = db.get_object(ochar_num)
 
 yield 1
 
-# Announce departure from IC room
 if not pobj.invis:
     pobj.location.msg_room(f"{pobj.noun} fades from existence.", exclude=[pobj])
 

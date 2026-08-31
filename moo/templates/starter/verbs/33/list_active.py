@@ -1,9 +1,5 @@
 """
-list_active on $effects_utils.
-
-Ported from `moo.effects` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -29,12 +25,10 @@ def list_active(pobj):
         """
         eu_obj = this
 
-        # Read the current registry
         registry = eu_obj.fx_registry or {}
         if not isinstance(registry, dict):
             return []
 
-        # Filter to entries matching the target object
         results = []
         for entry in registry.values():
             if entry['objnum'] == pobj.objnum:
@@ -45,7 +39,6 @@ def list_active(pobj):
                     'interval': entry['interval'],
                 })
         return results
-
 
 _a = kwargs.pop('_pyargs', None)
 

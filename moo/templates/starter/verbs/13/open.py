@@ -12,8 +12,6 @@ Ported from Evennia CmdOpen.
 Abbrev:  open=2
 """
 
-# Can the character act? do_wait covers roundtime as well as the
-# immobilising conditions, and emits its own message.
 if pobj.do_wait():
     return
 

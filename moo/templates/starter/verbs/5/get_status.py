@@ -1,15 +1,6 @@
 """
-get_status verb on #5 (ICharacter).
-
-Returns a dictionary of the character's active status effects. Includes
-statuses like unconscious, sleeping, stunned, paralyzed, etc. The 'life'
-status is only included when its value is 0 (i.e., the character is dead).
-
-Called programmatically: call_verb(char, 'get_status')
-
-Returns:
-    dict - {status_name: value} for active statuses. Life is included
-           only when it equals 0 (dead).
+Active statuses.  'life' is the exception: it is reported only when it is 0,
+because 0 means dead and every other status means afflicted.
 
 Hidden:  yes
 """

@@ -13,13 +13,11 @@ if auth_level(pobj) < 5:
     pobj.msg("Do what?")
     return
 
-# /list switch
 if 'list' in switches:
     reserved = sorted(db._index.reserved_objects)
     if not reserved:
         pobj.msg("No object numbers are currently reserved.")
         return
-    # Group into contiguous blocks
     blocks = []
     start = reserved[0]
     prev = reserved[0]
@@ -39,10 +37,8 @@ if 'list' in switches:
             pobj.msg(f"  #{s} to #{e}")
     return
 
-# Check for /free switch
 free = 'free' in switches
 
-# Parse: dobj = #<start>, prep = to, iobj = #<end>
 if not dobj or prep != 'to' or not iobj:
     pobj.msg("Usage: @reserve #<start> to #<end>")
     pobj.msg("       @reserve /free #<start> to #<end>")
@@ -65,7 +61,6 @@ if free:
     db.unreserve_objects(start, end)
     pobj.msg(f"Unreserved #{start} to #{end} ({count} objects).")
 else:
-    # Check for existing objects in the range
     existing = []
     for n in range(start, end + 1):
         if n in db._objects or db._object_exists_in_sql(n):

@@ -14,7 +14,6 @@ should not know the topic exists.
 Type:    function
 """
 
-
 def text_for(topic, plevel=0):
     """``[heading, text]`` for *topic* as *plevel* may read it, or ``[]``."""
     wanted = (topic or '').strip().lower()
@@ -22,7 +21,6 @@ def text_for(topic, plevel=0):
         return []
     names = call_verb(this, 'topics', plevel)
 
-    # A property of this object, by name.
     for name in names:
         if name.lower() == wanted:
             val = getattr(this, name, None)
@@ -31,7 +29,6 @@ def text_for(topic, plevel=0):
             if isinstance(val, dict):
                 return [name, ', '.join(sorted(val.keys()))]
 
-    # A subtopic: a key inside one of the dict properties.
     for name in names:
         val = getattr(this, name, None)
         if isinstance(val, dict):
@@ -39,7 +36,6 @@ def text_for(topic, plevel=0):
                 if key.lower() == wanted:
                     return ['%s > %s' % (name, key), text]
     return []
-
 
 _a = kwargs.pop('_pyargs', None)
 

@@ -46,7 +46,6 @@ col_w = 20
 cols = 4
 VAL_WIDTH = 90
 
-
 def _nodes(v):
     """How many values are in there -- what a property read actually costs."""
     if isinstance(v, dict):
@@ -55,12 +54,8 @@ def _nodes(v):
         return 1 + sum(_nodes(x) for x in v)
     return 1
 
-
 def _render(v):
     """One line: short enough to read, and safe to emit."""
-    # `&` is escaped because this is data on its way to a display: a
-    # description holding one would otherwise print as a colour code
-    # instead of as itself.
     text = repr(v).replace("&", "&&")
     if len(text) <= VAL_WIDTH:
         return text
@@ -68,9 +63,7 @@ def _render(v):
     tail = "  &<245>(%d nodes)&n" % n if n > 1 else ""
     return text[:VAL_WIDTH] + "..." + tail
 
-
 blocks = []
-# Build ancestor chain from root to target
 chain = []
 cur = target
 while cur:
@@ -84,7 +77,6 @@ while cur:
         break
 chain.reverse()
 
-# For each object, show only props first defined there (not on any ancestor)
 seen = set()
 for obj in chain:
     defined = {k: v for k, v in obj.properties.items() if k not in seen}
@@ -100,13 +92,17 @@ if not blocks:
     pobj.msg("No properties found.")
     return
 
+_sr = (pobj.settings or {}).get('screenreader', False)
+
 for obj, props in blocks:
     items = sorted(props.keys(), key=lambda t: t.lower())
     pobj.msg("#" + str(obj.objnum) + ":")
     if show_val:
-        width = max(len(s) for s in items)
+        width = 0 if _sr else max(len(s) for s in items)
         for name in items:
             pobj.msg("  %s = %s" % (name.ljust(width), _render(props[name].value)))
+    elif _sr:
+        pobj.msg("  " + ", ".join(items))
     else:
         for i in range(0, len(items), cols):
             row = items[i:i + cols]

@@ -49,12 +49,6 @@ if not dobj:
     pobj.msg('Example: @renumber #42')
     return
 
-# Property names whose values hold object numbers as bare integers.
-# Overridable per world via $objref_props; this is the fallback, and it
-# deliberately leaves out anything whose numbers are not references --
-# obvexits (direction indices), every stat and skill list, and merchant
-# vessels, whose entries pair a prototype with a multiplier that a blind
-# rewrite would corrupt. What is left out is reported instead.
 DEFAULT_OBJREF_PROPS = [
     'exits', 'dexits', 'destination', 'rexit', 'reverse',
     'in_exit', 'on_exit', 'under_exit', 'behind_exit', 'through_exit',
@@ -70,7 +64,6 @@ if not old_obj:
     return
 old_num = old_obj.objnum
 
-# Lowest unassigned number, which is also the default target.
 if db._index.recycled_objects:
     lowest_available = min(db._index.recycled_objects)
 else:
@@ -92,8 +85,6 @@ if new_num == old_num:
     pobj.msg(f"#{old_num} is already at that number.")
     return
 
-# Refuse to open a gap: an unassigned target is only allowed if it is the
-# lowest one free, or if something is already sitting above it.
 if not db.valid(new_num) and new_num != lowest_available:
     has_objects_above = False
     for n in range(new_num + 1, db._index.next_objnum):
@@ -104,7 +95,6 @@ if not db.valid(new_num) and new_num != lowest_available:
         pobj.msg(f"#{lowest_available} is the lowest unassigned number.")
         return
 
-# An occupied target has to be cleared first, and only with permission.
 if db.valid(new_num):
     existing = db.get_object(new_num)
     answer = yield f"#{new_num} ({existing.name}) already exists. Delete it? [y/n] "
@@ -121,7 +111,6 @@ if db.valid(new_num):
     recycle(existing)
     pobj.msg(f"Deleted &<245>#{new_num}:{existing_name}&n.")
 
-# --- 1. Move the object ---------------------------------------------------
 try:
     counts = db.renumber_object(old_num, new_num)
 except Exception as e:
@@ -132,7 +121,6 @@ moved = ', '.join(f'{k} x{v}' for k, v in counts.items() if v)
 pobj.msg(f"&<245>#{old_num}&n is now &<245>#{new_num}:{db.get_object(new_num).name}&n.")
 pobj.msg(f"&<245>Moved: {moved}&n")
 
-# --- 2. Move the verb source ----------------------------------------------
 import os
 
 try:
@@ -155,11 +143,9 @@ if base:
             except Exception as e:
                 pobj.msg(f"&<245>Verb files: could not move {src}: {e}&n")
 
-# --- 3. Rewrite the references we can be sure about ------------------------
 objref_props = getattr(db.get_object(0), 'objref_props', None) or DEFAULT_OBJREF_PROPS
 old_ref = f'#{old_num}'
 new_ref = f'#{new_num}'
-
 
 def remap(value, listed):
     """
@@ -193,7 +179,6 @@ def remap(value, listed):
         return (out, True) if hit else (value, False)
     return value, False
 
-
 def mentions(value):
     """Does this value still name the old number anywhere in it?"""
     if isinstance(value, str):
@@ -207,7 +192,6 @@ def mentions(value):
     if isinstance(value, dict):
         return any(mentions(v) for v in value.values())
     return False
-
 
 fixed = []
 for obj in list(db.objects()):
@@ -224,7 +208,6 @@ if fixed:
     pobj.msg(f"&<245>Rewrote {len(fixed)}: {', '.join(fixed[:12])}"
              + (' ...' if len(fixed) > 12 else '') + '&n')
 
-# --- 4. Report whatever is left -------------------------------------------
 left = []
 for obj in list(db.objects()):
     for pname, info in obj.properties.items():

@@ -1,9 +1,5 @@
 """
-collapse on $string_utils.
-
-Ported from `moo.string_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -73,14 +69,10 @@ def collapse(block):
         if not lines:
             return ''
 
-        # Blank lines are excluded from the measurement: a run of empty
-        # rows inside a box would otherwise report an indent of zero and
-        # cancel the dedent for everything else.
         indents = [len(line) - len(line.lstrip()) for line in lines if line]
         cut = min(indents) if indents else 0
 
         return '\n'.join(line[cut:] for line in lines)
-
 
 _a = kwargs.pop('_pyargs', None)
 

@@ -1,11 +1,7 @@
 """
-_title verb on #1 (RootObject).
-
 Rebuilds an object's display name from its name_mod_list components.
 The name_mod_list is a 5-element list: [article, adj1, adj2, adj3, trailer].
 Combines these with the object's noun to form the full display name.
-
-Called programmatically after modifying name_mod_list components.
 
 Handles a/an article correction based on the first letter of the next
 word (vowel -> "an", consonant -> "a"). Sets this.name.

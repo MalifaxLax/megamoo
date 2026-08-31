@@ -20,7 +20,6 @@ ochar = db.get_object(ochar_num)
 
 yield 1
 
-# Announce departure from IC room
 if not pobj.invis:
     pobj.location.msg_room(f"{pobj.noun} fades from existence.", exclude=[pobj])
 

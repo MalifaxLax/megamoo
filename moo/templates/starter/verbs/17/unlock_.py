@@ -1,6 +1,5 @@
 """
 unlock_ on #17 (ClosableGoExit)
-Called by room verbs: call_verb(target, 'unlock_', iobj=key_obj)
 Unlocks this exit. Checks already not locked.
 If this.key is set, validates iobj.key matches or is 'skeleton'.
 Sets locked=False on this and reverse exit.
@@ -12,11 +11,8 @@ if not this.locked:
     player.msg(this.culockf or '&D is not locked.', dob=this)
     return
 
-# Key validation
 _door_key = this.key
 if _door_key:
-    # A keyed door stays locked when no key is offered. The room hears the
-    # attempt -- rattling a lock you cannot open is worth seeing.
     if not iobj:
         player.msg(getattr(this, 'ulockn', None)
                    or 'You need a key to unlock &d.', dob=this)
@@ -25,10 +21,6 @@ if _door_key:
                 getattr(this, 'oulockn', None) or '&S struggles to unlock &D.',
                 exclude=[pobj], sub=pobj, dob=this)
         return
-    # getattr: `key` is declared on #17, not on items, so a bare read
-    # raised E_PROPNF for whatever the player happened to be holding --
-    # the fit check below already treats a non-matching value as the
-    # wrong key, which is exactly what a thing with no key is.
     _key_str = getattr(iobj, 'key', None)
     if _key_str != _door_key and _key_str != 'skeleton':
         player.msg(this.ulockf or "The key doesn't seem to fit.",
@@ -37,11 +29,6 @@ if _door_key:
 
 this.set_property('locked', False, db)
 
-# Whether a key was used picks the sentence, rather than one sentence
-# naming a key that might not exist. That is a choice about wording now:
-# `&i` is no longer a colour code, so an unfilled one is simply left as
-# text. It used to be read as ANSI reverse video and invert the rest of
-# the line, which made this branch load-bearing rather than tidy.
 if iobj:
     player.msg(getattr(this, 'ulockk', None) or 'You unlock &d with &i.',
                dob=this, iob=iobj)
@@ -53,7 +40,6 @@ if not player.invis:
     if omsg:
         pobj.location.msg_room(omsg, exclude=[pobj], sub=pobj, dob=this, iob=iobj)
 
-# Unlock reverse exit too
 _rev = this.reverse
 if _rev and type(_rev) == int:
     _rev = db.get_object(_rev)

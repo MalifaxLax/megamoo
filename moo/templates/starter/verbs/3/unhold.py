@@ -27,7 +27,6 @@ item = bmatch(args, pobj, candidates)
 if not item:
     return
 
-# Check if player is holding the item
 mh = pobj.mh
 oh = pobj.oh
 in_mh = mh and hasattr(mh, 'objnum') and mh.objnum == item.objnum
@@ -37,7 +36,6 @@ if not in_mh and not in_oh:
     pobj.msg("You aren't holding that.")
     return
 
-# Clear from hand(s)
 call_verb(pobj, 'clear_hand', dobj=item)
 
 pobj.msg("You put away " + item.name + ".")

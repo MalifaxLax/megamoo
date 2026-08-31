@@ -1,9 +1,5 @@
 """
-adj_match on $match_utils.
-
-Ported from `moo.match_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -11,8 +7,6 @@ Type:    function
 from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
 
 from moo.objects import MOOObject
-
-
 
 def adj_match(adjectives: List[str], obj: MOOObject) -> bool:
     """
@@ -58,28 +52,21 @@ def adj_match(adjectives: List[str], obj: MOOObject) -> bool:
 
     title = obj.name.casefold()
 
-    # --- Pass 1: Ordered substring matching against the full name ---
     pos = 0
     for adj in adjectives:
         adj_low = adj.casefold()
-        # Find the adjective starting at 'pos' (after previous matches)
         idx = title.find(adj_low, pos)
         if idx == -1:
             break
-        # Enforce word boundary: adjective must be at start of string
-        # or preceded by a space
         if idx > 0 and title[idx - 1] != ' ':
             idx = title.find(' ' + adj_low, pos)
             if idx == -1:
                 break
-            idx += 1  # skip the leading space
-        # Advance past this adjective for the next search
+            idx += 1
         pos = idx + len(adj_low)
     else:
-        # The for-loop completed without breaking -- all adjectives matched
         return True
 
-    # --- Pass 2: Fallback to the 'adjectives' property list ---
     props = obj.properties
     if 'adjectives' in props:
         obj_adjs = props['adjectives'].value
@@ -88,7 +75,6 @@ def adj_match(adjectives: List[str], obj: MOOObject) -> bool:
             last_idx = -1
             for adj in adjectives:
                 adj_low = adj.casefold()
-                # Find this adjective in the property list after last_idx
                 found = False
                 for i in range(last_idx + 1, len(obj_adjs_low)):
                     if obj_adjs_low[i].startswith(adj_low):
@@ -100,7 +86,6 @@ def adj_match(adjectives: List[str], obj: MOOObject) -> bool:
             return True
 
     return False
-
 
 _a = kwargs.pop('_pyargs', None)
 

@@ -1,11 +1,7 @@
 """
-sit_ verb on #23 (BaseFurniture).
-
 Makes a player sit down at this furniture. Checks seat capacity, removes
 the player from any previous furniture, sets position to 6 (sitting),
 and adds the player to this furniture's sitters list.
-
-Called by the room-level sit verb: call_verb(furniture, 'sit_')
 
 Cleans stale sitters (characters no longer in the room) from the list.
 Uses sit/osit messages from the furniture, or builds defaults from
@@ -20,17 +16,14 @@ item = this
 sitters = item.sitters or []
 seats = (item.seats or 1)
 
-# Already sitting here?
 if pobj.objnum in sitters:
     pobj.msg("You're already sitting there!")
     return True
 
-# Full?
 if len(sitters) >= seats:
     pobj.msg(f"There's no room for you at {item.name}.")
     return True
 
-# If sitting elsewhere, stand from current furniture first
 cur_table = pobj.table
 if cur_table:
     try:
@@ -47,11 +40,9 @@ if cur_table:
     except Exception:
         pass
 
-# Sit down
 pobj.position = 6
 sitters.append(pobj.objnum)
 
-# Clean stale sitters (anyone no longer in room)
 if pobj.location:
     here = [obj.objnum for obj in pobj.location.contents]
     sitters = [s for s in sitters if s in here]
@@ -59,7 +50,6 @@ if pobj.location:
 item.sitters = sitters
 pobj.table = item.objnum
 
-# Messages (build from sit_prep if no custom message set)
 prep = (item.sit_prep or 'on')
 sit_msg = item.sit or f'You sit {prep} &d.'
 osit_msg = item.osit or f'&S sits {prep} &d.'

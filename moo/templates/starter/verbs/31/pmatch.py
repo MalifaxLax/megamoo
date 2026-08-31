@@ -1,9 +1,5 @@
 """
-pmatch on $match_utils.
-
-Ported from `moo.match_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -11,8 +7,6 @@ Type:    function
 from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
 
 from moo.objects import MOOObject
-
-
 
 def pmatch(inp: str, pobj: MOOObject,
            candidates: Sequence[MOOObject]) -> Optional[MOOObject]:
@@ -42,26 +36,21 @@ def pmatch(inp: str, pobj: MOOObject,
 
     text = inp.strip()
 
-    # --- "my <X>" -- filter candidates to player's possessions ---
     if text.casefold().startswith('my '):
         text = text[3:].strip()
         if not text:
             return None
-        # Filter candidates to only those located inside the player
         my_items = [obj for obj in candidates
                     if getattr(obj.location, 'objnum', None) == pobj.objnum]
         return call_verb(this, 'match', text, my_items) if my_items else None
 
-    # --- Keywords only: "me" and "here" (no #N or $name) ---
     low = text.casefold()
     if low == 'me':
         return pobj
     if low == 'here':
         return pobj.location
 
-    # --- Name-based matching ---
     return call_verb(this, 'match', text, candidates)
-
 
 _a = kwargs.pop('_pyargs', None)
 

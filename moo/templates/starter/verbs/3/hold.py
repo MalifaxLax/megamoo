@@ -28,12 +28,10 @@ if not item:
     pobj.msg("You don't have that.")
     return
 
-# Check item is in player's contents
 if item.location.objnum != pobj.objnum:
     pobj.msg("You don't have that.")
     return
 
-# Check if already holding it
 mh = pobj.mh
 oh = pobj.oh
 if (mh and hasattr(mh, 'objnum') and mh.objnum == item.objnum) or \
@@ -41,13 +39,11 @@ if (mh and hasattr(mh, 'objnum') and mh.objnum == item.objnum) or \
     pobj.msg("You're already holding that.")
     return
 
-# Check for a free hand
 hand = call_verb(pobj, 'hands_free')
 if not hand:
     pobj.msg("Your hands are full.")
     return
 
-# Place in hand
 call_verb(pobj, 'move_to_hand', dobj=item)
 
 hand_name = (pobj.hand or ['right', 'left'])[0] if hand == 'both' else hand

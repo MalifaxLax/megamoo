@@ -1,7 +1,6 @@
 """
 Room look verb for #11 BaseRoom.
 
-Called by the look verb (on #12 OOCRoom or similar) when a player
 types 'look' or 'l' with no arguments. Displays:
 
   1. Room name (dark gray)
@@ -21,7 +20,6 @@ desc = room.description
 dnames = room.dnames
 obvexits = room.obvexits
 
-# Room name in dark gray (leader=True adds a leading blank line by default)
 _leader = "\n" if locals().get('leader', True) else ""
 _sr = (player.settings or {}).get('screenreader', False)
 if _sr:
@@ -29,25 +27,18 @@ if _sr:
 else:
     player.msg(f"{_leader}&<245>{room.name}&n")
 
-# Room description in default text color
 if desc:
     player.msg(desc)
 
-# All room contents except the looker
 all_contents = [obj for obj in room.contents if obj.objnum != player.objnum]
 
-# Visible contents (not invis, hidden, or dark)
 visible = [obj for obj in all_contents
            if not obj.invis
            and not obj.hidden
            and not obj.dark]
 
-# Build furniture sitter mapping from character table properties
-# AND from furniture sitters lists (furniture may be dark)
-# {furniture_objnum: [char_objnum, ...]}
 furn_sitters = {}
 
-# Check character table properties
 for obj in all_contents:
     if obj.is_char:
         tbl = obj.table
@@ -57,12 +48,7 @@ for obj in all_contents:
             if obj.objnum not in furn_sitters[tbl]:
                 furn_sitters[tbl].append(obj.objnum)
 
-# Also check furniture sitters lists (catches all cases)
 for obj in all_contents:
-    # getattr, not a bare read: sitters belongs to furniture,
-    # and a rock is not furniture.  This used to work because a
-    # missing property came back falsy; now it raises E_PROPNF,
-    # which is what MOO does and what makes a typo visible.
     sitters = getattr(obj, 'sitters', None)
     if sitters and isinstance(sitters, list):
         room_nums = {c.objnum for c in all_contents}
@@ -74,7 +60,6 @@ for obj in all_contents:
                 if s not in furn_sitters[obj.objnum]:
                     furn_sitters[obj.objnum].append(s)
 
-# Also check the looker's table
 looker_tbl = player.table
 if looker_tbl and isinstance(looker_tbl, int):
     if looker_tbl not in furn_sitters:
@@ -82,7 +67,6 @@ if looker_tbl and isinstance(looker_tbl, int):
     if player.objnum not in furn_sitters[looker_tbl]:
         furn_sitters[looker_tbl].append(player.objnum)
 
-# Set of character objnums sitting at furniture
 chars_on_furn = set()
 for slist in furn_sitters.values():
     chars_on_furn.update(slist)
@@ -92,7 +76,6 @@ olist = []
 elist = []
 furn_lines = []
 
-# Collect obvious exits from ALL contents (exits are typically dark)
 for obj in all_contents:
     if obj.is_exit and obj.is_obvious:
         elist.append(obj.name)
@@ -100,7 +83,7 @@ for obj in all_contents:
 for obj in visible:
     if obj.is_char:
         if obj.objnum in chars_on_furn:
-            continue  # Will show under furniture
+            continue
         pos = obj.position or 0
         label = obj.noun or obj.name
         if pos:
@@ -116,12 +99,11 @@ for obj in visible:
     elif not obj.is_exit:
         olist.append(obj.name)
 
-# Build furniture lines (furniture may be dark, look it up by objnum)
 for furn_num, sitter_nums in furn_sitters.items():
     snames = []
     for snum in sitter_nums:
         if snum == player.objnum:
-            continue  # Don't list looker in furniture sitters
+            continue
         try:
             schar = db.get_object(snum)
             if schar.invis:
@@ -142,17 +124,13 @@ for furn_num, sitter_nums in furn_sitters.items():
         except Exception:
             pass
 
-# Build single display line: characters + furniture sitters + objects
 parts = []
 
-# Characters not on furniture
 if plist:
     parts.append(f"You see {su.listtoenglish(plist)}.")
 
-# Furniture sitter sentences
 parts.extend(furn_lines)
 
-# Objects
 if olist:
     joined = su.listtoenglish(olist)
     if len(olist) == 1:
@@ -163,8 +141,6 @@ if olist:
 if parts:
     player.msg(' '.join(parts))
 
-# Obvious exits: combine virtual exits (from obvexits indices into dnames)
-# with any object-based exit names collected above
 oelist = [dnames[i] for i in obvexits if type(i) == int and i < len(dnames)]
 elist += oelist
 elist = ou.order_exits(elist)

@@ -30,11 +30,9 @@ if not room or not room.is_room:
     pobj.msg("You must be in a room.")
     return
 
-# Try match_exit first to find the exit
 exit = call_verb(room, 'match_exit', argstr=spec)
 
 if exit is None:
-    # Also try bmatch against room contents for non-directional objects
     target = bmatch(spec, pobj, list(room.contents), db)
     if not target:
         pobj.msg(f"Exit '{spec}' not found in this room.")
@@ -42,7 +40,6 @@ if exit is None:
     exit = target
 
 if type(exit) == int:
-    # Virtual exit — clear dexits[enum] and remove from obvexits
     enum = exit
     dname = DNAMES[enum] if enum < len(DNAMES) else str(enum)
 
@@ -78,7 +75,6 @@ if type(exit) == int:
 
     pobj.msg(f"Removed virtual exit &<245>{dname}&n{dest_str}.")
 else:
-    # Object exit — move to #40 and remove from exits/obvexits
     target = exit
 
     answer = yield f"Remove exit &<245>#{target.objnum}:{target.name}&n? [y/n] "
@@ -102,7 +98,6 @@ else:
     room._mark_modified()
     pobj.msg(f"Removed exit &<245>#{target.objnum}:{target.name}&n from room.")
 
-    # Check for return/reverse exit and remove it too
     ret_num = target.rexit or target.rxexit or target.reverse
     if ret_num:
         if hasattr(ret_num, 'objnum'):

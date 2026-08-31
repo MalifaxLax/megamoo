@@ -1,17 +1,11 @@
 """
-_get_eu_obj on $effects_utils.
-
-Ported from `moo.effects` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Hidden:  yes
 Type:    function
 """
 
 _db = None
-
-
 
 def _get_eu_obj():
     """
@@ -37,16 +31,11 @@ def _get_eu_obj():
     eu_ref = sys_obj.eu
     if eu_ref is None:
         raise RuntimeError("No 'eu' property on #0")
-    # Handle different reference formats
     if hasattr(eu_ref, 'objnum'):
-        # Already a MOOObject
         return eu_ref
-    # String "#33" form
     if isinstance(eu_ref, str) and eu_ref.startswith('#'):
         return _db.get_object(int(eu_ref[1:]))
-    # Plain integer
     return _db.get_object(int(eu_ref))
-
 
 _a = kwargs.pop('_pyargs', None)
 

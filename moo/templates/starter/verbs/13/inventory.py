@@ -9,12 +9,9 @@ and nothing answered to it -- there is no alias, only the length.
 Abbrev:  inventory=3
 """
 
-# Can the character act? do_wait covers roundtime as well as the
-# immobilising conditions, and emits its own message.
 if pobj.do_wait():
     return
 
-# Hands
 mh = pobj.mh
 if isinstance(mh, int):
     mh = db.get_object(mh)
@@ -42,7 +39,6 @@ elif mh:
 else:
     pobj.msg(f"You have {oh.name} in your {hand[1]} hand.")
 
-# Staff contents — show everything not held
 if pobj.auth:
     held_nums = set()
     if mh and hasattr(mh, 'objnum'):

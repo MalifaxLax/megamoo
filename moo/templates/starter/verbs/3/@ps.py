@@ -2,10 +2,7 @@
 Lists the tasks the server is currently running.
 
 Usage: @ps
-       @ps <player>
-
-Arguments:
-    player - Optional: show only tasks belonging to this character.
+       @ps <player>      only that character's tasks
 
 Switches:
     /all   - Include recently finished tasks as well.
@@ -42,7 +39,6 @@ except RuntimeError as exc:
     pobj.msg(f"Cannot read the task queue: {exc}")
     return
 
-# Narrow to one player, either named or 'me'.
 who = None
 if 'me' in switches:
     who = pobj
@@ -62,20 +58,30 @@ if not tasks:
     pobj.msg(f"No tasks{whose}." + ("" if include_done else "  (/all includes finished ones.)"))
     return
 
-# Sort so the interesting ones are at the top: running first, then the
-# longest-lived, since a task that has been around a while is the one you
-# are usually hunting.
 _order = {'running': 0, 'suspended': 1, 'pending': 2, 'done': 3}
 tasks.sort(key=lambda t: (_order.get(t['state'], 9), -t['age']))
 
-pobj.msg("&<245>   ID  STATE      PLAYER  VERB                 AGE    WAKES   TICKS&n")
+_sr = (pobj.settings or {}).get('screenreader', False)
+
+if not _sr:
+    pobj.msg("&<245>   ID  STATE      PLAYER  VERB                 AGE    WAKES   TICKS&n")
 for t in tasks:
     player = f"#{t['player']}" if t['player'] else '-'
     verb = (t['verb'] or '-')[:20]
     wakes = f"{t['resumes_in']:.1f}" if t['resumes_in'] else '-'
     forked = f" (forked by {t['parent']})" if t['parent'] else ''
-    pobj.msg(f"  {t['id']:>4}  {t['state']:<9}  {player:<6}  {verb:<20} "
-             f"{t['age']:>5.1f}  {wakes:>6}  {t['ticks']:>6}{forked}")
+    if _sr:
+        bits = [f"task {t['id']}", t['state'], f"verb {verb}"]
+        if t['player']:
+            bits.append(f"player {player}")
+        bits.append(f"age {t['age']:.1f}s")
+        if t['resumes_in']:
+            bits.append(f"wakes in {wakes}s")
+        bits.append(f"{t['ticks']} tick{'' if t['ticks'] == 1 else 's'}")
+        pobj.msg(", ".join(bits) + forked + ".")
+    else:
+        pobj.msg(f"  {t['id']:>4}  {t['state']:<9}  {player:<6}  {verb:<20} "
+                 f"{t['age']:>5.1f}  {wakes:>6}  {t['ticks']:>6}{forked}")
 
 pobj.msg("")
 running = sum(1 for t in tasks if t['state'] == 'running')

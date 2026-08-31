@@ -1,16 +1,10 @@
 """
-prep_match on $match_utils.
-
-Ported from `moo.match_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
 
 from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
-
-
 
 def prep_match(word: str) -> Optional[str]:
     """
@@ -37,7 +31,6 @@ def prep_match(word: str) -> Optional[str]:
         prep_match('beh')    # => 'behind'
         prep_match('sword')  # => None
     """
-    # Lazy import to avoid circular dependency with moo.globals
     from moo.globals import PREPOSITIONS
 
     low = word.casefold()
@@ -55,7 +48,6 @@ def prep_match(word: str) -> Optional[str]:
                 if alias.lower() == low:
                     return canonical
     return None
-
 
 _a = kwargs.pop('_pyargs', None)
 

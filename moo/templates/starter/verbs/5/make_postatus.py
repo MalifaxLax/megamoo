@@ -1,11 +1,7 @@
 """
-make_postatus verb on #5 (ICharacter).
-
 Builds and returns a combined position/status string for display in room
 listings. Combines the character's position string (e.g., "sitting",
 "lying down") with any active status effects (e.g., "stunned", "bleeding").
-
-Called programmatically: call_verb(char, 'make_postatus')
 
 Returns:
     str - A parenthesized string like "(sitting/stunned)" or "(standing)"

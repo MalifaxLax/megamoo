@@ -28,20 +28,13 @@ if not argstr:
     pobj.msg("Act how?")
     return
 
-# do_wait covers unconscious, sleeping, paralyzed, the five conditions and
-# roundtime, and messages the player itself.
 if call_verb(pobj, 'do_wait'):
     return
 
-# The player's own text, going into a message esub will read. `&` opens a
-# substitution token, so an unescaped one lets anybody emit colour codes,
-# or a stray `&S` naming somebody else, inside a line attributed to them.
 action = argstr.replace('&', '&&')
 name = pobj.name
 
 if '@' in action:
-    # Every occurrence, and no name prefix: the point of `@` is to place
-    # yourself in the sentence rather than at the front of it.
     emotestr = action.replace('@', name)
 else:
     emotestr = name + ("'s " if verb == "act's" else " ") + action

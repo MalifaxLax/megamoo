@@ -1,9 +1,5 @@
 """
-omatch on $match_utils.
-
-Ported from `moo.match_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -34,8 +30,6 @@ def _resolve_db(pobj: MOOObject, db: Database = None) -> Optional[Database]:
     if db is not None:
         return db
     return getattr(pobj, '_database', None)
-
-
 
 def omatch(inp: str, pobj: MOOObject, db: Database = None) -> Optional[MOOObject]:
     """
@@ -69,15 +63,12 @@ def omatch(inp: str, pobj: MOOObject, db: Database = None) -> Optional[MOOObject
     """
     low = inp.casefold().strip()
 
-    # --- Keyword: "me" ---
     if low == 'me':
         return pobj
 
-    # --- Keyword: "here" ---
     if low == 'here':
-        return pobj.location  # None if the player is nowhere
+        return pobj.location
 
-    # --- Direct dbref: "#N" (e.g. "#3", "#13") ---
     if low.startswith('#') and low[1:].isdigit():
         rdb = _resolve_db(pobj, db)
         if rdb:
@@ -87,9 +78,6 @@ def omatch(inp: str, pobj: MOOObject, db: Database = None) -> Optional[MOOObject
                 return None
         return None
 
-    # --- System constant: "$name" (e.g. "$room_builder") ---
-    # Looks up a property on object #0 (the system/root object) and
-    # resolves it to a game object.
     if low.startswith('$') and len(low) > 1:
         rdb = _resolve_db(pobj, db)
         if not rdb:
@@ -100,21 +88,15 @@ def omatch(inp: str, pobj: MOOObject, db: Database = None) -> Optional[MOOObject
             val = getattr(sys_obj, prop_name, None)
             if val is None:
                 return None
-            # MOOObject.__getattr__ auto-resolves "#N" string values to
-            # live MOOObject instances, so check if it's already resolved
             if hasattr(val, 'objnum'):
                 return val
-            # If it's a bare integer, treat it as an object number
             if isinstance(val, int):
                 return rdb.get_object(val)
         except (KeyError, Exception):
             return None
         return None
 
-    # Not a keyword or reference -- return None so the caller can
-    # fall through to name-based matching
     return None
-
 
 _a = kwargs.pop('_pyargs', None)
 

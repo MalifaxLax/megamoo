@@ -31,7 +31,7 @@ else:
     else:
         nml = target.name_mod_list
         if nml:
-            nml = list(nml)  # local copy (don't mutate inherited)
+            nml = list(nml)
         else:
             nml = ['', '', '', '', '']
         while len(nml) < 5:

@@ -1,9 +1,5 @@
 """
-has_property on $obj_utils.
-
-Ported from `moo.object_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -18,10 +14,9 @@ def has_property(obj, name: str) -> bool:
     if obj is None or not name:
         return False
     try:
-        return getattr(obj, name) != None      # noqa: E711 -- sentinel
+        return getattr(obj, name) != None
     except AttributeError:
         return False
-
 
 _a = kwargs.pop('_pyargs', None)
 

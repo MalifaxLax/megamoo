@@ -18,7 +18,6 @@ if not target:
     pobj.msg("Lock what?")
     return
 
-# Match key from held items if iobj provided
 _key_obj = None
 if iobj:
     _held = [x for x in [pobj.mh, pobj.oh] if x]

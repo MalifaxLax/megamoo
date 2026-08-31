@@ -36,11 +36,6 @@ if not dobj:
     pobj.msg('Example: @copy/drop #412 times 12')
     return
 
-# How many copies? A trailing 'times N'.
-#
-# Pulled off the argument string by hand rather than read from prep2/dobj2:
-# 'times' is not one of the parser's prepositions, so it would otherwise be
-# swallowed into the object name and the match would fail.
 count = 1
 _target = (dobj or '').strip()
 _tail = (iobj or '').strip() if prep == '=' else ''
@@ -72,11 +67,8 @@ if not source:
 
 new_noun = _tail if _tail else (source.noun or None)
 
-# The source's own properties. Inherited ones are deliberately skipped:
-# the copy shares the parent, so it already has them, and duplicating them
-# locally would silently detach the copy from later edits to the parent.
 own_props = source.properties_list(include_inherited=False, database=db)
-skip = ('name',)  # rebuilt from the name parts by make_object
+skip = ('name',)
 
 made = []
 for _ in range(count):

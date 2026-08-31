@@ -1,16 +1,10 @@
 """
-make_exit on $obj_utils.
-
-Ported from `moo.object_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
 
 from typing import TYPE_CHECKING, Optional
-
-
 
 def make_exit(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
               noun: Optional[str] = None,
@@ -42,45 +36,22 @@ def make_exit(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
     """
     new_exit = call_verb(this, 'make_object', parent, db, pobj, noun=noun)
 
-    # Movement messages, naming the direction this exit actually goes.
-    #
-    # Step 4 of the list above, which the body did not do.  Every exit
-    # therefore inherited #14 BaseExit's literals -- "You walk out." going
-    # north, south and every other way -- and an osuccess still written in
-    # the %% sigil from before it moved to &, so the watching room got
-    # "%%S %%OMODE out." on every move through a created exit.
-    #
-    # The templates have been in globals.py as ESUCC/EOSUCC/EODROP all
-    # along; `&1` is the slot fname and rfname exist to fill.
-    #
-    # Only when there is a name to put in.  A go-exit created without one
-    # keeps whatever its parent says, which is right for `go archway`:
-    # there is no direction to announce.
     _fname = fname or noun
     if _fname:
         from moo.globals import ESUCC, EOSUCC, EODROP, GESUCC, GEOSUCC
         _rfname = rfname or _fname
         if fname:
-            # A direction was named, so the name belongs in the sentence:
-            # you go north, you do not go through north.
             _succ, _osucc = (ESUCC.replace('&1', _fname),
                              EOSUCC.replace('&1', _fname))
         else:
-            # A named exit -- a door, an archway, drapes -- is a thing you
-            # go through, and &d reads its name at emit time so a later
-            # rename carries.  Only @open names a direction; the four
-            # named-exit builders pass none, which is what tells them
-            # apart here without make_exit having to know their parents.
             _succ, _osucc = GESUCC, GEOSUCC
         new_exit.add_property('success', _succ, perms='rc')
         new_exit.add_property('osuccess', _osucc, perms='rc')
         new_exit.add_property('odrop', EODROP.replace('&1', _rfname), perms='rc')
 
-    # Set destination
     if dest:
         new_exit.add_property('destination', dest.objnum, perms='rc')
 
-    # Place in room
     if room:
         new_exit.move_to(room, db)
         exits = room.exits or []
@@ -89,7 +60,6 @@ def make_exit(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
         room._mark_modified()
 
     return new_exit
-
 
 _a = kwargs.pop('_pyargs', None)
 

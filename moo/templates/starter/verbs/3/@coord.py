@@ -51,7 +51,6 @@ from moo.roommap import AUTHORED_OFFSETS, canonical_direction, invalidate
 DIM = '&<245>'
 OFF = '&n'
 
-
 def as_room(text):
     """The room a word names, or None (with the complaint already sent)."""
     text = (text or '').strip()
@@ -61,10 +60,6 @@ def as_room(text):
             pobj.msg("You are not in a room, so name one.")
             return None
         return room
-    # Rooms are rarely in reach of the player naming them, so the
-    # candidate list is the room they are in plus what they carry --
-    # enough for "here" and a nearby exit, while `#N` (the way a room is
-    # almost always named) is resolved by bmatch before candidates matter.
     nearby = list(pobj.contents or [])
     where = pobj.location
     if where:
@@ -78,7 +73,6 @@ def as_room(text):
         return None
     return found
 
-
 def coords_of(room):
     """A room's coordinates as a 3-tuple of ints, or None if unset/bad."""
     value = getattr(room, 'coordinates', None)
@@ -88,7 +82,6 @@ def coords_of(room):
         return tuple(int(n) for n in value)
     except (TypeError, ValueError):
         return None
-
 
 def bearings_from(room):
     """
@@ -125,7 +118,6 @@ def bearings_from(room):
             found.append((direction, dest))
     return found
 
-
 def show(room):
     position = coords_of(room)
     where = f"{DIM}#{room.objnum}:{room.name}{OFF}"
@@ -135,10 +127,6 @@ def show(room):
         pobj.msg(f"{where} is at {DIM}{position[0]}, {position[1]}, "
                  f"{position[2]}{OFF}  (x east, y north, z up)")
 
-
-# ---------------------------------------------------------------------------
-#   /check -- audit, change nothing
-# ---------------------------------------------------------------------------
 if 'check' in switches:
     rooms = {o.objnum: o for o in db.objects() if getattr(o, 'is_room', False)}
     known = {n: coords_of(r) for n, r in rooms.items()}
@@ -177,10 +165,6 @@ if 'check' in switches:
              "fold. Nothing has been changed.")
     return
 
-
-# ---------------------------------------------------------------------------
-#   /fill -- flood outward from a coordinated room
-# ---------------------------------------------------------------------------
 if 'fill' in switches:
     start = as_room(args)
     if not start:
@@ -192,8 +176,6 @@ if 'fill' in switches:
         return
 
     rooms = {o.objnum: o for o in db.objects() if getattr(o, 'is_room', False)}
-    # Every already-coordinated room anchors the fill, not just the seed:
-    # re-running after building must not fight the coordinates already set.
     taken = {}
     for objnum, room in rooms.items():
         position = coords_of(room)
@@ -216,9 +198,6 @@ if 'fill' in switches:
             want = (here[0] + dx, here[1] + dy, here[2] + dz)
             existing = coords_of(rooms[dest])
             if existing is not None:
-                # Already stated. Honour it, walk on through it, and say
-                # so only when it disagrees -- that is a fold in the world
-                # or a mistake, and either way it is the builder's call.
                 seen.add(dest)
                 queue.append(dest)
                 if existing != want:
@@ -259,10 +238,6 @@ if 'fill' in switches:
                  + (' ...' if len(unset) > 12 else ''))
     return
 
-
-# ---------------------------------------------------------------------------
-#   /clear
-# ---------------------------------------------------------------------------
 if 'clear' in switches:
     room = as_room(args)
     if not room:
@@ -273,10 +248,6 @@ if 'clear' in switches:
     pobj.msg(f"{DIM}#{room.objnum}:{room.name}{OFF} is derived again.")
     return
 
-
-# ---------------------------------------------------------------------------
-#   show, or set
-# ---------------------------------------------------------------------------
 text = (args or '').strip()
 if '=' not in text:
     room = as_room(text)

@@ -32,7 +32,6 @@ if not args:
     pobj.msg("Say what?")
     return
 
-# Build list of sitter objects (excluding self)
 others = []
 for objnum in sitters:
     if objnum != pobj.objnum:
@@ -44,14 +43,12 @@ for objnum in sitters:
 noun = (furn.noun or 'table')
 
 if args[0] == ':':
-    # Emote: "At your table, Name smiles"
     emote = args[1:].strip()
     msg = f"At your {noun}, {pobj.name} {emote}"
     pobj.msg(msg)
     for other in others:
         other.msg(msg)
 else:
-    # Speech
     pobj.msg(f'You say to those at {furn.name}, "{args}"')
     msg = f'At your {noun}, {pobj.name} says, "{args}"'
     for other in others:

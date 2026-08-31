@@ -26,17 +26,15 @@ Hidden:  yes
 Perms:   rxd
 """
 
-
 import re
-
-# ── Quit exception ─────────────────────────────────────────────────────
 
 class _Quit(Exception):
     pass
 
-# ── Helpers ─────────────────────────────────────────────────────────────
-
 def _header(text):
+    if (pobj.settings or {}).get('screenreader', False):
+        pobj.msg(text)
+        return
     border = "=" * len(text)
     pobj.msg(f"&<245>{border}&n")
     pobj.msg(text)
@@ -72,7 +70,6 @@ def _pick(prompt, options, allow_back=True, redisplay=None):
             if 0 <= idx < len(options):
                 return (idx, options[idx])
         else:
-            # Match option names by prefix
             matches = []
             for i, opt in enumerate(options):
                 name = str(opt).lower() if opt is not None else ''
@@ -108,8 +105,6 @@ def _validate_name(name, label):
         return "I don't think so."
     return None
 
-# ── Chargen Flow ────────────────────────────────────────────────────────
-
 origin_room = pobj.location
 msg_room(origin_room, f"{pobj.name} is consumed by a burst of primal energy.", exclude=[pobj], sub=pobj, dob=dobj, iob=iobj)
 move(pobj, db.get_object(29))
@@ -119,21 +114,15 @@ chargen_state = {'ichar': None}
 def _run_chargen():
     """Inner generator containing all chargen steps."""
 
-    # ── Variable initializations ──────────────────────────────────────
-    ichar = None      # character object, created at slot selection
-    step = None       # None = start from slot selection
+    ichar = None
+    step = None
 
-    # Local variables derived from ichar on resume
     first_name = None
     last_name = None
     gender = None
 
-    # None is in the set so the slot picker is re-enterable: `back` at the
-    # first-name prompt returns to it, and the slot block sets `step` on
-    # every path out of its own loop, so the membership test still ends.
     _STEPS = frozenset({None, 'first_name', 'last_name', 'gender'})
     while step in _STEPS:
-        # ── Step 1: Slot selection ────────────────────────────────────────
 
         while step is None:
             max_chars = this.max_characters or 5
@@ -141,7 +130,6 @@ def _run_chargen():
             while True:
                 characters = list(pobj.characters or [])
 
-                # Pad to max_chars so empty slots are selectable
                 slots = list(characters) + [None] * (max_chars - len(characters))
                 slots = slots[:max_chars]
 
@@ -163,12 +151,10 @@ def _run_chargen():
                 slot_idx, slot_val = result
 
                 if slot_val is not None:
-                    # Occupied slot
                     try:
                         ichar = db.get_object(slot_val)
                         char_name = ichar.noun or (ichar.name or '<unnamed>').split()[0]
                     except Exception:
-                        # Invalid object — just clear the slot
                         characters = [c for c in characters if c != slot_val]
                         pobj.characters = characters
                         pobj._mark_modified()
@@ -178,7 +164,6 @@ def _run_chargen():
                     chargen_step_val = ichar.chargen_step
 
                     if chargen_step_val is not None:
-                        # In-progress character — resume or start over
                         _header("[R]esume or [S]tart over?")
                         chose_resume = False
                         while True:
@@ -197,25 +182,23 @@ def _run_chargen():
                             _header("[R]esume or [S]tart over?")
 
                         if chose_resume:
-                            # Resume: load state from ichar
                             chargen_state['ichar'] = ichar
                             step = chargen_step_val
 
-                            # Restore local variables from ichar properties
                             first_name = ichar.name or ichar.noun or 'unnamed'
                             last_name = ichar.last_name
                             gender = ichar.gender
 
-                            break  # Exit slot selection loop, proceed to resumed step
+                            break
 
-                        # Start over — fall through to destroy confirmation
-
-                    # Destroy confirmation (finished character or start-over)
                     warn = "DESTROYING YOUR CHARACTER IS IRREVOCABLE!"
-                    border = "=" * len(warn)
-                    pobj.msg(f"&<245>{border}&n")
-                    pobj.msg(f"&<245>DESTROYING YOUR CHARACTER IS &<196>IRREVOCABLE!&n")
-                    pobj.msg(f"&<245>{border}&n")
+                    if (pobj.settings or {}).get('screenreader', False):
+                        pobj.msg(warn)
+                    else:
+                        border = "=" * len(warn)
+                        pobj.msg(f"&<245>{border}&n")
+                        pobj.msg(f"&<245>DESTROYING YOUR CHARACTER IS &<196>IRREVOCABLE!&n")
+                        pobj.msg(f"&<245>{border}&n")
                     confirm_str = f"DESTROY {char_name.upper()}"
                     pobj.msg(f"Enter &<196>{confirm_str}&n to erase {char_name}. Anything else to abort.")
                     ans = yield from _input("&<255>>&n ")
@@ -232,7 +215,6 @@ def _run_chargen():
                         characters = [c for c in characters if c != slot_val]
                         pobj.characters = characters
                         pobj._mark_modified()
-                        # Remove name from taken list
                         taken_names = list(this.character_names or [])
                         if char_name in taken_names:
                             taken_names.remove(char_name)
@@ -245,14 +227,6 @@ def _run_chargen():
                     ichar = None
                     continue
                 else:
-                    # Empty slot — create character immediately
-                    # A character owns itself, the way an account does.
-                    # Ownership is what `_check_write` reads, so this is
-                    # what lets somebody edit their own character and
-                    # nobody else's. Owned by the account instead, the
-                    # character could not write its own properties once
-                    # puppeted -- the actor is then the character, not the
-                    # account that owns it.
                     new_char = create(parent=5, owner=pobj.objnum)
                     new_char.owner = new_char.objnum
                     new_char.noun = "unnamed"
@@ -260,56 +234,29 @@ def _run_chargen():
                     new_char.add_property('account', pobj.objnum)
                     new_char.add_property('chargen_step', 'first_name')
 
-                    # Claim the slot *before* anything that can fail.
-                    #
-                    # The auth copy below used to come first, and when it
-                    # raised, the character existed and the account had
-                    # never heard of it: an orphan the slot list did not
-                    # name, so `[R]esume` could not offer it and the slot
-                    # still read <unused>.  Three of them accumulated in one
-                    # afternoon of hitting the same error.  Linked first,
-                    # a later failure leaves something resumable.
                     chars = list(pobj.characters or [])
                     chars.append(new_char.objnum)
                     pobj.characters = chars
                     pobj._mark_modified()
 
-                    # Copy auth and permissions from account
                     acct_auth = list(pobj.auth or [])
                     if acct_auth:
                         new_char.add_property('auth', list(acct_auth))
                         if pobj.is_programmer:
-                            new_char.flags |= 2  # PROGRAMMER
+                            new_char.flags |= 2
                         if pobj.is_wizard:
-                            new_char.flags |= 4  # WIZARD
+                            new_char.flags |= 4
 
                     ichar = new_char
                     chargen_state['ichar'] = ichar
                     step = 'first_name'
                     break
 
-        # A dispatch loop, so `step` can move backwards.  These were plain
-        # sequential blocks: setting `step` to an earlier name broke out of the
-        # current one, and every block above it had already been passed, so the
-        # player fell out of the bottom of the sequence and chargen ended
-        # without a word.  Typing B at the gender prompt -- which the slot
-        # header offers "any time" -- dropped them back in the room instead.
-        #
-        # The membership test is the guard: the loop runs only while `step`
-        # names a block that exists, so a typo'd or unknown step falls out
-        # instead of spinning.
-
-        # ── Step 2: First name ────────────────────────────────────────────
-
         while step == 'first_name':
             _header("What is your first name?")
             while True:
                 name = yield from _input("&<255>>&n ")
                 name = name.strip()
-                # Reserved here the way 'quit' is reserved everywhere, and
-                # for the same reason: the slot header offers back "any
-                # time", and without this the word was simply accepted --
-                # you asked to go back and were named Back instead.
                 if name.lower() == 'back':
                     step = None
                     break
@@ -321,11 +268,6 @@ def _run_chargen():
                     _header("What is your first name?")
                     continue
                 taken_names = list(this.character_names or [])
-                # su.capitalise, not str.capitalize: names admit apostrophes
-                # and hyphens, and capitalize() lowercases everything after
-                # the first letter -- it turned "MacLeod" into "Macleod" and
-                # "O'Brien" into "O'brien".  The taken check folds case
-                # itself so that only affects spelling.
                 first_name = su.capitalise(name)
                 if first_name.lower() in [t.lower() for t in taken_names]:
                     pobj.msg("That name is taken.")
@@ -337,8 +279,6 @@ def _run_chargen():
                 _set(ichar, 'chargen_step', 'last_name')
                 step = 'last_name'
                 break
-
-        # ── Step 3: Last name ─────────────────────────────────────────────
 
         while step == 'last_name':
             _header("And what shall your last name be?")
@@ -361,8 +301,6 @@ def _run_chargen():
                 _set(ichar, 'chargen_step', 'gender')
                 step = 'gender'
                 break
-
-        # ── Step 4: Gender ────────────────────────────────────────────────
 
         while step == 'gender':
             _header("[M]ale or [F]emale? (Contact a GM if you'd like other gender pronouns.)")
@@ -391,39 +329,23 @@ def _run_chargen():
                 break
             continue
 
-    # ── Step 5: Finalization ──────────────────────────────────────────
-
     if step == 'finalize':
-        # A plain starting description. Games that add appearance steps
-        # should build desclist from those answers instead.
         pronoun = 'man' if gender == 'male' else 'woman'
         _set(ichar, 'desclist', [f"{first_name} {last_name} is an unremarkable {pronoun}."])
 
-        # Leave home unset — the portal on #44 drops the character into the
-        # IC room named by $globals.ic_dropin_room on first entry.
         _set(ichar, 'last_location', 0)
 
-        # Start alive and able to act.
-        #
-        # do_wait only consults roundtime for a character whose status
-        # carries a truthy 'life', so without this a new character is
-        # never gated by rt at all. status is a dict: it has to be
-        # reassigned, not mutated in place, or the write never reaches
-        # the database (see _tick_down.py).
         _status = dict(ichar.status or {})
         _status['life'] = 1
         _set(ichar, 'status', _status)
         _set(ichar, 'rt', 0)
 
-        # Mark chargen complete
         _set(ichar, 'chargen_step', None)
 
         pobj.msg("")
         _header(f"{first_name} {last_name} is ready.")
         pobj.msg("Head south and step through the portal to enter the game.")
         pobj.msg("")
-
-# ── Run with cleanup ──────────────────────────────────────────────────
 
 try:
     yield from _run_chargen()

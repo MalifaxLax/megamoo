@@ -1,9 +1,5 @@
 """
-parse_ordinal on $match_utils.
-
-Ported from `moo.match_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -19,8 +15,6 @@ _ORDINAL_WORDS = {
 _ORDINAL_SUFFIXES = frozenset({'st', 'nd', 'rd', 'th'})
 
 from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
-
-
 
 def parse_ordinal(word: str) -> Optional[int]:
     """
@@ -52,21 +46,17 @@ def parse_ordinal(word: str) -> Optional[int]:
     """
     low = word.casefold()
 
-    # Word ordinals: "first" -> 0, "second" -> 1, etc.
     idx = _ORDINAL_WORDS.get(low)
     if idx is not None:
         return idx
 
-    # Numeric suffix ordinals: "1st" -> 0, "2nd" -> 1, "3rd" -> 2, etc.
     if len(low) > 2 and low[-2:] in _ORDINAL_SUFFIXES and low[:-2].isdigit():
         return int(low[:-2]) - 1
 
-    # Bare integer: "1" -> 0, "2" -> 1, etc.
     if low.isdigit():
         return int(low) - 1
 
     return None
-
 
 _a = kwargs.pop('_pyargs', None)
 

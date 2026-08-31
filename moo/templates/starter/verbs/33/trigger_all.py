@@ -1,9 +1,5 @@
 """
-trigger_all on $effects_utils.
-
-Ported from `moo.effects` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -31,11 +27,9 @@ def trigger_all(pobj, effects_list):
         """
         for effect in effects_list:
             if isinstance(effect, (list, tuple)):
-                # Unpack the tuple as positional args to trigger()
                 call_verb(this, 'trigger', pobj, *effect)
             else:
                 raise TypeError(f"Expected tuple/list, got {type(effect)}")
-
 
 _a = kwargs.pop('_pyargs', None)
 

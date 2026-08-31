@@ -70,8 +70,11 @@ for obj, vlist in blocks:
         items.append(name)
     items.sort(key=lambda t: t.lstrip("@+;:$_").replace(star, "").lower())
     pobj.msg("#" + str(obj.objnum) + ":")
-    for i in range(0, len(items), cols):
-        row = items[i:i + cols]
-        line = "".join(s.ljust(col_w) for s in row)
-        pobj.msg("  " + line.rstrip())
+    if (pobj.settings or {}).get('screenreader', False):
+        pobj.msg("  " + ", ".join(items))
+    else:
+        for i in range(0, len(items), cols):
+            row = items[i:i + cols]
+            line = "".join(s.ljust(col_w) for s in row)
+            pobj.msg("  " + line.rstrip())
     pobj.msg("")

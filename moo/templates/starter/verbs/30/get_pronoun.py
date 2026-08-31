@@ -1,9 +1,5 @@
 """
-get_pronoun on $string_utils.
-
-Ported from `moo.string_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -35,17 +31,11 @@ def get_pronoun(regex_match, source=None):
             str: The resolved pronoun string, e.g. ``"he"``, ``"Her"``,
             ``"their"``.
         """
-        matched = regex_match.group()       # e.g. "%ps", "%PO"
-        typ = matched[1:].lower()           # e.g. "ps", "po"
+        matched = regex_match.group()
+        typ = matched[1:].lower()
         pmap = call_verb(this, '_pronoun_map', source)
         pronoun = pmap.get(typ, matched)
-        # Capitalise if the first letter after the sigil was uppercase.
-        # capitalise(), not str.capitalize: the pronoun map holds single
-        # lowercase words today, so the two agree, but capitalize()
-        # lowercases the tail and would silently wreck any multi-word or
-        # internally-capitalised pronoun added later.
         return call_verb(this, 'capitalise', pronoun) if matched[1].isupper() else pronoun
-
 
 _a = kwargs.pop('_pyargs', None)
 

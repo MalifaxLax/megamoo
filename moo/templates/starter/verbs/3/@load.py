@@ -61,9 +61,6 @@ if not spec:
 if not spec.endswith('.json'):
     spec += '.json'
 
-# Keep the read inside dumps/.  A gm3 can reach the disk by other means,
-# so this is tidiness rather than a barrier -- but a stray '..' in a
-# filename should not quietly read something else.
 path = os.path.normpath(os.path.join(folder, spec))
 if not path.startswith(folder + os.sep):
     pobj.msg("That is not in the dumps directory.")
@@ -97,14 +94,10 @@ if parent_num and parent is None:
     pobj.msg(f"This dump wants parent #{parent_num}, which does not exist here.")
     return
 
-# Object references travel as bare numbers and mean nothing in a database
-# that did not write them.  Find them so they can be reported.
 dangling = []
 for pname, pinfo in props.items():
     value = (pinfo or {}).get('value')
     if isinstance(value, str) and value.startswith('#') and value[1:].isdigit():
-        # A missing object raises rather than returning None -- which is
-        # precisely the case being looked for here.
         try:
             found = db.get_object(int(value[1:]))
         except Exception:
@@ -157,8 +150,6 @@ for vinfo in verbs:
     if not names:
         continue
     try:
-        # Built directly rather than through add_verb(), which creates the
-        # verb with empty code and has nowhere to put it back.
         from moo.verbs import VerbDef
         vd = VerbDef(names=names,
                      code=vinfo.get('code') or '',

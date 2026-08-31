@@ -1,12 +1,8 @@
 """
-move verb on #19 (JumpableExit).
-
 Moves a player through a jumpable exit after checking closed state,
 lock restrictions, and a skill-based jump difficulty check. If the
 jump fails, shows failure messages and optionally moves the player
 to a fail_dest room (falling/missing the landing).
-
-Called programmatically: call_verb(exit, 'move')
 
 Properties checked:
     closed     - Whether the exit is closed.
@@ -35,7 +31,6 @@ if locklist and not getattr(player, 'is_royal', None):
     else:
         player.msg((this.lockfail or 'You cannot pass.'))
         return
-# Jump check
 difficulty = this.difficulty or 0
 if difficulty > 0:
     skill_name = (this.skill or 'jump')
@@ -43,13 +38,11 @@ if difficulty > 0:
     import random
     roll = random.randint(1, 100)
     if roll > skill_val + (100 - difficulty):
-        # Failed the jump
         player.msg(this.fail or 'You try to jump &D but fail.', dob=this)
         if not player.invis:
             omsg = this.ofail
             if omsg:
                 player.location.msg_room(omsg, exclude=[player], sub=player, dob=this)
-        # Fall to fail_dest if set
         fail_dest = this.fail_dest
         if fail_dest and type(fail_dest) == int:
             fail_dest = db.get_object(fail_dest)

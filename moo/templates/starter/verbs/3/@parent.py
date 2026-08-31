@@ -16,9 +16,6 @@ if auth_level(pobj) < 3:
     pobj.msg("Do what?")
     return
 
-# Act as whoever typed this, not as the staff account that owns the verb.
-# See @set: without it a staff-owned command lends staff's rights to anyone
-# who can type it, and the ownership rules below never get a chance to apply.
 set_task_perms(caller_perms())
 
 if not dobj or prep != '=' or not iobj:
@@ -26,14 +23,12 @@ if not dobj or prep != '=' or not iobj:
     pobj.msg("       @parent #<start> to #<end> = <new_parent>")
     return
 
-# Resolve new parent
 candidates = list(pobj.contents) + list(pobj.location.contents)
 new_parent = bmatch(iobj.strip(), pobj, candidates, db)
 if not new_parent:
     pobj.msg(f"Parent '{iobj}' not found.")
     return
 
-# Check for range: #N to #N
 import re
 range_match = re.match(r'#(\d+)\s+to\s+#(\d+)', dobj.strip())
 
@@ -56,7 +51,6 @@ if range_match:
     if errors:
         pobj.msg(f"  {errors} object(s) skipped (not found or error).")
 else:
-    # Single object
     target = bmatch(dobj.strip(), pobj, candidates, db)
     if not target:
         pobj.msg(f"Object '{dobj}' not found.")

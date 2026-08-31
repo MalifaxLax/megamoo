@@ -34,15 +34,12 @@ target = pobj
 kind = None
 spec = (args or '').strip()
 
-# 'isa <parent>' off the end, by hand -- not a preposition the parser knows.
 at = spec.lower().rfind(' isa ')
 if at > 0:
     tail = spec[at + 5:].strip()
     candidates = list(pobj.location.contents) + list(pobj.contents)
     kind = bmatch(tail, pobj, candidates, db)
     if kind is None and tail.startswith('#') and tail[1:].isdigit():
-        # get_object raises for a number nobody holds, rather than
-        # returning None, so the report below never got reached.
         try:
             kind = db.get_object(int(tail[1:]))
         except Exception:
@@ -56,8 +53,6 @@ if spec:
     candidates = list(pobj.location.contents) + list(pobj.contents)
     target = bmatch(spec, pobj, candidates, db)
     if target is None and spec.startswith('#') and spec[1:].isdigit():
-        # get_object raises for a number nobody holds, rather than
-        # returning None, so the report below never got reached.
         try:
             target = db.get_object(int(spec[1:]))
         except Exception:
@@ -80,8 +75,6 @@ if not owned:
 if 'rooms' in switches:
     owned = [o for o in owned if o.is_room]
 if 'nowhere' in switches:
-    # Rooms have no location by nature, so they are not orphans and would
-    # drown out the ones that are.
     owned = [o for o in owned if not o.location and not o.is_room]
 
 if not owned:
@@ -90,8 +83,6 @@ if not owned:
 
 if 'count' in switches:
     rooms = sum(1 for o in owned if o.is_room)
-    # Same rule as /nowhere: a room has no location by nature and is not
-    # an orphan, so counting it as one would contradict the listing.
     homeless = sum(1 for o in owned if not o.location and not o.is_room)
     pobj.msg(f"{target.name} owns {len(owned)} object"
              f"{'' if len(owned) == 1 else 's'}: {rooms} room"
@@ -100,7 +91,6 @@ if 'count' in switches:
 
 pobj.msg(f"&<245>Owned by {target.name}:&n")
 
-# Rooms have no location, so grouping them by one says nothing.  List flat.
 if 'rooms' in switches:
     pobj.msg("")
     for obj in owned[:MAX_HITS]:
@@ -109,8 +99,6 @@ if 'rooms' in switches:
     pobj.msg(f"&<245>-- {len(owned)} room{'' if len(owned) == 1 else 's'}.&n")
     return
 
-# Group by location. A builder's things cluster where they were built, and
-# that is usually what is being looked for.
 groups = {}
 for obj in owned[:MAX_HITS]:
     loc = obj.location

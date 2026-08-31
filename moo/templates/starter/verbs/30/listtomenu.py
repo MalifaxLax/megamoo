@@ -1,9 +1,5 @@
 """
-listtomenu on $string_utils.
-
-Ported from `moo.string_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -36,17 +32,14 @@ def listtomenu(itemlist, prefix=''):
         for ind, elem in enumerate(itemlist):
             if not elem:
                 continue
-            # Capitalise the first letter of the item
             rname = elem[0].upper() + elem[1:]
             line = "{0}{1}{2}. {3}"
             if ind:
-                # Prepend newline for all items after the first
                 line = line.format('\n', prefix, str(ind + 1).rjust(2), rname)
             else:
                 line = line.format('', prefix, str(ind + 1).rjust(2), rname)
             menu += line
         return menu
-
 
 _a = kwargs.pop('_pyargs', None)
 

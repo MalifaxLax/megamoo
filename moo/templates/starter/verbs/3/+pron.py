@@ -26,8 +26,14 @@ pobj.msg("  &&pa / &&Pa = absolute   (his, hers, its, theirs)")
 pobj.msg("  &&pr / &&Pr = reflexive  (himself, herself, itself, themself)")
 pobj.msg("  Uppercase P = capitalize output.")
 pobj.msg("")
-pobj.msg("  Gender        &&ps    &&po    &&pp    &&pa      &&pr")
+_sr = (pobj.settings or {}).get('screenreader', False)
+if not _sr:
+    pobj.msg("  Gender        &&ps    &&po    &&pp    &&pa      &&pr")
 for gender, pronouns in pmap.items():
+    if _sr:
+        pobj.msg(f"  {gender}: ps {pronouns['ps']}, po {pronouns['po']}, "
+                 f"pp {pronouns['pp']}, pa {pronouns['pa']}, pr {pronouns['pr']}")
+        continue
     ps = pronouns['ps'].ljust(6)
     po = pronouns['po'].ljust(6)
     pp = pronouns['pp'].ljust(6)

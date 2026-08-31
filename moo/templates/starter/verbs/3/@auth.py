@@ -38,9 +38,6 @@ if auth_level(pobj) < 5:
     pobj.msg("Do what?")
     return
 
-# Act as whoever typed this. Granting authority is gm5, and the engine checks
-# the *actor's* level -- so without this the actor is #0, which owns the verb
-# and has no `auth` property of its own, and even a gm5 was refused.
 set_task_perms(caller_perms())
 
 GM_LEVELS = ['gm1', 'gm2', 'gm3', 'gm4', 'gm5']
@@ -50,14 +47,6 @@ if not dobj:
     pobj.msg(f"GM levels: {', '.join(GM_LEVELS)}")
     return
 
-# Not bmatch over the room: auth has nothing to do with where anybody is
-# standing.  Matching room contents meant granting to someone required
-# being next to them, and any object whose *name* contained a player's
-# name shadowed the player -- "a gem with Bramble" in your pack answered
-# to `@auth Bramble` and then raised E_PROPNF on its missing auth list.
-#
-# #N resolves directly; a bare name goes to the players table, which is
-# the register of who exists rather than of what is nearby.
 _spec = dobj.strip()
 target = None
 if _spec.startswith('#') and _spec[1:].isdigit():
@@ -77,8 +66,6 @@ if not target:
     pobj.msg(f"No player named '{_spec}'.")
     return
 
-# An auth list belongs to a character or an account.  Anything else that
-# happened to match is refused here rather than raising on the read.
 if 'auth' not in (target.properties or {}) and not hasattr(target, 'auth'):
     pobj.msg(f"&<245>#{target.objnum}:{target.name}&n has no auth list.")
     return
@@ -86,7 +73,6 @@ if 'auth' not in (target.properties or {}) and not hasattr(target, 'auth'):
 where = f"&<245>#{target.objnum}:{target.name}&n"
 held = list(target.auth or [])
 
-# --- Report, when there is nothing to grant -------------------------------
 if prep != '=' or not iobj:
     if held:
         pobj.msg(f"Auth for {where}: &<255>{', '.join(held)}&n")
@@ -97,7 +83,6 @@ if prep != '=' or not iobj:
         pobj.msg(f"{where} has &<245>no auth&n.")
     return
 
-# --- Grant ----------------------------------------------------------------
 wanted = [w.strip() for w in iobj.replace(';', ',').split(',')]
 wanted = [w for w in wanted if w]
 if not wanted:
@@ -107,9 +92,6 @@ if not wanted:
 added = []
 already = []
 for token in wanted:
-    # gm levels are matched case-insensitively; anything else is stored as
-    # typed, since a world's own gate may well be case-significant and this
-    # verb has no business deciding that.
     tok = token.lower() if token.lower() in GM_LEVELS else token
     if tok in held:
         already.append(tok)
@@ -118,9 +100,6 @@ for token in wanted:
     added.append(tok)
 
 if added:
-    # Appended in the order given, never re-sorted: sorting by gm level
-    # would have to decide where a world's own tokens go, and the obvious
-    # implementation -- keep the ones I recognise -- deletes them.
     target.auth = held
     sync_auth_flags(target)
     db.save_object(target)

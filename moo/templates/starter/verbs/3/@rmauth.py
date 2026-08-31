@@ -33,23 +33,12 @@ if auth_level(pobj) < 5:
     pobj.msg("Do what?")
     return
 
-# Act as whoever typed this. Granting authority is gm5, and the engine checks
-# the *actor's* level -- so without this the actor is #0, which owns the verb
-# and has no `auth` property of its own, and even a gm5 was refused.
 set_task_perms(caller_perms())
 
 GM_LEVELS = ['gm1', 'gm2', 'gm3', 'gm4', 'gm5']
 USAGE = ('Usage: @rmauth <player> = <auth>[, <auth> ...]'
          '   or  @rmauth <auth>[, <auth> ...] from <player>')
 
-# Which half is the player depends on which spelling was used: `=` puts
-# the target first, `from` puts it last.  Decided here, once, so the rest
-# of the verb does not care which was typed.
-# prep_match, not `prep == 'from'`: `prep` is the surface form the player
-# typed, not the canonical one.  `out of` and `fro` are both legal
-# spellings of `from` (globals.py maps a canonical to its aliases, with a
-# tuple giving a minimum length), and a bare string compare rejected them
-# with a usage message.
 if iobj and prep and prep_match(prep) == 'from':
     who, what = iobj, dobj
 elif prep == '=' and iobj:
@@ -62,14 +51,6 @@ if not who or not what:
     pobj.msg(USAGE)
     return
 
-# Not bmatch over the room: auth has nothing to do with where anybody is
-# standing.  Matching room contents meant granting to someone required
-# being next to them, and any object whose *name* contained a player's
-# name shadowed the player -- "a gem with Bramble" in your pack answered
-# to `@auth Bramble` and then raised E_PROPNF on its missing auth list.
-#
-# #N resolves directly; a bare name goes to the players table, which is
-# the register of who exists rather than of what is nearby.
 _spec = who.strip()
 target = None
 if _spec.startswith('#') and _spec[1:].isdigit():
@@ -89,8 +70,6 @@ if not target:
     pobj.msg(f"No player named '{_spec}'.")
     return
 
-# An auth list belongs to a character or an account.  Anything else that
-# happened to match is refused here rather than raising on the read.
 if 'auth' not in (target.properties or {}) and not hasattr(target, 'auth'):
     pobj.msg(f"&<245>#{target.objnum}:{target.name}&n has no auth list.")
     return
@@ -107,8 +86,6 @@ if not wanted:
 removed = []
 absent = []
 for token in wanted:
-    # Case-insensitive for gm levels, exact for anything else -- matching
-    # @auth, which stores a world's own tokens as typed.
     tok = token.lower() if token.lower() in GM_LEVELS else token
     if tok in held:
         held.remove(tok)

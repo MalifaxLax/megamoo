@@ -1,6 +1,4 @@
 """
-_rt verb on #1 (RootObject).
-
 Applies round time (action cooldown) to a character and starts the
 tick-down timer to count it off. Round time prevents the character
 from taking most actions until it expires.

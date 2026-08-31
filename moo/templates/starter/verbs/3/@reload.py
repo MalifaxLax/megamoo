@@ -51,7 +51,6 @@ if not args:
     pobj.msg("Usage: @reload <object>.<verb_name_or_path>  or  @reload all")
     return
 
-# Resolve base verb path from #39.moo_verb_path
 verb_path = getattr(db.get_object(39), 'moo_verb_path', None)
 if not verb_path:
     pobj.msg("#39.moo_verb_path is not set.")
@@ -59,7 +58,6 @@ if not verb_path:
 from moo.verb_loader import expand_verb_path
 base_path = expand_verb_path(verb_path)
 
-# --- @reload all ---
 if args.strip().lower() == 'all':
     updated = 0
     created = 0
@@ -86,11 +84,9 @@ if args.strip().lower() == 'all':
                 pobj.msg(f"&<196>Error reading {filepath}: {e}&n")
                 errors += 1
                 continue
-            # Skip empty/comment-only files
             stripped = '\n'.join(l for l in code.splitlines() if l.strip() and not l.strip().startswith('#'))
             if not stripped.strip():
                 continue
-            # Find existing verb
             matches = [v for v in obj.verbs if verb_name in v.names]
             if matches:
                 v = matches[0]
@@ -104,7 +100,6 @@ if args.strip().lower() == 'all':
                     errors += 1
                     continue
             else:
-                # Create new verb
                 try:
                     vd = VerbDef(names=[verb_name], code=code, owner=obj.owner, perms='rx')
                     obj.add_verb(vd)
@@ -117,7 +112,6 @@ if args.strip().lower() == 'all':
     pobj.msg(f"Reload all: &<245>{updated}&n updated, &<245>{created}&n created, &<196>{errors}&n errors.")
     return
 
-# --- Reload all verbs on one object: @reload #N ---
 dot = args.find('.')
 if dot < 0:
     obj_ref = args.strip()
@@ -178,8 +172,6 @@ if dot < 0:
     pobj.msg(f"Reload #{obj.objnum}: &<245>{updated}&n updated, &<245>{created}&n created, &<196>{errors}&n errors.")
     return
 
-# --- Single verb reload ---
-
 obj_ref = args[:dot].strip()
 verb_part = args[dot + 1:].strip()
 
@@ -187,7 +179,6 @@ if not obj_ref or not verb_part:
     pobj.msg("Usage: @reload <object>.<verb_name_or_path>")
     return
 
-# Resolve object
 if obj_ref.startswith('#') and obj_ref[1:].isdigit():
     try:
         obj = db.get_object(int(obj_ref[1:]))
@@ -200,17 +191,13 @@ else:
         pobj.msg(f"Object '{obj_ref}' not found.")
         return
 
-# Determine if verb_part is a path or a verb name
 if '/' in verb_part:
-    # Path form: derive verb name from last component
     verb_name = os.path.basename(verb_part)
     filepath = verb_part + '.py'
 else:
     verb_name = verb_part
     obj_dir = os.path.join(base_path, str(obj.objnum))
 
-    # If the per-object directory doesn't exist, create it and
-    # export all verbs on this object into it
     if not os.path.isdir(obj_dir):
         os.makedirs(obj_dir, exist_ok=True)
         exported = 0
@@ -227,16 +214,13 @@ else:
         if exported:
             pobj.msg(f"Created &<245>{obj_dir}&n — exported {exported} verb(s).")
 
-    # Primary: per-object directory
     filepath = os.path.join(obj_dir, verb_name + '.py')
 
-    # Fallback: flat directory
     if not os.path.isfile(filepath):
         flat = os.path.join(base_path, verb_name + '.py')
         if os.path.isfile(flat):
             filepath = flat
 
-# Read the file
 if not os.path.isfile(filepath):
     pobj.msg(f"File not found: {filepath}")
     return
@@ -247,7 +231,6 @@ except Exception as e:
     pobj.msg(f"Error reading file: {e}")
     return
 
-# Find the verb on the object, or create it
 matches = [v for v in obj.verbs if verb_name in v.names]
 if matches:
     v = matches[0]

@@ -14,8 +14,6 @@ if not args:
     pobj.msg("Put what?")
     return
 
-# Can the character act? do_wait covers roundtime as well as the
-# immobilising conditions, and emits its own message.
 if pobj.do_wait():
     return
 
@@ -23,7 +21,6 @@ if not prep:
     pobj.msg("Put it where?")
     return
 
-# Determine dispatch verb based on preposition
 dispatch = None
 if smatch('into', prep, 2) or smatch('inside', prep, 2) or prep == 'in':
     dispatch = 'in_put'
@@ -46,20 +43,17 @@ if not iobj:
     pobj.msg("Put it where?")
     return
 
-# Find the item in player's hands/inventory
 item = pmatch(dobj, pobj, list(pobj.contents))
 if not item:
     pobj.msg("You don't have that.")
     return
 
-# Find the container in room or inventory
 candidates = list(pobj.location.contents) + list(pobj.contents)
 container = pmatch(iobj, pobj, candidates)
 if not container:
     pobj.msg("You don't see that here.")
     return
 
-# Dispatch to container verb
 try:
     if not call_verb(container, dispatch, dobj=item):
         pobj.msg("You can't do that.")

@@ -8,7 +8,6 @@ the character from the room's plist.
 Hidden:  yes
 """
 
-# Clean up furniture/table state
 table_num = this.table
 if table_num:
     try:
@@ -22,10 +21,6 @@ if table_num:
         pass
     this.table = None
 
-# Remove from room plist
-# Objnums, and every occurrence -- see on_puppet.  This compared a
-# MOOObject against a list of ints too, so logging out never removed
-# anything and the room kept counting you after you had gone.
 _room = this.location
 if _room and this.is_char:
     _plist = [getattr(p, 'objnum', p) for p in (_room.plist or [])]

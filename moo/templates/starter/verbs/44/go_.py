@@ -1,11 +1,8 @@
 """
-go_ verb on #44 (Enter Game Portal).
-
 Handles the "enter game" portal in the OOC lobby. When a player goes
 through this portal, presents a menu of their completed characters
 and puppets them into the selected character.
 
-Called by the go verb: call_verb(exit, 'go_')
 Returns True to block normal exit traversal.
 
 Flow:
@@ -26,7 +23,6 @@ _globals = db.get_object(_g) if type(_g) == int else _g
 _dr = (_globals.ic_dropin_room or 200)
 DROPIN_ROOM = _dr.objnum if hasattr(_dr, 'objnum') else int(_dr)
 
-# Get character list
 chars = list(pobj.characters or [])
 completed = []
 for c in chars:
@@ -43,7 +39,6 @@ if not completed:
     result = True
     return
 
-# Display menu
 pobj.msg("")
 pobj.msg("&<245>=========&n")
 pobj.msg("Become...", sub=pobj, dob=dobj, iob=iobj)
@@ -70,7 +65,6 @@ while True:
 
     ichar = completed[slot - 1]
 
-    # Only set drop-in room if character has no valid last_location
     last_loc = ichar.last_location
     if hasattr(last_loc, 'objnum'):
         last_loc = last_loc.objnum
@@ -85,7 +79,6 @@ while True:
     pobj.msg(f"{GAME_ENTRY_MESSAGE}", sub=pobj, dob=dobj, iob=iobj)
     yield 2
 
-    # Announce departure
     if not pobj.invis:
         pobj.location.msg_room(f"{pobj.name} steps into the portal and vanishes.", exclude=[pobj], sub=pobj, dob=dobj, iob=iobj)
 

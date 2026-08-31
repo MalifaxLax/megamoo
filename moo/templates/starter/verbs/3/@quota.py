@@ -2,10 +2,7 @@
 Reports how much of the database a player has built.
 
 Usage: @quota
-       @quota <player>
-
-Arguments:
-    player - Whose usage to report.  Defaults to you.
+       @quota <player>   whose usage to report; defaults to you
 
 Auth: gm2+ (auth_level 2)
 
@@ -31,8 +28,6 @@ if spec:
     candidates = list(pobj.location.contents) + list(pobj.contents)
     target = bmatch(spec, pobj, candidates, db)
     if target is None and spec.startswith('#') and spec[1:].isdigit():
-        # get_object raises for a number nobody holds, rather than
-        # returning None, so the report below never got reached.
         try:
             target = db.get_object(int(spec[1:]))
         except Exception:
@@ -58,8 +53,6 @@ pobj.msg("")
 
 quota = getattr(target, 'quota', None)
 
-# A property set through the API arrives as a string, one set by @set as an
-# int.  Both mean the same thing to a person, so take either.
 if isinstance(quota, str) and quota.strip().lstrip('-').isdigit():
     quota = int(quota.strip())
 

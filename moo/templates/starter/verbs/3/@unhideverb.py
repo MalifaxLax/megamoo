@@ -35,7 +35,6 @@ if not target:
     pobj.msg(f"Object '{obj_part}' not found.")
     return
 
-# Find the verb (check all verbs including hidden ones)
 found = None
 for v in target.verbs:
     if verb_name in v.names:
@@ -43,7 +42,6 @@ for v in target.verbs:
         break
 
 if not found:
-    # Check inherited verbs
     current = target
     while current.parent:
         current = db.get_object(current.parent)

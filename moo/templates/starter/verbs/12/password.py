@@ -1,6 +1,4 @@
 """
-password verb on #12 (OOCRoom).
-
 Changes the player's account password. Prompts for confirmation to
 ensure the password was typed correctly.
 
@@ -18,11 +16,6 @@ if not args:
 
 pw1 = args
 
-# Yielded as the prompt rather than msg'd.  The engine suppresses echo
-# for a password prompt and emits the newline itself once the line comes
-# in, because the player's Enter was not echoed back either.  A prompt
-# carrying a newline of its own left that compensating one showing as a
-# blank line.
 pw2 = yield "Confirm new password: "
 pw2 = pw2.strip()
 

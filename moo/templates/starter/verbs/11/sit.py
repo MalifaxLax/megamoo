@@ -18,7 +18,6 @@ if pos != 0:
     return
 
 if dobj:
-    # Sit on/at a specific object
     slist = list(pobj.location.contents)
     target = pmatch(dobj, pobj, slist)
     if not target:
@@ -33,7 +32,6 @@ if dobj:
         pobj.msg("You can't sit on that.")
     return
 
-# Floor sit — check room permission
 room = pobj.location
 if not room.is_sittable:
     pobj.msg("You can't sit here.")

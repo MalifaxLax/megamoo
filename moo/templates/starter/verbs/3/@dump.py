@@ -49,8 +49,6 @@ if not spec:
 candidates = list(pobj.location.contents) + list(pobj.contents)
 target = bmatch(spec, pobj, candidates, db)
 if target is None and spec.startswith('#') and spec[1:].isdigit():
-    # get_object raises for a number nobody holds, rather than
-    # returning None, so the report below never got reached.
     try:
         target = db.get_object(int(spec[1:]))
     except Exception:
@@ -61,8 +59,6 @@ if target is None:
 
 raw = target.to_dict()
 
-# Relationships, not identity.  A dump loaded elsewhere would point these
-# at whatever happens to hold those numbers in the target database.
 for key in ('location', 'contents', 'children', 'created', 'last_move'):
     raw.pop(key, None)
 
@@ -85,7 +81,6 @@ if 'verbs' in switches:
             'code': v.code or '',
             'owner': v.owner or 0,
             'perms': v.perms or 'rx',
-            # Read off the VerbDef, not to_dict(), which omits these three.
             'auth': v.auth or 0,
             'hidden': bool(v.hidden),
             'min_lengths': dict(v.min_lengths or {}),
@@ -100,8 +95,6 @@ text = json.dumps(record, indent=2, sort_keys=True, default=str)
 if 'screen' in switches:
     pobj.msg("")
     for line in text.splitlines():
-        # Raw JSON on a colour-processing channel: % is the escape
-        # character, so it has to be doubled or the output is mangled.
         pobj.msg(line.replace('&', '&&'))
     return
 

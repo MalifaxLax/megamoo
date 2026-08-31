@@ -1,9 +1,6 @@
 """
-enter_func verb on #20 (BaseContainer).
-
-Hook called when a player enters this container (e.g., going into a
-large chest or wardrobe). Currently a stub -- override on child objects
-to add custom enter behavior.
+Hook fired when something enters this container.  A stub -- override it on a
+child to give entering an effect.
 
 Hidden:  yes
 """

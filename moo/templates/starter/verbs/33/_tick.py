@@ -1,6 +1,4 @@
 """
-_tick verb on #33 (effects_utils).
-
 Periodic ticker callback that drives the effects system. Called by the
 ticker system at regular intervals. Iterates through all registered
 effects in fx_registry, fires any that are due (next_fire <= now),
@@ -35,7 +33,6 @@ for key in list(registry):
     if now < e['next_fire']:
         continue
 
-    # Resolve target
     try:
         target = db.get_object(e['objnum'])
     except (KeyError, Exception):
@@ -45,7 +42,6 @@ for key in list(registry):
     e['tick'] += 1
     e['remaining'] -= 1
 
-    # Call do_{name} with target as pobj
     target_cv = make_call_verb(target, db)
     try:
         target_cv(this, f"do_{e['name']}",
@@ -53,13 +49,9 @@ for key in list(registry):
                   effect_args=e.get('args', []),
                   effect_kwargs=e.get('kwargs', {}))
     except KeyError:
-        expired.append(key)  # do_ verb doesn't exist
+        expired.append(key)
         continue
     except Exception as err:
-        # The comment said "log but don't cancel" and then did not log, so
-        # a failing effect handler ticked silently for as long as the
-        # effect lasted.  Not cancelling is still right -- one bad tick
-        # should not end an effect -- but it has to be visible.
         server_log(f"effect {key} tick failed: {err}", is_error=True)
 
     if e['remaining'] <= 0:

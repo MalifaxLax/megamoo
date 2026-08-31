@@ -20,15 +20,12 @@ Returns:
 Hidden:  yes
 """
 
-# Get the room's direction names and exit object list
 directions = this.directions
 exits = this.exits or []
 
 try:
-    # Find the index of the typed direction in the directions list
     enum = directions.index(argstr.strip().lower())
 except ValueError:
-    # Not a standard direction — try matching exit objects by name
     if exits:
         exit_objs = []
         for ex in exits:
@@ -42,18 +39,15 @@ except ValueError:
                 return exit
     return None
 
-# Normalize aliases: directions 12+ are abbreviations of 0-11
 if enum > 11:
     enum -= 12
 
-# Map cardinal directions (0-3) to their opposite index for reverse lookups
 if enum < 4:
     onum = enum + 12
 else:
     onum = enum
 oname = directions[onum]
 
-# Resolve exit objnums to objects for name matching
 if exits:
     exit_objs = []
     for ex in exits:
@@ -65,7 +59,6 @@ if exits:
     if exit:
         return exit
 
-# Fall back to virtual directional exits (dexits) list
 dexits = this.dexits
 if dexits and enum < len(dexits) and dexits[enum]:
     return enum

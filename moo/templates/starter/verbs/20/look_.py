@@ -1,6 +1,4 @@
 """
-look_ verb on #20 (BaseContainer).
-
 What `look <container>` shows: the container itself. Its description, and
 whether it is shut -- which you can see from outside without opening it.
 
@@ -21,9 +19,6 @@ Hidden:  yes
 desc = this.description
 pobj.msg(desc if desc else "You see nothing special.")
 
-# Shut-ness is visible from outside, so it belongs to looking at the
-# thing rather than into it.  Nothing is said when it is open: that is the
-# ordinary state, and a line per container adds up in a full room.
 if not this.open:
     pobj.msg("&D is closed.", dob=this)
 

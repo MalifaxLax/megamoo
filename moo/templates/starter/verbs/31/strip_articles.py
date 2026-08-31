@@ -1,16 +1,10 @@
 """
-strip_articles on $match_utils.
-
-Ported from `moo.match_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
 
 _ARTICLES = frozenset({'the', 'a', 'an', 'some'})
-
-
 
 def strip_articles(text: str) -> str:
     """
@@ -39,13 +33,11 @@ def strip_articles(text: str) -> str:
     """
     first_space = text.find(' ')
     if first_space == -1:
-        # Single word -- nothing to strip
         return text
     first_word = text[:first_space].casefold()
     if first_word in _ARTICLES:
         return text[first_space + 1:]
     return text
-
 
 _a = kwargs.pop('_pyargs', None)
 

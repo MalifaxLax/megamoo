@@ -24,7 +24,6 @@ if auth_level(pobj) < 3:
     return
 
 if 'list' in switches:
-    # @freeon/list — display all ranges of reserved unused object numbers
     def obj_exists(n):
         try:
             return db.get_object(n) is not None
@@ -35,7 +34,6 @@ if 'list' in switches:
     if not unused_reserved:
         pobj.msg("No reserved unused object numbers.")
         return
-    # Collapse into ranges
     ranges = []
     rstart = unused_reserved[0]
     prev = rstart
@@ -58,7 +56,6 @@ if 'list' in switches:
     return
 
 elif 'set' in switches:
-    # @freeon/set <start> to <end> — store a range of already-reserved numbers
     if not dobj or prep != 'to' or not iobj:
         pobj.msg("Usage: @freeon/set <start> to <end>")
         return
@@ -79,7 +76,6 @@ elif 'set' in switches:
     pobj.msg(f"Set free_obj range to #{start}-#{end} ({count} objects).")
 
 elif 'clear' in switches:
-    # @freeon/clear
     if not pobj.free_obj:
         pobj.msg("No free_obj range set.")
         return
@@ -87,7 +83,6 @@ elif 'clear' in switches:
     pobj.msg("Cleared free_obj range.")
 
 else:
-    # @freeon — unreserve unused numbers in range
     frange = pobj.free_obj
     if not frange:
         pobj.msg("No free_obj range set. Use @freeon/set <start> to <end> first.")
@@ -107,7 +102,6 @@ else:
         db._conn.execute(
             "DELETE FROM reserved_objects WHERE objnum = ?", (n,)
         )
-        # Add to recycled_objects so create() picks them up next
         db._index.recycled_objects.add(n)
         db._conn.execute(
             "INSERT OR IGNORE INTO recycled_objects (objnum) VALUES (?)", (n,)

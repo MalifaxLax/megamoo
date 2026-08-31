@@ -41,8 +41,6 @@ if not dobj or prep != '=' or not iobj:
 want = dobj.strip()
 new_name = iobj.strip()
 
-# Accept #100 or the name it logs in with. Accounts are not in the room or
-# anybody's inventory, so the usual matcher has nothing to search.
 target = None
 if want.startswith('#') and want[1:].isdigit():
     try:
@@ -63,7 +61,6 @@ if target.parent != 4:
              f"@rname renames children of #4; use @name for anything else.")
     return
 
-# --- Is it a name at all? The rules character generation already applies.
 if len(new_name) < 3:
     pobj.msg("Too short. Must be at least 3 characters.")
     return
@@ -77,9 +74,6 @@ if not re.match(r"^[A-Za-z'-]+$", new_name):
     pobj.msg("Only letters, apostrophes, and hyphens allowed.")
     return
 
-# The world's bad-name list lives with character generation, the only other
-# place a name gets chosen. Missing is not an error: a world that keeps no
-# list simply refuses nothing here.
 badnames = []
 try:
     badnames = list(get_object(43).bad_names or [])
@@ -89,7 +83,6 @@ if new_name.lower() in [b.lower() for b in badnames]:
     pobj.msg("I don't think so.")
     return
 
-# --- Is the login free?
 taken = db.get_player(new_name)
 if taken is not None and taken != target.objnum:
     pobj.msg(f"'{new_name}' is already the login name of &<245>#{taken}&n.")
@@ -98,19 +91,13 @@ if taken is not None and taken != target.objnum:
 old_name = target.name
 old_login = db.get_player(old_name)
 
-# su.capitalise, not str.capitalize: the pattern above admits apostrophes
-# and hyphens, and capitalize() lowercases everything after the first
-# letter -- it turns "MacLeod" into "Macleod" and "O'Brien" into "O'brien".
 new_name = su.capitalise(new_name)
 
 target.noun = new_name
-target.name_mod_list = ['', '', '', '', '']   # proper noun: no article
+target.name_mod_list = ['', '', '', '', '']
 target._title()
 db.save_object(target)
 
-# Move the login with it. Remove first: the index is keyed on the name, so
-# adding before removing would leave the old key pointing at this object
-# and both names would go on working.
 if old_login == target.objnum:
     db.remove_player(old_name)
 db.add_player(new_name, target.objnum)

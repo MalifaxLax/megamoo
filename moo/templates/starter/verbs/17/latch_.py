@@ -1,6 +1,5 @@
 """
 latch_ on #17 (ClosableGoExit)
-Called by room verbs: call_verb(target, 'latch_')
 Latches this exit. Checks latchable, closed, already latched.
 Sets latched=True on this and reverse exit.
 
@@ -20,16 +19,12 @@ if this.latched:
     return
 
 this.set_property('latched', True, db)
-# getattr like its three siblings above: `latch` is declared nowhere,
-# so this crashed the moment a builder set latchable=True -- the one
-# path that reaches it.
 player.msg(getattr(this, 'latch', None) or 'You latch &d.', dob=this)
 if not player.invis:
     omsg = getattr(this, 'olatch', None)
     if omsg:
         pobj.location.msg_room(omsg, exclude=[pobj], sub=pobj, dob=this)
 
-# Latch reverse exit too
 _rev = this.reverse
 if _rev and type(_rev) == int:
     _rev = db.get_object(_rev)

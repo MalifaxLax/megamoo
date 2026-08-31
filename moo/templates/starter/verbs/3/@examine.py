@@ -45,7 +45,6 @@ if target.contents:
     pobj.msg(f"  Contents: {', '.join(clist)}")
 pobj.msg(f"&<245>--- Properties ---")
 
-# Show only local properties (defined or overridden on this object)
 for prop_name in sorted(target.properties.keys()):
     try:
         val = target.properties[prop_name].value
@@ -56,7 +55,6 @@ for prop_name in sorted(target.properties.keys()):
     if len(val_str) > 200:
         val_str = val_str[:200] + '...'
 
-    # Escape % so stored esub/color tokens (%i, %r, %n...) display literally
     pobj.msg(f"  .{prop_name} = {val_str.replace('&', '&&')}")
 
 if target.verbs:

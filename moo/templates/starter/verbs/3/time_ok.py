@@ -1,15 +1,7 @@
 """
-time_ok verb on #3 (Base_Character).
-
 Checks whether the character is currently in round time (action cooldown).
 If round time is active, notifies the player of the remaining wait and
 returns False. Otherwise returns True to indicate the character can act.
-
-Called programmatically: call_verb(pobj, 'time_ok')
-
-Returns:
-    False - Character has round time remaining; a wait message is sent.
-    True  - Character is free to act.
 
 Hidden:  yes
 """

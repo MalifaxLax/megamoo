@@ -36,14 +36,12 @@ if not dobj:
     pobj.msg('Example: @make/drop chest = sack')
     return
 
-# Resolve the parent object
 candidates = list(pobj.location.contents) + list(pobj.contents)
 parent = bmatch(dobj, pobj, candidates, db)
 if not parent:
     pobj.msg(f"Parent object '{dobj}' not found.")
     return
 
-# Determine the owner (default: the caller)
 owner = pobj
 if prep2 == 'with' and dobj2:
     owner = bmatch(dobj2, pobj, candidates, db)
@@ -51,11 +49,9 @@ if prep2 == 'with' and dobj2:
         pobj.msg(f"Owner '{dobj2}' not found.")
         return
 
-# Create the new object with the specified parent and owner
 new_name = iobj.strip() if prep == '=' and iobj else None
 new_obj = ou.make_object(parent, db, pobj, noun=new_name, owner=owner)
 
-# Place the object: in room (/drop) or in inventory (default)
 if 'drop' in switches:
     new_obj.move_to(pobj.location, db)
     pobj.msg(f"Created &<245>#{new_obj.objnum}:{new_obj.name}&n, dropped here.")

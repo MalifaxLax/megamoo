@@ -45,15 +45,11 @@ if not room or not room.is_room:
     pobj.msg("You must be in a room to create an exit.")
     return
 
-# Parse exit name from dobj
 name = dobj.strip() if dobj else args.strip().split()[0]
 if not name:
     pobj.msg("You must provide a name for the exit.")
     return
 
-# A trailing direction on the name -- "door east" -- is the bearing, not
-# part of the name. Read off the end so `@gopen crack` still makes an
-# exit called "crack" and nothing else has to change.
 bearing_word = ''
 if ' ' in name:
     head, _, tail = name.rpartition(' ')
@@ -61,7 +57,6 @@ if ' ' in name:
     if head and _cd(tail):
         name, bearing_word = head.strip(), tail.strip()
 
-# Parse destination if provided
 dest = None
 dest_str = iobj.strip() if iobj else ''
 if dest_str and dest_str.startswith('#') and dest_str[1:].isdigit():
@@ -76,25 +71,9 @@ if dest_str and dest_str.startswith('#') and dest_str[1:].isdigit():
 elif dest_str:
     pobj.msg("Please supply a valid destination ID (#N). Exit not linked.")
 
-# Create the exit via make_exit
 parent = db.get_object(16)
 new_exit = ou.make_exit(parent, db, pobj, noun=name, room=room, dest=dest)
 
-# /noadd -- an exit only something else can reach.
-#
-# make_exit does two things: it moves the exit into the room and it lists
-# the objnum in room.exits.  Both have to be undone, because either one on
-# its own still leaves the exit walkable by name.  room.exits is what
-# match_exit searches, and it resolves those numbers straight to objects
-# without ever looking at where they are -- an exit moved inside another
-# object went on answering to `go <name>` exactly as before.  And #13 go
-# falls back to matching room.contents when match_exit finds nothing, so
-# an exit merely dropped from the list is still reachable if it is lying
-# in the room.
-#
-# Out of both, the exit is reachable only from a property that names it:
-# <object>.behind_exit and its in_/on_/under_/through_ siblings.  gmove
-# only reads destination, so nowhere is a perfectly good place to be.
 if 'noadd' in switches:
     room.exits = [n for n in (room.exits or []) if n != new_exit.objnum]
     room._mark_modified()
@@ -106,13 +85,6 @@ if 'noadd' in switches:
 
 from moo.roommap import canonical_direction, place_relative, _opposite
 
-# A bearing, if one was given.
-#
-# A go-exit is a named thing you walk through, so nothing about it says
-# which way it goes -- and the mapper cannot draw what nobody stated. It
-# used to guess, and drew a staircase as a step south and a door the game
-# calls east pointing west. Stating it is the fix; leaving it blank is
-# still correct for a front door, which genuinely has no compass bearing.
 bearing = canonical_direction(bearing_word) if bearing_word else None
 if bearing_word and not bearing:
     pobj.msg(f"'{bearing_word}' is not a direction; the exit has no bearing.")
@@ -123,19 +95,14 @@ if bearing:
 if dest:
     pobj.msg(f"Exit linked to: &<245>#{dest.objnum}:{dest.name}&n")
 
-    # Create return exit unless /noret switch is set
     if 'noret' not in switches:
         ret_exit = ou.make_exit(parent, db, pobj, noun=name,
                                 room=dest, dest=room)
 
-        # Cross-link the exits via rexit property
         new_exit.add_property('rexit', ret_exit.objnum, perms='rc')
         ret_exit.add_property('rexit', new_exit.objnum, perms='rc')
         new_exit._mark_modified()
 
-        # The way back is the way out, reversed. Setting it here is what
-        # keeps a pair from contradicting itself the way #5012 and #5013
-        # do, where both sides of one doorway claim to lead east.
         back = _opposite(bearing) if bearing else None
         if back:
             ret_exit.add_property('direction', back, perms='rc')

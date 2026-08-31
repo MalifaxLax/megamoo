@@ -1,6 +1,4 @@
 """
-_sub_token on $string_utils.
-
 A helper the ported verbs call, and the piece the first port left behind.
 `get_pronoun`, `psub1`, `psub1a`, `psub2` and `psub2a` were emitted calling
 `call_verb(this, '_sub_token', ...)` -- the plan's rule for a helper more than one
@@ -42,14 +40,8 @@ def _sub_token(text: str, letter: str, value: str) -> str:
     Returns:
         str: The text with every ``<sigil><letter>`` replaced.
     """
-    # A numeric slot also has to refuse a following digit, or `&1` would
-    # bite into `&10`.  (The caller sorts high-index-first as well; belt
-    # and braces, since only one of the two is obvious at a glance.)
     tail = r'(?![A-Za-z0-9])' if letter[-1].isdigit() else r'(?![A-Za-z])'
     for sigil in SUBST_SIGILS:
-        # A lambda for the replacement, not the string: `value` is a
-        # player-supplied name, and re.sub reads backslashes in a literal
-        # replacement as group references.
         text = re.sub(re.escape(sigil + letter) + tail, lambda _: value, text)
     return text
 

@@ -20,7 +20,6 @@ if _objnum:
     _obj = db.get_object(_objnum)
     if _obj.is_char:
         _plist = list(this.plist or [])
-        # Normalise: older worlds may hold objects here as well as ints.
         _plist = [getattr(p, 'objnum', p) for p in _plist]
         if _objnum not in _plist:
             _plist.append(_objnum)

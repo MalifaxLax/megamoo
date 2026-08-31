@@ -38,8 +38,6 @@ if not args or not args.strip():
 
 MAX_HITS = 200
 
-# 'on <object>' narrows the search. Split by hand: 'on' is a preposition
-# the parser knows, but the search text itself may contain one.
 needle = args.strip()
 scope = None
 _low = needle.lower()
@@ -53,7 +51,6 @@ if _at > 0:
             scope = found
             needle = needle[:_at].strip()
 
-# Strip surrounding quotes, so a phrase can be given as "like this".
 if len(needle) >= 2 and needle[0] == needle[-1] and needle[0] in ('"', "'"):
     needle = needle[1:-1]
 
@@ -80,8 +77,6 @@ def hit(text):
         return matcher.search(text) is not None
     return (needle in text) if cased else (needle.lower() in text.lower())
 
-# Walk objects. Verbs live on objects, so there is no verb table to query
-# from in here -- iterate what the database will hand us.
 objnums = [scope.objnum] if scope else range(0, (max_object() or 0) + 1)
 
 lines = []

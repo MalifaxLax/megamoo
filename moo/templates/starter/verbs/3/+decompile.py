@@ -26,20 +26,17 @@ if auth_level(pobj) < 3:
 
 raw = args
 
-# Validate input: must contain a dot to separate object from verb name
 if not raw or '.' not in raw:
     pobj.msg("Usage: +decompile <object>.<verb_name>")
     pobj.msg("Example: +decompile #29.eval")
     return
 
-# Split object reference from verb name at the last dot
 obj_part, verb_name = raw.strip().rsplit('.', 1)
 verb_name = verb_name.strip()
 if not verb_name:
     pobj.msg("No verb name specified.")
     return
 
-# Build candidate list and match the target object
 candidates = list(pobj.contents)
 if pobj.location:
     candidates += list(pobj.location.contents)
@@ -48,7 +45,6 @@ if not target:
     pobj.msg(f"Object '{obj_part}' not found.")
     return
 
-# Search for the verb by name on the target object
 found = None
 for v in target.verbs:
     if verb_name in v.names:
@@ -58,7 +54,6 @@ if not found:
     pobj.msg(f"Verb '{verb_name}' not found on &<245>#{target.objnum}:{target.name}&n.")
     return
 
-# Display verb header (names and permissions) and source code
 names = ", ".join(found.names)
 pobj.msg(f"&W#{target.objnum}:{target.name}.{names}&n  perms={found.perms}")
 code = found.code
@@ -68,13 +63,6 @@ if not code or not code.strip():
 
 lines = code.splitlines()
 
-# /body: the code that runs, without the provenance around it.  An
-# imported verb carries a docstring saying where it came from and a copy
-# of the original MOO at the foot, which together are usually most of the
-# file -- and neither is what you are looking at when something is wrong.
-#
-# The line numbers stay absolute, because the # PORT: notes cite absolute
-# numbers and renumbering a trimmed view would make them point at nothing.
 first, last = 1, len(lines)
 if 'body' in switches:
     if lines and lines[0].startswith('"""'):
@@ -82,8 +70,6 @@ if 'body' in switches:
             if lines[i].rstrip().endswith('"""'):
                 first = i + 2
                 break
-    # Step over blank lines so the view opens on something.  The gap
-    # between the docstring and the code is a separator, not content.
     while first <= len(lines) and not lines[first - 1].strip():
         first += 1
     for i, line in enumerate(lines, 1):
@@ -94,8 +80,6 @@ if 'body' in switches:
 width = len(str(last))
 for n in range(first, last + 1):
     line = lines[n - 1]
-    # Escape % or the output goes through esub and %i turns into inverse
-    # video -- the same trap that bit the raw-value display in @ex.
     shown = line.replace('&', '&&')
     if 'line' in switches:
         pobj.msg(f"&<245>{n:>{width}}&n {shown}")

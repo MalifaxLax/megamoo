@@ -39,7 +39,6 @@ import time
 
 CHECKPOINT_GLOB = 'checkpoint_'
 
-
 def _checkpoints(directory):
     """Existing checkpoint files, newest last, with their sizes."""
     try:
@@ -56,7 +55,6 @@ def _checkpoints(directory):
             out.append((n, 0))
     return out
 
-
 def _size(n):
     """Bytes as something a person can read."""
     for unit in ('B', 'KB', 'MB', 'GB'):
@@ -65,10 +63,6 @@ def _size(n):
         n /= 1024.0
     return f'{n:.1f}GB'
 
-
-# The guard, not just the docstring.  The verb's auth value gates the
-# command parser; this stops it being reached through call_verb, which
-# the value does not cover.
 if auth_level(pobj) < 4:
     pobj.msg('You are not authorized to do that.')
     return
@@ -99,9 +93,6 @@ except Exception as err:
     return
 elapsed = time.time() - started
 
-# checkpoint() returns nothing, so the new file is found by comparing the
-# directory rather than by being told -- which also catches the case where
-# it silently did nothing, as it does in readonly mode.
 after = _checkpoints(directory)
 fresh = [c for c in after if c not in before]
 

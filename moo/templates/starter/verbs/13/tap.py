@@ -10,8 +10,6 @@ Examples:
     tap barrel      - Tap an object
 """
 
-# Can the character act? do_wait covers roundtime as well as the
-# immobilising conditions, and emits its own message.
 if pobj.do_wait():
     return
 
@@ -20,7 +18,6 @@ if not dobj:
     pobj.location.msg_room("&S taps &pp foot impatiently.", exclude=[pobj], sub=pobj)
     return
 
-# Match in hands, room
 mh = pobj.mh
 oh = pobj.oh
 slist = list(pobj.location.contents)

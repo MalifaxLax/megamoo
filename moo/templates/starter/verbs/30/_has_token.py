@@ -1,6 +1,4 @@
 """
-_has_token on $string_utils.
-
 A helper the ported verbs call, and the piece the first port left behind.
 `get_pronoun`, `psub1`, `psub1a`, `psub2` and `psub2a` were emitted calling
 `call_verb(this, '_has_token', ...)` -- the plan's rule for a helper more than one

@@ -24,35 +24,24 @@ if not room or not room.is_room:
     pobj.msg("You can't go anywhere from here.")
     return
 
-# Can the character act? do_wait covers roundtime as well as the
-# immobilising conditions, and emits its own message.
-#
-# IC only. The #11 and #12 copies of this verb are deliberately left
-# ungated so that roundtime from a fight never strands anyone in an
-# out-of-character room.
 if pobj.do_wait():
     return
 
-# Check if the player is in a position that prevents movement
 pos = pobj.position or 0
 if pos:
     pobj.msg("You can't do that in your current position.")
     return
 
-# Use the room's match_exit verb to find the exit
 exit = call_verb(room, 'match_exit', argstr=verb)
 
 if exit is None:
     pobj.msg("You can't go that way.")
 elif type(exit) == int:
-    # Virtual exit — delegate to #15 DirectionalExit's vmove
     call_verb(db.get_object(15), 'vmove', enum=exit)
 else:
-    # Climbable/jumpable exits require specific commands
     if exit.climbable:
         pobj.msg("You have to climb that!")
     elif exit.jumpable:
         pobj.msg("You have to jump that!")
     else:
-        # Object exit — call its invoke verb (checks closed, then gmove)
         call_verb(exit, 'invoke')

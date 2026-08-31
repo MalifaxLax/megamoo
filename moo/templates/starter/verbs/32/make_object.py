@@ -1,9 +1,5 @@
 """
-make_object on $obj_utils.
-
-Ported from `moo.object_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -37,7 +33,6 @@ def _call_title(obj: 'MOOObject', db: 'Database', pobj: 'MOOObject'):
     except Exception:
         pass
 
-    # Fallback: inline the _title logic if no verb context is available
     _inline_title(obj)
 
 def _set_property(obj: 'MOOObject', prop_name: str, value):
@@ -79,12 +74,10 @@ def _inline_title(obj: 'MOOObject'):
     Args:
         obj: The object whose title needs to be rebuilt.
     """
-    # Read the name_mod_list from local properties
     nml_val = None
     if 'name_mod_list' in obj.properties:
         nml_val = obj.properties['name_mod_list'].value
 
-    # Ensure nml is always a 5-element list
     if nml_val:
         nml = list(nml_val)
         while len(nml) < 5:
@@ -92,13 +85,11 @@ def _inline_title(obj: 'MOOObject'):
     else:
         nml = ['', '', '', '', '']
 
-    # Decompose the name_mod_list
     article = (nml[0] or '').strip()
     adjs = [a.strip() for a in nml[1:4] if a and a.strip()]
     trailer = (nml[4] or '').strip()
     noun = (obj.noun or '').strip()
 
-    # Auto-correct a/an based on the first letter of the next word
     if article.lower() in ('a', 'an'):
         first_word = adjs[0] if adjs else noun
         if first_word and first_word[0].lower() in 'aeiou':
@@ -107,13 +98,11 @@ def _inline_title(obj: 'MOOObject'):
             article = 'a' if article[0].islower() else 'A'
         nml[0] = article
 
-    # Build the display name: "a rusty old sword"
     parts = [p for p in [article] + adjs + [noun] if p]
     name = ' '.join(parts)
     if trailer:
         name = f'{name} {trailer}'
 
-    # Update the object
     obj.name = name
     _set_property(obj, 'name_mod_list', nml)
 
@@ -140,11 +129,9 @@ def _get_property_value(obj: 'MOOObject', prop_name: str, db: 'Database' = None)
         The property value, or ``None`` if not found anywhere in the
         inheritance chain.
     """
-    # Check local properties first (fast path)
     if prop_name in obj.properties:
         return obj.properties[prop_name].value
 
-    # If no database was provided, try to get one from the verb context
     if db is None:
         try:
             from .verb_context import verb_ctx
@@ -154,10 +141,9 @@ def _get_property_value(obj: 'MOOObject', prop_name: str, db: 'Database' = None)
         except Exception:
             pass
 
-    # Walk the parent chain looking for an inherited property
     if db is not None:
         parent_num = obj.parent
-        visited = {obj.objnum}  # Track visited objects to prevent cycles
+        visited = {obj.objnum}
         while parent_num and parent_num not in visited:
             visited.add(parent_num)
             try:
@@ -169,8 +155,6 @@ def _get_property_value(obj: 'MOOObject', prop_name: str, db: 'Database' = None)
             parent_num = parent_obj.parent
 
     return None
-
-
 
 def make_object(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
                 noun: Optional[str] = None,
@@ -218,14 +202,12 @@ def make_object(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
     owner_obj = owner or pobj
     new_obj = db.create_object(parent=parent.objnum, owner=owner_obj.objnum)
 
-    # Copy name_mod_list from parent, defaulting to ['a', '', '', '', '']
     parent_nml = _get_property_value(parent, 'name_mod_list', db)
     if parent_nml is not None:
         nml = list(parent_nml)
     else:
         nml = ['a', '', '', '', '']
 
-    # Set the noun -- either the provided noun or the parent's noun
     if noun is not None:
         new_obj.noun = noun
     else:
@@ -233,15 +215,12 @@ def make_object(parent: 'MOOObject', db: 'Database', pobj: 'MOOObject',
 
     _set_property(new_obj, 'name_mod_list', nml)
 
-    # Call _title to build the display name from noun + name_mod_list
     _call_title(new_obj, db, pobj)
 
-    # Fire the object_creation hook
     from moo.hooks import fire_hook
     fire_hook('object_creation', new_obj)
 
     return new_obj
-
 
 _a = kwargs.pop('_pyargs', None)
 

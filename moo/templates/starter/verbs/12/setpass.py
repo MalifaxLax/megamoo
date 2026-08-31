@@ -12,10 +12,6 @@ if not args:
     pobj.msg("Usage: setpass <new password>  (%s)" % password_rule())
     return
 
-# The same rule account creation applies, from the same function.  This
-# verb used to check only that the two entries matched -- so it would set
-# a blank password on an existing account, and check_password refuses an
-# empty hash, which locked the account out of itself.
 problem = password_problem(args)
 if problem:
     pobj.msg(problem)
@@ -23,11 +19,6 @@ if problem:
 
 pw1 = args
 
-# Yielded as the prompt rather than msg'd.  The engine suppresses echo
-# for a password prompt and emits the newline itself once the line comes
-# in, because the player's Enter was not echoed back either.  A prompt
-# carrying a newline of its own left that compensating one showing as a
-# blank line.
 pw2 = yield "Confirm new password: "
 pw2 = pw2.strip()
 

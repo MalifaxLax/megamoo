@@ -41,8 +41,6 @@ if target.lower() == 'all':
     killed = []
     failed = []
     for t in tasks:
-        # Skip whatever is running this command; killing it would abort
-        # the report before it is sent.
         if t['state'] == 'running' and t['player'] == pobj.objnum:
             continue
         if kill_task(t['id']):

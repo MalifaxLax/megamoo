@@ -1,6 +1,4 @@
 """
-_pronoun_map on $string_utils.
-
 A helper the ported verbs call, and the piece the first port left behind.
 `get_pronoun`, `psub1`, `psub1a`, `psub2` and `psub2a` were emitted calling
 `call_verb(this, '_pronoun_map', ...)` -- the plan's rule for a helper more than one
@@ -16,11 +14,6 @@ Type:    function
 
 from moo.globals import GENDER_PRONOUN_MAP
 
-# _getprop carried in rather than dispatched: it is ten lines, and the plan
-# inlines a shared helper at or under that.  It is also its own verb, for
-# psub1 and friends, which is the one place two copies are the right answer
-# -- this one is the same source, carried the way the porter carries any
-# helper into the verb that uses it.
 def _getprop(obj, name, default=None):
     """
     Safely retrieve an attribute from a MegaMOO object.
@@ -44,7 +37,6 @@ def _getprop(obj, name, default=None):
         return val if val is not None else default
     except Exception:
         return default
-
 
 def _pronoun_map(obj):
     """

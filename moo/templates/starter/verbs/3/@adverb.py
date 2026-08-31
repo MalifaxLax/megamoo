@@ -47,30 +47,19 @@ if auth_level(pobj) < 3:
 
 import re
 
-# Parse argstr, the full unsplit argument string, rather than the
-# parser's dobj/prep/iobj.
-#
-# '=' is a preposition, so `@adverb #3.x with rx auth=3` was split at the
-# '=' before this verb ran: prep was '=', never 'with', and the whole
-# remainder arrived as one blob that became the verb's *name*.  It
-# created `x with rx auth=3` and reported success.  Reading argstr sees
-# what was typed, so options containing '=' work as documented.
 raw = (argstr or '').strip()
 head, sep, tail = raw.partition(' with ')
 spec = head.strip()
 opts = tail.strip() if sep else ''
 
-# Validate input: must contain a dot to separate object from verb name(s)
 if not spec or '.' not in spec:
     pobj.msg('Usage: @adverb <object>.<name[(min)][,...]> [with <perms> [base] [min=N] [auth=N]]')
     pobj.msg('Example: @adverb #43.look,l')
     pobj.msg('Example: @adverb #2.examine(3),look(1),l')
     pobj.msg('Example: @adverb #2.examine,x with rx min=3')
 else:
-    # Split object reference from verb name(s) at the last dot
     obj_part, name_part = spec.rsplit('.', 1)
 
-    # Build candidate list and match the target object
     candidates = list(pobj.contents)
     if pobj.location:
         candidates += list(pobj.location.contents)
@@ -78,14 +67,12 @@ else:
     if not target:
         pobj.msg(f"Object '{obj_part}' not found.")
     else:
-        # Parse comma-separated verb names, each optionally with (min_length)
         raw_names = [n.strip() for n in name_part.split(',') if n.strip()]
         names = []
         pat = re.compile(r'^(.+?)\((\d+)\)$')
         for rn in raw_names:
             m = pat.match(rn)
             if m:
-                # Name with explicit min abbreviation length
                 names.append((m.group(1), int(m.group(2))))
             else:
                 names.append(rn)
@@ -93,7 +80,6 @@ else:
         if not names:
             pobj.msg('No verb name specified.')
         else:
-            # Parse options: perms string, base flag, global min
             perms = 'rx'
             ptype = 'moo.verb_types.MasterVerb'
             mn = None
@@ -103,10 +89,6 @@ else:
                     if p == 'base':
                         ptype = 'moo.verb_types.BaseVerb'
                     elif p.startswith('min='):
-                        # Reported, not raised. An unguarded int() died on
-                        # the server's generic handler, so a typo answered
-                        # "Do what?" -- which reads as "no such command"
-                        # rather than "that is not a number".
                         if not p[4:].isdigit():
                             pobj.msg("min= wants a number, not '%s'." % p[4:])
                             return
@@ -119,18 +101,12 @@ else:
                     elif p and all(c in 'rwxdc' for c in p):
                         perms = p
                     else:
-                        # Anything unrecognised used to become the perms
-                        # string in silence: `with rwx junk` set perms to
-                        # 'junk' and the verb looked fine until something
-                        # tried to honour it.
                         pobj.msg("I don't know the option '%s'." % p)
                         return
 
-            # Add the verb to the target object
             is_hidden = 'hidden' in switches or 'hide' in switches
             add_verb(target, names, perms=perms, parent_type=ptype, min=mn, hidden=is_hidden, auth=auth_val)
 
-            # Ensure per-object directory exists and write verb file
             import os
             verb_path = getattr(db.get_object(39), 'moo_verb_path', None)
             if verb_path:
@@ -139,7 +115,6 @@ else:
                 obj_dir = os.path.join(base_path, str(target.objnum))
                 if not os.path.isdir(obj_dir):
                     os.makedirs(obj_dir, exist_ok=True)
-                    # Export all existing verbs on this object
                     for v in target.verbs:
                         vn = v.names[0] if v.names else None
                         if vn and v.code:
@@ -148,7 +123,6 @@ else:
                                     f.write(v.code)
                             except Exception:
                                 pass
-                # Write a stub file for the new verb
                 primary = names[0]
                 vn = primary[0] if isinstance(primary, tuple) else primary
                 stub_path = os.path.join(obj_dir, vn + '.py')
@@ -159,7 +133,6 @@ else:
                     except Exception:
                         pass
 
-            # Build confirmation message showing names and min lengths
             parts = []
             for n in names:
                 if isinstance(n, tuple):

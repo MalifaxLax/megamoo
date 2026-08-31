@@ -10,7 +10,6 @@ verb that acts on them should not be the only place they can be changed.
 Type:    function
 """
 
-
 def _cfg(name, default):
     """Read one of this object's underscore-named config properties.
 
@@ -29,19 +28,13 @@ def _cfg(name, default):
     prop = this.properties.get(name)
     return default if prop is None else prop.value
 
-
 def command_topics(who, plevel=0, exclude=()):
     """The visible command names around *who*, sorted."""
     if who is None:
         return []
 
-    # Engine machinery, not player commands: hook verbs invoked by name via
-    # call_verb.  They cannot be marked hidden -- that also removes them from
-    # dispatch -- so help filters them here.
     internal = set(_cfg('_internal_verbs', []) or [])
     prefixes = tuple(_cfg('_internal_prefixes', []) or ())
-    # One verb implements every compass command, so deduping onto names[0]
-    # would show only 'n'.  List the long forms instead.
     direction_canon = _cfg('_direction_canon', 'n')
     direction_topics = list(_cfg('_direction_topics', []) or [])
 
@@ -58,9 +51,6 @@ def command_topics(who, plevel=0, exclude=()):
                 continue
             if vdef.auth and plevel < vdef.auth:
                 continue
-            # _resolved_verbs is keyed by every legal abbreviation, so dedupe
-            # on the canonical name; this also collapses aliases
-            # (@set/@val -> @set).
             names = vdef.names or [vname]
             canon = names[0]
             if (canon in internal
@@ -77,7 +67,6 @@ def command_topics(who, plevel=0, exclude=()):
             else:
                 out.append(canon)
     return sorted(out)
-
 
 _a = kwargs.pop('_pyargs', None)
 

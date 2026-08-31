@@ -37,18 +37,19 @@ else:
 
 pobj.msg(f"Start: {start} End: {end}")
 
-# Gaps in the number line are normal -- recycled objects, and the holes
-# left between prototype blocks -- so they are counted, not narrated.
-# A virgin world has 63 of them, and printing a line each made a third of
-# this command's output an error report about nothing being wrong.
 missing = 0
+
+_sr = (pobj.settings or {}).get('screenreader', False)
 
 for num in range(start, end + 1):
     try:
         obj = db.get_object(num)
         if obj.parent is not None and obj.parent >= 0:
-            label = f"#{obj.parent}:#{num}:"
-            pobj.msg(f"{label:<14}{obj.name}")
+            if _sr:
+                pobj.msg(f"#{num} {obj.name}, parent #{obj.parent}")
+            else:
+                label = f"#{obj.parent}:#{num}:"
+                pobj.msg(f"{label:<14}{obj.name}")
         else:
             pobj.msg(f"#{num} is a placeholder object,")
     except Exception:

@@ -1,9 +1,5 @@
 """
-esub on $string_utils.
-
-Ported from `moo.string_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -101,20 +97,12 @@ def _sub_token(text: str, letter: str, value: str) -> str:
     Returns:
         str: The text with every ``<sigil><letter>`` replaced.
     """
-    # A numeric slot also has to refuse a following digit, or `&1` would
-    # bite into `&10`.  (The caller sorts high-index-first as well; belt
-    # and braces, since only one of the two is obvious at a glance.)
     tail = r'(?![A-Za-z0-9])' if letter[-1].isdigit() else r'(?![A-Za-z])'
     for sigil in SUBST_SIGILS:
-        # A lambda for the replacement, not the string: `value` is a
-        # player-supplied name, and re.sub reads backslashes in a literal
-        # replacement as group references.
         text = re.sub(re.escape(sigil + letter) + tail, lambda _: value, text)
     return text
 
 import re
-
-
 
 def esub(text, sub=None, dob=None, iob=None, uob=None,
              svals=None, viewer=None):
@@ -176,41 +164,18 @@ def esub(text, sub=None, dob=None, iob=None, uob=None,
         if not text or not isinstance(text, str):
             return text
 
-        # --- Protect a doubled sigil, the way the colour codes already do ---
-        #
-        # A doubled sigil is how you write a literal one: color.py hides
-        # `&&` behind a placeholder before reading any code and restores a
-        # single `&` at the end.  Substitution never learned the same rule,
-        # and the token regex matches `&S` wherever it sits -- including on
-        # the second `&` of an escaped pair -- so `&&S` came out as `&`
-        # followed by a name.
-        #
-        # It matters wherever a verb puts a player's own words into a
-        # message: `act` doubles what you type precisely so that a stray
-        # `&S` stays text rather than naming somebody else inside a line
-        # attributed to you, and only half that escape was being honoured.
-        #
-        # Restored as `&&`, not `&`: colour processing runs after this and
-        # still has its own half of the escape to consume.  Undoubling here
-        # would hand it a live `&<196>` instead of a literal one.
         _ESC = '\x00SIG\x00'
         text = text.replace(SUBST_SIGILS[0] * 2, _ESC)
 
-        # --- Raw-string slots: %0 / %1 ... / %N (also $0 / $1 ... / $N) ---
-        # Each `sN` value (passed straight as a kwarg, e.g. s0="txt0") replaces
-        # the matching %N/$N token verbatim -- the kwarg keeps its `s` prefix,
-        # the token drops it (s0 -> %0).  Higher indices first so `%1` can't
-        # clobber `%10`.
         if svals:
             for _k in sorted(svals,
                              key=lambda n: int(n[1:]) if n[1:].isdigit() else 0,
                              reverse=True):
-                _idx = _k[1:]                 # 's3' -> '3'
+                _idx = _k[1:]
                 _rep = '' if svals[_k] is None else str(svals[_k])
                 for _g in SUBST_SIGILS:
                     text = text.replace(_g + _idx, _rep)
 
-        # --- Noun object (uob) tokens: %u / %U / $u / $U ---
         if uob is not None:
             noun = _getprop(uob, 'noun', '')
             cap_noun = noun[:1].upper() + noun[1:] if noun else ''
@@ -238,9 +203,7 @@ def esub(text, sub=None, dob=None, iob=None, uob=None,
             """
             return value.replace(SUBST_SIGILS[0], _ESC) if value else value
 
-        # --- Subject tokens: gender pronouns first, then %s / %S / $s / $S ---
         if sub is not None:
-            # Replace gender pronouns (%ps, %po, etc.) via regex
             text = RE_GENDER_PRONOUN.sub(
                 lambda m: call_verb(this, 'get_pronoun', m, source=sub), text
             )
@@ -249,68 +212,18 @@ def esub(text, sub=None, dob=None, iob=None, uob=None,
             text = _sub_token(text, 's', _protect(sname))
             text = _sub_token(text, 'S', _protect(scap))
 
-        # --- Direct object tokens: %d / %D / $d / $D ---
         if dob is not None:
             dname = _getprop(dob, 'name', '')
             dcap = call_verb(this, 'capitalise', dname)
             text = _sub_token(text, 'd', _protect(dname))
             text = _sub_token(text, 'D', _protect(dcap))
 
-        # --- Indirect object tokens: %i / %I / $i / $I ---
         if iob is not None:
             iname = _getprop(iob, 'name', '')
             icap = call_verb(this, 'capitalise', iname)
             text = _sub_token(text, 'i', _protect(iname))
             text = _sub_token(text, 'I', _protect(icap))
 
-        # --- Viewer-aware tokens and verb agreement -------------------
-        #
-        # These exist so one string serves both audiences.  Everything
-        # above renders the same text for everybody, which is why a verb
-        # has always had to write the line twice -- msg() saying "your
-        # ear" and msg_room() saying "his ear" -- with nothing checking
-        # that the two stay in step.
-        #
-        # Substitution already runs once per recipient (msg_room walks
-        # the room calling msg on each listener), so the only thing that
-        # was missing is knowing who is reading.  That is `viewer`.
-        #
-        # The family is `y` plus the same five cases the pronoun tokens
-        # use, so &ys sits beside &ps and nothing new has to be learned:
-        #
-        #        viewer is sub   otherwise
-        #   &ys  you             the name
-        #   &yo  you             him / her / them
-        #   &yp  your            his / her / their
-        #   &ya  yours           his / hers / theirs
-        #   &yr  yourself        himself / herself / themself
-        #   &v(smile)    agrees with sub
-        #   &vd(dangle)  agrees with dob
-        #
-        # &ys renders the *name* rather than "he" on purpose.  Subject
-        # position is where a line says who it is about, and "He smiles
-        # at Bramble" arriving cold has no antecedent; the other cases
-        # take pronouns because by then the name has been said.
-        #
-        # Capitalise by upper-casing the token's first letter, the rule
-        # the pronoun tokens already use: &Ys, &Yp, &Ps.
-        # An emit has three audiences, not two -- "You attack Bramble",
-        # "Malifax attacks you", "Malifax attacks Bramble" -- so the
-        # target needs the same treatment the subject gets.  &t is that
-        # family, keyed on dob:
-        #
-        #        viewer is dob   otherwise
-        #   &ts  you             the name
-        #   &to  you             the name
-        #   &tp  your            her / his / their
-        #   &ta  yours           hers / his / theirs
-        #   &tr  yourself        herself / himself / themself
-        #
-        # &ts and &to give the same text on purpose: "you" is caseless,
-        # and the third-person form is the name for the same reason &ys
-        # uses one -- "Malifax attacks her" arriving cold names nobody.
-        # Both are kept so the two families are learned once and an
-        # author never has to remember which of the five coincide.
         for _who, _prefix in ((sub, 'y'), (dob, 't')):
             if _who is None or not _has_family_token(text, _prefix):
                 continue
@@ -322,9 +235,6 @@ def esub(text, sub=None, dob=None, iob=None, uob=None,
             else:
                 _pm = _pronoun_map(_who)
                 _name = _getprop(_who, 'name', '')
-                # The subject reads as a pronoun in object position -- its
-                # name has just been said by &ys.  The target has not been
-                # named yet at that point, so it reads as a name.
                 _vals = {'s': _name,
                          'o': _pm['po'] if _prefix == 'y' else _name,
                          'p': _pm['pp'], 'a': _pm['pa'], 'r': _pm['pr']}
@@ -334,7 +244,6 @@ def esub(text, sub=None, dob=None, iob=None, uob=None,
                                   _protect(call_verb(this, 'capitalise', _v)))
                 text = _sub_token(text, _tok, _protect(_v))
 
-        # &vd() before &v(), or the shorter pattern eats the longer one.
         for _sigil in SUBST_SIGILS:
             for _name, _agrees_with in (('vd', dob), ('v', sub)):
                 _plural = call_verb(this, 'takes_plural_verb', _agrees_with, viewer)
@@ -344,7 +253,6 @@ def esub(text, sub=None, dob=None, iob=None, uob=None,
                     text)
 
         return text.replace(_ESC, SUBST_SIGILS[0] * 2)
-
 
 _a = kwargs.pop('_pyargs', None)
 

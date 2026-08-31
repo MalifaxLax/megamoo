@@ -1,11 +1,7 @@
 """
-invoke verb on #14 (BaseExit).
-
 Called when a player attempts to move through this exit. Checks if the
 exit is closed; if so, displays failure/ofailure messages. Otherwise
 calls the exit's gmove verb to perform the actual movement.
-
-Called programmatically: call_verb(exit, 'invoke')
 
 Note: This is the standard entry point for exit traversal. The go/n
 verbs call this after resolving the exit.

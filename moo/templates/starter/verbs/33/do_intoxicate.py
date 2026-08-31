@@ -1,17 +1,10 @@
 """
-do_intoxicate verb on #33 (effects_utils).
-
 Effect handler for the 'intoxicate' effect. Called by the _tick dispatcher
 each time the intoxication effect fires on a character.
 
 On the first tick, shows initial intoxication onset messages. Every tick
 shows a "world spins" message. On the final tick (remaining == 0), shows
 recovery messages.
-
-Context variables (injected by _tick):
-    pobj      - The affected character.
-    tick      - Current tick number (1-based).
-    remaining - Ticks remaining after this one.
 
 Hidden:  yes
 Type:    function

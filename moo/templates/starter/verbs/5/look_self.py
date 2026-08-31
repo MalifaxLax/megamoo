@@ -1,11 +1,8 @@
 """
-look_self verb on #5 (ICharacter).
-
 Displays the full appearance of an IC character to a viewer. Shows the
 character's description lines (from chargen), custom description, and
 items held in hands.
 
-Called programmatically: call_verb(char, 'look_self') or
     call_verb(char, 'look_self', args=viewer_obj)
 
 Arguments:
@@ -24,26 +21,20 @@ Hidden:  yes
 char = this
 viewer = args if args else pobj
 
-# 1. Chargen description lines
 desclist = (char.desclist or ['', '', '', ''])
 for line in desclist:
     if line:
         viewer.msg(line)
 
-# 2. Character description
 desc = char.description
 if desc:
     viewer.msg(desc)
 
-# 3. Held items
 mh = char.mh
 oh = char.oh
 mh_valid = mh and hasattr(mh, 'objnum')
 oh_valid = oh and hasattr(oh, 'objnum')
 
-# &Ps follows char.gender, so the verb has to as well: only "ambiguous"
-# -- which is also what an unset gender falls back to -- takes "they",
-# and "They is holding a shot glass." is what you get for not asking.
 hold = 'is' if char.gender in ('male', 'female', 'neutral') else 'are'
 
 if mh_valid and oh_valid and mh.objnum == oh.objnum:

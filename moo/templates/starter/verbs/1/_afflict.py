@@ -18,17 +18,11 @@ Aliases: _immobilize, _entangle, _imprison, _web, _bind, _unconscious, _sleep, _
 Hidden:  yes
 """
 
-# Read the injected kwarg into a NEW name -- reassigning `duration` itself would
-# make it verb-local, so `try: duration` would raise UnboundLocalError and clobber
-# the kwarg to 0.  See [[verb-kwarg-idiom-gotcha]].
 try:
     _dur = duration
 except NameError:
     _dur = int(args) if args else 0
 
-# Config: verb name -> the effect name $eu knows it by.  The dict and key
-# each affliction writes now live in its own do_<effect> handler on #33,
-# which is the only thing that needs to know them.
 _AFF = {
     '_immobilize':  'immobilize',
     '_entangle':    'entangle',
@@ -47,8 +41,4 @@ _AFF = {
 
 effect = _AFF.get(verb)
 if effect and _dur > 0:
-    # One tick a second, so `duration` still means seconds. trigger()
-    # stacks by itself: the same target, effect and interval adds to the
-    # remaining count rather than starting a second copy, which is what
-    # the old code meant by "stacks with existing".
     _effects.trigger(this, effect, int(_dur), 1)

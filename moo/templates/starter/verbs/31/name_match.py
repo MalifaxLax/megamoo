@@ -1,9 +1,5 @@
 """
-name_match on $match_utils.
-
-Ported from `moo.match_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -11,8 +7,6 @@ Type:    function
 _ARTICLES = frozenset({'the', 'a', 'an', 'some'})
 
 from moo.objects import MOOObject
-
-
 
 def name_match(obj: MOOObject, token: str) -> bool:
     """
@@ -57,10 +51,6 @@ def name_match(obj: MOOObject, token: str) -> bool:
         name_match(sword_obj, '')       # False (the only thing rejected)
     """
     tok = token.casefold()
-    # The empty string is the only token this rejects: min_prefix is 1
-    # whenever the token is one character or shorter, so `len(tok) <
-    # min_prefix` is only ever true for ''.  Everything else goes to the
-    # prefix comparisons below, one-character tokens included.
     min_prefix = 1 if len(tok) <= 1 else 2
 
     if len(tok) < min_prefix:
@@ -68,25 +58,21 @@ def name_match(obj: MOOObject, token: str) -> bool:
 
     obj_name = obj.name.casefold()
 
-    # Check each non-article word in the object's name
     for word in obj_name.split():
         if word in _ARTICLES:
             continue
         if word.startswith(tok):
             return True
 
-    # Check alias list (alternative names for the object)
     for alias in obj.aliases:
         if alias.casefold().startswith(tok):
             return True
 
-    # Check the 'noun' property (the core/atomic name, e.g. "sword")
     noun = obj.noun
     if noun and noun.casefold().startswith(tok):
         return True
 
     return False
-
 
 _a = kwargs.pop('_pyargs', None)
 

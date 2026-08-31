@@ -34,7 +34,6 @@ if not args:
     pobj.msg("Usage: @verbauth <object>.verb_name [= <auth_level>]")
     return
 
-# Split on = for set mode
 setting = False
 auth_val = None
 if prep == '=' and iobj:
@@ -66,7 +65,6 @@ if not target:
     pobj.msg(f"Object '{obj_part}' not found.")
     return
 
-# Find the verb
 found = None
 found_on = target
 for v in target.verbs:
@@ -91,23 +89,6 @@ if not found:
     return
 
 if setting:
-    # You cannot touch a verb gated above your own level.
-    #
-    # Not a containment boundary against gm3 -- gm3 can write arbitrary
-    # verb code, so anyone at that level can already do whatever any
-    # gm3-gated verb does, and no rule here changes that. What it stops is
-    # a gm3 *handing a higher-gated verb to everyone else*: lowering a
-    # gm5 verb to 0 is not using a power you have, it is granting one you
-    # do not, to the whole world.
-    #
-    # Only safe today because every shipped sensitive verb re-checks
-    # auth_level(pobj) in its own body, so the metadata is not the real
-    # gate. A world that writes a sensitive verb relying on the metadata
-    # alone -- which is the documented way to gate one -- would have had
-    # no protection at all.
-    #
-    # Raising is unrestricted: locking a verb further is not an escalation
-    # and a builder should not need a wizard to tighten something.
     mylevel = auth_level(pobj)
     if (found.auth or 0) > mylevel:
         pobj.msg(f"'{verb_name}' is restricted to auth {found.auth}, above "

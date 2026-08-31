@@ -6,7 +6,6 @@ The property must already exist on the object (locally or inherited); use
 @adprop to create a new one. A property that exists with the value None is
 fine — it is set as normal.
 
-
 Usage: @set <object>.<property> = <value>   set the value
        @set <object>.<property>             show the current value
 
@@ -33,22 +32,8 @@ if auth_level(pobj) < 3:
     pobj.msg("Do what?")
     return
 
-# Act as whoever typed this, not as the staff account that owns the verb.
-#
-# Without it every staff-owned command is a way to borrow staff's rights:
-# `_check_write` asks who the *running verb* acts as, so `@set` owned by
-# staff wrote anything, and `@set me.auth = ["gm5"]` promoted a builder to
-# god while `me.auth = ["gm5"]` inside a verb was refused.
-#
-# With it the ordinary ownership rules apply to what follows. A builder may
-# write what they own and the local copy of an inherited property on an
-# object they own -- their rooms, their objects, their own description --
-# and nothing else. `auth` is owned by #0 with 'rc' perms, so it refuses
-# itself, with no list of special names to keep up to date.
 set_task_perms(caller_perms())
 
-# With "= <value>" the object.property spec is the direct object and the value
-# is the indirect object. Without "=", the whole argument is the spec (read).
 if prep == '=':
     spec = (dobj or '').strip()
     val_str = (iobj or '').strip()
@@ -77,38 +62,21 @@ if not target:
     pobj.msg(f"Object '{obj_part}' not found.")
     return
 
-# The property must already exist (locally OR inherited). A structural check
-# means a property whose value is None still counts as existing.
 if not target.has_property(prop_name, local_only=False, database=db):
     pobj.msg(f"&<245>{prop_name}&n doesn't exist on &<245>#{target.objnum}&n.")
     return
 
-# No value supplied — read mode: show the current value and stop.
 if not val_str:
     if prop_name in target.properties:
-        cur = target.properties[prop_name].value   # raw local read (no perm gating)
+        cur = target.properties[prop_name].value
         origin = ""
     else:
-        cur = getattr(target, prop_name, None)      # inherited resolved value
+        cur = getattr(target, prop_name, None)
         origin = "  (inherited)"
-    # Display resolved: a scalar "#N" stores as a string but MEANS the object
-    # (it auto-resolves on normal attribute access), so show it resolved here
-    # too rather than leaking the raw storage form.
     cur = target._resolve_objref(cur)
     pobj.msg(f"&<245>#{target.objnum}:{target.name}&n.{prop_name} = {repr(cur).replace('&', '&&')}{origin}")
     return
 
-# A literal, evaluated as a literal. This used to be a real `eval()`, which
-# made a gm3 command arbitrary Python in the server's process --
-# `@set me.description = __import__('socket').gethostname()` worked -- and
-# so made the gm5 gate on @program and eval worth nothing.
-#
-# Resolve object references the same way verb source does: rewrite each bare
-# #N token to db.get_object(N) (and $name to a system-property lookup) before
-# evaluating the literal. preprocess_objrefs is string/comment-aware, so a #N
-# inside a quoted string is left alone. This makes `#N` mean "the object"
-# uniformly -- `@set x.p = #5` and `@set x.items = [#5, #29]` both resolve,
-# instead of falling back to a raw "#5" string.
 try:
     from moo.verbs import preprocess_objrefs
     processed = preprocess_objrefs(val_str)
@@ -120,32 +88,20 @@ try:
     value = eval_value_literal(processed, db)
 except Exception as e:
     if processed != val_str:
-        # The value contained #N / $name references but didn't evaluate --
-        # a bad object number or malformed literal. Surface it rather than
-        # silently storing broken text.
         pobj.msg(f"Could not resolve value {repr(val_str).replace('&', '&&')}: {e}")
         return
-    # No references: a bare word like `Champion` -- store it as a raw string.
     value = val_str
 
-# --- Capture undo state BEFORE writing. Snapshot the raw LOCAL value straight
-# from the property table (bypasses read-perm gating). When there is no local
-# value, the property is inherited: undo just drops the override @set creates,
-# restoring inheritance — so we don't need the inherited value for the undo.
 had_local = prop_name in target.properties
 old_local = target.properties[prop_name].value if had_local else None
-old_resolved = getattr(target, prop_name, None)  # prior resolved value, for the message
+old_resolved = getattr(target, prop_name, None)
 
-# Write via the method path (set_property), which creates a local override for
-# an inherited property and bypasses the per-property can_write gate that
-# attribute assignment enforces — this verb is already gated to gm3+.
 try:
     target.set_property(prop_name, value, database=db)
 except Exception as e:
     pobj.msg(f"Could not set '{prop_name}': {e}")
     return
 
-# Single-level, in-memory undo record on the acting GM.
 pobj._set_undo = {
     'obj': target.objnum,
     'prop': prop_name,

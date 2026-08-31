@@ -31,7 +31,6 @@ if not args:
     call_verb(loc, 'look_here', leader=False)
     return
 
-# Normalize preposition
 _prep = ''
 if prep:
     if smatch('into', prep, 2) or smatch('inside', prep, 2) or prep == 'in':
@@ -43,11 +42,9 @@ if prep:
     elif smatch('behind', prep, 3):
         _prep = 'behind'
 
-# Build search list: room contents + hands
 slist = list(loc.contents)
 slist += [x for x in [pobj.mh, pobj.oh] if x]
 
-# Match object
 is_staff = auth_level(pobj) >= 3
 if is_staff:
     obj = pmatch(dobj, pobj, slist)
@@ -55,7 +52,6 @@ else:
     obj = pmatch(dobj, pobj, slist)
 
 if not obj:
-    # Try directional look
     try:
         result = call_verb(loc, 'match_exit', argstr=dobj)
     except KeyError:
@@ -93,7 +89,6 @@ if not obj:
     pobj.msg(f"Look {_at} what?")
     return
 
-# Preposition look: look in/on/under/behind <object>
 if _prep:
     if obj.is_char:
         pobj.msg("Perv.")
@@ -108,27 +103,18 @@ if _prep:
         pobj.msg(f"You see nothing notable {_prep} {obj.name}.")
     return
 
-# Try object's look_ verb (rlook for staff, then look_)
-#
-# Nested, the way the room branch above already does it.  Flat, a staff
-# member's missing `rlook` raised straight past `look_` to the fallback --
-# and almost nothing but a room defines rlook, so staff never reached a
-# look_ hook on any object at all.  A container showed no contents and a
-# chair no occupants, for gm3+ only, which reads as one player being
-# unable to see things rather than as a dispatch bug.
 try:
     if is_staff:
         try:
             call_verb(obj, 'rlook')
             return
         except KeyError:
-            pass        # no builder view here; the ordinary hook still applies
+            pass
     call_verb(obj, 'look_')
     return
 except KeyError:
     pass
 
-# Fallback
 if obj == loc:
     call_verb(loc, 'look_here', leader=False)
 elif obj.is_char:
@@ -139,9 +125,6 @@ elif obj.is_char:
         pass
     pobj.msg("You see nothing special.")
 elif not (obj.invis or obj.hidden):
-    # The description alone, no name header.  It repeated the thing you
-    # had just typed at and named it as the database holds it rather than
-    # as the room reads, which is a builder's caption, not a look.
     desc = obj.description
     pobj.msg(desc if desc else "You see nothing special.")
 else:

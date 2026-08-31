@@ -1,9 +1,5 @@
 """
-bmatch on $match_utils.
-
-Ported from `moo.match_utils` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -13,8 +9,6 @@ from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
 from moo.database import Database
 
 from moo.objects import MOOObject
-
-
 
 def bmatch(inp: str, pobj: MOOObject, candidates: Sequence[MOOObject],
            db: Database = None) -> Optional[MOOObject]:
@@ -63,19 +57,15 @@ def bmatch(inp: str, pobj: MOOObject, candidates: Sequence[MOOObject],
 
     text = inp.strip()
 
-    # --- "my <X>" -- restrict to player's own inventory ---
     if text.casefold().startswith('my '):
         text = text[3:].strip()
         return call_verb(this, 'match', text, pobj.contents) if text else None
 
-    # --- Keywords / dbrefs / system constants ---
     obj = call_verb(this, 'omatch', text, pobj, db)
     if obj is not None:
         return obj
 
-    # --- Name-based matching against the candidate list ---
     return call_verb(this, 'match', text, candidates)
-
 
 _a = kwargs.pop('_pyargs', None)
 

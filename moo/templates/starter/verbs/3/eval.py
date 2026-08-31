@@ -23,7 +23,6 @@ verbs run as them, so `auth` (owned by #0, perms 'rc') refuses them -- but it
 cannot stop a verb that means harm, and pretending otherwise would be worse
 than saying this plainly.
 """
-# Eval command - evaluate Python expression (wizards only)
 if auth_level(pobj) < 3:
     pobj.msg("Do what?")
     return
@@ -46,10 +45,6 @@ else:
         else:
             player.msg("=> None")
     except PermissionError:
-        # The guard above should have caught this. It can still happen if
-        # an auth list was edited without sync_auth_flags(), leaving the
-        # level and the WIZARD flag disagreeing -- and the answer to "may
-        # I" is the same one a missing verb gets, not an engine message.
         pobj.msg("Do what?")
     except Exception as e:
         player.msg(f"Error: {e}")

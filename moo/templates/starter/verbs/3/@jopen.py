@@ -34,13 +34,11 @@ if not room or not room.is_room:
     pobj.msg("You must be in a room to create an exit.")
     return
 
-# Parse exit name from dobj
 name = dobj.strip() if dobj else args.strip().split()[0]
 if not name:
     pobj.msg("You must provide a name for the exit.")
     return
 
-# Parse destination if provided
 dest = None
 dest_str = iobj.strip() if iobj else ''
 if dest_str and dest_str.startswith('#') and dest_str[1:].isdigit():
@@ -55,25 +53,9 @@ if dest_str and dest_str.startswith('#') and dest_str[1:].isdigit():
 elif dest_str:
     pobj.msg("Please supply a valid destination ID (#N). Exit not linked.")
 
-# Create the exit via make_exit
 parent = db.get_object(19)
 new_exit = ou.make_exit(parent, db, pobj, noun=name, room=room, dest=dest)
 
-# /noadd -- an exit only something else can reach.
-#
-# make_exit does two things: it moves the exit into the room and it lists
-# the objnum in room.exits.  Both have to be undone, because either one on
-# its own still leaves the exit walkable by name.  room.exits is what
-# match_exit searches, and it resolves those numbers straight to objects
-# without ever looking at where they are -- an exit moved inside another
-# object went on answering to `go <name>` exactly as before.  And #13 go
-# falls back to matching room.contents when match_exit finds nothing, so
-# an exit merely dropped from the list is still reachable if it is lying
-# in the room.
-#
-# Out of both, the exit is reachable only from a property that names it:
-# <object>.behind_exit and its in_/on_/under_/through_ siblings.  gmove
-# only reads destination, so nowhere is a perfectly good place to be.
 if 'noadd' in switches:
     room.exits = [n for n in (room.exits or []) if n != new_exit.objnum]
     room._mark_modified()
@@ -86,12 +68,10 @@ if 'noadd' in switches:
 if dest:
     pobj.msg(f"Exit linked to: &<245>#{dest.objnum}:{dest.name}&n")
 
-    # Create return exit unless /noret switch is set
     if 'noret' not in switches:
         ret_exit = ou.make_exit(parent, db, pobj, noun=name,
                                 room=dest, dest=room)
 
-        # Cross-link the exits via rexit property
         new_exit.add_property('rexit', ret_exit.objnum, perms='rc')
         ret_exit.add_property('rexit', new_exit.objnum, perms='rc')
         new_exit._mark_modified()

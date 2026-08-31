@@ -20,9 +20,6 @@ if auth_level(pobj) < 3:
     pobj.msg("Do what?")
     return
 
-# Act as whoever typed this, not as the staff account that owns the verb.
-# See @set: without it a staff-owned command lends staff's rights to anyone
-# who can type it, and the ownership rules below never get a chance to apply.
 set_task_perms(caller_perms())
 
 spec = args.strip() if args else ''

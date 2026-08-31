@@ -1,11 +1,7 @@
 """
-lay_ verb on #23 (BaseFurniture).
-
 Makes a player lie down on this furniture. Checks seat capacity, removes
 the player from any previous furniture, sets position to 8 (lying on
 back), and adds the player to this furniture's sitters list.
-
-Called by the room-level lay verb: call_verb(furniture, 'lay_')
 
 Cleans stale sitters (characters no longer in the room) from the list.
 Uses lay/olay messages from the furniture or defaults.
@@ -19,17 +15,14 @@ item = this
 sitters = item.sitters or []
 seats = (item.seats or 1)
 
-# Already here?
 if pobj.objnum in sitters:
     pobj.msg("You're already lying there!")
     return True
 
-# Full?
 if len(sitters) >= seats:
     pobj.msg(f"There's no room for you on {item.name}.")
     return True
 
-# If sitting elsewhere, stand from current furniture first
 cur_table = pobj.table
 if cur_table:
     try:
@@ -46,11 +39,9 @@ if cur_table:
     except Exception:
         pass
 
-# Lie down (position 8 = lying on back)
 pobj.position = 8
 sitters.append(pobj.objnum)
 
-# Clean stale sitters
 if pobj.location:
     here = [obj.objnum for obj in pobj.location.contents]
     sitters = [s for s in sitters if s in here]
@@ -58,7 +49,6 @@ if pobj.location:
 item.sitters = sitters
 pobj.table = item.objnum
 
-# Messages
 lay_msg = (item.lay or 'You lie down on &d.')
 olay_msg = (item.olay or '&S lies down on &d.')
 pobj.msg(lay_msg, dob=item)

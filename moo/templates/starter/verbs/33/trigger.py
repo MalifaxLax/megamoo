@@ -1,9 +1,11 @@
 """
-trigger on $effects_utils.
+Schedules an effect and fires its handler once per tick.
 
-Ported from `moo.effects` by tools/port_to_verbs.py.  The function is carried
-verbatim rather than rewritten, so the behaviour is identical by
-construction; tools/equivalence.py checks that against the original.
+Dispatch is by name: the effect 'stun' calls do_stun on this object, so a
+handler's own name is the whole binding.  There is no table of names to
+fall out of step with, which is exactly what went wrong in #1:_td_rt.
+
+Ported verbatim from moo.moo_libs; tools/equivalence.py checks it.
 
 Type:    function
 """
@@ -59,7 +61,6 @@ def _ensure_ticker():
         return
     eu_obj = _get_eu_obj()
     handler = _server.ticker_handler
-    # Check if already subscribed to avoid duplicate registrations
     for sub in handler.all(eu_obj):
         if sub.get('id') == 'effect_dispatcher':
             return
@@ -89,17 +90,11 @@ def _get_eu_obj():
     eu_ref = sys_obj.eu
     if eu_ref is None:
         raise RuntimeError("No 'eu' property on #0")
-    # Handle different reference formats
     if hasattr(eu_ref, 'objnum'):
-        # Already a MOOObject
         return eu_ref
-    # String "#33" form
     if isinstance(eu_ref, str) and eu_ref.startswith('#'):
         return _db.get_object(int(eu_ref[1:]))
-    # Plain integer
     return _db.get_object(int(eu_ref))
-
-
 
 def trigger(pobj, name, ticks, interval, *args, **kwargs):
         """
@@ -134,7 +129,6 @@ def trigger(pobj, name, ticks, interval, *args, **kwargs):
         """
         eu_obj = this
 
-        # Read the current registry from the $eu object's fx_registry property
         registry = eu_obj.fx_registry or {}
         if not isinstance(registry, dict):
             registry = {}
@@ -142,27 +136,22 @@ def trigger(pobj, name, ticks, interval, *args, **kwargs):
         key = _effect_key(pobj.objnum, name, interval, args, kwargs)
 
         if key in registry:
-            # Stack: add ticks to the remaining count of the existing effect
             registry[key]['remaining'] += ticks
         else:
-            # New effect entry
             registry[key] = {
                 'objnum': pobj.objnum,
                 'name': name,
                 'remaining': ticks,
-                'tick': 0,          # number of times this effect has fired
+                'tick': 0,
                 'interval': interval,
                 'next_fire': time.time() + interval,
                 'args': list(args),
                 'kwargs': kwargs,
             }
 
-        # Write the updated registry back to the $eu object
         eu_obj.fx_registry = registry
 
-        # Ensure the 1-second dispatcher ticker is running
         _ensure_ticker()
-
 
 _a = kwargs.pop('_pyargs', None)
 

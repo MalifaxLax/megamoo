@@ -38,8 +38,6 @@ if not spec:
 candidates = list(pobj.location.contents) + list(pobj.contents)
 target = bmatch(spec, pobj, candidates, db)
 if target is None and spec.startswith('#') and spec[1:].isdigit():
-    # get_object raises for a number nobody holds, rather than
-    # returning None, so the report below never got reached.
     try:
         target = db.get_object(int(spec[1:]))
     except Exception:
@@ -48,8 +46,6 @@ if target is None:
     pobj.msg(f"'{spec}' not found.")
     return
 
-# search(isa=) matches everything that descends from the object *and* the
-# object itself, so drop it before counting anyone's children.
 family = [o for o in search(isa=target) if o.objnum != target.objnum]
 
 pobj.msg("")
@@ -57,14 +53,12 @@ if not family:
     pobj.msg(f"#{target.objnum}:{target.name} has no children.")
     return
 
-
 def parent_num(obj):
     """A parent is stored as a live object or a bare number; want the number."""
     p = obj.parent
     if not p:
         return 0
     return p if isinstance(p, int) else p.objnum
-
 
 by_parent = {}
 for obj in family:
@@ -86,8 +80,6 @@ pobj.msg("")
 shown = 0
 
 if 'all' in switches:
-    # Depth-first, indenting one level per generation.  The tree is the
-    # point of /all, so it is drawn rather than flattened.
     stack = [(obj, 1) for obj in reversed(direct)]
     while stack:
         if shown >= MAX_HITS:

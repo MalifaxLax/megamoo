@@ -1,8 +1,6 @@
 """
-exit_func verb on #20 (BaseContainer).
-
-Hook called when a player exits this container. Currently a stub --
-override on child objects to add custom exit behavior.
+Hook fired when something leaves this container.  A stub -- override it on a
+child to give leaving an effect.
 
 Hidden:  yes
 """

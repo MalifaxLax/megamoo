@@ -67,13 +67,11 @@ if len(alias.split()) > 1 or ',' in alias:
     pobj.msg("One alias at a time -- no spaces or commas.")
     return
 
-# Resolve object
 obj = bmatch(obj_ref, pobj, list(pobj.location.contents) + list(pobj.contents), db)
 if not obj:
     pobj.msg(f"Object '{obj_ref}' not found.")
     return
 
-# Find the verb locally, then walk the inheritance chain
 inherited_from = None
 matches = [v for v in obj.verbs if verb_name in v.names]
 if not matches:
@@ -108,11 +106,6 @@ v.names.remove(alias)
 if getattr(v, 'min_lengths', None):
     v.min_lengths.pop(alias, None)
 
-# Take the name out of the verb's file on disk, not merely out of the
-# database copy of its source: the loader compares the stored verb against
-# the file and refreshes from the file when they disagree, so a name left
-# in the file comes straight back.  File first, database second, abandon
-# on a write failure -- the order @program and @port already keep.
 from moo.verb_meta import render_verb_meta
 from moo.builtins import verb_file_path, write_verb_file
 
@@ -127,13 +120,13 @@ if rewritten != v.code:
     if path:
         err = write_verb_file(path, rewritten)
         if err:
-            v.names.insert(1, alias)       # nothing was changed
+            v.names.insert(1, alias)
             pobj.msg(f"Could not write {path}: {err}")
             pobj.msg("Alias not removed.")
             return
         persisted = True
     v.code = rewritten
-    v.compiled_code = None   # force recompile, as @program does
+    v.compiled_code = None
     v.compile()
 
 obj.invalidate_inheritance_cache()

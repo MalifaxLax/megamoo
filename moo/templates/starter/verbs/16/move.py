@@ -1,12 +1,8 @@
 """
-move verb on #16 (GoExit).
-
 Moves a player through this exit after checking closed state and lock
 restrictions. If the exit is closed, shows the failure message. If a
 locklist is defined and the player is not royal, either calls the lock
 function or shows the lockfail message.
-
-Called programmatically: call_verb(exit, 'move')
 
 Properties checked:
     closed   - Whether the exit is closed (blocks passage).
