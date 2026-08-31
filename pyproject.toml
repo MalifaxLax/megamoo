@@ -54,6 +54,10 @@ packages = ["moo", "moo.web"]
 # about a verb that has no file behind it.
 "moo" = [
     "templates/starter/world.db",
+    # The back catalogue of released-starter hashes, so a world created by
+    # any earlier version can still be told apart from what it shipped as.
+    # A delta chain: 35 KB for twenty releases, against 798 KB stored whole.
+    "templates/manifests/chain.json.gz",
     "templates/starter/verbs/ruff.toml",
     "templates/starter/verbs/verb_context.pyi",
     "templates/starter/verbs/*/*.py",

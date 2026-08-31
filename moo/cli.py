@@ -810,6 +810,94 @@ Examples:
         print(banner)
 
 
+def _upgrade_cmd(argv):
+    """Report what the starter has learned since a world was created.
+
+    Reads only.  A world belongs to its builder, so nothing here changes
+    one; what it can do is say which of its verbs are still exactly as
+    they shipped, and have since been fixed upstream.
+    """
+    import argparse
+    from . import upgrade as up
+
+    ap = argparse.ArgumentParser(
+        prog='megamoo upgrade',
+        description='Show what the current starter has that your world does '
+                    'not. Reads only; nothing is written.')
+    ap.add_argument('world', nargs='?', default='world.db',
+                    help='the world to inspect (default: world.db)')
+    ap.add_argument('--apply', action='store_true',
+                    help='actually apply the safe changes. Without this, '
+                         'nothing is written.')
+    a = ap.parse_args(argv)
+
+    if not os.path.exists(a.world):
+        print('No such world: %s' % a.world, file=sys.stderr)
+        return 1
+
+    # Before anything else, and whether or not --apply was given: if a
+    # server has this world open, that is what the user needs to know.
+    # Reporting a missing stamp first would bury it.
+    live = up.server_holding(a.world)
+    if live:
+        print('A server is running on this world -- pid %s, port %s.'
+              % (live.get('pid'), live.get('port')))
+        if a.apply:
+            print('Stop it first: two writers on one database lose changes '
+                  'silently.', file=sys.stderr)
+            return 1
+        print('Reporting only; --apply would be refused until it stops.')
+        print()
+
+    plan = up.plan(a.world)
+    for line in up.summarise(plan):
+        print(line)
+    if plan['error']:
+        return 1
+
+    has_conflict = any(v == up.CONFLICT for v, _, _ in plan['items'])
+    if has_conflict:
+        print()
+        print('Conflicts are verbs you changed that also changed upstream. '
+              'Nothing decides those but you, and nothing here will touch '
+              'them.')
+
+    if not a.apply:
+        actionable = sum(1 for v, _, _ in plan['items']
+                         if v in (up.UPDATE, up.ADD, up.REMOVABLE))
+        print()
+        if actionable:
+            print('Nothing was written. Re-run with --apply to make the %d '
+                  'safe change%s above.' % (actionable,
+                                            '' if actionable == 1 else 's'))
+        else:
+            print('Nothing was written.')
+        return 0
+
+    result = up.apply(a.world)
+    if result['error']:
+        print()
+        print(result['error'], file=sys.stderr)
+        return 1
+
+    print()
+    if result['backup']:
+        print('Backed up to %s' % os.path.basename(result['backup']))
+    kinds = {}
+    for verdict, _ in result['applied']:
+        kinds[verdict] = kinds.get(verdict, 0) + 1
+    for verdict in (up.UPDATE, up.ADD, up.REMOVABLE):
+        if kinds.get(verdict):
+            print('  %4d %s' % (kinds[verdict], verdict))
+    for key, why in result['skipped']:
+        print('  skipped %s -- %s' % (key, why))
+    if result['now_at']:
+        print('This world is now at %s.' % result['now_at'])
+    if has_conflict:
+        print('Your own changes were left exactly as they were.')
+    return 0
+
+
 def main():
     """
     Application entry point.
@@ -825,6 +913,9 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == 'init':
         from .init import main as init_main
         return init_main(sys.argv[2:])
+
+    if len(sys.argv) > 1 and sys.argv[1] == 'upgrade':
+        return _upgrade_cmd(sys.argv[2:])
 
     app = MegaMOO()
     return app.run()
