@@ -209,6 +209,41 @@ def world_template_version(db_path: str) -> Optional[str]:
         return row[0]
 
 
+IGNORE_PROP = 'upgrade_ignore'
+
+
+def _ignored(world_db: str):
+    """Keys this world has declined, from #0.upgrade_ignore.
+
+    A world that arrived at the starter's numbering from its own history --
+    rather than by being copied out of it -- shares a great deal and
+    deliberately differs elsewhere.  Shadowfall routes afflictions through
+    #1:_afflict instead of $eu's do_* handlers, and keeps do_wait on #5
+    rather than #3.  Those are not omissions to be repaired; offering them
+    at every upgrade forever would be noise, and taking them would be wrong.
+
+    Entries are the same keys the plan reports -- '33:do_stun', '#101',
+    '5:status' -- and an entry only ever suppresses an *addition*.  Nothing
+    here can stop a conflict being reported: declining something you do not
+    want is not the same as hiding a collision with something you do.
+    """
+    con = sqlite3.connect('file:%s?mode=ro' % world_db, uri=True)
+    try:
+        row = con.execute(
+            "select value from properties where objnum=0 and name=?",
+            (IGNORE_PROP,)).fetchone()
+    except sqlite3.DatabaseError:
+        return set()
+    finally:
+        con.close()
+    if not row:
+        return set()
+    try:
+        return set(json.loads(row[0]) or [])
+    except (ValueError, TypeError):
+        return set()
+
+
 def plan(world_db: str, starter_db: str = STARTER_WORLD,
          chain_path: str = MANIFEST_CHAIN) -> dict:
     """What an upgrade would do to *world_db*.  Reads only."""
@@ -326,6 +361,13 @@ def plan(world_db: str, starter_db: str = STARTER_WORLD,
                 result['items'].append((LOCAL, key, 'yours, dropped upstream'))
         elif in_b and not in_t and not in_n:
             result['items'].append((GONE, key, 'gone both sides'))
+
+    declined = _ignored(world_db)
+    if declined:
+        for kind in ('items', 'objects', 'properties'):
+            result[kind] = [(v, k, w) for v, k, w in result[kind]
+                            if not (v == ADD and k in declined)]
+        result['declined'] = len(declined)
 
     return result
 
