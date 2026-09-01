@@ -53,7 +53,31 @@ def next_keys(existing, needed):
     return out
 
 
-def stamp(db_path, check=False):
+def unstamped_starter_objects(db_path):
+    """Starter-derived objects in this world that have no key yet.
+
+    Stamping those would be a mistake that cannot be undone by anything.
+    They are supposed to receive the *starter's* keys, which is what an
+    upgrade copies across; giving them fresh random ones instead pairs them
+    with nothing forever, and the upgrade has no way to notice -- a property
+    absent from the manifest but present-and-different on both sides falls
+    through every branch of the classifier and is silently skipped.
+
+    A world stamped in the wrong order reports 142 objects to add and 277
+    verbs as locally changed, and never takes another upstream fix.
+    """
+    con = sqlite3.connect('file:%s?mode=ro' % db_path, uri=True)
+    have = {o for (o,) in con.execute(
+        'select objnum from properties where name=?', (PROP,))}
+    # Below the reserved line is the starter's territory; a world's own
+    # creations start at 201.
+    starterish = [o for (o,) in con.execute(
+        'select objnum from objects where objnum < 201')]
+    con.close()
+    return sorted(o for o in starterish if o not in have)
+
+
+def stamp(db_path, check=False, force=False):
     con = sqlite3.connect('file:%s?mode=ro' % db_path if check else db_path,
                           uri=check)
     rows = list(con.execute('select objnum,noun,parent from objects'))
@@ -87,7 +111,28 @@ def main():
     ap.add_argument('world', nargs='?', default=STARTER)
     ap.add_argument('--check', action='store_true',
                     help='report without writing')
+    ap.add_argument('--force', action='store_true',
+                    help='stamp anyway, even if starter objects are unkeyed. '
+                         'Almost certainly wrong; see the refusal message.')
     a = ap.parse_args()
+
+    if not a.check and a.world != STARTER and not a.force:
+        pending = unstamped_starter_objects(a.world)
+        if pending:
+            print('Refusing: %d objects below #201 have no key yet, including '
+                  '#%s.' % (len(pending), ', #'.join(str(o)
+                                                     for o in pending[:4])),
+                  file=sys.stderr)
+            print('', file=sys.stderr)
+            print('Those are meant to receive the starter\'s keys, which '
+                  '`megamoo upgrade --apply` copies across. Stamping them '
+                  'with fresh ones instead pairs this world with the starter '
+                  'on nothing, permanently, and no later upgrade can tell.',
+                  file=sys.stderr)
+            print('', file=sys.stderr)
+            print('Upgrade first, then run this to key the objects you made '
+                  'yourself.', file=sys.stderr)
+            return 1
 
     r = stamp(a.world, check=a.check)
     if a.check:

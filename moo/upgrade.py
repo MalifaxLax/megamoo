@@ -104,6 +104,18 @@ def _read_objects(db_path: str) -> Dict[str, dict]:
     return out
 
 
+def _comparable(objects: Dict[str, dict]) -> Dict[str, dict]:
+    """Just what an object *is*, for comparison.
+
+    Never the key and never the number.  Both identify the object rather
+    than describe it, and including either makes an object differ from
+    itself -- the key because a manifest predating it has none, the number
+    because a renumbered object has a new one.
+    """
+    return {num: {'parent': rec.get('parent'), 'noun': rec.get('noun')}
+            for num, rec in objects.items()}
+
+
 def _by_key_parents(objects: Dict[str, dict]) -> Dict[str, dict]:
     """Re-express each object's parent as the parent's key, not its number.
 
@@ -270,8 +282,9 @@ def plan(world_db: str, starter_db: str = STARTER_WORLD,
                 'still be carried across by hand.'
                 % (born, len(renamed), ', #'.join(renamed[:4])))
             return result
-        result['objects'] = _classify(base['objects'], world_objects,
-                                      new_objects)
+        result['objects'] = _classify(_comparable(base['objects']),
+                                      _comparable(world_objects),
+                                      _comparable(new_objects))
 
     def _tr(keyed_map, m=None):
         """Starter numbering -> this world's, for `N:name` keys."""
