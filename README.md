@@ -253,6 +253,29 @@ If you want a world where players write code, that needs a real sandbox —
 a separate piece of work, and not something the current permission levels
 provide.
 
+## Upgrading a world you already built
+
+`megamoo init` copies the starter out and the world is yours from that
+moment — the engine keeps no copy to merge against. The other side of that
+bargain used to be that fixes to the starter never reached a world that
+already existed.
+
+```bash
+megamoo upgrade world.db          # reports; writes nothing
+megamoo upgrade world.db --apply  # brings the safe changes across
+```
+
+It compares your world against the version it was created from and against
+the current starter, and sorts every verb, object and property: untouched
+here and changed upstream is safe to take; changed by you is yours and is
+left alone; changed by both is a conflict, reported and untouched. It backs
+the world up first and refuses while a server has it open.
+
+Every object carries an opaque identity from creation, so pairing survives
+renumbering and renaming. Worlds created before 0.10.0-beta23 pair by
+object number instead — which works until something renumbers, and is
+refused rather than guessed at when it does.
+
 ## Accessibility
 
 MegaMOO is developed by a quadriplegic (C1–C2) programmer using a head-pointer input device at about 30 words per minute, in collaboration with AI pair-programming tools. That vantage point shapes the engine:

@@ -30,6 +30,8 @@ import sqlite3
 import subprocess
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+STARTER = os.path.join(os.path.dirname(HERE), 'moo', 'templates', 'starter',
+                       'world.db')
 ENGINE = os.path.dirname(HERE)
 MANIFEST_DIR = os.path.join(ENGINE, 'moo', 'templates', 'manifests')
 
@@ -141,7 +143,7 @@ def _git(*args):
                           capture_output=True)
 
 
-def from_all_tags():
+def from_all_tags(pending=None):
     """One manifest per released tag, so worlds already in the field are
     upgradable rather than only worlds created from here on."""
     tags = _git('tag', '-l', 'v0.10.0-beta*').stdout.decode().split()
@@ -175,6 +177,16 @@ def from_all_tags():
               % (version, c['verbs'], c['objects'], c['properties']))
         written += 1
 
+    # The release being cut has no tag yet -- its world.db is the working
+    # tree's.  Without this the chain always trails the release by one, and
+    # a world created from the new version has no manifest to pair against.
+    if pending:
+        collected.append((pending, manifest_for(STARTER, pending)))
+        c = collected[-1][1]['counts']
+        print('  %-22s %3d verbs %3d objects %4d props  (working tree)'
+              % (pending, c['verbs'], c['objects'], c['properties']))
+        written += 1
+
     chain = build_chain(collected)
     out = os.path.join(MANIFEST_DIR, 'chain.json.gz')
     blob = json.dumps(chain, separators=(',', ':'), sort_keys=True).encode()
@@ -201,10 +213,13 @@ def main():
     ap.add_argument('version', nargs='?')
     ap.add_argument('-o', '--output')
     ap.add_argument('--all-tags', action='store_true')
+    ap.add_argument('--pending', metavar='VERSION',
+                    help='append the working tree\'s starter as VERSION, for '
+                         'the release being cut before its tag exists')
     a = ap.parse_args()
 
     if a.all_tags:
-        n = from_all_tags()
+        n = from_all_tags(pending=a.pending)
         return 0
 
     if not a.world or not a.version:

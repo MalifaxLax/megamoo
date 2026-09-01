@@ -91,6 +91,50 @@ is <code>pip install --upgrade megamoo</code> and nothing you wrote is
 touched.
 </p>
 
+<h3 id="upgrade">Taking a fix that landed after you started</h3>
+
+<p>
+The other side of that bargain used to be that improvements to the starter
+never reached a world already built from it. A verb fixed upstream stayed
+broken in your game, forever, because nothing could tell a verb you had
+edited from one you had simply never touched.
+</p>
+
+<p>
+<code>megamoo upgrade</code> answers that. It compares your world against
+the version it was created from and against the current starter, and sorts
+every verb, object and property into what it can safely bring across and
+what is yours:
+</p>
+
+<div class="term"><code>megamoo upgrade world.db
+
+<span class="o">World born from 0.10.0-beta21.</span>
+
+<span class="o">   277 can be updated -- untouched here, changed upstream</span>
+<span class="o">     1 can be added -- new upstream</span>
+<span class="o">     1 dropped upstream, untouched here</span>
+
+<span class="o">Nothing was written. Re-run with --apply to make the 279 safe changes above.</span></code></div>
+
+<p>
+It writes nothing without <code>--apply</code>, backs the world up before
+it does, and refuses outright while a server has the world open. Anything
+you changed that also changed upstream is reported as a conflict and left
+exactly as you wrote it — an upgrade that overwrote your work would have
+taken your world away from you, which is the one thing it must not do.
+</p>
+
+<div class="note">
+    <span class="label">Objects know who they are</span>
+    <p>Every object carries an opaque identity from the moment it is
+       created, so pairing survives both renumbering and renaming: rename
+       a prototype and its fixes still reach it, and the rename is
+       reported as yours. Worlds made before this pair by object number
+       instead, which works until something renumbers and is refused
+       rather than guessed at when it does.</p>
+</div>
+
 <div class="note">
     <span class="label">Saying something before you take a player</span>
     <p>Drop a <code>newaccount_screen.txt</code> beside
