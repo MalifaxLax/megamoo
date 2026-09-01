@@ -104,6 +104,22 @@ def _read_objects(db_path: str) -> Dict[str, dict]:
     return out
 
 
+def _by_key_parents(objects: Dict[str, dict]) -> Dict[str, dict]:
+    """Re-express each object's parent as the parent's key, not its number.
+
+    Otherwise a world that renumbered a prototype reports every child of it
+    as locally changed -- the child is identical, and only the number it
+    names its parent by has moved.
+    """
+    keys = {num: r['key'] for num, r in objects.items() if 'key' in r}
+    out = {}
+    for num, rec in objects.items():
+        r = dict(rec)
+        r['parent'] = keys.get(str(rec.get('parent')), rec.get('parent'))
+        out[num] = r
+    return out
+
+
 def _rekey(objects: Dict[str, dict]) -> Dict[str, dict]:
     """Re-index objects by template_key where they have one.
 
@@ -116,7 +132,10 @@ def _rekey(objects: Dict[str, dict]) -> Dict[str, dict]:
     """
     out = {}
     for num, rec in objects.items():
-        out[rec['key'] if 'key' in rec else '#' + num] = dict(rec, objnum=num)
+        # Only what identifies the object, never the number: including the
+        # number makes every renumbered object differ from itself.
+        out[rec['key'] if 'key' in rec else '#' + num] = {
+            'parent': rec.get('parent'), 'noun': rec.get('noun')}
     return out
 
 
@@ -183,8 +202,8 @@ def plan(world_db: str, starter_db: str = STARTER_WORLD,
     """What an upgrade would do to *world_db*.  Reads only."""
     born = world_template_version(world_db)
     chain = load_chain(chain_path)
-    result = {'world': world_db, 'born': born, 'items': [],
-              'objects': [], 'properties': [], 'error': None}
+    result = {'world': world_db, 'born': born, 'items': [], 'objects': [],
+              'properties': [], 'error': None, 'paired_by': None}
 
     if chain is None:
         result['error'] = 'no manifest chain shipped with this engine'
@@ -202,34 +221,75 @@ def plan(world_db: str, starter_db: str = STARTER_WORLD,
 
     hl = chain['hash_len']
     new_objects = _read_objects(starter_db)
+    world_objects = _read_objects(world_db)
 
-    # An object number that now holds a different object is not an update,
-    # it is a different object.  The starter was renumbered once, at b17,
-    # and 75 numbers changed hands; a world from before that cannot be
-    # reconciled by number alone, and pretending otherwise would rewrite
-    # its rooms into somebody else's prototypes.  One release did this and
-    # another might, so the test is for the condition rather than for b17.
-    renamed = sorted(
-        (k for k in set(base['objects']) & set(new_objects)
-         if base['objects'][k]['noun'] != new_objects[k]['noun']),
-        key=int)
-    if renamed:
-        result['error'] = (
-            'object numbers were reassigned between %s and the current '
-            'starter -- %d of them, including #%s. A world from before that '
-            'cannot be upgraded by number: those numbers hold different '
-            'objects now. Verb files can still be carried across by hand.'
-            % (born, len(renamed), ', #'.join(renamed[:4])))
-        return result
+    # Pair on identity where every side has it.  template_key is assigned at
+    # creation and changed by nothing, so it is the only spelling of "these
+    # are the same object" that survives both a renumber and a rename.
+    xlate = {}
+    base_xlate = {}
+    if keyed(base['objects']) and keyed(world_objects) and keyed(new_objects):
+        result['paired_by'] = 'identity'
+        world_by_key = {r['key']: num for num, r in world_objects.items()
+                        if 'key' in r}
+        # Both the starter and the manifest speak the starter's numbering;
+        # only the world speaks its own.  So both get translated into it,
+        # not just the starter -- translating one and not the other reads
+        # every renumbered object's verbs as deleted here and added there.
+        for num, rec in new_objects.items():
+            here = world_by_key.get(rec.get('key'))
+            if here is not None and here != num:
+                xlate[num] = here
+        for num, rec in base['objects'].items():
+            here = world_by_key.get(rec.get('key'))
+            if here is not None and here != num:
+                base_xlate[num] = here
+        result['objects'] = _classify(
+            _rekey(_by_key_parents(base['objects'])),
+            _rekey(_by_key_parents(world_objects)),
+            _rekey(_by_key_parents(new_objects)))
+    else:
+        # No keys on one side or another -- a world older than the stamp.
+        # Fall back to the number, which holds only while nothing has been
+        # renumbered.  An object number that now carries a different object
+        # is not an update, it is a different object: the starter was
+        # renumbered at b17 and 75 numbers changed hands, and reconciling
+        # such a world by number would rewrite its rooms into unrelated
+        # prototypes.  The test is for the condition, not for b17.
+        result['paired_by'] = 'number'
+        renamed = sorted(
+            (k for k in set(base['objects']) & set(new_objects)
+             if base['objects'][k]['noun'] != new_objects[k]['noun']),
+            key=int)
+        if renamed:
+            result['error'] = (
+                'object numbers were reassigned between %s and the current '
+                'starter -- %d of them, including #%s. This world predates '
+                'template_key, so there is nothing to pair on but the number, '
+                'and those numbers hold different objects now. Verb files can '
+                'still be carried across by hand.'
+                % (born, len(renamed), ', #'.join(renamed[:4])))
+            return result
+        result['objects'] = _classify(base['objects'], world_objects,
+                                      new_objects)
 
-    result['objects'] = _classify(base['objects'], _read_objects(world_db),
-                                  new_objects)
-    result['properties'] = _classify(base['properties'],
+    def _tr(keyed_map, m=None):
+        """Starter numbering -> this world's, for `N:name` keys."""
+        m = xlate if m is None else m
+        if not m:
+            return keyed_map
+        out = {}
+        for k, v in keyed_map.items():
+            num, _, rest = k.partition(':')
+            out['%s:%s' % (m.get(num, num), rest)] = v
+        return out
+
+    result['properties'] = _classify(_tr(base['properties'], base_xlate),
                                      _read_props(world_db, hl),
-                                     _read_props(starter_db, hl))
+                                     _tr(_read_props(starter_db, hl)))
     theirs = _read_verbs(world_db, hl)
-    new = _read_verbs(starter_db, hl)
-    b = base['verbs']
+    new = _tr(_read_verbs(starter_db, hl))
+    b = _tr(base['verbs'], base_xlate)
 
     for key in sorted(set(b) | set(theirs) | set(new)):
         in_b, in_t, in_n = key in b, key in theirs, key in new
