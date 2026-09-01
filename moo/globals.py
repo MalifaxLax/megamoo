@@ -422,7 +422,7 @@ DEFAULT_AUTORELOAD_INTERVAL = 2.0
 DEFAULT_SERVER_NAME = 'MegaMOO Server'
 
 # Server version (imported from __init__.py)
-SERVER_VERSION = '0.10.0-beta22'
+SERVER_VERSION = '0.10.0-beta23'
 
 # ---------------------------------------------------------------------------
 #   Object identity
